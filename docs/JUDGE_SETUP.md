@@ -23,7 +23,7 @@ python3.13 -m venv .venv
 .venv/bin/python -m pip check
 ```
 
-The declared frontend tool versions are pinned and tool-checked, although no frontend dependency lockfile exists yet (NI-002 installs/pins those): with Node 24 and its bundled corepack on PATH, `corepack pnpm --version` must report `12.16.1` from the `packageManager` pin in [package.json](../package.json); `.node-version` declares the Node 24 LTS family. See [DEPENDENCIES.md](DEPENDENCIES.md) for verified versions, the hex-digest note and platform caveats.
+The declared frontend tool versions are pinned and tool-checked: with Node 24 and its bundled corepack on PATH, `corepack pnpm --version` must report `12.16.1` from the `packageManager` pin in [package.json](../package.json); `.node-version` declares the Node 24 LTS family. The web skeleton boots: `pnpm install --frozen-lockfile` then `pnpm --filter web dev` (or `build` + `start`) serves apps/web on :3000 where `/health` must return 200 JSON; without the root `.env` it returns a readable 503. See [DEPENDENCIES.md](DEPENDENCIES.md) for verified versions, the hex-digest note and platform caveats. The API runtime, migrations and Compose services below remain unimplemented.
 
 These commands install packages only. They require package-index access or an independently prepared matching wheelhouse. They do not start the application, create users, run migrations or access a blockchain provider. Windows uses the corresponding .venv\Scripts\python.exe path and remains untested here. [Dependency policy and actual checks](DEPENDENCIES.md) specifies supported/tested platforms and version-update rules.
 
@@ -33,7 +33,7 @@ The current repository contains documentation, dependency manifests and visual m
 
 | Requirement | Deliverable / responsible tasks | Verification required |
 | --- | --- | --- |
-| Frontend runtime | package.json, pinned Node/pnpm and pnpm-lock.yaml; NI-001/NI-002 | Frozen install and production build from a clean clone |
+| Frontend runtime | package.json, pinned Node/pnpm and pnpm-lock.yaml; NI-001/NI-002 web part **done**: skeleton boots, frozen install/build verified | Frozen install and production build from a clean clone pass for the skeleton; real public/workspace pages build in their own tasks |
 | Python application | Actual near_api source, pyproject.toml/uv.lock and synchronized root requirements.txt; NI-002 | Dependency hashes match the lock; package imports and health endpoint work |
 | Database | PostgreSQL service/roles and committed Alembic migrations; NI-003 | Empty database migrates with documented commands and correct runtime permissions |
 | Authentication | Documented local or development Supabase Auth setup and callback/cookie config; NI-016–NI-020 | A new judge can create/use isolated credentials; no production service-role secret or disabled authorization shortcut |

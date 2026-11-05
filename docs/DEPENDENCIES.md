@@ -30,6 +30,21 @@ Workspace membership (`pnpm-workspace.yaml`) lists `apps/web` and `packages/*` p
 
 Contributor runtime note (macOS setup machine): Homebrew's `node@24` is keg-only, so the pre-existing `/usr/local/bin/node` (21.7.1) still shadows it on PATH. Activate the declared runtime per your version manager (`.node-version` works with fnm/nvm/asdf) or prefix `PATH` with `/opt/homebrew/opt/node@24/bin` as the docs/JUDGE_SETUP preflight does. Linux/Windows runtime execution remains a release check.
 
+## Frontend dependencies (NI-002 web skeleton)
+
+Added 5 November 2026 for the `apps/web` runtime skeleton. [pnpm-lock.yaml](../pnpm-lock.yaml) is the exact resolved source (install with `--frozen-lockfile`); package.json declares direct dependencies. Versions were taken from the npm registry on 2026-11-05, not memory. TypeScript uses the mature 5.x line (5.9.3) instead of the new 7.x native-compiler line to stay on the pairing the selected Next release documents; moving to TS 7 is a deliberate later upgrade, not a silent bump.
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| [next](https://www.npmjs.com/package/next/v/16.4.5) | 16.4.5 | App Router runtime/build; engines `node >=20.9.0` |
+| [react](https://www.npmjs.com/package/react/v/19.3.1) / [react-dom](https://www.npmjs.com/package/react-dom/v/19.3.1) | 19.3.1 | UI runtime; satisfies next 16 peer range |
+| [@next/env](https://www.npmjs.com/package/@next/env/v/16.4.5) | 16.4.5 | Explicit loading of the root .env for native development |
+| [zod](https://www.npmjs.com/package/zod/v/4.6.7) | 4.6.7 | Environment/contract validation |
+| [typescript](https://www.npmjs.com/package/typescript/v/5.9.3) | 5.9.3 | Strict typecheck (latest 5.x) |
+| @types/node, @types/react, @types/react-dom | ^24 / ^19 | Type declarations |
+
+ESLint wiring belongs to NI-005. ECharts, Tiptap, TanStack Query, Tailwind and shadcn/ui arrive with their owning tasks (NI-006/NI-009/NI-033/NI-038); do not add them to the skeleton speculatively. Verified: clean-directory `pnpm install --frozen-lockfile` against the committed lockfile, `tsc --noEmit`, `next build`, production `next start` and dev-server boot with `/health` 200; with the root .env removed, `/health` returns 503 with a readable message naming the missing required variables. The API skeleton part of NI-002 (pyproject.toml/uv.lock) is handed off to role B and is not implemented yet.
+
 ## Verified direct packages
 
 Versions came from the official PyPI index, not remembered version numbers. License strings below are extracted from installed distribution metadata and linked to the matching primary package release; binary distributions may include additional third-party notices. This records a dependency review, not a legal opinion or a guarantee that every bundled license has the same identifier.
