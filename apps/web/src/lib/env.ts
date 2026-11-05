@@ -42,7 +42,12 @@ function findRepoRoot(): string {
   return process.cwd();
 }
 
-function ensureRootEnvLoaded(): void {
+/**
+ * Idempotently loads the root .env into process.env (explicit loading; a
+ * variable already present wins over the file). Shared with the auth config
+ * contract so every server entry point sees the same values.
+ */
+export function ensureRootEnvLoaded(): void {
   if (envLoaded) {
     return;
   }
