@@ -599,7 +599,18 @@ Specification: [DATA_PIPELINE.md](DATA_PIPELINE.md).
 - **Priority:** P0
 - **Dependencies:** NI-001
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** BLOCKED
+- **Claimed by:** Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b
+- **Execution role:** B
+- **Started at:** 2026-11-06T02:14:00+03:00
+- **Branch/worktree:** feat/ni-026-provider-capabilities; D:/хахатон/near-intelligence
+- **Authorization:** Participant B explicitly authorized role-B implementation and private-repository code/tests/config/docs publication on 6 November 2026. Raw historical archives remain excluded.
+- **Dependency verification:** main cfdd914 contains NI-001 DONE with tool/dependency evidence and NI-002 runtime/lock files. Clean checkout verified; no competing NI-026 claim or open PR found at start.
+- **Scope:** Validate source capability records and fail-closed probe controls, refresh documentation/rights evidence, and perform isolated Windows Python compatibility verification. Provider credentials, approved quotas/budgets and the historical input archive are absent. Unresolved operational gates retain their OQ IDs.
+- **Result:** Immutable capability registry for ten sources and a single-use finalized-header probe with disabled defaults, evidence/approval/stop gates, byte caps, no redirect/retry and sanitized output. No provider request, SQL, paid operation, collector or historical import was run. See [verification](verification/ni-026/README.md).
+- **Verification (6 November 2026):** CPython 3.13.15/Windows 11, uv 0.12.13; frozen hash-checked binary installation and dependency check pass for 48 packages; offline lock check and generated-export parity pass; 14 imports and synthetic OLS/linear algebra/PNG plus missing-config `/health` 503 pass. Eleven capability/guard tests pass with mock transports; `git diff --check` passes. No real-data result is claimed.
+- **Blocker:** OQ-03 prevents operational probes/refresh: operator-approved endpoint/account, quota, no-cost request cap and usage/redistribution evidence are absent. OQ-01/OQ-08/OQ-10/OQ-11 retain the per-source attribution/history limitations. Historical files and hashes must come from an authorized archive-owner handoff, outside GitHub. Until evidence and a bounded approved probe exist this task is not DONE; downstream NI-027/NI-030 remain gated.
+- **Reviewer:** ILYUTKICK (role A), pending on PR #14; narrow source changes only, no ignore-rule exception requested.
 
 **Description:** Close operational data feasibility beyond the documentation-only source inspection.
 

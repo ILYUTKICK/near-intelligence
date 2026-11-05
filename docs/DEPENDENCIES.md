@@ -100,7 +100,7 @@ python3.13 -m venv .venv
 .venv/bin/python -m pip check
 ```
 
-On Windows use the installed Python3.13 launcher to create the environment and .venv\Scripts\python.exe for pip; Windows execution is not verified by this baseline. On macOS/Linux python3 may be used if its actual version is 3.13. Do not use sudo or modify system packages. No provider credentials or data collection are needed to install dependencies.
+On Windows use the installed Python3.13 launcher to create the environment and .venv\Scripts\python.exe for pip; see the 6 November Windows verification below. On macOS/Linux python3 may be used if its actual version is 3.13. Do not use sudo or modify system packages. No provider credentials or data collection are needed to install dependencies.
 
 Hash-checking installs fail if an unpinned/unhashed dependency is introduced. Binary-only installation fails clearly on an unsupported platform instead of silently compiling a scientific stack. See [pip secure installs](https://pip.pypa.io/en/stable/topics/secure-installs/).
 
@@ -139,3 +139,36 @@ Verified after the transition: fresh macOS ARM64 CPython 3.13.3 venv install fro
 - Node was installed locally via Homebrew (`node@24` keg-only 24.22.2) to verify the declared runtime; the pre-existing system Node 21.7.1 is EOL and is not declared. Linux/Windows execution of the toolchain remains unverified.
 
 See [judge setup](JUDGE_SETUP.md) for the distinction between a ready dependency environment and a deployable release.
+
+### 6 November 2026 — independent role-B Windows verification
+
+BkycnocTbI / Codex session 01a1a2c9-f42d-7422-8e3e-755c9e33551b checked
+main cfdd914 on Windows 11 (10.0.26200), CPython 3.13.15 x86_64 and uv 0.12.13.
+NI-001 was already DONE; this verification does not replace its owner or reopen
+its completed claim. No dependency version or lock was changed.
+
+- Two fresh isolated environments installed all 48 packages from root
+  requirements.txt with `uv pip install --require-hashes --only-binary :all:`;
+  `uv pip check` passed for the repository API environment.
+- `uv lock --check --offline --project apps/api` passed. A fresh frozen export
+  matched every requirement/version/hash line; only the generated command-path
+  comment differs when the output filename changes.
+- All 14 direct imports passed. Synthetic OLS on `y = 2 + 3*x` recovered the
+  known coefficients (`rtol=1e-8`, `atol=1e-10`); SciPy linear solve and pandas
+  sum checks passed, and Matplotlib Agg wrote a local PNG. These are compatibility
+  fixtures, not NEAR coefficients or research findings.
+- API TestClient returned the expected 503 naming APP_ENV without configuration.
+  It emits a Starlette deprecation warning for httpx; the current pinned pair
+  works. A future transport update must preserve tested locks rather than adding
+  another dependency just to suppress this warning.
+- Cold scientific imports exceeded initial short 25/45-second diagnostic limits.
+  The complete smoke passed with a 180-second limit in a separate ASCII-path
+  environment. This does not establish that the path caused the delay. No
+  quantitative compatibility fix is justified by the successful calculation.
+
+Baseline SHA-256: requirements.txt
+`2d47bc97fdadd85bd7a9540a725f346050646d37e96f305083533357279d253f`;
+apps/api/uv.lock
+`60a84ff5af9a8a11f05955efb66467f345bee5fafd6d9b490d26f6212fcf3bba`.
+Windows Docker, provider auth and production deployment remain unverified;
+the source archive is absent and no collection was started.

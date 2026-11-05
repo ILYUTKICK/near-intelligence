@@ -2,6 +2,13 @@
 
 Review date: **5 November 2026**. Method: inspected existing saved inputs/manifests/scripts and browsed official provider documentation/source code. No new bulk collection, authenticated API call, cloud query or paid job was executed. A documentation page being reachable does not establish our account's entitlement, a live endpoint's SLA, full historical coverage or commercial redistribution rights. Source enablement requires NI-026 and OQ-01/OQ-03 gates.
 
+**6 November 2026 role-B verification:** the fresh Windows checkout has no raw
+historical archive. The saved-evidence claims below remain attributed to the
+original 5 November inspection. Current documentation checks, executable disabled
+capability records, probe guards and operational blockers are recorded in
+[NI-026 verification](verification/ni-026/README.md). No source is operationally
+enabled and no real probe was executed in this follow-up.
+
 Status vocabulary: **saved evidence** = local historical response inspected; **documented** = official current docs/source inspected; **probe pending** = no new operational API smoke test; **restricted** = requires access/budget/license review. These dimensions are independent.
 
 | ID | Provider / capability | Access, limits and actual coverage | Update / reliability / license decision |
