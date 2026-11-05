@@ -1,0 +1,5 @@
+# Normalize new project text, but preserve evidence and visual artifacts byte-for-byte.
+* text=auto eol=lf
+/research/** -text -whitespace
+/product-plan/** -text -whitespace
+*.png binary

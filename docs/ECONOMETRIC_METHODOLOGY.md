@@ -1,0 +1,44 @@
+# Econometric methodology
+
+Research protocol for implementation, not a report of executed regressions. [Thesis](INVESTMENT_THESIS.md), [metrics](METRIC_CATALOG.md), [reproducibility](REPRODUCIBILITY.md). The target question is observational association and sustainable economic capture; causal identification is not established.
+
+## Data readiness before any fit
+
+Preferred dependent variable: independently reconciled daily `protocol_revenue_usd` under consistent entity scope and recognition basis. Explanatory activity: comparable daily `provider_intents_volume_usd` with lineage/definition fixed. Existing saved observations do not establish the preferred dependent series. Treasury cash payouts and gross fees cannot be renamed protocol revenue.
+
+Readiness output records required metric IDs/versions, window/frequency, quality, complete dates, sample exclusions, zeros, revisions, structural regime flags and reasons for rejection. Provisional publication policy: at least60 complete daily observations and at least10 observations per estimated parameter, including intercept. These are conservative project gates, not statistical guarantees; 90 days cannot establish a long-term stable mechanism. Max3 substantive slopes plus intercept for the first specification; avoid many weakly justified controls. If effective sample fails, publish readiness failure and follow the limited fallback in [MVP scope](MVP_SCOPE.md).
+
+For exploratory fallback, define a separate model `gross-fee-activity-v1`: provider gross fees versus provider volume, source-qualified, with the mechanical construction warning displayed before coefficient interpretation. A second optional `purchases-activity-v1` uses observed-cohort acquisition measures and cannot estimate protocol revenue or whole-market demand. Reject lower-bound issuance/burn or short attribution cohorts as if they were exact daily outcomes.
+
+## Preparation and transform policy
+
+Construct a calendar-indexed daily table from one prepared dataset manifest; retain original Decimal strings and explicitly convert selected model columns to finite float64. Do not silently inner-join away dates. Publish every exclusion/reason and source cutoff. Compute differences on the full calendar, then drop incomplete adjacent-day pairs; do not difference across gaps as if days were contiguous.
+
+Review units and USD valuation: contemporaneous USD conversion can mechanically introduce common prices. Define baseline and sensitivity using source original USD, NEAR quantities and alternate daily price marks where appropriate. No forward-fill of flows/prices. Strict log specification requires x>0,y>0; report zero counts, excluded sample and selection bias. If many genuine zeros, choose a predeclared level/scaled model or inverse-hyperbolic-sine with stated units and nonelastic interpretation. Never add an arbitrary epsilon or claim log1p is an ordinary elasticity. Negative cash adjustments require a suitable level model, not dropping them quietly.
+
+## Specification decision tree
+
+1. Plot raw/log series, growth rates, revisions and known fee-policy changes. Identify whether dependent fees are formulaically constructed from volume.
+2. Evaluate trend and stationarity of proposed levels using ADF (null unit root) and KPSS (null stationarity), with deterministic terms/lag selection and finite-sample limitations recorded. Short-sample disagreement is a warning, not evidence whichever model is convenient.
+3. Default exploratory trend-resistant candidate when positive daily data permit: `Δlog(Y_t)=α+βΔlog(V_t)+γZ_t+ε_t`, with Z limited to justified predeclared controls (e.g. market return or known policy regime). Interpret β as a conditional short-run association. If levels have credible stationarity/trend specification, estimate levels with trend controls as a sensitivity, not automatically as the primary result.
+4. Proposed levels starting point `log(Y_t)=α+βlog(V_t)+γControls_t+ε_t` is not admissible just because R² is high. Without stationarity/credible cointegration reasoning, do not publish it as an economic relationship. Cointegration/ECM is outside initial short-sample MVP unless data substantially improve.
+5. For cash timing use predeclared lag0/1 candidates only if operational timing supports them; do not search many lags for significant β. Weekly aggregation may provide a descriptive robustness chart but 12 full weeks is insufficient for the project's inferential sample gate.
+6. No unsupported instrument or causal claim. Endogeneity, unobserved incentives, common market trends and provider construction remain limitations even with robust standard errors.
+
+## Estimation and diagnostics
+
+OLS through statsmodels; include explicit intercept and rank/condition checks. Use HAC covariance for daily observations when serial dependence plausible. Baseline maxlags7 (documented weekly timing), sensitivity3 and14 if sample supports it; record Bartlett kernel, correction and use_t settings explicitly in config. Robust SE do not fix nonstationarity, misspecification, measurement error or endogeneity. [statsmodels covariance API](https://www.statsmodels.org/stable/generated/statsmodels.regression.linear_model.OLSResults.get_robustcov_results.html) documents configurable HAC estimation.
+
+Required diagnostics: sample table, residual time plot/ACF, Ljung–Box at justified small lags, heteroskedasticity test (e.g. Breusch–Pagan with scope/limitations), residual outliers/influence and design-matrix rank/condition. Record ADF/KPSS settings/results, not only a pass/fail label. Document actual source/policy break dates; investigate predeclared interactions/split sensitivity only with sufficient subsample, otherwise show descriptive break warning. Do not run a battery mechanically or remove outliers without an operational reason and a with/without report.
+
+Alternative specifications are limited and preregistered in config: difference baseline, justified levels sensitivity, lag1 timing sensitivity, provider-revision/source sensitivity and price-mark sensitivity where data support them. Rolling regressions are P1 only with adequate windows, shown with sample sizes/CI; do not imply stable long-term elasticity from a short fit. Report the full chosen specification family, not only significant estimates. Diagnostic p-values are advisory in a short sample; no binary truth verdict.
+
+## Model output contract
+
+Model/run ID, model/specification version, prepared dataset ID/hash, full input metric/source versions, code commit, lockfile/config hashes, seed if stochastic, sample start/end/nobs/omissions, transformed variables/design-matrix hash, coefficient/standard-error/95%CI/p-value table, covariance settings, tests/diagnostics with nulls/lag settings, fitted/residual artifacts, interpretation, limitations and exact reproduction command. Undefined tests are null with a reason, never zero. Separate machine-verified metadata from authored interpretation.
+
+No model auto-publishes. Operator checks admissibility, artifact completeness and interpretation, then creates a published immutable run. Published model API never runs new code. Coefficients can be statistically weak, zero or sign-opposite to the thesis; report them honestly. A regression on gross fees/volume may mostly reflect effective fee rate, not sustainable revenue or token value. No token-price forecast, cash-flow valuation multiple or buy recommendation is implied.
+
+## Reproduction and validation
+
+Fixed model registry and allowlisted configs only; deterministic design preparation; dependency lock and relevant BLAS/Python metadata recorded; random algorithms fixed seed. Exact hashes for inputs/design serialized numeric source values; floating outputs compared under documented tolerances. Synthetic known-behavior tests validate fitting/covariance handling, but publication requires saved real permitted data. A clean offline rerun with no provider credentials is a release requirement (NI-054). Fit execution is future work; this documentation does not claim model results exist.

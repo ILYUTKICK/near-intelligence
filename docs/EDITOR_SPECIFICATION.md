@@ -1,0 +1,50 @@
+# Investment research editor
+
+Tiptap core/ProseMirror with React custom node views; no custom rich-text engine. [Architecture](ARCHITECTURE.md), [database](DATABASE_SCHEMA.md), [API](API_SPECIFICATION.md). P0 single-author optimistic concurrency; P2 collaboration deferred.
+
+## Canonical schema
+
+EditorDocument: `{schema_version:1,type:"doc",content:BlockNode[]}`. Every top-level node has `attrs.block_id:UUID`; heading nodes carry level1–3; rich text allows paragraph/text/bold/italic/link/bullet/ordered list with depth≤3. Internal paragraph/list children do not require top-level block IDs. Arbitrary HTML, iframe, executable code, unsupported marks or remote image fetch nodes are rejected. P0 no image uploads.
+
+| Type / priority | Persisted attributes | Interaction and acceptance |
+| --- | --- | --- |
+| paragraph P0 | block_id; standard bounded rich-text content | Edit/paste sanitized text and marks; keyboard/IME/undo preserved |
+| heading P0 | block_id, level1–3, text content | Outline/navigation uses stable IDs, not mutable text slugs |
+| liveChart P0 | block_id, chart_definition_version_id, mode live/snapshot, selection, observed_dataset_version_id, snapshot_id? | Canonical ChartView node; hover/tap/table/range/filter/source/refresh; no embedded provider logic. Save resolves immutable context |
+| dataTable P0 | block_id, columns (key,label,type,unit?), rows or dataset/table_ref | Small authored table or approved dataset projection; max1k cells; formulas not executable; big data uses reference and pagination |
+| insight P0 | block_id, insight_id, type, classification, body, context, authored_at, modified_at, hypothesis_id? | Context-preserving observation/hypothesis/risk/conclusion; structured metadata accessible |
+| hypothesis P0 | block_id, hypothesis_id, statement, assessment, authored_at, modified_at | Editable hypothesis with linked evidence counts; status manually authored with rationale |
+| evidence P0 | block_id, evidence_id, hypothesis_id, classification, target_kind,target_id,explanation | Link to insight/chart block/public model/citation; target validated, no dangling private IDs |
+| risk P0 | block_id, title, body, related_hypothesis_id? | Explicit counterargument card, no algorithmic probability score |
+| divider P0 | block_id | Semantic separator; keyboard delete/reorder |
+| modelResult P1 | block_id, model_run_id, dataset_version_id, interpretation rich text | Immutable published run; coefficients/diagnostics read-only, narrative editable |
+
+Citation attributes use a structured `{artifact_id|source_id,url?,label,locator?,accessed_at?}` object with a server-approved immutable artifact where possible; external URL-only citations are marked weaker and never a substitute for missing dataset provenance. Context contains chart/model and inspected selection/dataset definition hashes as in API. User/owner ID is server-derived, not trusted editor attrs.
+
+## Persistence and revisions
+
+The complete JSON is canonical. Each save creates an immutable document_versions row plus validated document_blocks/insights/hypotheses/evidence projections atomically. Insights endpoints are convenience editors of this same JSON, not a second database text source. See schema for composite FKs.
+
+Autosave after 1s idle, max5s while typing; manual Save immediate. Retain dirty buffer during pending save; only mark revision content clean if its captured editor state matches acknowledged payload. Changes typed while request runs remain dirty. Use If-Match with last revision and an idempotency key per payload. Do not enqueue unlimited writes: at most one in flight, latest subsequent state coalesced. On 409 stop autosaving, preserve local version, show conflict options; never silently overwrite.
+
+Server validates 2 MiB/200 top-level blocks, unique IDs, nesting/marks, filtered charts, public data visibility, same-owner snapshots, same-document private links and all dependencies. Title rename also creates a version, ensuring export title/content attribution are consistent. Empty document is valid. Revision pin creation and projections are a single transaction.
+
+Schema migrations are explicit pure version→version transforms with fixture tests and a new revision. Old revisions remain immutable; unsupported versions open read-only with a recovery download and actionable message. Never reinterpret unknown nodes and discard their content.
+
+## Live versus fixed evidence
+
+A live working chart may query newest approved data and show “updated since last save”. The chart's inspected/observed version is submitted and validated when saving; save pins exactly that version. If new data arrives between inspection and save, preserve the inspected version and indicate newer available data, rather than changing evidence silently. The revision's resolved_contexts map contains dataset/chart/metric/renderer versions, filters, selected dates and context hash for every chart.
+
+Opening a historical revision or exporting never resolves latest. Reopening the current working document can show live data alongside a saved-version badge; existing insight contexts always retain their own inspected pins. Explicit P1 Freeze changes mode and creates a private snapshot; unfreezing is a new document revision. Delete/revoke a referenced private snapshot is blocked while referenced. Missing frozen artifacts are a reconstruction error, not a reason to substitute current data.
+
+## Block operations and focus
+
+Insert via slash menu, toolbar or library at selected top-level position; moving a block updates order, preserves ID/insights; duplicate allocates new block and entity IDs and rewrites internal relationships only within the copied set. A duplicated single evidence block may still link to its existing hypothesis in the same document. Deleting a hypothesis/insight/chart target requires explicit linked-evidence removal or rejection; UI previews affected links.
+
+After insertion focus first editable field; atomic chart node selected with keyboard and properties toolbar. Up/down reorder buttons announced through polite status. Outline follows heading IDs. Escape exits chart controls to editor without discarding input. Test undo/redo across node insertion/deletion and prevent chart React updates replacing the ProseMirror selection. Prototype IME/paste and chart event handling before broad integration (NI-038).
+
+## Templates, duplication and export
+
+P0 start empty. P1 template headings: Executive Summary, Investment Hypothesis, Adoption Evidence, Revenue Analysis, Token Economics, Econometric Results, Risks, Conclusion. No fabricated paragraphs or numerical placeholder claims. Public duplication clones a specified public release into new private IDs and retains attribution/data/model pins. Public subsequent edits do not mutate copies.
+
+P0 export uses the exact acknowledged document revision; renders all block types to Markdown with static chart files, CSV and evidence/model citations. Unknown/unrenderable nodes fail explicitly. P1 PDF uses the same frozen intermediate representation; no screenshot of the live editor. [Export tasks](TASKS.md) define verification, and [chart system](CHART_SYSTEM.md) defines static rendering.

@@ -1,0 +1,73 @@
+# Database schema
+
+Logical PostgreSQL schema; no migration is created in this phase. SQLAlchemy/Alembic implements this design after approval. [Editor](EDITOR_SPECIFICATION.md), [API](API_SPECIFICATION.md), [security](AUTHENTICATION_SECURITY.md).
+
+## Global conventions
+
+Use UUID primary keys unless a stable catalog ID is specified. `created_at`/`updated_at` are non-null TIMESTAMPTZ UTC, server-generated on mutable entities. Immutable entities have created_at only and are update-protected to the runtime role. Direct deletion of scientific artifacts is restricted; private revision projections may be removed only by an ownership-checked parent-document deletion cascade. Dates represent UTC day boundaries, intervals `[start_date,end_date)`. All FKs indexed unless covered by a leading PK/unique index. Strings have bounded lengths; enums use checked text with versioned migrations.
+
+Raw amounts are decimal digit strings in raw artifacts and NUMERIC(78,0) where normalized; derived amounts NUMERIC(78,30), with metric-specific overflow/scale checks before insertion. Preserve more precise original calculation strings in versioned artifacts; never silently truncate and call them exact. API uses decimal strings. Statistical coefficients may be finite float64 in model JSON with explicit numeric policy; reject NaN/Infinity. Hashes are lowercase SHA-256 hex (64 chars), calculated from canonical bytes.
+
+Private rows carry `owner_id REFERENCES users(id)`. Public scientific definitions/data have no owner and are not editable by ordinary users. Composite FKs enforce same-document/same-owner references. RLS uses transaction-local verified application identity plus explicit service predicates; no reliance on frontend filtering.
+
+## Identity and private documents
+
+| Entity | Fields and keys | Constraints/indexes/lifecycle |
+| --- | --- | --- |
+| users | id UUID PK (provider JWT sub), auth_provider='supabase', created_at, disabled_at nullable | No password hashes; email stays at auth provider. API creates row only after JWT validation; immutable subject |
+| user_profiles | user_id PK/FK users, display_name varchar(80), display_timezone varchar(64), updated_at | One-to-one; timezone validated against IANA; calculations remain UTC; CAS via updated_at or profile revision |
+| documents | id PK, owner_id, title varchar(200), revision bigint default 1, current_version_id UUID, schema_version int, created_at, updated_at | UNIQUE(id,owner_id); index(owner_id,updated_at DESC,id); title nonempty; revision >0. Current version composite FK points to same document/owner, DEFERRABLE for insert transaction |
+| document_versions | id PK, document_id, owner_id, revision bigint, schema_version, content JSONB, resolved_contexts JSONB, content_sha256, created_at, source_publication_id nullable | FK(document_id,owner_id)→documents; UNIQUE(document_id,revision), UNIQUE(id,document_id,owner_id). Immutable; max content 2 MiB/200 top-level blocks. resolved_contexts keyed by block ID, includes pinned dataset/chart/model versions |
+| document_blocks | document_version_id, document_id, owner_id, block_id UUID, parent_block_id nullable, position int, type, attrs JSONB | PK(document_version_id,block_id); composite FK(version,doc,owner)→document_versions; UNIQUE(version,parent,position) using NULLS NOT DISTINCT. Parent FK(version,parent_block_id)→same table; check acyclic/max nesting depth 3. Index(version,type). Derived projection, never independently edited |
+| saved_charts | id PK, owner_id, chart_definition_version_id, label nullable, mode live/snapshot, selection JSONB, last_resolved_dataset_version_id, snapshot_id nullable, created_at, updated_at | UNIQUE(id,owner_id), index(owner_id,updated_at DESC,id). selection validates date/filter schema. snapshot mode requires owner-matched snapshot; chart FK RESTRICT. No unique chart/range restriction: users may save variants |
+| research_snapshots | id PK, owner_id, chart_definition_version_id, dataset_version_id, selection JSONB, calculation_context JSONB, artifact_id, content_sha256, created_at | Immutable; UNIQUE(id,owner_id). Shareable scientific inputs may be global but snapshot metadata is private. Snapshot API P1; P0 resolved-context pins live in document_versions |
+| insights | document_version_id, document_id, owner_id, insight_id UUID, block_id, type, classification, body JSONB, context JSONB, authored_at, modified_at | PK(version,insight_id); FK(version,block_id)→document_blocks; same owner/doc/version via composite FKs. Index(doc,owner,modified_at DESC). Derived from canonical insight nodes; no independent mutable text |
+| hypotheses | document_version_id, document_id, owner_id, hypothesis_id UUID, block_id, statement text, assessment, authored_at, modified_at | PK(version,hypothesis_id); block FK; assessment supported/mixed/weakened/insufficient_data/untested is authored, not automatic truth |
+| evidence_links | document_version_id, document_id, owner_id, evidence_id UUID, block_id, hypothesis_id UUID, classification, target_kind, target_id UUID, explanation text | PK(version,evidence_id); hypothesis and evidence-block composite FKs. target_kind insight/chart_block/model_run/citation validated to an allowed typed target in same revision or public immutable artifact. Reject cross-user private IDs and dangling targets; no polymorphic FK is trusted without service validation |
+
+**Canonical content rule:** `document_versions.content` contains the complete editor JSON, including notes/hypotheses/evidence attributes. Relational block/insight/hypothesis/evidence tables are validated projections of that revision created in the same transaction. Insight and hypothesis REST mutations rewrite the appropriate nodes and create a new document version through the same service. There is no competing mutable copy. Old versions retain exact original text, links and pins; APIs default to current_version_id.
+
+Editor UI undo/redo is local until saved. A failed validation rolls back the entire revision and all projections. Duplicate blocks get new IDs and rewrite their internal private links; public chart/model/dataset IDs remain stable.
+
+## Shared definitions, data and provenance
+
+| Entity | Fields and keys | Constraints/indexes/lifecycle |
+| --- | --- | --- |
+| data_sources | id stable text PK e.g. SRC-LLAMA, name, docs_url, base_url, access_status, freshness_target_seconds, license_status, verified_at, lineage JSONB, created_at, updated_at | No secrets in this table. access_status disabled/documented/approved; unverified licenses prevent raw redistribution |
+| metric_definitions | id UUID PK, metric_id text, version int, name, unit, frequency, economic_scope, formula_key, source_id, definition JSONB, quality_rules JSONB, created_at | UNIQUE(metric_id,version); source FK RESTRICT. Immutable; formulas select fixed registered Python functions, not arbitrary SQL/eval |
+| chart_definitions | id UUID PK, chart_id text, version int, title, description, category, visualization_type, metric_definition_ids JSONB, filter_schema JSONB, unit_schema JSONB, renderer_version, created_at | UNIQUE(chart_id,version); immutable. Validate all metric IDs via chart_metrics junction; supported categories fixed |
+| chart_metrics | chart_definition_version_id, metric_definition_id, series_role | Composite PK(chart_definition_version_id,metric_definition_id,series_role); FKs RESTRICT; defines required/optional series |
+| ingestion_runs | id PK, source_id, status, query_identity/hash, cursor_checkpoint JSONB, started_at, finished_at, retrieved_at, error_code, request_count, byte_count, manifest_artifact_id | Index(source_id,started_at DESC). Secrets redacted; statuses queued/running/succeeded/failed/paused; paused collectors require deliberate operator change |
+| artifacts | id PK, relative_storage_key, sha256, byte_size bigint, media_type, scope public/private/internal, owner_id nullable, license_status, created_at | UNIQUE(storage_key), index(sha256). private requires owner_id; public/internal have no owner. Storage key server-generated, no user paths. Actual bytes written before transaction; abandoned bytes GC after 7 days |
+| dataset_versions | id PK, dataset_key, version int, status, start_date, end_date, frequency, pipeline_version, code_commit, config_hash, dependency_lock_hash, manifest_artifact_id, content_sha256, source_as_of, retrieved_at, quality JSONB, supersedes_id nullable, created_at | UNIQUE(dataset_key,version), UNIQUE(dataset_key,content_sha256); end>start; status staged/validated/approved/rejected; supersedes same dataset key. Approved immutable; history never overwritten |
+| dataset_inputs | dataset_version_id, artifact_id, source_id, ingestion_run_id nullable, role, query_hash nullable | PK(dataset_version_id,artifact_id,role); RESTRICT inputs referenced by approved datasets. Captures raw/normalized/price/SQL/config lineage |
+| dataset_metrics | dataset_version_id, metric_definition_id | Composite PK; every observation must reference a member metric |
+| metric_observations | dataset_version_id, metric_definition_id, period_start TIMESTAMPTZ, period_end TIMESTAMPTZ, dimensions JSONB, dimensions_hash, value NUMERIC nullable, quality_status, bound_kind nullable, source_record_ref nullable | PK(dataset_version_id,metric_definition_id,period_start,dimensions_hash). FK pair→dataset_metrics; period_end>start. Unique canonical dimensions; quality missing/unavailable implies null, verified zero explicit. bound_kind exact/estimate/lower/upper; value null requires reason in quality metadata |
+| active_datasets | dataset_key PK, dataset_version_id, published_at | FK approved same dataset key enforced service/constraint trigger; transaction pointer switch after all quality gates. Historical versions remain readable |
+
+Normalized raw-event imports, when needed, use `chain_events`: id PK, dataset_version_id, network, tx_hash, receipt_id, log_index, item_index, action_index, event_type, event_time_ns NUMERIC(30,0), payload JSONB. UNIQUE(dataset_version_id,network,receipt_id,log_index,item_index,action_index,event_type). Source adapters provide non-null sentinel indexes for non-log actions; canonical logical event identity must not rely solely on tx hash. Index(dataset_version_id,event_time_ns). Aggregate-only archives must not pretend to contain raw events; link them as input artifacts instead.
+
+## Models, publication and jobs
+
+| Entity | Fields and keys | Constraints/indexes/lifecycle |
+| --- | --- | --- |
+| model_definitions | id UUID PK, model_id text, version int, question, spec JSONB, required_metrics JSONB, readiness_rules JSONB, code_entrypoint, created_at | UNIQUE(model_id,version); immutable fixed code registry; no user code |
+| model_runs | id PK, model_definition_version_id, dataset_version_id, status, parameters JSONB, parameters_hash, code_commit, dependency_lock_hash, seed nullable, sample_start/end, nobs nullable, result JSONB nullable, diagnostics JSONB, limitations JSONB, reproduction_artifact_id, created_at, finished_at | UNIQUE(definition_version,dataset_version,parameters_hash,code_commit,dependency_lock_hash). status rejected_readiness/running/failed/succeeded/published; finite coefficient schema; succeeded outputs immutable; published requires manifest, diagnostics and reviewed interpretation |
+| research_publications | id PK, slug, version int, title, content JSONB, evidence_manifest JSONB, content_sha256, status, published_at, created_at | UNIQUE(slug,version); only published rows public; operator-reviewed full public projection. Private source-document IDs never serialized to public output |
+| publication_model_runs | publication_id, model_run_id | Composite PK; both published. Public dataset/artifact references reviewed for license and access |
+| export_jobs | id PK, owner_id, document_id, document_version_id, format markdown_zip/pdf, status, idempotency_key, artifact_id nullable, error_code nullable, expires_at, created_at, updated_at | UNIQUE(owner_id,idempotency_key); composite FK version/doc/owner; index(status,created_at), index(owner_id,created_at DESC). queued/running/succeeded/failed/expired; worker leases, retry max 2; download requires same owner |
+| idempotency_records | owner_id, route_key, idempotency_key, request_hash, response_status/body, expires_at | PK(owner_id,route_key,idempotency_key); same key/different body→409; retain 24h, avoid sensitive duplicate payload if response is retrievable by ID |
+| audit_events | id PK, actor_id nullable, action, resource_type, resource_id, outcome, request_id, created_at | index(actor_id,created_at DESC); no document text/tokens; retention 90d target |
+
+## Transactions, authorization and deletion
+
+1. Verify JWT then start DB transaction, SET LOCAL identity using set_config; never interpolate untrusted SQL. API runtime role is not table owner and cannot bypass RLS. Every private query includes owner predicate as well.
+2. Save locks documents row, checks expected revision, validates schema/references, resolves data pins once, writes version and projections, increments pointer/revision atomically. A mismatch returns 409 without changes.
+3. Read historical version verifies parent document owner; knowing a version UUID grants no access. Public release content is a separate entity, never “document is public” on an ordinary private record.
+4. Delete document: delete the owner-checked parent in one service transaction; ON DELETE CASCADE on document→versions→projections and document→export_jobs removes these children (handle deferrable current pointer; no general direct revision-delete endpoint). Owned snapshots/saved charts survive unless explicitly deleted; their source data remain globally immutable. Model/data/artifact scientific FKs use RESTRICT.
+5. Delete user: explicit privileged retention workflow, purge documents/saved instances/private snapshots/exports/profile; global data and public editorial artifacts stay. Automated self-service deletion is P2; P0 settings explains operator-assisted removal. No silent orphaning.
+6. Expired export bytes may be deleted after job expiry; document versions retain sufficient data/pins to regenerate. Scientific artifacts required by any approved dataset/published model/revision cannot be garbage-collected.
+
+## Required migration verification
+
+Empty DB → head, rollback last reversible migration, upgrade again; two-user RLS tests over pooled connections; race two identical revision saves; reject cross-owner snapshot/document refs, dangling evidence and out-of-range NUMERIC. Verify restoring a backup preserves content/artifact hashes. No DB trigger is a substitute for validating rich editor schema in the document service.

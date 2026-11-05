@@ -1,0 +1,64 @@
+# Local operating-system and editor files
+.DS_Store
+._*
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Credentials and local configuration; keep the documented template
+.env
+.env.*
+!.env.example
+!**/.env.example
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx
+.aws/
+.codex/
+
+# JavaScript dependencies and generated builds
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+.vercel/
+*.tsbuildinfo
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Test output and process state
+coverage/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+*.log
+*.pid
+
+# Local application state, private drafts and private exports
+.local/
+artifacts/
+private-exports/
+
+# GitHub sharing scope explicitly selected by the user: documentation and mockups only.
+# Keep local research bytes; track Markdown explanations without raw inputs/code.
+/research/**
+!/research/**/
+!/research/**/*.md
+/product-plan/**/*.py
+/product-plan/**/*.cjs
+/product-plan/**/*.js
+# STOP_PUBLIC_COLLECTION remains present locally; never delete/resume a stopped collector.

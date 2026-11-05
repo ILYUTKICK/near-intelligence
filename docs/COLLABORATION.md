@@ -1,0 +1,29 @@
+# Repository and collaboration setup
+
+Setup date:5 November 2026. Local branch:`main`. Target remote:`ILYUTKICK/near-intelligence`, private. Repository creation/push and invitation must be verified before they are described as completed. Verified collaborator account:[BkycnocTbI](https://github.com/BkycnocTbI); requested access:write (`push`).
+
+## Explicit sharing scope
+
+The user chose **documentation and mockups only**. Include root instructions/plans, docs/*.md, research Markdown findings/READMEs and product-plan Markdown/SVG/PNG designs/prompts. Include .env.example and Git configuration templates as onboarding metadata; no real credentials.
+
+Raw research JSON/CSV/TXT/SQL, manifests containing raw data metadata, collection/calculation scripts, captured third-party JS/HTML and process state remain on the original machine and are ignored. The original research archive is roughly149 MB; it is not authorized for GitHub upload. STOP_PUBLIC_COLLECTION stays on disk, and collectors remain stopped.
+
+The unpublished initial full-project commit was replaced before any push. Only the documentation/mockup history may be sent to GitHub. Never use force-add, push--mirror or broad data uploads to bypass the sharing boundary. Future source-data sharing requires explicit authorization and an agreed channel; being a collaborator does not itself authorize publishing ignored data.
+
+A fresh clone therefore cannot execute legacy offline scripts or open every linked data artifact. Markdown findings remain available for context. Before a data/research task, confirm the actual input bundle and hashes or record the missing-data blocker; do not download paid/bulk data, fabricate inputs or treat a missing archive as zero.
+
+## Contributor workflow
+
+1. Accept the invitation in the BkycnocTbI account. A pending invitation is not yet accepted access.
+2. Clone the verified remote URL in a separate local directory. Configure your own Git author name/email; never copy another contributor's credentials.
+3. Read [AGENTS.md](../AGENTS.md), [PLAN.md](../PLAN.md), [task backlog](TASKS.md), [team assignments](TEAM_PLAN.md) and task specifications.
+4. Select an available assigned NI-task, coordinate its claim/status, and create a short branch `feat/ni-XXX-description`. Do not overwrite another active claim or edit a generated API client manually.
+5. Run appropriate verification and open a pull request into main. The other participant reviews it; merge only after the task's full acceptance checks pass.
+
+Application installation commands in README remain target contracts until foundation tasks implement runtimes/services. Git setup alone does not complete NI-001's runtime/toolchain requirements or automatically start NI-002.
+
+## Access and safeguards
+
+Private visibility; normal collaborator write access, not administrator access. No unrelated accounts or public publication. .gitignore excludes ignored research inputs, credentials, caches, environments, logs and private exports. .gitattributes preserves tracked research/design bytes without newline conversion. A bounded local scan initially inspected431 text files and found no obvious token/private-key patterns; this is not a guarantee of absence of every sensitive value.
+
+Branch protection/required CI must be configured and verified separately when repository plan support and actual CI exist; this setup does not claim those protections are enforced.
