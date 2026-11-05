@@ -6,7 +6,7 @@ The investment question is whether cross-chain adoption translates into sustaina
 
 ## Current state — 5 November 2026
 
-The Git repository is initialized on branch `main` and published privately at [ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence). **GitHub sharing covers documentation and visual mockups, the Python dependency manifests, and — under the 5 November 2026 implementation authorization — new application code, tests, configuration and tooling manifests created by authorized NI-tasks.** Raw research inputs, SQL and calculation/collection scripts remain local and ignored. Some evidence links and offline commands below refer to that unshared local archive and are unavailable in a fresh clone; arrange a separately authorized data handoff before research implementation. The application is not initialized; no frontend/backend source, migrations, uv/pnpm lockfiles or Docker Compose file exist yet. A tested Python dependency baseline is available in requirements.txt, and Node 24 LTS / pnpm 12.16.1 are pinned in [.node-version](.node-version) and [package.json](package.json) with the root [pnpm workspace](pnpm-workspace.yaml). On 5 November 2026 the user (participant A, ILYUTKICK) authorized starting implementation of role-A tasks through [PLAN.md](PLAN.md). Local evidence is historical, principally 6 August–3 November 2026 UTC; it must never be labeled live merely because a page loads.
+The Git repository is initialized on branch `main` and published privately at [ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence). **GitHub sharing covers documentation and visual mockups, the Python dependency manifests, and — under the 5 November 2026 implementation authorization — new application code, tests, configuration and tooling manifests created by authorized NI-tasks.** Raw research inputs, SQL and calculation/collection scripts remain local and ignored. Some evidence links and offline commands below refer to that unshared local archive and are unavailable in a fresh clone; arrange a separately authorized data handoff before research implementation. The web runtime skeleton exists under [apps/web](apps/web) (NI-002 web part: Next.js App Router, strict TypeScript, pnpm-lock.yaml, `/health`); the API source, database migrations, uv.lock and Docker Compose file do not exist yet — NI-002's API part is handed off to role B. A tested Python dependency baseline is available in requirements.txt, and Node 24 LTS / pnpm 12.16.1 are pinned in [.node-version](.node-version) and [package.json](package.json) with the root [pnpm workspace](pnpm-workspace.yaml). On 5 November 2026 the user (participant A, ILYUTKICK) authorized starting implementation of role-A tasks through [PLAN.md](PLAN.md). Local evidence is historical, principally 6 August–3 November 2026 UTC; it must never be labeled live merely because a page loads.
 
 - **[Mandatory agent execution plan](PLAN.md)** — read before selecting or implementing any task.
 - [Collaboration and repository setup](docs/COLLABORATION.md)
@@ -38,7 +38,14 @@ These four analysis scripts use Python standard-library modules. Optional plotti
 
 ## Available now — Python dependencies
 
-Use CPython 3.13 from the repository root:
+Preferred path (uv, frozen lock):
+
+```sh
+uv sync --project apps/api --frozen
+uv lock --check --project apps/api
+```
+
+pip/venv path from the generated export (judges without uv):
 
 ```sh
 python3.13 -m venv .venv
@@ -46,24 +53,32 @@ python3.13 -m venv .venv
 .venv/bin/python -m pip check
 ```
 
-The generated [requirements.txt](requirements.txt) pins the selected API/research stack and transitive distribution hashes. [requirements.in](requirements.in) is its direct dependency source until NI-002 migrates declarations to pyproject.toml/uv.lock. This installs dependencies only; it does not launch an application or supply the unshared research archive. See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for tested platforms and [JUDGE_SETUP.md](docs/JUDGE_SETUP.md) for the remaining deployment gates.
+[apps/api/uv.lock](apps/api/uv.lock) is the exact frozen environment at the cutoff recorded in [apps/api/pyproject.toml](apps/api/pyproject.toml); [requirements.txt](requirements.txt) is its generated hash-pinned export. This installs dependencies only; it does not launch an application or supply the unshared research archive. See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for tested platforms and [JUDGE_SETUP.md](docs/JUDGE_SETUP.md) for the remaining deployment gates.
 
 ## Planned onboarding contract — unavailable until foundation tasks finish
 
-Future prerequisites: Node 24 LTS (pinned in [.node-version](.node-version)), pnpm pinned through `packageManager` (12.16.1), CPython 3.13, uv, Docker Compose, Supabase development auth project. Python packages are resolved and hash-pinned now and Node/pnpm tool versions are pinned; uv/pnpm dependency lockfiles are completed in NI-002.
+Future prerequisites: Node 24 LTS (pinned in [.node-version](.node-version)), pnpm pinned through `packageManager` (12.16.1), CPython 3.13, uv, Docker Compose, Supabase development auth project. Python packages are resolved and hash-pinned now, Node/pnpm tool versions are pinned and pnpm-lock.yaml is committed; the API uv.lock is completed in NI-002's API part.
+
+Tested runtime commands (NI-002; nothing else starts on boot):
 
 ```sh
 cp .env.example .env
 pnpm install --frozen-lockfile
+pnpm --filter web dev            # boots apps/web on :3000; /health validates required config
+pnpm --filter web build && pnpm --filter web start
 uv sync --project apps/api --frozen
+uv run --project apps/api uvicorn near_api.main:app --reload --port 8000   # boots apps/api on :8000
+```
+
+Planned database/compose commands remain target contracts until NI-003 and later foundation tasks implement them:
+
+```sh
 # Planned Compose services: db, api, web; no collector starts automatically.
 docker compose up --build
 uv run --project apps/api alembic upgrade head
-pnpm --filter web dev
-uv run --project apps/api uvicorn near_api.main:app --reload --port 8000
 ```
 
-Compose mode and native development mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Backend `.env` loading must be implemented explicitly. Production settings and health gates: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example).
+Compose mode and native development mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Web `.env` loading is implemented explicitly in [apps/web/src/lib/env.ts](apps/web/src/lib/env.ts) and API loading in [apps/api/src/near_api/settings.py](apps/api/src/near_api/settings.py); missing required configuration makes `/health` return a readable 503 on both services. Production settings and health gates: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example).
 
 ## Delivery gates
 
