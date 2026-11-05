@@ -142,7 +142,16 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** S
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-05T22:41:45+03:00
+- **Branch/worktree:** feat/ni-006-design-tokens (stacked on feat/ni-002-web-skeleton); /Users/ilyutkinn/Desktop/Near
+- **Selection note:** NI-005 stays TODO because its dependencies NI-003/NI-004 (role B) are not DONE; NI-006 is the earliest eligible role-A task whose dependency NI-002 is verified DONE.
+- **Verification:** `pnpm --filter web check:contrast` — all 22 documented token pairings pass their WCAG targets (text pairs ≥4.5:1 measured 5.67–15.69; control boundaries/focus/chart series ≥3:1 measured 3.42–6.52); the script parses token values from tokens.css and exits non-zero on failure. `tsc --noEmit` strict typecheck and `next build` pass. Font checks: `next build` fails loudly when a font file is missing (renamed-file probe), computed styles in the browser confirm Newsreader/Inter actually load ("newsreader loaded", "inter loaded"), and the CSS/next-font fallback stacks (Georgia, system-ui + size-adjusted fallbacks) are declared for failure cases. Focused visual review via browser at 1440×900 and 360×780: hero renders 64/68 desktop and 40/44 phone exactly per spec, body 16/26, canvas #F6F4EC and text #17242D confirmed from computed styles; no horizontal overflow at 360 (screenshots committed under docs/verification/ni-006/).
+- **Result:** apps/web/src/styles/tokens.css — full semantic token set from DESIGN_SYSTEM.md (colors, spacing 4–96, radii 12/8/16, elevation, focus, motion, type scale with phone hero override, layout widths) plus base shell styling and a reduced-motion guard; self-hosted SIL OFL 1.1 variable fonts Newsreader + Inter as WOFF2 with license files and provenance notes in apps/web/src/styles/fonts/; layout.tsx wires them via next/font/local (same-origin, no external font calls); `check:contrast` npm script. No page-specific palette values introduced anywhere.
+- **Reviewer:** pending — role-B review requested on PR #4 (NI-006 reviewer per TEAM_PLAN.md).
+- **Completed at:** 2026-11-05T22:52:10+03:00
 
 **Description:** Translate the ivory/forest/editorial direction into centralized accessible styling.
 
