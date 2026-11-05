@@ -142,7 +142,12 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** S
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-05T22:41:45+03:00
+- **Branch/worktree:** feat/ni-006-design-tokens (stacked on feat/ni-002-web-skeleton); /Users/ilyutkinn/Desktop/Near
+- **Selection note:** NI-005 stays TODO because its dependencies NI-003/NI-004 (role B) are not DONE; NI-006 is the earliest eligible role-A task whose dependency NI-002 is verified DONE.
 
 **Description:** Translate the ivory/forest/editorial direction into centralized accessible styling.
 
