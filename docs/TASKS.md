@@ -599,7 +599,14 @@ Specification: [DATA_PIPELINE.md](DATA_PIPELINE.md).
 - **Priority:** P0
 - **Dependencies:** NI-001
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b
+- **Execution role:** B
+- **Started at:** 2026-11-06T02:14:00+03:00
+- **Branch/worktree:** feat/ni-026-provider-capabilities; D:/хахатон/near-intelligence
+- **Authorization:** Participant B explicitly authorized role-B implementation and private-repository code/tests/config/docs publication on 6 November 2026. Raw historical archives remain excluded.
+- **Dependency verification:** main cfdd914 contains NI-001 DONE with tool/dependency evidence and NI-002 runtime/lock files. Clean checkout verified; no competing NI-026 claim or open PR found at start.
+- **Scope:** Validate source capability records and fail-closed probe controls, refresh documentation/rights evidence, and perform isolated Windows Python compatibility verification. Provider credentials, approved quotas/budgets and the historical input archive are absent. Unresolved operational gates retain their OQ IDs.
 
 **Description:** Close operational data feasibility beyond the documentation-only source inspection.
 
