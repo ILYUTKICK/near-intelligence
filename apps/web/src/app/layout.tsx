@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import localFont from "next/font/local";
-import "@/styles/tokens.css";
+import "@/styles/globals.css";
 
 // Self-hosted variable fonts (SIL OFL 1.1) — see src/styles/fonts/LICENSE-NOTES.md.
 // next/font/local serves them same-origin with automatic fallback-metric
