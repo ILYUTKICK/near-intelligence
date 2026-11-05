@@ -402,7 +402,12 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-016, NI-007
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-06T00:14:47+03:00
+- **Branch/worktree:** feat/ni-017-auth-gateway; /Users/ilyutkinn/Desktop/Near
+- **Scope note:** this session implements the offline-implementable part (gateway handlers, signed HttpOnly cookie lifecycle, CSRF, login UI, mocked-provider test suite). The provider-backed dev E2E (real sign-up/verification round trip, cookie attributes at production-like TLS) stays an open criterion until the user completes the NI-016 Supabase handoff; the task must not be marked DONE before it.
 
 **Description:** Provide registration/login/logout/recovery with server-readable sessions and safe return navigation.
 
