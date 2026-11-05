@@ -17,15 +17,18 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Dependencies:** —
 - **Complexity:** M
 - **Status:** IN_PROGRESS
-- **Claimed by:** Codex / Python requirements and judge setup
+- **Claimed by:** Codex / Python requirements and judge setup (previous session; subset complete, handed off below)
 - **Execution role:** A
 - **Started at:** 2026-11-05T18:34:46+03:00
 - **Scope:** User authorized repository/collaborator setup, then a Python requirements baseline and judge deployment instructions. Python dependencies are now pinned/tested; frontend/workspace runtime tooling remains pending. Do not mark the full NI-001 DONE for this subset.
 - **Repository setup result:** Private ILYUTKICK/near-intelligence created; main pushed; BkycnocTbI accepted the invitation; active write access verified through the collaborator-permission API. User explicitly selected documentation/mockups only; raw research remains local and excluded from the published history.
 - **Repository setup verification:** Approved-path/history audit, secret-pattern scan, git diff --cached --check, preserved original artifact hashes, successful remote push and invitation API response. Runtime/toolchain acceptance criteria have not been performed.
-- **Handoff:** Repository and Python dependency setup are complete. No active file claim remains after this subset; the next role-A agent may resume the remaining frontend/workspace/runtime criteria. NI-001 stays IN_PROGRESS until all its acceptance criteria pass.
+- **Handoff (Codex → next role-A agent):** Repository and Python dependency setup are complete. No active file claim remains after this subset; the next role-A agent may resume the remaining frontend/workspace/runtime criteria. NI-001 stays IN_PROGRESS until all its acceptance criteria pass.
 - **Dependency setup started at:** 2026-11-05T18:57:15+03:00
 - **Branch/worktree:** feat/ni-001-python-requirements; /Users/ilyutkinn/Desktop/Near
+- **Resumed by (new claim):** ZCode agent for ILYUTKICK, role A, session 42d29234 — resumed under the user's 2026-11-05 implementation authorization, per the Codex handoff above.
+- **Resumed at:** 2026-11-05T19:34:30+03:00
+- **Remaining scope (this session):** select supported Node/pnpm/uv versions, add root workspace metadata and exact tool pins (package.json, pnpm-workspace.yaml, .node-version), clean-directory tool/dependency preflight, archive-hash preservation check, ignore-rules review, and the user's implementation-authorization update in AGENTS.md/COLLABORATION.md.
 
 **Description:** Create the first maintainable project envelope without changing saved research or design artifacts. Implementation begins only after user approval.
 
