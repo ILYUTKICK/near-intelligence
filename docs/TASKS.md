@@ -21,6 +21,9 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Execution role:** A
 - **Started at:** 2026-11-05T18:34:46+03:00
 - **Scope:** User authorized Git initialization, initial commit, private remote and collaborator access. Runtime tooling manifests/pins remain pending; do not mark the full NI-001 DONE for this subset.
+- **Repository setup result:** Private ILYUTKICK/near-intelligence created; main pushed; BkycnocTbI invited with write permission (acceptance pending). User explicitly selected documentation/mockups only; raw research remains local and excluded from the published history.
+- **Repository setup verification:** Approved-path/history audit, secret-pattern scan, git diff --cached --check, preserved original artifact hashes, successful remote push and invitation API response. Runtime/toolchain acceptance criteria have not been performed.
+- **Handoff:** Git/collaborator setup is complete; no active file claim remains from this setup session. The next role-A agent may resume the remaining NI-001 tooling requirements on the user's implementation instruction. NI-001 remains IN_PROGRESS until its full acceptance criteria pass.
 
 **Description:** Create the first maintainable project envelope without changing saved research or design artifacts. Implementation begins only after user approval.
 

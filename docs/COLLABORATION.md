@@ -1,6 +1,6 @@
 # Repository and collaboration setup
 
-Setup date:5 November 2026. Local branch:`main`. Target remote:`ILYUTKICK/near-intelligence`, private. Repository creation/push and invitation must be verified before they are described as completed. Verified collaborator account:[BkycnocTbI](https://github.com/BkycnocTbI); requested access:write (`push`).
+Setup date:5 November 2026. Repository:[ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence), created private and initially pushed on `main`. Verified collaborator account:[BkycnocTbI](https://github.com/BkycnocTbI). Invitation sent with **write** permission; invitation ID341761870. Sending the invitation does not mean the collaborator has accepted it. Check current GitHub membership/invitation status before claiming active access.
 
 ## Explicit sharing scope
 
@@ -11,6 +11,15 @@ Raw research JSON/CSV/TXT/SQL, manifests containing raw data metadata, collectio
 The unpublished initial full-project commit was replaced before any push. Only the documentation/mockup history may be sent to GitHub. Never use force-add, push--mirror or broad data uploads to bypass the sharing boundary. Future source-data sharing requires explicit authorization and an agreed channel; being a collaborator does not itself authorize publishing ignored data.
 
 A fresh clone therefore cannot execute legacy offline scripts or open every linked data artifact. Markdown findings remain available for context. Before a data/research task, confirm the actual input bundle and hashes or record the missing-data blocker; do not download paid/bulk data, fabricate inputs or treat a missing archive as zero.
+
+## Clone URL
+
+```sh
+git clone https://github.com/ILYUTKICK/near-intelligence.git
+cd near-intelligence
+```
+
+The invited account must accept at [repository invitations](https://github.com/ILYUTKICK/near-intelligence/invitations) and authenticate Git with its own credentials. HTTPS cloning a private repository requires GitHub authentication; no shared password/token is stored in this repository.
 
 ## Contributor workflow
 
