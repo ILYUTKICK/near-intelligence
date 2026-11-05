@@ -58,7 +58,9 @@ private-exports/
 /research/**
 !/research/**/
 !/research/**/*.md
-/product-plan/**/*.py
-/product-plan/**/*.cjs
-/product-plan/**/*.js
+/product-plan/**
+!/product-plan/**/
+!/product-plan/**/*.md
+!/product-plan/**/*.svg
+!/product-plan/**/*.png
 # STOP_PUBLIC_COLLECTION remains present locally; never delete/resume a stopped collector.

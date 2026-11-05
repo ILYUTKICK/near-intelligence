@@ -1,6 +1,6 @@
 # Repository and collaboration setup
 
-Setup date:5 November 2026. Repository:[ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence), created private and initially pushed on `main`. Verified collaborator account:[BkycnocTbI](https://github.com/BkycnocTbI). Invitation sent with **write** permission; invitation ID341761870. Sending the invitation does not mean the collaborator has accepted it. Check current GitHub membership/invitation status before claiming active access.
+Setup date:5 November 2026. Repository:[ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence), created private and initially pushed on `main`. Verified collaborator account:[BkycnocTbI](https://github.com/BkycnocTbI). Invitation ID341761870 was accepted during setup. GitHub collaborator-permission API verified **active write access** for BkycnocTbI. Membership can change later; re-check current permissions when investigating access issues.
 
 ## Explicit sharing scope
 
