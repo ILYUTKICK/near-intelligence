@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { DemoSignIn } from "@/app/(auth)/login/DemoSignIn";
 import { LoginForm } from "@/app/(auth)/login/LoginForm";
 import { SkipLink } from "@/components/layout/SkipLink";
 import { PublicHeader } from "@/components/layout/PublicHeader";
@@ -28,6 +29,7 @@ export default function LoginPage() {
               Create an account
             </Link>
           </p>
+          <DemoSignIn />
         </div>
       </main>
       <PublicFooter />
