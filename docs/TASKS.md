@@ -243,11 +243,15 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-006, NI-007, NI-009
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A
 - **Started at:** 2026-11-05T23:36:25+03:00
 - **Branch/worktree:** feat/ni-010-chart-frame; /Users/ilyutkinn/Desktop/Near
+- **Verification:** `pnpm --filter web test` — 23/23 pass (9 new): frame renders title/units/mode/quality badge with the freshness metadata line (period + last observed) as unconditional wrapping elements whose presence is asserted (they cannot disappear on small screens); the equivalent data table lives in a labeled scrollable region with an sr-only caption as its accessible name and states "not zero" for empty rows; the accessible summary is present; toolbar controls are keyboard reachable and Tab-walking reaches the source drawer trigger, whose Enter opens the provenance dialog showing provider name, license/access status, verification and last-success timestamps and lineage; the stale notice retains last-good values beside a live-mode badge; link sanitization renders only http(s) targets as anchors — javascript:/data:/protocol-relative/unparseable URLs become inert "(link withheld)" text and no javascript: anchor exists in the document; axe passes on the open drawer. `tsc --noEmit`, `next build`, `check:contrast` (22/22) pass.
+- **Result:** apps/web/src/features/charts/ — chart-frame-types.ts (interim DataSource mirror, replaced by generated types in NI-004), ChartFrame (title/units/mode/quality/freshness slots, range+actions toolbar slot, accessible summary details, data table slot, stale notice; no fetching — plot is a child slot for NI-033), SourceDrawer (per-source license/access/verification/cadence/last-success/lineage + definition/formula/manifest links, URL sanitization), DataTable (labeled scroll region, tabular-nums). Metadata is never hidden at any breakpoint; the drawer reflows instead. No new dependencies.
+- **Reviewer:** pending — role-B review requested on PR #10 (NI-010 reviewer per TEAM_PLAN.md).
+- **Completed at:** 2026-11-05T23:41:00+03:00
 
 **Description:** Provide consistent analytical framing before wiring rendering.
 
