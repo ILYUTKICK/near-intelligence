@@ -243,7 +243,11 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-006, NI-007, NI-009
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-05T23:36:25+03:00
+- **Branch/worktree:** feat/ni-010-chart-frame; /Users/ilyutkinn/Desktop/Near
 
 **Description:** Provide consistent analytical framing before wiring rendering.
 
