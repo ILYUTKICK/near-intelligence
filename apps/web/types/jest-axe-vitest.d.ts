@@ -36,3 +36,7 @@ declare module "vitest" {
     toHaveNoViolations(): void;
   }
 }
+
+// Turn this file into a module so the blocks above are augmentations,
+// not replacement declarations of the real modules.
+export {};
