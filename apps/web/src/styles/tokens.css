@@ -1,0 +1,156 @@
+/*
+ * Design tokens (NI-006) — source of truth: docs/DESIGN_SYSTEM.md.
+ * Values are the documented proposal; measured WCAG results are recorded in
+ * docs/TASKS.md (NI-006). Components must consume these variables instead of
+ * page-local palette values. Breakpoints for media queries (768, 1280) cannot
+ * be CSS custom properties: use them as constants in component styles.
+ */
+
+:root {
+  /* --- color.canvas --- */
+  --color-canvas: #f6f4ec; /* main warm ivory background */
+  --color-surface: #fffefa; /* reading paper, cards, dialogs */
+  --color-surface-muted: #e9eee5; /* quiet section/selection background */
+  --color-text: #17242d; /* primary navy-charcoal typography */
+  --color-text-secondary: #4b5c54; /* secondary descriptions, metadata */
+  --color-accent: #214d3b; /* primary action, links, chart series 1 */
+  --color-accent-hover: #173a2c; /* hover/pressed action */
+  --color-sage: #dce6d7; /* highlight fill only; dark text above */
+  --color-border: #d8ddd2; /* decorative border; never sole control boundary */
+  --color-control-border: #79877c; /* input boundaries on light surfaces */
+  --color-focus: #285f9a; /* focus ring, >=2px plus offset */
+  --color-warning: #80521d; /* stale/partial text with pale background */
+  --color-danger: #9b3b38; /* errors and opposing evidence, always with label/icon */
+  --color-chart-2: #5a7189; /* distinguishable secondary series */
+  --color-chart-3: #99662d;
+  --color-chart-4: #86657e;
+  --color-on-accent: #fffefa; /* text on primary action fills */
+
+  /* --- spacing scale (px) --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* --- radius and elevation --- */
+  --radius-surface: 12px;
+  --radius-control: 8px;
+  --radius-dialog: 16px;
+  --border-width: 1px;
+  --shadow-overlay: 0 8px 32px rgba(23, 36, 45, 0.08); /* menus/dialogs only */
+
+  /* --- focus --- */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* --- motion (restrained; see DESIGN_SYSTEM.md) --- */
+  --transition-fast: 120ms;
+  --transition-base: 180ms;
+
+  /* --- typography families (fonts self-hosted via next/font in layout.tsx) --- */
+  --font-serif: var(--font-newsreader, "Newsreader"), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter, "Inter"), system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* --- type scale: size/leading per DESIGN_SYSTEM.md; phone values in the
+     media query below. Hero 64/68 desktop, 40/44 phone. --- */
+  --text-hero-size: 64px;
+  --text-hero-leading: 68px;
+  --text-title-size: 36px;
+  --text-title-leading: 42px;
+  --text-heading-size: 24px;
+  --text-heading-leading: 32px;
+  --text-body-size: 16px;
+  --text-body-leading: 26px;
+  --text-ui-size: 14px;
+  --text-ui-leading: 20px;
+  --text-metadata-size: 12px;
+  --text-metadata-leading: 18px;
+  --text-document-size: 17px;
+  --text-document-leading: 28px;
+
+  /* --- layout widths --- */
+  --width-content-max: 1280px; /* desktop max */
+  --width-prose: 72ch; /* public prose reading width 68-74ch */
+  --width-sidebar: 240px;
+  --width-editor-outline: 200px;
+  --width-editor-tools: 280px;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --text-hero-size: 40px;
+    --text-hero-leading: 44px;
+  }
+}
+
+/* Base shell wiring: the theme applies to the whole app; components layer on top. */
+html {
+  background-color: var(--color-canvas);
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
+  margin: 0;
+  /* respect user zoom and iOS input zoom prevention (>=16px on inputs in components) */
+  -webkit-text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-serif);
+  color: var(--color-text);
+  margin: 0;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--text-hero-size);
+  line-height: var(--text-hero-leading);
+  font-weight: 500;
+}
+
+h2 {
+  font-size: var(--text-title-size);
+  line-height: var(--text-title-leading);
+  font-weight: 500;
+}
+
+h3 {
+  font-size: var(--text-heading-size);
+  line-height: var(--text-heading-leading);
+  font-weight: 500;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/* Tabular lining numerals for metrics/tables. */
+.tabular-nums {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Restrained motion: honor the reduced-motion preference globally. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
