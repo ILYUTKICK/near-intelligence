@@ -198,11 +198,15 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-007
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A
 - **Started at:** 2026-11-05T23:43:52+03:00
 - **Branch/worktree:** feat/ni-008-layout-shells; /Users/ilyutkinn/Desktop/Near
+- **Verification:** `pnpm --filter web test` — 31/31 pass (8 new): the route registry matches INFORMATION_ARCHITECTURE.md label-by-label (public 4 items, workspace 4 groups / 11 items), hrefs are unique, every entry enabled P0, and no label/path matches strategy|portfolio; the skip link is the first tabbable element targeting #main-content; the public header renders registry nav with aria-current on the active route; the mobile drawer opens from the keyboard, lists items, closes on Escape with focus restored (vaul focus trap) and shows workspace groups with availability notes; the workspace sidebar marks the active route via aria-current and exposes the mobile trigger; breadcrumbs link ancestors and aria-current the current page; axe passes on header and open drawer (region rule disabled with the recorded NI-007 rationale). `tsc --noEmit`, `next build`, `check:contrast` (22/22) pass. Browser visual review at 1440/768/360 on the dev server: horizontal overflow absent at all three widths (scrollWidth === viewport), DOM landmarks skip-link → banner → main → contentinfo verified in the accessibility tree, mobile drawer opens with grouped items (screenshots in docs/verification/ni-008/).
+- **Result:** apps/web/src/lib/navigation.ts (canonical registry: public nav, workspace groups, auth entries, editorial anchors) + apps/web/src/lib/workspace-auth.tsx (pluggable anonymous-default auth context — replaced by the real session provider in NI-016/021 without touching shells) + apps/web/src/components/layout/ — SkipLink, PublicHeader (registry-driven, active route, sign-in action, mobile trigger), PublicFooter (honest framing, editorial anchors), MobileNavDrawer (one registry for desktop and mobile), WorkspaceSidebar (240px desktop + grouped mobile drawer), Breadcrumbs. Home page now renders the full public shell. No Strategy/Portfolio routes anywhere; no fake stats in the footer. Fix on this branch: workspace-auth renamed .tsx (JSX). Route protection itself is NI-021.
+- **Reviewer:** pending — role-B review requested on PR #11 (NI-008 reviewer per TEAM_PLAN.md).
+- **Completed at:** 2026-11-05T23:51:30+03:00
 
 **Description:** Implement one configurable navigation source for desktop and mobile.
 
