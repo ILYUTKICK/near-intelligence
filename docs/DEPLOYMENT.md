@@ -2,6 +2,10 @@
 
 Planned topology; no resources are provisioned and no deployment has occurred. Baseline is deliberately portable: reverse proxy + Next.js + FastAPI on one VM, managed PostgreSQL and Supabase Auth, persistent artifact volume, scheduled Python CLI/worker. No hosting purchase or account creation is part of this documentation work.
 
+## Dependency baseline and judge handoff
+
+[DEPENDENCIES.md](DEPENDENCIES.md) defines the tested CPython3.13 hash-pinned requirements baseline and migration to the future uv.lock. Python dependencies are installable now; application services are not implemented. [JUDGE_SETUP.md](JUDGE_SETUP.md) is the mandatory clean-clone deployment/reproduction runbook for NI-066/NI-069, including frontend locks, database/auth configuration and explicitly authorized evidence input access. A dependency-only smoke test does not satisfy deployment acceptance.
+
 ## Local development contract
 
 NI-001–NI-003 creates exact runtime pins, pnpm/uv locks, `.gitignore`, Dockerfiles, Compose and root scripts. Compose services: `db` (PostgreSQL major chosen/tested at bootstrap), `api` (FastAPI), `web` (Next.js); optional explicit `worker` profile for exports. Startup must not run ingestion, models, fetch scripts or cloud SQL automatically. Supabase Auth is an explicitly configured dev project or optional local stack; do not silently use production auth.

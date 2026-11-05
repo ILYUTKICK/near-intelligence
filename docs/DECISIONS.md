@@ -20,6 +20,7 @@ Accepted for the implementation specification on 5 November 2026; no application
 | ADR-014 | UTC half-open dates, integer/Decimal money and decimal-string transport | Floating arithmetic is allowed only for statistical fitting after explicit transformation; raw quantities remain exact |
 | ADR-015 | Offline saved data first; ingestion opt-in with provider-specific bounds | No automatic restart of stopped RPC or paid BigQuery. “Live” release still needs at least one approved fresh series |
 | ADR-016 | One-writer document revision CAS; conflict UI, no silent merge | CRDT/collaboration deferred. Whole-document autosave transaction is tractable within bounded document limits |
+| ADR-017 | Provide a generated, hash-pinned root requirements.txt for CPython3.13 before API scaffolding | User requested convenient contributor/judge installation. requirements.in is the temporary direct source; NI-002 migrates to pyproject.toml/uv.lock and exports requirements.txt from it. No parallel independent locks; deployment still requires actual app/source/data/config. |
 
 ## Evidence behind tool choices
 

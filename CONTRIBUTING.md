@@ -29,3 +29,9 @@ These commands are planned, not currently installed. Run checks proportional to 
 State the user-visible behavior, task ID, rationale, actual checks and results, changed data/definitions, migrations and rollback implications. Include visual evidence for UI work and a source-to-claim trace for research changes. Label synthetic fixtures and do not report fixture models as findings. Review against acceptance criteria before marking DONE; blocked provider access remains BLOCKED with the blocking question ID.
 
 Any new dependency needs a reason, current official documentation, license check, pinned lock entry and compatibility validation. ADRs are required for changing authentication, editor schema, canonical storage, deployment topology or model methodology. Update documentation whenever routes, fields, states, commands, metric definitions or priorities change.
+
+## Dependency changes
+
+Read [DEPENDENCIES.md](docs/DEPENDENCIES.md). The current requirements.txt is generated from requirements.in with exact versions and hashes; use a clean CPython3.13 environment and hash-checked installation. NI-002 migrates declarations to pyproject.toml/uv.lock and exports the compatibility requirements file from that lock. Do not hand-edit the generated file or freeze an unrelated personal environment. Frontend dependencies use package.json/pnpm-lock.yaml once implemented.
+
+Judge setup is a release acceptance criterion: keep [JUDGE_SETUP.md](docs/JUDGE_SETUP.md) synchronized with real working commands. A Python install is not evidence that Docker/auth/database/data/model reproduction works.

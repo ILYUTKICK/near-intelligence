@@ -22,6 +22,10 @@ Inspect each script's read paths before execution: not every legacy script is a 
 
 **Do not run** fetch scripts, archival header collection, cloud SQL or stopped account-balance collectors as part of offline reproduction. Do not remove STOP_PUBLIC_COLLECTION. In particular the supply audit must continue to report 6/297 verified headers; no offline calculation can invent missing gross issuance/burn. Do not rerun Explorer collection requiring the former token.
 
+## Dependency baseline
+
+The root [requirements.txt](../requirements.txt) now contains a tested hash-pinned Python dependency set; [DEPENDENCIES.md](DEPENDENCIES.md) records platforms and checks. This does not include the unshared research code/data. NI-002 will make pyproject.toml/uv.lock the declaration/lock source and export the pip-compatible file, keeping one exact version source. A published model must record its actual Python patch, dependency lock/hash and input manifests; installing packages alone does not reproduce a model.
+
 ## Future reproducibility bundle
 
 Each approved dataset bundle includes manifest schema version, dataset UUID/key/version, UTC scope and cohort, raw artifact names/byte hashes, source URLs/query IDs/SQL hashes, source cutoff/retrieved times, original units/decimals, cleaning/matching rules, metric definition versions, code commit, dependency lock hash, config and canonical transformed-data hash. Include quality/coverage/revisions/known exclusions/license restrictions.

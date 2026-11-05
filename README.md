@@ -6,10 +6,11 @@ The investment question is whether cross-chain adoption translates into sustaina
 
 ## Current state — 5 November 2026
 
-The Git repository is initialized on branch `main` and published privately at [ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence). **GitHub sharing is limited to documentation and visual mockups, including Markdown research findings.** Raw research inputs, SQL and calculation/collection scripts remain local and ignored. Some evidence links and offline commands below refer to that unshared local archive and are unavailable in a fresh clone; arrange a separately authorized data handoff before research implementation. The application is not initialized; no frontend, backend, migrations, lockfiles or Docker Compose file exist yet. The user has authorized repository initialization and collaborator setup; runtime/application implementation remains outside this setup task. Local evidence is historical, principally 6 August–3 November 2026 UTC; it must never be labeled live merely because a page loads.
+The Git repository is initialized on branch `main` and published privately at [ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence). **GitHub sharing is limited to documentation, visual mockups and Python dependency manifests, including Markdown research findings.** Raw research inputs, SQL and calculation/collection scripts remain local and ignored. Some evidence links and offline commands below refer to that unshared local archive and are unavailable in a fresh clone; arrange a separately authorized data handoff before research implementation. The application is not initialized; no frontend/backend source, migrations, uv/pnpm lockfiles or Docker Compose file exist yet. A tested Python dependency baseline is available in requirements.txt. The user has authorized repository initialization and collaborator setup; runtime/application implementation remains outside this setup task. Local evidence is historical, principally 6 August–3 November 2026 UTC; it must never be labeled live merely because a page loads.
 
 - **[Mandatory agent execution plan](PLAN.md)** — read before selecting or implementing any task.
 - [Collaboration and repository setup](docs/COLLABORATION.md)
+- [Python dependency baseline](docs/DEPENDENCIES.md) and [judge setup checklist](docs/JUDGE_SETUP.md)
 - [Documentation index](docs/INDEX.md)
 - [Repository audit](docs/REPOSITORY_AUDIT.md) and [source verification](docs/SOURCE_VERIFICATION.md)
 - [Product requirements](docs/PRODUCT_REQUIREMENTS.md), [strict MVP](docs/MVP_SCOPE.md)
@@ -35,9 +36,21 @@ python3 research/near-treasury/scripts/analyze.py
 
 These four analysis scripts use Python standard-library modules. Optional plotting and future econometrics need pinned scientific dependencies. Do not run `fetch_*`, cloud SQL, stopped balance collection or archival mint collection to reproduce existing findings. [Detailed reproduction](docs/REPRODUCIBILITY.md) covers provenance scripts and caveats.
 
+## Available now — Python dependencies
+
+Use CPython 3.13 from the repository root:
+
+```sh
+python3.13 -m venv .venv
+.venv/bin/python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
+.venv/bin/python -m pip check
+```
+
+The generated [requirements.txt](requirements.txt) pins the selected API/research stack and transitive distribution hashes. [requirements.in](requirements.in) is its direct dependency source until NI-002 migrates declarations to pyproject.toml/uv.lock. This installs dependencies only; it does not launch an application or supply the unshared research archive. See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for tested platforms and [JUDGE_SETUP.md](docs/JUDGE_SETUP.md) for the remaining deployment gates.
+
 ## Planned onboarding contract — unavailable until foundation tasks finish
 
-Future prerequisites: Node supported by the selected Next.js release, pnpm pinned through `packageManager`, Python 3.13 compatibility check, uv, Docker Compose, Supabase development auth project. Exact versions are resolved and locked in NI-001/NI-002, not guessed here.
+Future prerequisites: Node supported by the selected Next.js release, pnpm pinned through `packageManager`, CPython 3.13, uv, Docker Compose, Supabase development auth project. Python packages are resolved and hash-pinned now; frontend tool versions and uv/pnpm lockfiles are completed in NI-001/NI-002.
 
 ```sh
 cp .env.example .env

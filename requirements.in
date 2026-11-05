@@ -1,0 +1,27 @@
+# NEAR Intelligence — direct Python dependencies for the selected API/research stack.
+# Input to requirements.txt, never install this unconstrained file in a release.
+# Supported interpreter family: CPython3.13. Versions/hashes are resolved from PyPI.
+# When NI-002 creates pyproject.toml/uv.lock, move declarations there and export
+# requirements.txt from that lock; do not maintain two independent version sources.
+
+# Typed HTTP API and environment settings
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+
+# Transactional PostgreSQL storage/migrations; psycopg binary avoids a local C build.
+SQLAlchemy
+alembic
+psycopg[binary]
+
+# Approved provider HTTP and asymmetric JWT verification
+httpx
+PyJWT[crypto]
+
+# Reproducible tabular/statistical analysis and diagnostic figures
+pandas
+numpy
+scipy
+statsmodels
+matplotlib

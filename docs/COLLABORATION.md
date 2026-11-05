@@ -4,7 +4,7 @@ Setup date:5 November 2026. Repository:[ILYUTKICK/near-intelligence](https://git
 
 ## Explicit sharing scope
 
-The user chose **documentation and mockups only**. Include root instructions/plans, docs/*.md, research Markdown findings/READMEs and product-plan Markdown/SVG/PNG designs/prompts. Include .env.example and Git configuration templates as onboarding metadata; no real credentials.
+The user chose **documentation and mockups only** for the archive upload and subsequently requested Python dependency manifests for contributors/judges. Include root instructions/plans, docs/*.md, research Markdown findings/READMEs and product-plan Markdown/SVG/PNG designs/prompts. Include .env.example, Git configuration templates and the explicitly requested .python-version/requirements.in/requirements.txt as onboarding metadata; no real credentials.
 
 Raw research JSON/CSV/TXT/SQL, manifests containing raw data metadata, collection/calculation scripts, captured third-party JS/HTML and process state remain on the original machine and are ignored. The original research archive is roughly149 MB; it is not authorized for GitHub upload. STOP_PUBLIC_COLLECTION stays on disk, and collectors remain stopped.
 
@@ -29,7 +29,7 @@ The invited account must accept at [repository invitations](https://github.com/I
 4. Select an available assigned NI-task, coordinate its claim/status, and create a short branch `feat/ni-XXX-description`. Do not overwrite another active claim or edit a generated API client manually.
 5. Run appropriate verification and open a pull request into main. The other participant reviews it; merge only after the task's full acceptance checks pass.
 
-Application installation commands in README remain target contracts until foundation tasks implement runtimes/services. Git setup alone does not complete NI-001's runtime/toolchain requirements or automatically start NI-002.
+The Python dependency-install commands in [DEPENDENCIES.md](DEPENDENCIES.md) are tested now; application startup commands remain target contracts until foundation tasks implement runtimes/services. Git setup alone does not complete NI-001's runtime/toolchain requirements or automatically start NI-002.
 
 ## Access and safeguards
 
