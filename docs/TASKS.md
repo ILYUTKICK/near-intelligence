@@ -375,7 +375,11 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-05T23:59:52+03:00
+- **Branch/worktree:** feat/ni-016-auth-environment; /Users/ilyutkinn/Desktop/Near
 
 **Description:** Establish Supabase identity configuration without creating a custom password store.
 
