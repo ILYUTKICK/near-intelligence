@@ -1,0 +1,26 @@
+# NI-003 DB contribution. API/web/worker packaging is NI-066; nothing ingests data.
+services:
+  db:
+    image: postgres:18.6-bookworm
+    environment:
+      POSTGRES_DB: near_intelligence
+      POSTGRES_USER: near_bootstrap
+      POSTGRES_PASSWORD: ${DB_BOOTSTRAP_PASSWORD:?Set DB_BOOTSTRAP_PASSWORD}
+      DB_RUNTIME_PASSWORD: ${DB_RUNTIME_PASSWORD:?Set DB_RUNTIME_PASSWORD}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:?Set DB_MIGRATION_PASSWORD}
+      DB_OPERATOR_PASSWORD: ${DB_OPERATOR_PASSWORD:?Set DB_OPERATOR_PASSWORD}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      # PostgreSQL 18+ image stores its versioned cluster below /var/lib/postgresql.
+      - near_db:/var/lib/postgresql
+      - ./scripts/db/010-roles.sql:/docker-entrypoint-initdb.d/010-roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U near_bootstrap -d near_intelligence"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: "no"
+
+volumes:
+  near_db:

@@ -70,12 +70,15 @@ uv sync --project apps/api --frozen
 uv run --project apps/api uvicorn near_api.main:app --reload --port 8000   # boots apps/api on :8000
 ```
 
-Planned database/compose commands remain target contracts until NI-003 and later foundation tasks implement them:
+NI-003 defines a DB-only Compose service and explicit identity migrations. Native
+PostgreSQL migration/RLS checks are tested; Docker execution is unverified in the
+role-B Windows session. Configure distinct credentials using the
+[database setup runbook](docs/DATABASE_SETUP.md) first:
 
 ```sh
-# Planned Compose services: db, api, web; no collector starts automatically.
-docker compose up --build
-uv run --project apps/api alembic upgrade head
+# Defined DB-only Compose path; API/web packaging belongs to NI-066.
+docker compose up -d db
+uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
 ```
 
 Compose mode and native development mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Web `.env` loading is implemented explicitly in [apps/web/src/lib/env.ts](apps/web/src/lib/env.ts) and API loading in [apps/api/src/near_api/settings.py](apps/api/src/near_api/settings.py); missing required configuration makes `/health` return a readable 503 on both services. Production settings and health gates: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example).

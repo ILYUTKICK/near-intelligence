@@ -1,6 +1,6 @@
 # Database schema
 
-Logical PostgreSQL schema; no migration is created in this phase. SQLAlchemy/Alembic implements this design after approval. [Editor](EDITOR_SPECIFICATION.md), [API](API_SPECIFICATION.md), [security](AUTHENTICATION_SECURITY.md).
+Logical PostgreSQL schema. NI-003 implements the initial identity tables and role/RLS foundation; remaining domain tables below are specifications for their owning tasks. See [database setup and checks](DATABASE_SETUP.md), [editor](EDITOR_SPECIFICATION.md), [API](API_SPECIFICATION.md), [security](AUTHENTICATION_SECURITY.md).
 
 ## Global conventions
 
@@ -15,7 +15,7 @@ Private rows carry `owner_id REFERENCES users(id)`. Public scientific definition
 | Entity | Fields and keys | Constraints/indexes/lifecycle |
 | --- | --- | --- |
 | users | id UUID PK (provider JWT sub), auth_provider='supabase', created_at, disabled_at nullable | No password hashes; email stays at auth provider. API creates row only after JWT validation; immutable subject |
-| user_profiles | user_id PK/FK users, display_name varchar(80), display_timezone varchar(64), updated_at | One-to-one; timezone validated against IANA; calculations remain UTC; CAS via updated_at or profile revision |
+| user_profiles | user_id PK/FK users, display_name varchar(80), display_timezone varchar(64), created_at, updated_at | One-to-one; timezone validated against IANA; calculations remain UTC; CAS via updated_at or profile revision |
 | documents | id PK, owner_id, title varchar(200), revision bigint default 1, current_version_id UUID, schema_version int, created_at, updated_at | UNIQUE(id,owner_id); index(owner_id,updated_at DESC,id); title nonempty; revision >0. Current version composite FK points to same document/owner, DEFERRABLE for insert transaction |
 | document_versions | id PK, document_id, owner_id, revision bigint, schema_version, content JSONB, resolved_contexts JSONB, content_sha256, created_at, source_publication_id nullable | FK(document_id,owner_id)→documents; UNIQUE(document_id,revision), UNIQUE(id,document_id,owner_id). Immutable; max content 2 MiB/200 top-level blocks. resolved_contexts keyed by block ID, includes pinned dataset/chart/model versions |
 | document_blocks | document_version_id, document_id, owner_id, block_id UUID, parent_block_id nullable, position int, type, attrs JSONB | PK(document_version_id,block_id); composite FK(version,doc,owner)→document_versions; UNIQUE(version,parent,position) using NULLS NOT DISTINCT. Parent FK(version,parent_block_id)→same table; check acyclic/max nesting depth 3. Index(version,type). Derived projection, never independently edited |
