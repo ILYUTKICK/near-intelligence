@@ -21,7 +21,8 @@ declare module "jest-axe" {
   ): Promise<AxeResults>;
 
   export const toHaveNoViolations: {
-    toHaveNoViolations: () => (results: AxeResults) => {
+    /** Matcher fn for expect.extend: (received) => ExpectationResult. */
+    toHaveNoViolations: (results: AxeResults) => {
       pass: boolean;
       message: () => string;
     };
