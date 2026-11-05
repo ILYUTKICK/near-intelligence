@@ -1,0 +1,117 @@
+"""Create, test and stop a disposable loopback PostgreSQL cluster; no user DB used.
+
+Run with the frozen API environment and --pg-bin pointing to PostgreSQL 18 bin.
+No Docker daemon, provider, auth account or historical research archive is needed.
+"""
+
+import argparse
+import os
+from pathlib import Path
+import secrets
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+
+from sqlalchemy.engine import URL
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--pg-bin", type=Path, required=True)
+    args = parser.parse_args()
+    repo = Path(__file__).resolve().parents[1]
+    local = (repo / ".local").resolve()
+    local.mkdir(exist_ok=True)
+    directory = Path(tempfile.mkdtemp(prefix="ni003-pg-", dir=local)).resolve()
+    if directory.parent != local or not directory.name.startswith("ni003-pg-"):
+        raise RuntimeError("Unsafe temporary-cluster path")
+    executable_suffix = ".exe" if os.name == "nt" else ""
+    environment = os.environ.copy()
+    environment["PGPASSWORD"] = secrets.token_urlsafe(32)
+    environment["DB_BOOTSTRAP_PASSWORD"] = environment["PGPASSWORD"]
+    for key in ("DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD", "DB_OPERATOR_PASSWORD"):
+        environment[key] = secrets.token_urlsafe(32)
+    password_file = directory / "bootstrap-password"
+    password_file.write_text(environment["PGPASSWORD"], encoding="utf-8")
+    with socket.socket() as candidate:
+        candidate.bind(("127.0.0.1", 0))
+        port = candidate.getsockname()[1]
+    environment.update(PGHOST="127.0.0.1", PGPORT=str(port), PGUSER="ni_test_admin")
+    data = directory / "data"
+    started, stopped = False, False
+
+    def run_pg(name, *arguments):
+        binary = args.pg_bin / (name + executable_suffix)
+        if not binary.is_file():
+            raise RuntimeError(f"PostgreSQL binary is unavailable: {name}")
+        # Background postgres children may inherit a pipe even after pg_ctl exits.
+        # A file avoids waiting forever for EOF from that inherited handle.
+        output = directory / f"{name}-command.log"
+        with output.open("wb") as log:
+            result = subprocess.run([str(binary), *map(str, arguments)], env=environment,
+                                    stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                                    timeout=60,
+                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+        message = output.read_text(encoding="utf-8", errors="replace")
+        if result.returncode:
+            for key in ("PGPASSWORD", "DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD", "DB_OPERATOR_PASSWORD"):
+                message = message.replace(environment[key], "[redacted]")
+            raise RuntimeError(f"{name} failed: {message}")
+        return message
+
+    def url(user, password):
+        return URL.create("postgresql+psycopg", username=user, password=password,
+                          host="127.0.0.1", port=port, database="near_intelligence_test").render_as_string(
+                              hide_password=False)
+
+    try:
+        version = run_pg("postgres", "--version").strip()
+        if " 18." not in version:
+            raise RuntimeError("The verified integration target is PostgreSQL major 18")
+        print(f"Testing {version} in a disposable loopback cluster", flush=True)
+        run_pg("initdb", "-D", data, "-U", "ni_test_admin", "--pwfile", password_file,
+               "--auth-host=scram-sha-256", "--auth-local=trust", "--encoding=UTF8", "--no-locale")
+        password_file.unlink()
+        # A partially successful start must also be stopped before any cleanup.
+        started = True
+        run_pg("pg_ctl", "-D", data, "-l", directory / "server.log", "-w", "-t", "20", "-o",
+               f"-h 127.0.0.1 -p {port}", "start")
+        run_pg("createdb", "near_intelligence_test")
+        run_pg("psql", "--no-psqlrc", "-d", "near_intelligence_test", "-f", repo / "scripts/db/010-roles.sql")
+        environment.update(
+            NI_ISOLATED_PG_TEST="1", PYTHONPATH=str(repo / "apps/api/src"),
+            NI_TEST_ADMIN_URL=url("ni_test_admin", environment["PGPASSWORD"]),
+            NI_TEST_RUNTIME_URL=url("near_app", environment["DB_RUNTIME_PASSWORD"]),
+            NI_TEST_OPERATOR_URL=url("near_operator", environment["DB_OPERATOR_PASSWORD"]),
+            MIGRATION_DATABASE_URL=url("near_migrator", environment["DB_MIGRATION_PASSWORD"]),
+        )
+        test_log = directory / "test-results.log"
+        with test_log.open("wb") as log:
+            result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "apps/api/tests",
+                                     "-p", "test_database.py", "-v"], cwd=repo, env=environment,
+                                    stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                    timeout=120,
+                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+        report = test_log.read_text(encoding="utf-8", errors="replace")
+        for key in ("PGPASSWORD", "DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD", "DB_OPERATOR_PASSWORD"):
+            report = report.replace(environment[key], "[redacted]")
+        print(report, flush=True)
+        if not report or "skipped=" in report:
+            raise RuntimeError("Integration tests must execute; no-output/skip is not a pass")
+        return result.returncode
+    finally:
+        if started:
+            try:
+                run_pg("pg_ctl", "-D", data, "-m", "fast", "-w", "-t", "20", "stop")
+                stopped = True
+            except Exception:
+                print(f"Cluster stop needs attention; retained isolated files at {directory}", file=sys.stderr)
+                raise
+        if (not started or stopped) and directory.parent == local and directory.name.startswith("ni003-pg-"):
+            shutil.rmtree(directory)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
