@@ -15,45 +15,36 @@ import { z } from "zod";
  *   client bundles (scripts/check-client-secrets.mjs guards the build).
  */
 
-const PLACEHOLDER_PATTERN = /^REPLACE[_A-Z0-9]*$/i;
+const PLACEHOLDER_PATTERN = /REPLACE[_A-Z0-9]*/i;
 
-function rejectPlaceholders(variable: string) {
-  return (value: string) => {
-    if (PLACEHOLDER_PATTERN.test(value.trim()) || value.trim().length === 0) {
-      throw new Error(
-        `${variable} still has its placeholder value. Copy .env.example to .env at the repository root and set the real development values (see docs/AUTHENTICATION_SECURITY.md).`,
-      );
-    }
-    return value;
-  };
+/** Refuse placeholder values as a refinement, so safeParse catches them. */
+function guardAgainstPlaceholder<T extends z.ZodType<string>>(schema: T, variable: string) {
+  return schema.refine((value) => !PLACEHOLDER_PATTERN.test(value), {
+    message: `${variable} still has its placeholder value. Copy .env.example to .env at the repository root and set the real development values (see docs/AUTHENTICATION_SECURITY.md).`,
+  });
 }
 
 const publicSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z
-    .string()
-    .url()
-    .transform(rejectPlaceholders("NEXT_PUBLIC_SUPABASE_URL")),
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z
-    .string()
-    .min(20)
-    .transform(rejectPlaceholders("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"))
-    .refine(
-      (value) => !value.toLowerCase().includes("service_role"),
-      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY looks like a service-role credential; the browser path must use the publishable key only.",
-    ),
+  NEXT_PUBLIC_SUPABASE_URL: guardAgainstPlaceholder(
+    z.string().url(),
+    "NEXT_PUBLIC_SUPABASE_URL",
+  ),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: guardAgainstPlaceholder(
+    z.string().min(20),
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  ).refine(
+    (value) => !value.toLowerCase().includes("service_role"),
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY looks like a service-role credential; the browser path must use the publishable key only.",
+  ),
 });
 
 const serverSchema = z.object({
-  SUPABASE_JWT_ISSUER: z.string().url().transform(rejectPlaceholders("SUPABASE_JWT_ISSUER")),
-  SUPABASE_JWKS_URL: z
-    .string()
-    .url()
-    .refine((value) => value.startsWith("https://"), "SUPABASE_JWKS_URL must be https.")
-    .transform(rejectPlaceholders("SUPABASE_JWKS_URL")),
-  SUPABASE_JWT_AUDIENCE: z
-    .string()
-    .min(1)
-    .transform(rejectPlaceholders("SUPABASE_JWT_AUDIENCE")),
+  SUPABASE_JWT_ISSUER: guardAgainstPlaceholder(z.string().url(), "SUPABASE_JWT_ISSUER"),
+  SUPABASE_JWKS_URL: guardAgainstPlaceholder(z.string().url(), "SUPABASE_JWKS_URL").refine(
+    (value) => value.startsWith("https://"),
+    "SUPABASE_JWKS_URL must be https.",
+  ),
+  SUPABASE_JWT_AUDIENCE: guardAgainstPlaceholder(z.string().min(1), "SUPABASE_JWT_AUDIENCE"),
   SUPABASE_JWT_ALGORITHM: z.enum(["ES256", "RS256", "EdDSA"], {
     message:
       "SUPABASE_JWT_ALGORITHM must be an asymmetric algorithm (ES256, RS256 or EdDSA). HS256/shared secrets are rejected by the security specification.",
@@ -82,14 +73,11 @@ const serverSchema = z.object({
       }
       return origins;
     }),
-  AUTH_COOKIE_SIGNING_SECRET: z
-    .string()
-    .min(32)
-    .transform(rejectPlaceholders("AUTH_COOKIE_SIGNING_SECRET")),
-  CSRF_SIGNING_SECRET: z
-    .string()
-    .min(32)
-    .transform(rejectPlaceholders("CSRF_SIGNING_SECRET")),
+  AUTH_COOKIE_SIGNING_SECRET: guardAgainstPlaceholder(
+    z.string().min(32),
+    "AUTH_COOKIE_SIGNING_SECRET",
+  ),
+  CSRF_SIGNING_SECRET: guardAgainstPlaceholder(z.string().min(32), "CSRF_SIGNING_SECRET"),
 });
 
 export type PublicAuthConfig = z.infer<typeof publicSchema>;
