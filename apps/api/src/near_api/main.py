@@ -6,10 +6,11 @@ model runs from this module; data boundaries are enforced by later tasks.
 
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request
 
 from near_api import __version__
+from near_api.contracts import error_response, install_contracts
+from near_api.schemas.common import ErrorResponse, HealthResponse
 from near_api.settings import SettingsError, get_settings
 
 app = FastAPI(
@@ -18,25 +19,18 @@ app = FastAPI(
     # Public catalog/data endpoints arrive in their own tasks (NI-032, NI-054).
     docs_url=None,
     redoc_url=None,
-    openapi_url=None,
+    openapi_url="/openapi.json",
 )
+install_contracts(app)
 
 
-@app.get("/health")
-def health() -> JSONResponse:
+@app.get("/health", response_model=HealthResponse, operation_id="getHealth",
+         responses={503: {"model": ErrorResponse, "description": "Invalid server configuration"}})
+def health(request: Request):
     """Process liveness mirroring the web service /health JSON shape."""
     try:
         settings = get_settings()
     except SettingsError as error:
-        return JSONResponse(
-            status_code=503,
-            content={"status": "error", "error": str(error)},
-        )
-    return JSONResponse(
-        content={
-            "status": "ok",
-            "service": "api",
-            "appEnv": settings.APP_ENV,
-            "checkedAt": datetime.now(timezone.utc).isoformat(),
-        }
-    )
+        return error_response(request, 503, "CONFIGURATION_ERROR", str(error))
+    return HealthResponse(status="ok", service="api", appEnv=settings.APP_ENV,
+                          checkedAt=datetime.now(timezone.utc))
