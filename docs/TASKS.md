@@ -198,7 +198,11 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-007
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-05T23:43:52+03:00
+- **Branch/worktree:** feat/ni-008-layout-shells; /Users/ilyutkinn/Desktop/Near
 
 **Description:** Implement one configurable navigation source for desktop and mobile.
 
