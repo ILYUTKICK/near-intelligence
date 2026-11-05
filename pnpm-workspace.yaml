@@ -1,0 +1,6 @@
+# Root pnpm workspace for JavaScript/TypeScript packages.
+# apps/api is Python (uv/pip); it must not be listed here.
+# packages/* covers future shared TypeScript packages (e.g. shared-types).
+packages:
+  - apps/web
+  - packages/*
