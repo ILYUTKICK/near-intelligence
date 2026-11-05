@@ -216,7 +216,16 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-007
 - **Complexity:** S
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-05T23:24:13+03:00
+- **Branch/worktree:** feat/ni-009-data-states; /Users/ilyutkinn/Desktop/Near
+- **Pre-task fix on this branch:** jsdom held at 30.1.3 — the 31.0.0 release published the same day violated pnpm 12's minimumReleaseAge supply-chain policy, and the auto-added exclusion in pnpm-workspace.yaml was removed in favor of the older, policy-compliant version (lockfile rebuilt via `pnpm clean --lockfile`; diff contained to the jsdom subtree; DEPENDENCIES.md updated).
+- **Verification:** `pnpm --filter web test` — 14/14 pass (7 NI-007 suites + 7 new): the empty state renders explanatory copy with retained units/period/limitation and never renders a bare zero, while a genuine zero value in data still displays as zero (matrix contrast case); the unavailable state driven by the canonical DataQuality shape shows its reasons verbatim plus metadata and no zero; the quality badge labels all six statuses and the lower-bound/coverage text in visible text+glyph (not color alone); the stale notice states the freshness target and retains metadata next to still-visible values; ErrorPanel retry fires exactly once under click/dblclick storms (Button pending); SaveStatus is persistent, aria-live=polite and renders all four states with glyphs. `tsc --noEmit`, `next build` and `check:contrast` (22/22) pass. Axe runs on every rendered state with the page-level `region` rule disabled (landmarks = NI-008), consistent with NI-007.
+- **Result:** apps/web/src/components/data-state/ — quality.ts (typed interim mirror of the canonical DataQuality contract from API_SPECIFICATION.md, to be replaced by generated shared types in NI-004), QualityBadge (status+bound+coverage, text not color), Skeleton, DataState panels (LoadingPanel, EmptyState, UnavailableState, ErrorPanel with retry, StaleNotice) retaining units/date/limitations metadata, SaveStatus (persistent, aria-live). No new dependencies. No production fixtures — all test data synthetic and labeled.
+- **Reviewer:** pending — role-B review requested on PR #9 (NI-009 reviewer per TEAM_PLAN.md).
+- **Completed at:** 2026-11-05T23:30:10+03:00
 
 **Description:** Make missing, stale and failed data distinct from verified zero throughout UI.
 

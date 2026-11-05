@@ -61,7 +61,7 @@ Added 5 November 2026 for `apps/web` accessible interaction primitives; versions
 | [vaul](https://www.npmjs.com/package/vaul/v/1.1.2) | 1.1.2 | Focus-trapped drawer (mobile nav) | MIT |
 | [class-variance-authority](https://www.npmjs.com/package/class-variance-authority/v/0.7.1) | 0.7.1 | Button variants | Apache-2.0 |
 | [clsx](https://www.npmjs.com/package/clsx/v/2.1.1) / [tailwind-merge](https://www.npmjs.com/package/tailwind-merge/v/3.7.0) | 2.1.1 / 3.7.0 | cn() class composition | MIT |
-| [vitest](https://www.npmjs.com/package/vitest/v/5.1.0) + jsdom + @vitejs/plugin-react | 5.1.0 / 31.0.0 / 6.2.1 | Component test runner | MIT |
+| [vitest](https://www.npmjs.com/package/vitest/v/5.1.0) + jsdom + @vitejs/plugin-react | 5.1.0 / 30.1.3 / 6.2.1 | Component test runner; jsdom held at 30.1.3 (2026-10-15) because 31.0.0 published the same day violated pnpm's minimumReleaseAge policy — upgrade deliberately once the age window clears | MIT |
 | @testing-library/react / user-event / jest-dom | 16.3.3 / 14.6.8 / 7.0.1 | Keyboard integration tests | MIT |
 | [jest-axe](https://www.npmjs.com/package/jest-axe/v/11.0.0) | 11.0.0 | Automated axe checks (local vitest types in apps/web/types) | MIT |
 
