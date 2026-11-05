@@ -38,7 +38,14 @@ These four analysis scripts use Python standard-library modules. Optional plotti
 
 ## Available now — Python dependencies
 
-Use CPython 3.13 from the repository root:
+Preferred path (uv, frozen lock):
+
+```sh
+uv sync --project apps/api --frozen
+uv lock --check --project apps/api
+```
+
+pip/venv path from the generated export (judges without uv):
 
 ```sh
 python3.13 -m venv .venv
@@ -46,32 +53,32 @@ python3.13 -m venv .venv
 .venv/bin/python -m pip check
 ```
 
-The generated [requirements.txt](requirements.txt) pins the selected API/research stack and transitive distribution hashes. [requirements.in](requirements.in) is its direct dependency source until NI-002 migrates declarations to pyproject.toml/uv.lock. This installs dependencies only; it does not launch an application or supply the unshared research archive. See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for tested platforms and [JUDGE_SETUP.md](docs/JUDGE_SETUP.md) for the remaining deployment gates.
+[apps/api/uv.lock](apps/api/uv.lock) is the exact frozen environment at the cutoff recorded in [apps/api/pyproject.toml](apps/api/pyproject.toml); [requirements.txt](requirements.txt) is its generated hash-pinned export. This installs dependencies only; it does not launch an application or supply the unshared research archive. See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for tested platforms and [JUDGE_SETUP.md](docs/JUDGE_SETUP.md) for the remaining deployment gates.
 
 ## Planned onboarding contract — unavailable until foundation tasks finish
 
 Future prerequisites: Node 24 LTS (pinned in [.node-version](.node-version)), pnpm pinned through `packageManager` (12.16.1), CPython 3.13, uv, Docker Compose, Supabase development auth project. Python packages are resolved and hash-pinned now, Node/pnpm tool versions are pinned and pnpm-lock.yaml is committed; the API uv.lock is completed in NI-002's API part.
 
-Tested web-runtime commands (NI-002 web part; nothing else starts on boot):
+Tested runtime commands (NI-002; nothing else starts on boot):
 
 ```sh
 cp .env.example .env
 pnpm install --frozen-lockfile
 pnpm --filter web dev            # boots apps/web on :3000; /health validates required config
 pnpm --filter web build && pnpm --filter web start
+uv sync --project apps/api --frozen
+uv run --project apps/api uvicorn near_api.main:app --reload --port 8000   # boots apps/api on :8000
 ```
 
-Planned API/compose commands remain target contracts until the NI-002 API handoff (role B) and later foundation tasks implement them:
+Planned database/compose commands remain target contracts until NI-003 and later foundation tasks implement them:
 
 ```sh
-uv sync --project apps/api --frozen
 # Planned Compose services: db, api, web; no collector starts automatically.
 docker compose up --build
 uv run --project apps/api alembic upgrade head
-uv run --project apps/api uvicorn near_api.main:app --reload --port 8000
 ```
 
-Compose mode and native development mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Web `.env` loading is implemented explicitly in [apps/web/src/lib/env.ts](apps/web/src/lib/env.ts); missing required configuration makes `/health` return a readable 503. Backend `.env` loading must be implemented explicitly. Production settings and health gates: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example).
+Compose mode and native development mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Web `.env` loading is implemented explicitly in [apps/web/src/lib/env.ts](apps/web/src/lib/env.ts) and API loading in [apps/api/src/near_api/settings.py](apps/api/src/near_api/settings.py); missing required configuration makes `/health` return a readable 503 on both services. Production settings and health gates: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example).
 
 ## Delivery gates
 
