@@ -1,6 +1,10 @@
 import "@testing-library/jest-dom/vitest";
 import { toHaveNoViolations } from "jest-axe";
-import { expect } from "vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, expect } from "vitest";
+
+// RTL auto-cleanup needs a global afterEach; vitest globals are off.
+afterEach(() => cleanup());
 
 expect.extend(toHaveNoViolations);
 
