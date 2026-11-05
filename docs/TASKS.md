@@ -17,23 +17,27 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Dependencies:** —
 - **Complexity:** M
 - **Status:** IN_PROGRESS
-- **Claimed by:** Codex / repository-sharing setup
+- **Claimed by:** Codex / Python requirements and judge setup
 - **Execution role:** A
 - **Started at:** 2026-11-05T18:34:46+03:00
-- **Scope:** User authorized Git initialization, initial commit, private remote and collaborator access. Runtime tooling manifests/pins remain pending; do not mark the full NI-001 DONE for this subset.
+- **Scope:** User authorized repository/collaborator setup, then a Python requirements baseline and judge deployment instructions. Python dependencies are now pinned/tested; frontend/workspace runtime tooling remains pending. Do not mark the full NI-001 DONE for this subset.
 - **Repository setup result:** Private ILYUTKICK/near-intelligence created; main pushed; BkycnocTbI accepted the invitation; active write access verified through the collaborator-permission API. User explicitly selected documentation/mockups only; raw research remains local and excluded from the published history.
 - **Repository setup verification:** Approved-path/history audit, secret-pattern scan, git diff --cached --check, preserved original artifact hashes, successful remote push and invitation API response. Runtime/toolchain acceptance criteria have not been performed.
-- **Handoff:** Git/collaborator setup is complete; no active file claim remains from this setup session. The next role-A agent may resume the remaining NI-001 tooling requirements on the user's implementation instruction. NI-001 remains IN_PROGRESS until its full acceptance criteria pass.
+- **Handoff:** Repository and Python dependency setup are complete. No active file claim remains after this subset; the next role-A agent may resume the remaining frontend/workspace/runtime criteria. NI-001 stays IN_PROGRESS until all its acceptance criteria pass.
+- **Dependency setup started at:** 2026-11-05T18:57:15+03:00
+- **Branch/worktree:** feat/ni-001-python-requirements; /Users/ilyutkinn/Desktop/Near
 
 **Description:** Create the first maintainable project envelope without changing saved research or design artifacts. Implementation begins only after user approval.
 
 **Implementation steps:** Inventory files and ignore generated caches/secrets; initialize Git if still absent; select supported Node/pnpm/Python/uv versions; add root workspace metadata and exact tool pins; record dependency/license evidence.
 
-**Expected files/modules:** package.json; pnpm-workspace.yaml; .node-version; .python-version; .gitignore; README.md
+**Expected files/modules:** package.json; pnpm-workspace.yaml; .node-version; .python-version; requirements.in; requirements.txt; .gitignore; README.md; docs/DEPENDENCIES.md; docs/JUDGE_SETUP.md
 
 **Acceptance criteria:** Clean bootstrap preserves archive bytes; no real secrets or raw private files staged; declared runtime versions are installed and compatible.
 
 **Testing requirements:** Clean-directory dependency/tool preflight; compare pre/post archive hashes; review ignore rules with representative raw and generated files.
+
+**Python dependency result:** requirements.in, hash-pinned requirements.txt, .python-version and contributor/judge instructions prepared. Fresh macOS ARM64 CPython3.13.3 install/import/pip-check and synthetic scientific/plot smoke passed; Linux x86_64/manylinux2.28 binary wheel target install passed (not Linux runtime execution). Full application/container/data reproduction is not implemented or claimed.
 
 ### NI-002 — Create web and API runtime skeletons
 
@@ -45,7 +49,7 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 **Description:** Establish typed frontend/API boundaries with actual runnable health paths and reproducible dependencies.
 
-**Implementation steps:** Initialize Next App Router and strict TS; initialize FastAPI/Pydantic project with settings; pin resolved pnpm/uv locks; provide native run scripts; smoke-check scientific dependency wheels on selected Python.
+**Implementation steps:** Initialize Next App Router and strict TS; initialize FastAPI/Pydantic project with settings; pin resolved pnpm/uv locks; migrate requirements.in declarations into pyproject.toml, export root requirements.txt from the frozen uv.lock and verify parity; provide native run scripts; smoke-check scientific dependency wheels on selected Python.
 
 **Expected files/modules:** apps/web/package.json; apps/web/tsconfig.json; apps/api/pyproject.toml; apps/api/src/near_api/main.py; pnpm-lock.yaml; apps/api/uv.lock
 
@@ -1285,11 +1289,11 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Description:** Create immutable app images and a fresh-machine onboarding path without auto-starting collection.
 
-**Implementation steps:** Add production Dockerfiles/web/API/export runtime; finish Compose profiles/env validation/readiness; include Node renderer and Python locks; restrict volumes/network/roles; document alternative native setup.
+**Implementation steps:** Add production Dockerfiles/web/API/export runtime; finish Compose profiles/env validation/readiness; include Node renderer and Python locks; restrict volumes/network/roles; document alternative native setup; implement the real clean-clone sequence in docs/JUDGE_SETUP.md using frozen Python/frontend locks, auth/config/migrations and an explicitly permitted input bundle.
 
 **Expected files/modules:** Dockerfiles; docker-compose.yml; deployment/; README.md
 
-**Acceptance criteria:** Fresh setup boots/migrates with documented commands; exact images reproducible; collectors off by default; API internal and persistent artifacts mounted.
+**Acceptance criteria:** Fresh setup boots/migrates with documented commands; exact images reproducible; collectors off by default; API internal and persistent artifacts mounted; judge setup is tested on Linux/container runtime, not inferred from wheel availability.
 
 **Testing requirements:** Clean build/Compose smoke; readiness/migration failure; inspect image secrets and renderer availability; scheduler disabled check.
 
@@ -1345,7 +1349,7 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Acceptance criteria:** Demo works on deployed product; judge can inspect real sources and rerun permissible model; no fictitious numbers or hidden access barriers; all P0 tasks verified.
 
-**Testing requirements:** Rehearse from clean browser and separate offline environment; verify source and ZIP hashes; record unresolved external judging/data risks.
+**Testing requirements:** Rehearse from clean browser and separate offline environment; verify source and ZIP hashes; record unresolved external judging/data risks and actual docs/JUDGE_SETUP.md commands/runtime/input hashes from a clean clone.
 
 ### NI-070 — Finalize and publish original research release
 

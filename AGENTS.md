@@ -1,6 +1,6 @@
 # NEAR Intelligence — agent operating instructions
 
-This is an evidence-first NEAR investment research product. **Before every task, read and follow the mandatory [PLAN.md](PLAN.md)**, then [README.md](README.md), [MVP scope](docs/MVP_SCOPE.md), [team assignments](docs/TEAM_PLAN.md), and the relevant specification. Current state: documentation and legacy research only. **Application implementation requires explicit user approval after this documentation phase.** Do not initialize services or migrations as part of preparing these specifications.
+This is an evidence-first NEAR investment research product. **Before every task, read and follow the mandatory [PLAN.md](PLAN.md)**, then [README.md](README.md), [MVP scope](docs/MVP_SCOPE.md), [team assignments](docs/TEAM_PLAN.md), and the relevant specification. Current state: documentation, visual mockups, a tested Python dependency baseline and local legacy research; the application is not implemented. **Application implementation requires explicit user approval after this documentation phase.** Do not initialize services or migrations as part of preparing these specifications.
 
 ## Mandatory execution rule — follow PLAN.md only
 
@@ -14,7 +14,7 @@ This is an evidence-first NEAR investment research product. **Before every task,
 
 ## Repository sharing scope
 
-GitHub is authorized to contain documentation (including research Markdown findings) and visual mockups only. Raw research JSON/CSV/SQL, calculation/collection scripts and process state remain local and ignored. A fresh clone may therefore lack linked evidence artifacts and offline commands. Verify actual input availability; request an authorized data handoff when needed, never invent replacements or restart collectors. Do not remove these ignore rules or add/push research data without explicit user authorization.
+GitHub is authorized to contain documentation (including research Markdown findings), visual mockups and the explicitly requested Python dependency manifests (.python-version, requirements.in and requirements.txt). Raw research JSON/CSV/SQL, calculation/collection scripts and process state remain local and ignored. A fresh clone may therefore lack linked evidence artifacts and offline commands. Verify actual input availability; request an authorized data handoff when needed, never invent replacements or restart collectors. Do not remove these ignore rules or add/push research data without explicit user authorization.
 
 ## Architecture and map
 
@@ -35,6 +35,7 @@ Planned paths: `apps/web` UI and same-origin auth gateway; `apps/api` domain/API
 - Purchases, fees, protocol revenue, treasury payouts, burns and issuance are different metrics. Treasury purchases do not reduce total supply. Preserve bounds as bounds. Never extrapolate sampled attribution to the full market.
 - Live charts explicitly indicate latest data; every saved document revision pins the last observed dataset. Historical revisions, exports and model artifacts never silently refresh. See [reproducibility](docs/REPRODUCIBILITY.md).
 - Do not restart stopped RPC collectors or remove `STOP_PUBLIC_COLLECTION`. Do not execute cloud SQL, paid providers or new bulk collection by default. Offline reproduction uses saved inputs. See [pipeline](docs/DATA_PIPELINE.md).
+- Follow [DEPENDENCIES.md](docs/DEPENDENCIES.md): requirements.txt is generated with exact versions/hashes; requirements.in is the declaration source until NI-002 creates pyproject.toml/uv.lock, then export requirements.txt from that frozen lock. Never independently maintain two conflicting version sources.
 - Add a dependency only when required by a bounded task: compare existing tools, review maintenance/license, pin the resolved version, commit lockfiles, and record significant choices. No invented current package versions.
 - Update API/schema/editor/metric docs and relevant ADR when behavior changes; update source verification dates after checking providers. Never describe a planned command as working.
 

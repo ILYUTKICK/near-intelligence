@@ -22,6 +22,8 @@ Version 1.0, 5 November 2026. Normative implementation specification; applicatio
 - [DATA_PIPELINE.md](DATA_PIPELINE.md) — ingestion and publishing.
 - [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md) — sessions and protection.
 - [DEPLOYMENT.md](DEPLOYMENT.md) — planned local/production operations.
+- [DEPENDENCIES.md](DEPENDENCIES.md) — pinned Python environment, package rationale and lockfile transition.
+- [JUDGE_SETUP.md](JUDGE_SETUP.md) — contributor/judge setup and remaining release gates.
 - [TESTING_STRATEGY.md](TESTING_STRATEGY.md) — meaningful verification.
 
 ## Evidence and research
