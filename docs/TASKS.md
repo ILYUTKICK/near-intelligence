@@ -53,7 +53,8 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-001
 - **Complexity:** M
-- **Status:** IN_PROGRESS (reopened for the requirements.in removal defect; all other criteria verified)
+- **Status:** DONE
+- **Re-closed at:** 2026-11-05T23:00:36+03:00 — PR #7 merged into main; verified on the post-merge tree: `requirements.in` absent, apps/api/pyproject.toml, apps/api/uv.lock and the regenerated root requirements.txt present. Documentation now matches the repository exactly.
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A — task closer per TEAM_PLAN.md; this session implements the web part, the API part is a concrete handoff to B below
 - **Started at:** 2026-11-05T20:14:20+03:00
@@ -171,7 +172,15 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-006
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-05T23:00:36+03:00
+- **Branch/worktree:** feat/ni-007-interaction-primitives; /Users/ilyutkinn/Desktop/Near
+- **Verification:** `pnpm --filter web test` — 7/7 pass across 3 suites: dialog opens from keyboard, closes on Escape and returns focus to the trigger; dropdown menu opens via ArrowDown, moves focus between items, closes with Escape with focus return; Button with `pending` blocks duplicate submits (aria-busy + disabled, one invocation across click/dblclick); Input error state keeps the typed value, sets aria-invalid with an accessible description and a role=alert message; 44px touch-target assertions on all button variants and input; axe checks on rendered dialog, menu and form have no violations (the page-level `region` best-practice rule is disabled in component tests with a recorded rationale — landmark structure arrives with NI-008 layout shells). `tsc --noEmit` strict typecheck, `next build` and `check:contrast` (22/22) all pass. Radix behavior is exercised through real keyboard events in jsdom with minimal browser-API stand-ins (vitest.setup.ts).
+- **Result:** apps/web/src/components/ui/ — Button (primary/secondary/quiet/destructive + pending/asChild, 44px, focus ring), Label, Input (error/aria-invalid/16px anti-zoom), Select (Radix keyboard model), Dialog (focus entry/escape/return), Drawer (vaul, safe-area), DropdownMenu (item targets, hover gated); lib/utils cn(); Tailwind v4 wired via postcss.config.mjs + globals.css `@theme inline` over the NI-006 tokens (no duplicated values; type-scale and radius utilities generated from token vars); vitest + Testing Library + jest-axe stack with local vitest-compatible types in apps/web/types/. Dependency review and declared licenses recorded in DEPENDENCIES.md. No UI kit imports; icons are inline SVG. ESLint wiring remains NI-005.
+- **Reviewer:** pending — role-B review requested on PR #8 (NI-007 reviewer per TEAM_PLAN.md).
+- **Completed at:** 2026-11-05T23:16:20+03:00
 
 **Description:** Create the small reusable control set needed across the product.
 
