@@ -87,7 +87,14 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b
+- **Execution role:** B
+- **Started at:** 2026-11-06T02:32:16+03:00
+- **Branch/worktree:** feat/ni-003-database-foundation; D:/хахатон/near-intelligence
+- **Dependency verification:** NI-002 is DONE and re-closed after PR #7; main cfdd914 contains the API runtime/uv.lock and no requirements.in. NI-026's separately published PR #14 records its operational BLOCKED state and does not gate NI-003. No competing NI-003 claim exists.
+- **Scope:** Identity tables, Alembic, isolated runtime/migration/operator roles and transaction-local UUID identity; DB-only Compose definition for role-A review. Existing private/research archives are absent and untouched. PostgreSQL 18.6 is installed locally for real disposable-database checks; Docker execution is not available here.
+- **Reviewer:** ILYUTKICK (role A), pending; root DB-only Compose/config documentation is submitted as this card's explicit DB contribution, with full app packaging reserved for NI-066.
 
 **Description:** Create the initial identity/role/migration foundation; later domain tasks add their own dataset, chart, document, model and export tables.
 
