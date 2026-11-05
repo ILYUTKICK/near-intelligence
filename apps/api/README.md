@@ -6,3 +6,4 @@ FastAPI backend runtime skeleton for NEAR Intelligence (NI-002).
 - Configuration: root `.env` created from [.env.example](../../.env.example); loading is explicit and injected environment variables win. `/health` returns 503 with a readable message when required configuration is missing.
 - Nothing else starts on boot: no collectors, no models, no ingestion, no scheduler.
 - Runbook: [root README](../../README.md), [dependencies](../../docs/DEPENDENCIES.md), [deployment](../../docs/DEPLOYMENT.md).
+- Identity-only PostgreSQL/Alembic foundation and real disposable-cluster checks: [database setup](../../docs/DATABASE_SETUP.md). Migrations are explicit; startup opens no database connection.

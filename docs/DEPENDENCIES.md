@@ -106,6 +106,13 @@ Hash-checking installs fail if an unpinned/unhashed dependency is introduced. Bi
 
 ## Update and regenerate
 
+PostgreSQL foundation (NI-003, 6 November 2026): native **18.6** on Windows
+passes the real disposable-cluster migrations/RLS/precision suite. DB-only
+Compose declares **postgres:18.6-bookworm**, confirmed in the
+[official image tag list](https://github.com/docker-library/docs/blob/master/postgres/README.md);
+the image was not executed here. No new Python packages or lock changes were
+needed. Full container packaging and image digest verification remain NI-066.
+
 uv 0.12.13 froze this baseline. The cutoff lives in `apps/api/pyproject.toml` `[tool.uv] exclude-newer`, so every uv command inherits it and a bare `uv lock --check` fails on drift instead of silently re-resolving. To change dependencies: edit the `apps/api` direct list, run `uv lock` (or a deliberate `uv lock --upgrade` with a new recorded cutoff), review the diff, run `uv lock --check`, then regenerate the export and the docs in the same change. A deliberate upgrade requires fresh compatibility checks on macOS ARM64 and a Linux wheel target.
 
 ```sh

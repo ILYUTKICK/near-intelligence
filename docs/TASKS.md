@@ -87,14 +87,17 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** L
-- **Status:** IN_PROGRESS
+- **Status:** BLOCKED
 - **Claimed by:** Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b
 - **Execution role:** B
 - **Started at:** 2026-11-06T02:32:16+03:00
 - **Branch/worktree:** feat/ni-003-database-foundation; D:/хахатон/near-intelligence
 - **Dependency verification:** NI-002 is DONE and re-closed after PR #7; main cfdd914 contains the API runtime/uv.lock and no requirements.in. NI-026's separately published PR #14 records its operational BLOCKED state and does not gate NI-003. No competing NI-003 claim exists.
 - **Scope:** Identity tables, Alembic, isolated runtime/migration/operator roles and transaction-local UUID identity; DB-only Compose definition for role-A review. Existing private/research archives are absent and untouched. PostgreSQL 18.6 is installed locally for real disposable-database checks; Docker execution is not available here.
-- **Reviewer:** ILYUTKICK (role A), pending; root DB-only Compose/config documentation is submitted as this card's explicit DB contribution, with full app packaging reserved for NI-066.
+- **Result:** Identity ORM/Alembic baseline, explicit four-secret role bootstrap, forced RLS/column privileges, bounded lazy runtime pool and transaction-local identity/reset, exact NUMERIC prevalidation, DB-only Compose and setup runbook. No domain tables, auth endpoints or ingestion are added.
+- **Verification (6 November 2026):** `apps/api/.venv/Scripts/python.exe scripts/run-db-tests.py --pg-bin 'C:/Program Files/PostgreSQL/18/bin'` passes all 8 tests on native PostgreSQL 18.6 / CPython 3.13.15 / Windows 11. Fresh cluster bootstrap, empty upgrade/down/up, Alembic metadata drift, Alice/Bob and anonymous isolation, role/RLS/DDL escalation denial, pooled identity reset, disabled user, invalid FK/timezone/length, exact 78-digit NUMERIC, overflow and transaction rollback verified. Cluster stopped; git diff check passes. Docker is unavailable; container startup is explicitly unverified.
+- **Blocker / handoff:** Implementation checks pass; required role-A review of PR #15 (especially the DB-only root Compose/config contribution) is pending. No merge is authorized in this session, so NI-003 is not marked DONE and its dependent tasks stay gated. Full container packaging belongs to NI-066. Independent NI-004 depends only on verified DONE NI-002 and may proceed.
+- **Reviewer:** ILYUTKICK (role A), pending on PR #15. [Database setup and evidence](DATABASE_SETUP.md).
 
 **Description:** Create the initial identity/role/migration foundation; later domain tasks add their own dataset, chart, document, model and export tables.
 
