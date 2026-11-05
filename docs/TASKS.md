@@ -105,7 +105,14 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b
+- **Execution role:** B
+- **Started at:** 2026-11-06T02:49:54+03:00
+- **Branch/worktree:** feat/ni-004-openapi-contract; D:/хахатон/near-intelligence
+- **Dependency verification:** NI-002 verified DONE; current main ac59b34 includes PR #14, leaving NI-026 BLOCKED operationally. NI-003 code/checks are submitted in PR #15 and await A review; it is not a dependency of NI-004. No competing NI-004 claim exists.
+- **Scope:** Common strict Pydantic errors/selection/quality/decimal contracts; sanitized HTTP failures and read-only OpenAPI; reproducible generated TypeScript client and drift checks. No unimplemented business endpoint or simulated data is added.
+- **Reviewer / handoff:** ILYUTKICK (role A), pending; generated client and root JS-lock changes are this card's schema/tooling contribution for consumer review.
 
 **Description:** Keep one executable contract for Python boundaries and TypeScript consumers.
 
