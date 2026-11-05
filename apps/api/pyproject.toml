@@ -29,5 +29,12 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# Resolution cutoff reproduced from the reviewed requirements baseline
+# (docs/DEPENDENCIES.md). Recorded here so every uv command — lock, --check,
+# sync, export — inherits it and a bare `uv lock --check` cannot silently
+# re-resolve against a newer index state.
+[tool.uv]
+exclude-newer = "2026-11-05T15:55:39Z"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/near_api"]
