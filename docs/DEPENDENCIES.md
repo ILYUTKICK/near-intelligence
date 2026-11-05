@@ -44,7 +44,28 @@ Added 5 November 2026 for the `apps/web` runtime skeleton. [pnpm-lock.yaml](../p
 | [typescript](https://www.npmjs.com/package/typescript/v/5.9.3) | 5.9.3 | Strict typecheck (latest 5.x) |
 | @types/node, @types/react, @types/react-dom | ^24 / ^19 | Type declarations |
 
-ESLint wiring belongs to NI-005. ECharts, Tiptap, TanStack Query, Tailwind and shadcn/ui arrive with their owning tasks (NI-006/NI-009/NI-033/NI-038); do not add them to the skeleton speculatively. Verified: clean-directory `pnpm install --frozen-lockfile` against the committed lockfile, `tsc --noEmit`, `next build`, production `next start` and dev-server boot with `/health` 200; with the root .env removed, `/health` returns 503 with a readable message naming the missing required variables. The API skeleton part of NI-002 (pyproject.toml/uv.lock) is handed off to role B and is not implemented yet.
+ESLint wiring belongs to NI-005. ECharts, Tiptap and TanStack Query arrive with their owning tasks (NI-009/NI-033/NI-038); do not add them speculatively. Verified: clean-directory `pnpm install --frozen-lockfile` against the committed lockfile, `tsc --noEmit`, `next build`, production `next start` and dev-server boot with `/health` 200; with the root .env removed, `/health` returns 503 with a readable message naming the missing required variables. The API skeleton part of NI-002 (pyproject.toml/uv.lock) was completed the same day under the user-authorized exception recorded in the NI-002 card.
+
+## Interaction primitives and styling stack (NI-007)
+
+Added 5 November 2026 for `apps/web` accessible interaction primitives; versions from the npm registry on that date. Licenses below are the packages' declared `license` metadata, not a legal opinion. Tailwind v4 consumes the NI-006 tokens through `@theme inline` (no duplicated values); standard Tailwind spacing steps (n × 4px) match the DESIGN_SYSTEM.md scale.
+
+| Package | Version | Purpose | Declared license |
+| --- | --- | --- | --- |
+| [tailwindcss](https://www.npmjs.com/package/tailwindcss/v/4.3.4) + [@tailwindcss/postcss](https://www.npmjs.com/package/@tailwindcss/postcss/v/4.3.4) | 4.3.4 | Utility styling over the token file | MIT |
+| [@radix-ui/react-dialog](https://www.npmjs.com/package/@radix-ui/react-dialog/v/1.3.1) | 1.3.1 | Dialog focus entry/escape/return | MIT |
+| [@radix-ui/react-select](https://www.npmjs.com/package/@radix-ui/react-select/v/2.4.1) | 2.4.1 | Keyboard-accessible select | MIT |
+| [@radix-ui/react-dropdown-menu](https://www.npmjs.com/package/@radix-ui/react-dropdown-menu/v/2.2.1) | 2.2.1 | Menus (block handle, account) | MIT |
+| [@radix-ui/react-label](https://www.npmjs.com/package/@radix-ui/react-label/v/2.1.17) | 2.1.17 | Persistent form labels | MIT |
+| [@radix-ui/react-slot](https://www.npmjs.com/package/@radix-ui/react-slot/v/1.5.0) | 1.5.0 | asChild composition | MIT |
+| [vaul](https://www.npmjs.com/package/vaul/v/1.1.2) | 1.1.2 | Focus-trapped drawer (mobile nav) | MIT |
+| [class-variance-authority](https://www.npmjs.com/package/class-variance-authority/v/0.7.1) | 0.7.1 | Button variants | Apache-2.0 |
+| [clsx](https://www.npmjs.com/package/clsx/v/2.1.1) / [tailwind-merge](https://www.npmjs.com/package/tailwind-merge/v/3.7.0) | 2.1.1 / 3.7.0 | cn() class composition | MIT |
+| [vitest](https://www.npmjs.com/package/vitest/v/5.1.0) + jsdom + @vitejs/plugin-react | 5.1.0 / 31.0.0 / 6.2.1 | Component test runner | MIT |
+| @testing-library/react / user-event / jest-dom | 16.3.3 / 14.6.8 / 7.0.1 | Keyboard integration tests | MIT |
+| [jest-axe](https://www.npmjs.com/package/jest-axe/v/11.0.0) | 11.0.0 | Automated axe checks (local vitest types in apps/web/types) | MIT |
+
+No UI kit is imported wholesale — components under `apps/web/src/components/ui/` are in-repo code on Radix behavior primitives, per the "no unnecessary UI kit imports" criterion.
 
 ## Verified direct packages
 
