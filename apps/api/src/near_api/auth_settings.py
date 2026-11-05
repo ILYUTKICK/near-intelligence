@@ -8,14 +8,11 @@ docs/AUTHENTICATION_SECURITY.md only asymmetric algorithms are accepted.
 """
 
 from functools import lru_cache
-from typing import Literal
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import AnyHttpUrl, Field, TypeAdapter, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from near_api.settings import SettingsError, find_repo_root
-
-_ASYMMETRIC_ALGORITHMS = ("ES256", "RS256", "EdDSA")
 
 
 class AuthSettingsError(SettingsError):
@@ -32,8 +29,10 @@ class AuthSettings(BaseSettings):
     SUPABASE_JWT_ISSUER: str = Field(min_length=1)
     SUPABASE_JWKS_URL: str = Field(min_length=1)
     SUPABASE_JWT_AUDIENCE: str = Field(min_length=1)
-    SUPABASE_JWT_ALGORITHM: Literal["ES256", "RS256", "EdDSA"]
-    AUTH_ALLOWED_REDIRECT_ORIGINS: list[str] = Field(min_length=1)
+    SUPABASE_JWT_ALGORITHM: str = Field(min_length=1)
+    # Comma/space-separated list as a plain string: pydantic-settings would
+    # JSON-decode a list field from env before any validator could run.
+    AUTH_ALLOWED_REDIRECT_ORIGINS: str = Field(min_length=1)
     AUTH_COOKIE_SIGNING_SECRET: str = Field(min_length=32)
     CSRF_SIGNING_SECRET: str = Field(min_length=32)
 
@@ -42,6 +41,16 @@ class AuthSettings(BaseSettings):
     def _jwks_must_be_https(cls, value: str) -> str:
         if not value.startswith("https://"):
             raise ValueError("SUPABASE_JWKS_URL must be https.")
+        return value
+
+    @field_validator("SUPABASE_JWT_ALGORITHM")
+    @classmethod
+    def _algorithm_must_be_asymmetric(cls, value: str) -> str:
+        if value not in ("ES256", "RS256", "EdDSA"):
+            raise ValueError(
+                "SUPABASE_JWT_ALGORITHM must be an asymmetric algorithm (ES256, RS256 "
+                "or EdDSA). HS256/shared secrets are rejected by the security specification."
+            )
         return value
 
     @field_validator(
@@ -54,19 +63,33 @@ class AuthSettings(BaseSettings):
     @classmethod
     def _reject_placeholders(cls, value: str, info) -> str:
         stripped = value.strip()
-        if not stripped or stripped.upper().startswith("REPLACE"):
+        if not stripped or "REPLACE" in stripped.upper():
             raise ValueError(
                 f"{info.field_name} still has its placeholder value; set the real "
                 "development value in the root .env (docs/AUTHENTICATION_SECURITY.md)."
             )
         return stripped
 
-    @field_validator("AUTH_ALLOWED_REDIRECT_ORIGINS", mode="before")
-    @classmethod
-    def _parse_origins(cls, value) -> list[str]:
-        if isinstance(value, str):
-            return [origin for origin in value.replace(",", " ").split() if origin]
-        return value
+    @model_validator(mode="after")
+    def _validate_redirect_origins(self) -> "AuthSettings":
+        origins = [
+            origin
+            for origin in self.AUTH_ALLOWED_REDIRECT_ORIGINS.replace(",", " ").split()
+            if origin
+        ]
+        if not origins:
+            raise ValueError("AUTH_ALLOWED_REDIRECT_ORIGINS is empty.")
+        TypeAdapter(list[AnyHttpUrl]).validate_python(origins)
+        return self
+
+    @property
+    def allowed_redirect_origins(self) -> list[str]:
+        """Parsed allowlist from AUTH_ALLOWED_REDIRECT_ORIGINS."""
+        return [
+            origin
+            for origin in self.AUTH_ALLOWED_REDIRECT_ORIGINS.replace(",", " ").split()
+            if origin
+        ]
 
 
 @lru_cache(maxsize=1)
