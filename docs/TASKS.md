@@ -53,7 +53,8 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-001
 - **Complexity:** M
-- **Status:** IN_PROGRESS (reopened for the requirements.in removal defect; all other criteria verified)
+- **Status:** DONE
+- **Re-closed at:** 2026-11-05T23:00:36+03:00 — PR #7 merged into main; verified on the post-merge tree: `requirements.in` absent, apps/api/pyproject.toml, apps/api/uv.lock and the regenerated root requirements.txt present. Documentation now matches the repository exactly.
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A — task closer per TEAM_PLAN.md; this session implements the web part, the API part is a concrete handoff to B below
 - **Started at:** 2026-11-05T20:14:20+03:00
@@ -171,7 +172,11 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-006
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-05T23:00:36+03:00
+- **Branch/worktree:** feat/ni-007-interaction-primitives; /Users/ilyutkinn/Desktop/Near
 
 **Description:** Create the small reusable control set needed across the product.
 
