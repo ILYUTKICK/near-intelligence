@@ -53,7 +53,12 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-001
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A — task closer per TEAM_PLAN.md; this session implements the web part, the API part is a concrete handoff to B below
+- **Started at:** 2026-11-05T20:14:20+03:00
+- **Branch/worktree:** feat/ni-002-web-skeleton (stacked on feat/ni-001-workspace-tooling); /Users/ilyutkinn/Desktop/Near
+- **Scope split:** A (this session): apps/web Next.js App Router strict-TS skeleton, explicit root .env loading, Zod env contract, web health route, native run scripts, pnpm-lock.yaml. B (handoff): FastAPI/Pydantic settings project, pyproject.toml/uv.lock migration of requirements.in declarations, root requirements.txt export from the frozen lock with parity verification, API health path and run scripts. The task stays IN_PROGRESS until both parts satisfy every acceptance criterion; neither side may mark it DONE alone.
 
 **Description:** Establish typed frontend/API boundaries with actual runnable health paths and reproducible dependencies.
 
