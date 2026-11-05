@@ -24,6 +24,8 @@ Selected 5 November 2026 from official registries, not memory:
 
 Note: the integrity suffix must be a **hex** SHA-512 digest (as pnpm documents for `packageManager`). The base64 `dist.integrity` string (`sha512-…==`) from the npm registry is rejected by corepack with "expected a semver version". Convert it once (`base64 -d | xxd -p`) when re-pinning.
 
+License metadata for these tools: Node.js MIT, pnpm MIT, corepack MIT (per their repositories/licenses at the pinned versions). This records a dependency review, not a legal opinion; runtime-transitive notices are distributed with each tool.
+
 Workspace membership (`pnpm-workspace.yaml`) lists `apps/web` and `packages/*` per the planned architecture; `apps/api` is Python (uv/pip) and is intentionally absent. Bootstrap was smoke-tested with `pnpm install --lockfile-only` in a clean temporary directory; the produced lockfile was discarded and is not committed. Real dependency lockfiles and frontend package versions are NI-002 scope.
 
 Contributor runtime note (macOS setup machine): Homebrew's `node@24` is keg-only, so the pre-existing `/usr/local/bin/node` (21.7.1) still shadows it on PATH. Activate the declared runtime per your version manager (`.node-version` works with fnm/nvm/asdf) or prefix `PATH` with `/opt/homebrew/opt/node@24/bin` as the docs/JUDGE_SETUP preflight does. Linux/Windows runtime execution remains a release check.
