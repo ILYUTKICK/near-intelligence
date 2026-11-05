@@ -216,7 +216,12 @@ Specification: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-007
 - **Complexity:** S
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-05T23:24:13+03:00
+- **Branch/worktree:** feat/ni-009-data-states; /Users/ilyutkinn/Desktop/Near
+- **Pre-task fix on this branch:** jsdom held at 30.1.3 — the 31.0.0 release published the same day violated pnpm 12's minimumReleaseAge supply-chain policy, and the auto-added exclusion in pnpm-workspace.yaml was removed in favor of the older, policy-compliant version (lockfile rebuilt via `pnpm clean --lockfile`; diff contained to the jsdom subtree; DEPENDENCIES.md updated).
 
 **Description:** Make missing, stale and failed data distinct from verified zero throughout UI.
 
