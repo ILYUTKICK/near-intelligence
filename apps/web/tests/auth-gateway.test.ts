@@ -221,6 +221,8 @@ describe("Logout gateway", () => {
     const response = await logoutPost(await logoutRequest(sessionValue));
     expect(response.status).toBe(200);
     expect(String(providerFetchMock.mock.calls[0][0])).toContain("logout?scope=global");
+    const init = providerFetchMock.mock.calls[0][1] as { headers: Record<string, string> };
+    expect(init.headers.authorization).toBe("Bearer a");
     const cookies = setCookies(response);
     for (const cookie of [findCookie(cookies, SESSION_COOKIE), findCookie(cookies, CSRF_COOKIE)]) {
       expect(cookie).toContain("Max-Age=0");
@@ -236,7 +238,8 @@ describe("Logout gateway", () => {
     providerFetchMock.mockRejectedValueOnce(new Error("network down"));
     const response = await logoutPost(await logoutRequest(sessionValue));
     expect(response.status).toBe(503);
-    expect((await response.json()).error).toContain("provider could not be reached");
+    expect((await response.json()).error).toContain("could not be revoked");
+    // Cookies are still cleared even on failure.
     const cookies = setCookies(response);
     expect(findCookie(cookies, SESSION_COOKIE)).toContain("Max-Age=0");
   });
