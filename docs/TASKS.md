@@ -375,11 +375,16 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A
 - **Started at:** 2026-11-05T23:59:52+03:00
 - **Branch/worktree:** feat/ni-016-auth-environment; /Users/ilyutkinn/Desktop/Near
+- **Verification:** web config matrix — 39/39 tests pass (8 new): publishable values accepted; placeholder values (substring detection, e.g. https://REPLACE_PROJECT...) fail readably naming the variable; a service-role-shaped key in the browser slot is rejected; HS256 is rejected with the asymmetric-algorithm message; http JWKS URLs rejected; each missing/placeholder server variable is named in one readable error; short signing secrets rejected; origin list parsing verified. API side verified by the recorded `uv run` matrix: valid config parses (allowed_redirect_origins split+validated), HS256/placeholder-in-URL/non-URL origin/http JWKS/short secret each rejected readably; /health stays independent of auth provisioning (separate AuthSettings). Secret-leak guard: build with synthetic non-production secrets in .env — `check:client-secrets` scans the client bundle (14 files) and finds nothing; positive control (injected leak file) fails with exit 1 naming the variable and file; .env restored afterwards. `tsc --noEmit`, `next build`, `check:contrast` (22/22) pass. Built-frontend inspection is automated by the script (no manual grep claims).
+- **Result:** apps/web/src/lib/auth/config.ts (public/server split: browser path reads only NEXT_PUBLIC_* publishable values; placeholder/HS256/service-role/https guards with readable AuthConfigError), apps/web/scripts/check-client-secrets.mjs + `check:client-secrets` npm script (server-secret leak scanner with positive-control verification), apps/api/src/near_api/auth_settings.py (AuthSettings with asymmetric-only algorithm, https JWKS, placeholder rejection, origin parsing; cached getter independent of /health), docs/AUTHENTICATION_SECURITY.md "Dev identity provider setup" section — operator checklist for the dev Supabase project (asymmetric keys, callback allowlist, generated signing secrets, recovery templates) explicitly marked as a user handoff step, .env.example format notes.
+- **Reviewer:** pending — role-B review requested on PR #12 (NI-016 reviewer per TEAM_PLAN.md).
+- **Completed at:** 2026-11-06T00:07:20+03:00
+- **Handoff (user):** create the dev Supabase project per the AUTHENTICATION_SECURITY.md checklist (requires the operator's Supabase account); values go into the local .env only. The provider round-trip smoke is NI-017/NI-020 and needs this project.
 
 **Description:** Establish Supabase identity configuration without creating a custom password store.
 
