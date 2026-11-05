@@ -402,7 +402,16 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-016, NI-007
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-06T00:14:47+03:00
+- **Branch/worktree:** feat/ni-017-auth-gateway; /Users/ilyutkinn/Desktop/Near
+- **Scope note:** this session implements the offline-implementable part (gateway handlers, signed HttpOnly cookie lifecycle, CSRF, login UI, mocked-provider test suite). The provider-backed dev E2E (real sign-up/verification round trip, cookie attributes at production-like TLS) stays an open criterion until the user completes the NI-016 Supabase handoff; the task must not be marked DONE before it.
+- **Verification (offline part):** `pnpm --filter web test` — 52/52 pass (13 new, provider mocked via stubbed fetch): CSRF minting returns a readable double-submit cookie; login with minted token sets a signed HttpOnly SameSite=Lax session cookie (Path=/, Secure deferred to production via APP_ENV), rotates the CSRF cookie, and carries only the publishable apikey to the provider; safe internal returnTo preserved verbatim while https://evil / protocol-relative / backslash targets collapse to "/"; cross-origin, missing origin, missing/mismatched CSRF, malformed body and missing fields all reject 403/400 **before any provider call**; wrong password and unknown email return the identical generic 401 message (anti-enumeration); 429/503 map honestly; logout verifies the signed pair, calls provider logout?scope=global, clears both cookies (Max-Age=0) even when the provider is unreachable (honest 503 body), and succeeds without a session; callback rejects missing/invalid link parameters pre-provider, sanitizes external return targets to internal paths on success, maps expired links to a generic expired flag and sets HttpOnly cookies on a valid exchange. `tsc --noEmit`, `next build` (routes: ƒ /api/auth/{csrf,login,logout}, ƒ /auth/callback, ○ /login), `check:contrast` (22/22) pass.
+- **Result (offline part):** src/lib/auth/session.ts (HMAC-signed cookie payloads, timing-safe comparisons, session encode/decode with expiry check, CSRF mint/verify, safeInternalReturnTo), src/lib/auth/provider.ts (three documented Supabase Auth REST calls via fetch with publishable apikey only; generic ProviderAuthError mapping; no tokens/passwords logged), gateway routes /api/auth/{csrf,login,logout} + /auth/callback, (auth)/login page + LoginForm (fresh CSRF per attempt, pending state, generic errors, server-validated redirect target). ADR-level choice recorded here: the provider SDK was deliberately not added — three REST calls with explicit cookie control keep the audit surface small; revisit only if a provider feature (OAuth, magic links) requires it.
+- **Open criteria (blocking DONE):** provider-backed dev E2E — real sign-up → verification email → callback → session round trip; cookie attribute inspection at a production-like TLS origin (Secure on); recovery flow never exposing previous user content (NI-020 overlaps). Unblocked by the user's NI-016 Supabase handoff.
+- **Reviewer:** pending — role-B review requested on PR #13 (NI-017 reviewer per TEAM_PLAN.md; B also owns the NI-018 server-side verification that consumes these cookies).
 
 **Description:** Provide registration/login/logout/recovery with server-readable sessions and safe return navigation.
 
