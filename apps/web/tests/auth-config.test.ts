@@ -26,7 +26,10 @@ const VALID_SERVER = {
 };
 
 function withEnv(values: Record<string, string | undefined>, run: () => void) {
-  const saved = Object.entries(values).map(([key]) => [key, process.env[key]]);
+  const saved: Array<[string, string | undefined]> = Object.entries(values).map(([key]) => [
+    key,
+    process.env[key],
+  ]);
   for (const [key, value] of Object.entries(values)) {
     if (value === undefined) {
       delete process.env[key];
