@@ -10,6 +10,22 @@ Use server-managed HttpOnly, Secure production, SameSite=Lax cookies; SDK integr
 
 FastAPI verifies signature with a configured issuer JWKS URL, exact issuer/audience, expiry/not-before, subject UUID, and an allowlisted asymmetric algorithm that matches project configuration. Never follow a JWT-supplied jku or accept alg=none/HS256 fallback. Bounded JWKS cache; on unknown kid refresh once, fail closed if unavailable. [Supabase JWT docs](https://supabase.com/docs/guides/auth/jwts) explain asymmetric key verification; deployment must validate actual key settings. Target 10-minute access tokens; provider refresh rotation and disabled-user behavior must be tested. Logout revokes refresh session; already-issued JWTs can remain valid until expiry. Sensitive disabled-user access also checks local users.disabled_at.
 
+## Dev identity provider setup (NI-016)
+
+The configuration contract is implemented and validated in code: the web side ([apps/web/src/lib/auth/config.ts](../apps/web/src/lib/auth/config.ts)) and the API side ([apps/api/src/near_api/auth_settings.py](../apps/api/src/near_api/auth_settings.py)) fail with readable errors on missing values, `.env.example` placeholders, HS256/shared-secret algorithms, non-https JWKS URLs, service-role keys in the browser slot, and short signing secrets. `pnpm --filter web check:client-secrets` scans the production client bundle for server-secret leakage.
+
+Creating the actual dev Supabase project requires the operator's Supabase account and is an **explicit user handoff step** — no provider account, project or credentials were created by the agent. Operator checklist for the dev project (values go into the root `.env`, never into Git):
+
+1. Create a dedicated **development** Supabase project (separate from any future production project; dev/prod secrets never share values).
+2. In Auth → JWT Keys, confirm **asymmetric signing keys** are active and note the published algorithm (ES256 expected; the app rejects HS256). The JWKS URL is `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json` and the issuer `https://<project-ref>.supabase.co/auth/v1`.
+3. Set the **Site URL** to the dev origin (`http://localhost:3000`) and allowlist only that origin plus the staging origin in redirect configuration; `AUTH_ALLOWED_REDIRECT_ORIGINS` in `.env` must match exactly.
+4. Generate two independent high-entropy secrets locally (`openssl rand -base64 32`) for `AUTH_COOKIE_SIGNING_SECRET` and `CSRF_SIGNING_SECRET`.
+5. Copy the **publishable** key into `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; the service-role key must stay out of the application environment entirely.
+6. Recovery/password-reset email templates: keep the provider defaults for the dev project, but the links must point at the allowlisted dev origin; confirm the recovery email lands and the reset flow never exposes the previous user's content (verified in NI-020).
+7. Run the environment checks before starting work: web tests (`pnpm --filter web test` include the config validation matrix) and a `/health` request after boot.
+
+The provider development-project smoke (a real sign-up/verification round trip) is part of NI-017/NI-020 and requires the operator-configured project above.
+
 Protect gateway mutations with Origin/Host allowlist and CSRF token bound to the server session (signed double-submit or synchronizer implementation), not SameSite alone. Auth callback validates state/PKCE and internal returnTo allowlist; never accept arbitrary external redirect URLs. Strict CORS if API is ever exposed; default API is internal and still authenticates every private request.
 
 ## Ownership invariants
