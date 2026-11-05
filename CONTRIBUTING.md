@@ -1,6 +1,6 @@
 # Contributing
 
-Read [AGENTS.md](AGENTS.md), the mandatory [PLAN.md](PLAN.md), and the task's linked specification. Select only an eligible NI-task, record its claim in TASKS.md before implementation, and follow the plan's handoff/completion protocol. Application implementation is not authorized by this documentation delivery. Git is initialized on `main`; repository setup covers the Git portion of NI-001, while its runtime/toolchain requirements remain pending. See [collaboration setup](docs/COLLABORATION.md). Never reset or rewrite the research archive to obtain a clean tree.
+Read [AGENTS.md](AGENTS.md), the mandatory [PLAN.md](PLAN.md), and the task's linked specification. Select only an eligible NI-task, record its claim in TASKS.md before implementation, and follow the plan's handoff/completion protocol. On 5 November 2026 the user authorized implementation of role-A tasks per PLAN.md, including publishing new application code, tests, configuration and documentation in the private repository; B's tasks require the same authorization from their participant. Git is initialized on `main`; NI-001 has a tested Python dependency baseline and pinned Node/pnpm workspace tooling, with runtime skeletons following in NI-002. See [collaboration setup](docs/COLLABORATION.md). Never reset or rewrite the research archive to obtain a clean tree.
 
 ## Workflow
 
