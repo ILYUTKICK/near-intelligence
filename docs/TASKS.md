@@ -53,7 +53,7 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-001
 - **Complexity:** M
-- **Status:** DONE
+- **Status:** IN_PROGRESS (reopened for the requirements.in removal defect; all other criteria verified)
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A — task closer per TEAM_PLAN.md; this session implements the web part, the API part is a concrete handoff to B below
 - **Started at:** 2026-11-05T20:14:20+03:00
@@ -67,6 +67,8 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **API-part result:** apps/api FastAPI skeleton — pyproject.toml, uv.lock, generated root requirements.txt (requirements.in removed per the DEPENDENCIES.md transition contract), src/near_api/{__init__,settings,main}.py with explicit lazy root-.env loading (injected env wins), SettingsError formatting validation issues, /health liveness mirroring the web JSON shape; docs disabled at the app level for now; nothing besides the HTTP server starts on boot. Docs updated: DEPENDENCIES.md transition section (completed), README tested/planned command split, JUDGE_SETUP Python-application row, AGENTS.md dependency-source convention.
 - **Reviewer:** pending — role-B review requested on PR #3 (whole task: web + API parts); merge waits for that review per the collaboration rules.
 - **Completed at:** 2026-11-05T22:58:40+03:00
+- **Reopened — defect (2026-11-05T22:56:25+03:00):** post-merge verification of main (after PR #5/#6) found `requirements.in` still tracked although this card and DEPENDENCIES.md record it as removed with the uv freeze. The removal was documented but never executed. Fix: `git rm requirements.in` plus sharing-scope reference updates (AGENTS.md, docs/COLLABORATION.md) on branch fix/ni-002-remove-requirements-in, PR #7. Other NI-002 criteria re-verified unaffected: main contains apps/api + apps/web, apps/api/uv.lock and the regenerated root requirements.txt; the parity and runtime evidence stands. Status set back to IN_PROGRESS until the fix PR merges; re-close recorded below.
+- **Re-closed at:** pending PR #7 merge — after merge, requirements.in is absent from main and the documentation matches the tree again.
 
 **Description:** Establish typed frontend/API boundaries with actual runnable health paths and reproducible dependencies.
 
