@@ -16,16 +16,24 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** —
 - **Complexity:** M
-- **Status:** IN_PROGRESS
-- **Claimed by:** Codex / Python requirements and judge setup
+- **Status:** DONE
+- **Claimed by:** Codex / Python requirements and judge setup (previous session; subset complete, handed off below)
 - **Execution role:** A
 - **Started at:** 2026-11-05T18:34:46+03:00
 - **Scope:** User authorized repository/collaborator setup, then a Python requirements baseline and judge deployment instructions. Python dependencies are now pinned/tested; frontend/workspace runtime tooling remains pending. Do not mark the full NI-001 DONE for this subset.
 - **Repository setup result:** Private ILYUTKICK/near-intelligence created; main pushed; BkycnocTbI accepted the invitation; active write access verified through the collaborator-permission API. User explicitly selected documentation/mockups only; raw research remains local and excluded from the published history.
 - **Repository setup verification:** Approved-path/history audit, secret-pattern scan, git diff --cached --check, preserved original artifact hashes, successful remote push and invitation API response. Runtime/toolchain acceptance criteria have not been performed.
-- **Handoff:** Repository and Python dependency setup are complete. No active file claim remains after this subset; the next role-A agent may resume the remaining frontend/workspace/runtime criteria. NI-001 stays IN_PROGRESS until all its acceptance criteria pass.
+- **Handoff (Codex → next role-A agent):** Repository and Python dependency setup are complete. No active file claim remains after this subset; the next role-A agent may resume the remaining frontend/workspace/runtime criteria. NI-001 stays IN_PROGRESS until all its acceptance criteria pass.
 - **Dependency setup started at:** 2026-11-05T18:57:15+03:00
 - **Branch/worktree:** feat/ni-001-python-requirements; /Users/ilyutkinn/Desktop/Near
+- **Resumed by (new claim):** ZCode agent for ILYUTKICK, role A, session 42d29234 — resumed under the user's 2026-11-05 implementation authorization, per the Codex handoff above.
+- **Resumed at:** 2026-11-05T19:34:30+03:00
+- **Remaining scope (this session):** select supported Node/pnpm/uv versions, add root workspace metadata and exact tool pins (package.json, pnpm-workspace.yaml, .node-version), clean-directory tool/dependency preflight, archive-hash preservation check, ignore-rules review, and the user's implementation-authorization update in AGENTS.md/COLLABORATION.md.
+- **Verification (tooling subset):** Clean-directory preflight in /tmp holding only declared manifests: node 24.22.2 vs declared family `24`, corepack 0.36.0, pnpm 12.16.1 resolved by corepack from the `packageManager` hex-integrity pin, CPython 3.13.3 vs `3.13`, uv 0.12.13 (matches the documented resolver). `pnpm install --lockfile-only` on the copied workspace metadata succeeded (lockfile kept in temp only). Fresh temp CPython 3.13.3 venv: hash-checked binary-only install from requirements.txt, `pip check` clean, all 14 direct imports, synthetic statsmodels OLS smoke. `git check-ignore` review: representative raw research JSON/SQL/scripts, captured JS, .env, node_modules/.venv/caches/logs all ignored; research Markdown, .env.example and new manifests correctly trackable; future apps/api/uv.lock not ignored (correct). Pre/post SHA-256 over research/ + product-plan/: 414 files byte-identical. Official Node release schedule fetched to confirm v24 LTS support until 2028-04-30; pnpm version taken from npm registry dist-tags, not memory.
+- **Branch (tooling subset):** feat/ni-001-workspace-tooling; /Users/ilyutkinn/Desktop/Near
+- **Result (tooling subset):** package.json (pnpm@12.16.1+sha512 hex integrity, engines node >=24 <25), pnpm-workspace.yaml (apps/web, packages/*), .node-version (24), installed Homebrew node@24 for verification. AGENTS.md/CONTRIBUTING.md/COLLABORATION.md now record the 5 November 2026 implementation authorization (role-A tasks, publish new app code/tests/config/docs in the private repo); README/DEPENDENCIES.md/JUDGE_SETUP.md document the pins, hex-digest format note and preflight evidence. No new ignore rules were necessary; existing rules already cover the newly introduced generated-artifact paths. No application code, dependencies or lockfiles were added (NI-002 scope).
+- **Reviewer:** pending — role-B review requested on the pull request into main (NI-001 reviewer per TEAM_PLAN.md); merge waits for that review per the collaboration rules.
+- **Completed at:** 2026-11-05T20:06:30+03:00
 
 **Description:** Create the first maintainable project envelope without changing saved research or design artifacts. Implementation begins only after user approval.
 

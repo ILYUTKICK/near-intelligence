@@ -23,7 +23,9 @@ python3.13 -m venv .venv
 .venv/bin/python -m pip check
 ```
 
-This installs Python packages only. It requires package-index access or an independently prepared matching wheelhouse. It does not start the application, create users, run migrations or access a blockchain provider. Windows uses the corresponding .venv\Scripts\python.exe path and remains untested here. [Dependency policy and actual checks](DEPENDENCIES.md) specifies supported/tested platforms and version-update rules.
+The declared frontend tool versions are pinned and tool-checked, although no frontend dependency lockfile exists yet (NI-002 installs/pins those): with Node 24 and its bundled corepack on PATH, `corepack pnpm --version` must report `12.16.1` from the `packageManager` pin in [package.json](../package.json); `.node-version` declares the Node 24 LTS family. See [DEPENDENCIES.md](DEPENDENCIES.md) for verified versions, the hex-digest note and platform caveats.
+
+These commands install packages only. They require package-index access or an independently prepared matching wheelhouse. They do not start the application, create users, run migrations or access a blockchain provider. Windows uses the corresponding .venv\Scripts\python.exe path and remains untested here. [Dependency policy and actual checks](DEPENDENCIES.md) specifies supported/tested platforms and version-update rules.
 
 The current repository contains documentation, dependency manifests and visual mockups. Research Markdown reports are included; raw research data, SQL and analysis/collection scripts remain excluded under the user's sharing instruction. Some linked artifact paths intentionally refer to the unshared local archive.
 

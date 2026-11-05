@@ -7,9 +7,28 @@ Baseline verified 5 November 2026 under NI-001. The user requested an explicit r
 - [requirements.in](../requirements.in): direct Python dependencies for the selected backend/research stack. This is the single declaration source until NI-002 creates the Python project.
 - [requirements.txt](../requirements.txt): generated exact versions for direct/transitive packages and SHA-256 distribution hashes, with environment markers. Do not edit it by hand or install the unconstrained .in file for a release.
 - [.python-version](../.python-version): supported interpreter family CPython 3.13. The family is pinned; final patch/container digest and uv tool pin are still part of foundation/deployment work. Actual smoke-test interpreter was 3.13.3.
-- Frontend dependencies belong in future package.json and pnpm-lock.yaml. Python requirements cannot install Next.js/ECharts/Tiptap or replace PostgreSQL, Docker, Node or an auth service.
+- [package.json](../package.json), [pnpm-workspace.yaml](../pnpm-workspace.yaml) and [.node-version](../.node-version): NI-001 workspace tooling pins (Node 24 LTS family, pnpm 12.16.1 exact with hex SHA-512 integrity). These declare tool versions and workspace membership only; no frontend dependencies are installed yet and no pnpm-lock.yaml is committed — that is NI-002. Python requirements cannot install Next.js/ECharts/Tiptap or replace PostgreSQL, Docker, Node or an auth service.
+- uv: the resolver/build tool for the Python baseline is **0.12.13** (verified installed at `~/.local/bin/uv` on the setup machine, matching the version used to generate requirements.txt). The final container/CLI digest pin remains part of deployment work (NI-066); a contributor may use a compatible uv version, but a different resolver result must not be committed over this baseline without a fresh compatibility check.
 
 RoleA owns this NI-001 handoff; roleB reviews API/scientific compatibility and later maintains Python project dependencies. Do not independently upgrade packages in separate environments and call the results one reproducible baseline.
+
+## Frontend tooling pins (NI-001)
+
+Selected 5 November 2026 from official registries, not memory:
+
+| Tool | Declared pin | Source of truth | Rationale |
+| --- | --- | --- | --- |
+| Node.js | `24` (family) in [.node-version](../.node-version); `>=24.0.0 <25` in `engines` | [nodejs/release schedule](https://raw.githubusercontent.com/nodejs/release/main/schedule.json): v24 "Krypton" LTS since 2025-10-28, supported until 2028-04-30 | An installed Node 21.7.1 on the setup machine is EOL and is not declared. Node 24 is a mature LTS line that selected Next.js releases support; Node 22 LTS (until 2027-04-30) also remains compatible but is closer to retirement. |
+| pnpm | `pnpm@12.16.1+sha512.091d1dee…f656d1` in `packageManager` | npm registry `dist-tags.latest` on 2026-11-05; SHA-512 hex digest derived from the release `dist.integrity` | Exact pin with integrity suffix lets corepack/Node verify the downloaded binary. Newer 12.17.0/12.18.0 exist but are not tagged `latest` and were therefore not selected. |
+| corepack | bundled with Node 24.22.2: **0.36.0** | Node distribution | Used to activate the pinned pnpm; no separate global pnpm install is required. |
+
+Note: the integrity suffix must be a **hex** SHA-512 digest (as pnpm documents for `packageManager`). The base64 `dist.integrity` string (`sha512-…==`) from the npm registry is rejected by corepack with "expected a semver version". Convert it once (`base64 -d | xxd -p`) when re-pinning.
+
+License metadata for these tools: Node.js MIT, pnpm MIT, corepack MIT (per their repositories/licenses at the pinned versions). This records a dependency review, not a legal opinion; runtime-transitive notices are distributed with each tool.
+
+Workspace membership (`pnpm-workspace.yaml`) lists `apps/web` and `packages/*` per the planned architecture; `apps/api` is Python (uv/pip) and is intentionally absent. Bootstrap was smoke-tested with `pnpm install --lockfile-only` in a clean temporary directory; the produced lockfile was discarded and is not committed. Real dependency lockfiles and frontend package versions are NI-002 scope.
+
+Contributor runtime note (macOS setup machine): Homebrew's `node@24` is keg-only, so the pre-existing `/usr/local/bin/node` (21.7.1) still shadows it on PATH. Activate the declared runtime per your version manager (`.node-version` works with fnm/nvm/asdf) or prefix `PATH` with `/opt/homebrew/opt/node@24/bin` as the docs/JUDGE_SETUP preflight does. Linux/Windows runtime execution remains a release check.
 
 ## Verified direct packages
 
@@ -78,5 +97,12 @@ Do not claim this command works now: the project and uv.lock do not yet exist. R
 - Hash-checked binary wheel installation into a temporary cross-platform target for CPython 3.13 Linux x86_64/manylinux 2.28 passed. Linux binaries were not executed on macOS.
 - No database connection, JWT-provider configuration, API service, browser flow or Docker application deployment was tested. Docker daemon is unavailable in the current session. Windows and Linux runtime execution remain release checks.
 - Legacy research scripts/inputs remain excluded from GitHub. Installing dependencies does not make missing research inputs available. Judge reproduction needs a separately authorized versioned input/code bundle.
+
+### 5 November 2026 (evening) — tool/workspace preflight (NI-001 role-A resume)
+
+- Clean-directory preflight in a fresh temporary directory holding only the declared manifests: Node **24.22.2** (matches declared family `24`), corepack **0.36.0**, pnpm **12.16.1** resolved by corepack from the `packageManager` hex-integrity pin, CPython **3.13.3** (matches `3.13`), uv **0.12.13**.
+- `pnpm install --lockfile-only` on the copied root workspace metadata succeeded and produced a lockfile in the temporary directory only (discarded; no lockfile is committed until NI-002 resolves real frontend dependencies).
+- Fresh temporary CPython 3.13.3 venv re-verified the Python baseline end to end on macOS ARM64: hash-checked binary-only install from requirements.txt, `pip check` clean, all 14 direct module imports, and a synthetic statsmodels OLS smoke. No research inputs, providers or application code were involved.
+- Node was installed locally via Homebrew (`node@24` keg-only 24.22.2) to verify the declared runtime; the pre-existing system Node 21.7.1 is EOL and is not declared. Linux/Windows execution of the toolchain remains unverified.
 
 See [judge setup](JUDGE_SETUP.md) for the distinction between a ready dependency environment and a deployable release.
