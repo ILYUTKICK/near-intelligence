@@ -99,7 +99,7 @@ def main() -> int:
         with test_log.open("wb") as log:
             for pattern in ("test_database.py", "test_auth_bootstrap.py", "test_ownership_rls.py",
                             "test_home_aggregation.py", "test_archive_import.py",
-                            "test_dataset_staging.py"):
+                            "test_dataset_staging.py", "test_profile.py"):
                 result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "apps/api/tests",
                                          "-p", pattern, "-v"], cwd=repo, env=environment,
                                         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
