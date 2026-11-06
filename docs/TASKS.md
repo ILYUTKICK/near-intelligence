@@ -313,7 +313,12 @@ Specification: [UI_SCREEN_SPECIFICATIONS.md](UI_SCREEN_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-008, NI-004
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234 (interactive session; a second dispatch runs role B/NI-018 in a separate worktree)
+- **Execution role:** A
+- **Started at:** 2026-11-06T18:38:50+03:00
+- **Branch/worktree:** feat/ni-011-public-routes; /Users/ilyutkinn/Desktop/Near
+- **Dependency verification:** NI-008 DONE (PR #11), NI-004 DONE (PRs #16/#17) — cards verified on origin/main a592a2f.
 
 **Description:** Build the real public reading surface and conditional economic value-chain explanation.
 
