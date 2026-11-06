@@ -462,7 +462,12 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-016, NI-003
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch
+- **Execution role:** B
+- **Started at:** 2026-11-06T18:43:55+03:00
+- **Branch/worktree:** feat/ni-018-jwt-verification; /Users/ilyutkinn/Desktop/near-intelligence-b
+- **Operator dispatch note (2026-11-06T18:43:55+03:00):** participant A (ILYUTKICK) explicitly instructed this role-B agent to implement NI-018 now and provided the machine-local environment handoff (docs/DEV_ENVIRONMENT.md, untracked operator file): the dev Supabase project exists, JWKS serves ES256 (GoTrue v2.197.0), and the operator verified a real gateway round trip (login → HttpOnly cookie → ES256 verification against the dev JWKS → logout revoking refresh) on 6 November 2026. The upstream provider smoke that NI-016's reopening demanded therefore exists as recorded operator evidence; NI-016's own DONE/review stays with A and is unchanged. The earlier "do not start before the provider smoke exists" condition is satisfied by that handoff; committed tests still use only local synthetic keys and mocks (no provider calls, no real account tokens in Git), with at most a bounded local smoke against the operator's dev project as explicitly allowed by the dispatch.
 - **Dependency audit (6 November 2026):** NI-003 is verified DONE after PR #15. NI-016's original real-provider smoke is unfulfilled and has been reopened under A's existing claim. NI-018 remains unclaimed/unstarted until that dependency is genuinely DONE; no local test key or fake account substitutes for the upstream acceptance evidence. Other available P0 role-B tasks require the blocked data/auth chain. No provider call or account creation was attempted by B.
 
 **Description:** Make the API authenticate independently of gateway trust.
