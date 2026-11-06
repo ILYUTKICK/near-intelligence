@@ -53,11 +53,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --project apps/api --frozen
       - run: uv lock --check --project apps/api
-      - name: Unit tests (contracts, source capabilities; no external I/O)
+      - name: Unit tests (contracts, source capabilities, JWT verification; no external I/O)
         run: |
           cd apps/api
           uv run python -m unittest discover -s tests -p test_contracts.py -v
           uv run python -m unittest discover -s tests -p test_source_capabilities.py -v
+          uv run python -m unittest discover -s tests -p test_jwt_verification.py -v
       - name: Generated client matches the API contract
         run: node packages/shared-types/scripts/generate.mjs --check
 

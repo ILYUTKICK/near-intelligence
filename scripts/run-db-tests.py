@@ -88,19 +88,24 @@ def main() -> int:
             MIGRATION_DATABASE_URL=url("near_migrator", environment["DB_MIGRATION_PASSWORD"]),
         )
         test_log = directory / "test-results.log"
+        # NI-003 identity/RLS suite plus the NI-018 bootstrap suite.
+        returncode = 0
         with test_log.open("wb") as log:
-            result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "apps/api/tests",
-                                     "-p", "test_database.py", "-v"], cwd=repo, env=environment,
-                                    stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                    timeout=120,
-                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+            for pattern in ("test_database.py", "test_auth_bootstrap.py"):
+                result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "apps/api/tests",
+                                         "-p", pattern, "-v"], cwd=repo, env=environment,
+                                        stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                        timeout=120,
+                                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+                if result.returncode and not returncode:
+                    returncode = result.returncode
         report = test_log.read_text(encoding="utf-8", errors="replace")
         for key in ("PGPASSWORD", "DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD", "DB_OPERATOR_PASSWORD"):
             report = report.replace(environment[key], "[redacted]")
         print(report, flush=True)
         if not report or "skipped=" in report:
             raise RuntimeError("Integration tests must execute; no-output/skip is not a pass")
-        return result.returncode
+        return returncode
     finally:
         if started:
             try:
