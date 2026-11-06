@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 
 from near_api import __version__
 from near_api.contracts import error_response, install_contracts
+from near_api.documents.routes import router as documents_router
 from near_api.schemas.common import ErrorResponse, HealthResponse
 from near_api.settings import SettingsError, get_settings
 from near_api.users.routes import router as me_router
@@ -25,9 +26,11 @@ app = FastAPI(
 )
 install_contracts(app)
 
-# Private workspace routes (NI-022): authenticate via get_principal and emit
-# no-store on every response. Route modules open no connection at import time.
+# Private workspace routes (NI-022) and document revision routes (NI-036):
+# authenticate via get_principal and emit no-store on every response. Route
+# modules open no connection at import time.
 app.include_router(workspace_router)
+app.include_router(documents_router)
 app.include_router(me_router)
 
 

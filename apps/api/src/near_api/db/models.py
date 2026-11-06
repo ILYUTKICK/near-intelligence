@@ -7,6 +7,8 @@ import_batches, imported_files, source_runs): metadata-only lineage for the
 read-only research archive import — file bytes are never stored. NI-028 adds
 the immutable dataset staging/publication zone (artifacts, dataset_versions,
 dataset_metrics, dataset_inputs, metric_observations, active_datasets).
+NI-036 adds the per-revision document projections (insights, hypotheses,
+evidence_links) derived from canonical document_versions.content.
 Remaining domain tables belong to their owning tasks and must keep these
 declarations in sync for the Alembic metadata drift check.
 """
@@ -27,6 +29,7 @@ from sqlalchemy import (
     MetaData,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     func,
     text,
@@ -146,6 +149,105 @@ class DocumentBlock(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     block_type: Mapped[str] = mapped_column(String(40), nullable=False)
     attrs: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+
+
+class Insight(Base):
+    """Per-revision projection of one canonical insight node (NI-036)."""
+
+    __tablename__ = "insights"
+    __table_args__ = (
+        ForeignKeyConstraint(["document_version_id", "document_id", "owner_id"],
+                             ["app.document_versions.id", "app.document_versions.document_id",
+                              "app.document_versions.owner_id"],
+                             name="fk_insights_version_id", ondelete="CASCADE"),
+        ForeignKeyConstraint(["document_version_id", "block_id"],
+                             ["app.document_blocks.document_version_id",
+                              "app.document_blocks.block_id"],
+                             name="fk_insights_block", ondelete="CASCADE"),
+        Index("ix_insights_document_owner_modified", "document_id", "owner_id",
+              text("modified_at DESC")),
+    )
+
+    document_version_id: Mapped[UUID] = mapped_column(primary_key=True)
+    insight_id: Mapped[UUID] = mapped_column(primary_key=True)
+    document_id: Mapped[UUID] = mapped_column(nullable=False)
+    owner_id: Mapped[UUID] = mapped_column(nullable=False)
+    block_id: Mapped[UUID] = mapped_column(nullable=False)
+    type: Mapped[str] = mapped_column(String(40), nullable=False)
+    classification: Mapped[str] = mapped_column(String(40), nullable=False)
+    body: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    context: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    authored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    modified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    hypothesis_id: Mapped[UUID | None]
+
+
+class Hypothesis(Base):
+    """Per-revision projection of one canonical hypothesis node (NI-036)."""
+
+    __tablename__ = "hypotheses"
+    __table_args__ = (
+        CheckConstraint("assessment IN ('untested','supported','mixed','weakened',"
+                        "'insufficient_data')", name="assessment"),
+        ForeignKeyConstraint(["document_version_id", "document_id", "owner_id"],
+                             ["app.document_versions.id", "app.document_versions.document_id",
+                              "app.document_versions.owner_id"],
+                             name="fk_hypotheses_version_id", ondelete="CASCADE"),
+        ForeignKeyConstraint(["document_version_id", "block_id"],
+                             ["app.document_blocks.document_version_id",
+                              "app.document_blocks.block_id"],
+                             name="fk_hypotheses_block", ondelete="CASCADE"),
+    )
+
+    document_version_id: Mapped[UUID] = mapped_column(primary_key=True)
+    hypothesis_id: Mapped[UUID] = mapped_column(primary_key=True)
+    document_id: Mapped[UUID] = mapped_column(nullable=False)
+    owner_id: Mapped[UUID] = mapped_column(nullable=False)
+    block_id: Mapped[UUID] = mapped_column(nullable=False)
+    statement: Mapped[str] = mapped_column(Text, nullable=False)
+    assessment: Mapped[str] = mapped_column(String(40), nullable=False)
+    authored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    modified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class EvidenceLink(Base):
+    """Per-revision projection of one canonical evidence node (NI-036).
+
+    The polymorphic target is validated by the revision service (same-revision
+    insight/chart block or public artifact); no polymorphic FK is trusted.
+    """
+
+    __tablename__ = "evidence_links"
+    __table_args__ = (
+        CheckConstraint("classification IN ('supporting','contradicting','uncertain')",
+                        name="classification"),
+        CheckConstraint("target_kind IN ('insight','chart_block','model_run','citation')",
+                        name="target_kind"),
+        ForeignKeyConstraint(["document_version_id", "document_id", "owner_id"],
+                             ["app.document_versions.id", "app.document_versions.document_id",
+                              "app.document_versions.owner_id"],
+                             name="fk_evidence_links_version_id", ondelete="CASCADE"),
+        ForeignKeyConstraint(["document_version_id", "block_id"],
+                             ["app.document_blocks.document_version_id",
+                              "app.document_blocks.block_id"],
+                             name="fk_evidence_links_block", ondelete="CASCADE"),
+        ForeignKeyConstraint(["document_version_id", "hypothesis_id"],
+                             ["app.hypotheses.document_version_id",
+                              "app.hypotheses.hypothesis_id"],
+                             name="fk_evidence_links_hypothesis", ondelete="CASCADE"),
+        Index("ix_evidence_links_document_owner", "document_id", "owner_id"),
+    )
+
+    document_version_id: Mapped[UUID] = mapped_column(primary_key=True)
+    evidence_id: Mapped[UUID] = mapped_column(primary_key=True)
+    document_id: Mapped[UUID] = mapped_column(nullable=False)
+    owner_id: Mapped[UUID] = mapped_column(nullable=False)
+    block_id: Mapped[UUID] = mapped_column(nullable=False)
+    hypothesis_id: Mapped[UUID] = mapped_column(nullable=False)
+    classification: Mapped[str] = mapped_column(String(40), nullable=False)
+    target_kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    target_id: Mapped[UUID] = mapped_column(nullable=False)
+    explanation: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 class Source(Base):
