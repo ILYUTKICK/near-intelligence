@@ -21,6 +21,13 @@ import { loadServerAuthConfig } from "@/lib/auth/config";
  * stored in a signed HttpOnly cookie; the CSRF cookie rotates.
  */
 export async function POST(request: NextRequest) {
+  const limit = checkRateLimit(`login:{clientKey(request)}`, 5, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts. Try again later." },
+      { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } },
+    );
+  }
   const origin = request.headers.get("origin");
   const allowedOrigins = loadServerAuthConfig().AUTH_ALLOWED_REDIRECT_ORIGINS;
   if (!origin || !allowedOrigins.includes(origin)) {

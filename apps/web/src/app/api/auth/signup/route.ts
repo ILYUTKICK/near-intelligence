@@ -28,6 +28,13 @@ export async function POST(request: NextRequest) {
       { status: 503 },
     );
   }
+  const limit = checkRateLimit(`signup:{clientKey(request)}`, 5, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts. Try again later." },
+      { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } },
+    );
+  }
   const origin = request.headers.get("origin");
   if (!origin || !allowedOrigins.includes(origin)) {
     return NextResponse.json({ error: "Request origin is not allowed." }, { status: 403 });
