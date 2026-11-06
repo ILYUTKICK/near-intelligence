@@ -1,0 +1,42 @@
+{
+  "spec_id": "supply_bounds_activity_v1",
+  "spec_version": 1,
+  "family": "supply_bound",
+  "declared_target": "supply_bounds",
+  "frequency": "daily",
+  "dependent_variable": {
+    "metric_id": "issuance_lower_bound_near",
+    "source": null
+  },
+  "explanatory_variables": [
+    {
+      "metric_id": "provider_intents_volume_usd",
+      "source": "SRC-LLAMA",
+      "role": "activity"
+    }
+  ],
+  "transformations": {
+    "baseline": "level",
+    "difference_adjacency": "calendar_adjacent_only",
+    "float64_conversion": "explicit_finite_required"
+  },
+  "parameters": {
+    "substantive_slopes": 1,
+    "intercept": true,
+    "controls": []
+  },
+  "sample_window": {
+    "start": "2026-08-06",
+    "end_exclusive": "2026-11-04"
+  },
+  "prohibited_labels": [
+    "protocol_revenue",
+    "exact_supply_outcome",
+    "deflation_claim",
+    "causal_effect"
+  ],
+  "limitation_notes": [
+    "Negative control example kept in the registry: issuance/burn exist only as conservative lower bounds over 30-day windows and the 90-day period, with a partially audited mint-header set (OQ-10).",
+    "The gate must reject any specification that treats a bound as an exact daily outcome; this config documents that rejection reproducibly."
+  ]
+}

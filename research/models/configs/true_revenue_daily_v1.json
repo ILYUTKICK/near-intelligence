@@ -1,0 +1,38 @@
+{
+  "spec_id": "true_revenue_daily_v1",
+  "spec_version": 1,
+  "family": "true_revenue",
+  "declared_target": "protocol_revenue",
+  "frequency": "daily",
+  "dependent_variable": {
+    "metric_id": "protocol_revenue_usd",
+    "source": null
+  },
+  "explanatory_variables": [
+    {
+      "metric_id": "provider_intents_volume_usd",
+      "source": "SRC-LLAMA",
+      "role": "activity"
+    }
+  ],
+  "transformations": {
+    "baseline": "difference_log",
+    "strictly_positive_required": true,
+    "difference_adjacency": "calendar_adjacent_only",
+    "float64_conversion": "explicit_finite_required"
+  },
+  "parameters": {
+    "substantive_slopes": 1,
+    "intercept": true,
+    "controls": []
+  },
+  "sample_window": {
+    "start": "2026-08-06",
+    "end_exclusive": "2026-11-04"
+  },
+  "prohibited_labels": [],
+  "limitation_notes": [
+    "The preferred dependent variable requires an independently reconciled daily revenue ledger under a consistent entity scope and recognition basis (OQ-01); the saved archive does not establish one.",
+    "This specification is evaluated first and honestly: while the gated metric has zero observations the verdict stays NOT_READY and nothing is fitted."
+  ]
+}

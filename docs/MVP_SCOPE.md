@@ -16,6 +16,8 @@ Preferred P0 model: activity versus a comparable daily protocol-attributable rev
 
 Fallback: execute a reproducible exploratory time-series association using explicitly provider-reported daily gross fees and volume, plus sensitivity to source revisions; optionally associate observed purchases with activity. Publish it as a limited proxy analysis, state the mechanical fee-volume relationship, and leave H1/H4 unresolved. This fulfills the statistical-analysis requirement only if the hackathon's evaluation accepts this limited empirical question; OQ-02 is an external judging risk. A no-data status alone does not fulfill P0 econometrics. If no defensible series/model is available, report the release incomplete.
 
+NI-051 implements this gate as offline research code (`research/models/readiness.py` with preregistered `research/models/configs/`): the true-revenue specification stays NOT_READY while OQ-01 is open, only the explicitly named `gross_fee_activity_v1` proxy is admitted — always with limits, never as protocol revenue — and windows below the project sample minimum are rejected. Generated readiness reports stay local and are not committed.
+
 There are no coefficients or fitted model outputs in this documentation. NI-052–NI-054 must run and validate real models after implementation is approved.
 
 ## P1

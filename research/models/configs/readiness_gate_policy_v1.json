@@ -1,0 +1,38 @@
+{
+  "policy_id": "readiness_gate_v1",
+  "policy_version": 1,
+  "window": {
+    "start": "2026-08-06",
+    "end_exclusive": "2026-11-04"
+  },
+  "min_complete_daily_observations": 60,
+  "min_observations_per_parameter": 10,
+  "max_substantive_slopes": 3,
+  "intercept_required": true,
+  "long_run_min_days": 365,
+  "fee_bps_regime_tolerance_pct": "10",
+  "spec_evaluation_order": [
+    "true_revenue_daily_v1",
+    "gross_fee_activity_v1",
+    "purchases_activity_v1",
+    "supply_bounds_activity_v1"
+  ],
+  "inputs": {
+    "flows": {
+      "cohort": "near-longitudinal",
+      "path": "near-longitudinal/data/flows_90d_raw.json"
+    },
+    "daily_flows": {
+      "cohort": "near-dollar",
+      "path": "near-dollar/analysis/daily.json"
+    },
+    "supply": {
+      "cohort": "near-supply",
+      "path": "near-supply/analysis/summary.json"
+    },
+    "treasury": {
+      "cohort": "near-treasury",
+      "path": "near-treasury/data/summary.json"
+    }
+  }
+}

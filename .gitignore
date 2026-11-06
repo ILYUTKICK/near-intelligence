@@ -58,6 +58,12 @@ private-exports/
 /research/**
 !/research/**/
 !/research/**/*.md
+# NI-051 model readiness gate: the deterministic gate code, preregistered
+# specification configs and its README are shared; generated readiness
+# reports stay local (never committed, never published).
+!/research/models/readiness.py
+!/research/models/configs/*.json
+research/models/reports/
 /product-plan/**
 !/product-plan/**/
 !/product-plan/**/*.md
