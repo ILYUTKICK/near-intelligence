@@ -44,10 +44,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
+          cache: pnpm
       - uses: astral-sh/setup-uv@v5
+      - run: pnpm install --frozen-lockfile
       - run: uv sync --project apps/api --frozen
       - run: uv lock --check --project apps/api
       - name: Unit tests (contracts, source capabilities; no external I/O)
@@ -78,4 +81,11 @@ jobs:
       - run: uv sync --project apps/api --frozen
       # Disposable loopback cluster created and destroyed by the runner
       # script itself; generated passwords stay inside the job.
-      - run: uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin
+      - name: Run the disposable-cluster suite
+        run: |
+          set -o pipefail
+          uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin || {
+            echo "=== server.log ==="; cat .local/ni003-pg-*/server.log || true
+            echo "=== initdb/start logs ==="; cat .local/ni003-pg-*/*-command.log || true
+            exit 1
+          }
