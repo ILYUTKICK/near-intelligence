@@ -559,7 +559,12 @@ Specification: [USER_JOURNEYS.md](USER_JOURNEYS.md).
 - **Priority:** P0
 - **Dependencies:** NI-008, NI-020
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-06T22:51:34+03:00
+- **Branch/worktree:** feat/ni-021-workspace-gate; /Users/ilyutkinn/Desktop/Near
+- **Dependency verification:** NI-008 DONE (PR #11), NI-020 DONE (PR #24, session/refresh boundaries in main) — cards on origin/main a594f78.
 
 **Description:** Connect the existing layout to authenticated navigation without relying on UI for resource ownership.
 
