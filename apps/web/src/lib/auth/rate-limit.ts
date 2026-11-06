@@ -51,3 +51,8 @@ export function clientKey(request: Request): string {
   }
   return request.headers.get("x-real-ip") ?? "unknown";
 }
+
+/** Test isolation only: clears every bucket (never call from production code). */
+export function resetRateLimitForTests(): void {
+  buckets.clear();
+}

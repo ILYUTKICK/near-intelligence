@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { checkRateLimit, clientKey } from "@/lib/auth/rate-limit";
 import { AuthConfigError, loadPublicAuthConfig, loadServerAuthConfig } from "@/lib/auth/config";
 import {
   CSRF_COOKIE,
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
       { status: 503 },
     );
   }
-  const limit = checkRateLimit(`demo:{clientKey(request)}`, 5, 60_000);
+  const limit = checkRateLimit(`demo:${clientKey(request)}`, 5, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again later." },

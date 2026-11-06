@@ -12,6 +12,7 @@ import {
   verifyCsrfPair,
 } from "@/lib/auth/session";
 
+import { checkRateLimit, clientKey } from "@/lib/auth/rate-limit";
 import { loadServerAuthConfig } from "@/lib/auth/config";
 
 /**
@@ -21,7 +22,7 @@ import { loadServerAuthConfig } from "@/lib/auth/config";
  * stored in a signed HttpOnly cookie; the CSRF cookie rotates.
  */
 export async function POST(request: NextRequest) {
-  const limit = checkRateLimit(`login:{clientKey(request)}`, 5, 60_000);
+  const limit = checkRateLimit(`login:${clientKey(request)}`, 5, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again later." },

@@ -11,6 +11,7 @@ import { POST as logoutPost } from "@/app/api/auth/logout/route";
 import { GET as csrfGet } from "@/app/api/auth/csrf/route";
 import { GET as callbackGet } from "@/app/auth/callback/route";
 import { CSRF_COOKIE, SESSION_COOKIE, encodeSessionCookie } from "@/lib/auth/session";
+import { resetRateLimitForTests } from "@/lib/auth/rate-limit";
 
 const ENV = {
   APP_ENV: "test",
@@ -36,6 +37,7 @@ function providerReply(status: number, body: unknown) {
 }
 
 beforeEach(() => {
+  resetRateLimitForTests();
   for (const [key, value] of Object.entries(ENV)) {
     process.env[key] = value;
   }
@@ -158,6 +160,7 @@ describe("Login gateway", () => {
       ["missing fields", loginRequest({ csrfCookie: "x", body: { email: "a@b.c" } })],
     ];
     for (const [name, request] of cases) {
+      resetRateLimitForTests(); // each hostile pattern is a fresh bucket
       const response = await loginPost(request);
       expect(response.status, name).toBe(403);
       expect(providerFetchMock, name).not.toHaveBeenCalled();
