@@ -47,6 +47,17 @@ Editor UI undo/redo is local until saved. A failed validation rolls back the ent
 
 Normalized raw-event imports, when needed, use `chain_events`: id PK, dataset_version_id, network, tx_hash, receipt_id, log_index, item_index, action_index, event_type, event_time_ns NUMERIC(30,0), payload JSONB. UNIQUE(dataset_version_id,network,receipt_id,log_index,item_index,action_index,event_type). Source adapters provide non-null sentinel indexes for non-log actions; canonical logical event identity must not rely solely on tx hash. Index(dataset_version_id,event_time_ns). Aggregate-only archives must not pretend to contain raw events; link them as input artifacts instead.
 
+### Operator archive import zone (NI-027)
+
+The read-only import of the existing research archive (implemented by `near_api.ingestion.archive`) writes four operator-zone tables before NI-028's artifacts/dataset tables exist. It stores metadata only — never file bytes — and the original archive stays untouched on disk:
+
+- `sources` — the operator-managed `data_sources` catalog subset: stable `SRC-*` text PK, name, docs/base URLs, `access_status` disabled/documented/approved, `license_status` unknown/unverified/verified/prohibited, verified_at, bounded JSONB lineage. No secrets. Readable by near_app; writable by near_operator only.
+- `import_batches` — one row per verified import. UNIQUE `manifest_sha256` is the idempotency key: re-importing the same manifest re-verifies every byte and changes nothing. Also records the cohort-registry hash, file count, verified byte total and importer identity.
+- `imported_files` — PK (batch_id, relative_path); sha256, byte_size, `file_role` raw/aggregate/provenance/editorial/script, `coverage_scope` raw_saved_response/aggregate_window/partial_raw_audit/point_in_time_snapshot/process_documentation, half-open UTC `[coverage_start, coverage_end_exclusive)`, source FK, per-cohort license visibility and a ≤4 KiB sanitized metadata JSONB (URLs credential-redacted). Classification is deliberately conservative: a file is `raw` only when the archive itself documents it as a saved response/export, so aggregate-only cohorts can never claim raw-chain completeness.
+- `source_runs` — retrieval lineage documented by cohort manifests (endpoint/job identity, retrieval UTC, byte count), the historical counterpart of `ingestion_runs`; the live ingestion lifecycle remains NI-028/NI-030 scope.
+
+All four tables are FORCE RLS with near_operator-only policies; near_app has SELECT on `sources` only. Batch writes are all-or-nothing: any hash mismatch, missing/extra/symlinked file, undeclared cohort or checksum divergence rejects the whole batch before any row is written.
+
 ## Models, publication and jobs
 
 | Entity | Fields and keys | Constraints/indexes/lifecycle |

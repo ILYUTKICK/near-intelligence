@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "description": "NI-027 cohort scope declarations for the existing research archive. Values are transcribed from each cohort's README.md and manifest.json plus docs/SOURCE_VERIFICATION.md; they bound what imported rows may claim and never extend the archive's own scope. Window boundaries are UTC dates; intervals are [start, end).",
+  "sources": {
+    "SRC-BQ": {
+      "name": "NEAR public BigQuery dataset",
+      "docs_url": "https://cloud.google.com/bigquery/public-data",
+      "access_status": "documented",
+      "license_status": "unverified",
+      "lineage": [
+        "Saved execution_outcomes/receipt_actions exports cover the archived cohorts; re-execution requires cloud identity and is not scheduled (docs/SOURCE_VERIFICATION.md SRC-BQ)"
+      ]
+    },
+    "SRC-DASHBOARD": {
+      "name": "revenue.near.org captured public pages",
+      "docs_url": "https://revenue.near.org/",
+      "base_url": "https://revenue.near.org/",
+      "access_status": "documented",
+      "license_status": "unverified",
+      "lineage": [
+        "Saved HTML/RSC/JSON snapshots are captured third-party material, not independently verified metrics (docs/SOURCE_VERIFICATION.md SRC-DASHBOARD)"
+      ]
+    },
+    "SRC-FASTNEAR": {
+      "name": "FastNear indexed transactions and accounts",
+      "docs_url": "https://docs.fastnear.com/",
+      "base_url": "https://tx.main.fastnear.com",
+      "access_status": "documented",
+      "license_status": "unverified",
+      "lineage": [
+        "Local 30-day role-index audit recorded exhausted pagination; index-head lag is not quantified (docs/SOURCE_VERIFICATION.md SRC-FASTNEAR)"
+      ]
+    },
+    "SRC-INTENTS": {
+      "name": "Explorer API swap records and fee declarations",
+      "docs_url": "https://docs.near.org/api/rpc/intents",
+      "access_status": "documented",
+      "license_status": "unverified",
+      "lineage": [
+        "Creation-cohort exports are documented; current endpoint auth/quota entitlement remains probe pending (docs/SOURCE_VERIFICATION.md SRC-INTENTS)",
+        "appFees declarations are not executed revenue"
+      ]
+    },
+    "SRC-LLAMA": {
+      "name": "DefiLlama reported fees, volume and adapter methodology",
+      "docs_url": "https://defillama.com/docs/api",
+      "base_url": "https://api.llama.fi",
+      "access_status": "documented",
+      "license_status": "unverified",
+      "lineage": [
+        "Provider-reported series; the public adapter maps Dune inputs and selected wallet flows and is not independent confirmation (docs/SOURCE_VERIFICATION.md SRC-LLAMA)"
+      ]
+    },
+    "SRC-NEAR-RPC": {
+      "name": "NEAR mainnet JSON-RPC",
+      "docs_url": "https://docs.near.org/api/rpc/providers",
+      "base_url": "https://rpc.mainnet.near.org",
+      "access_status": "approved",
+      "license_status": "unverified",
+      "verified_at": "2026-11-06T19:13:45Z",
+      "lineage": [
+        "OQ-03 RESOLVED operator authorization 2026-11-06: free tier, no account/key, header-only, byte caps (PR #28 probe evidence)",
+        "Historical archival RPC audit stopped on HTTP429 after 6 of 297 headers; stopped collectors are not restarted"
+      ]
+    },
+    "SRC-NEARBLOCKS": {
+      "name": "NEARBlocks indexed charts and boundaries",
+      "docs_url": "https://nearblocks.io/",
+      "base_url": "https://api.nearblocks.io",
+      "access_status": "documented",
+      "license_status": "unverified",
+      "lineage": [
+        "Secondary reconciliation source; current API entitlement/quota/history/license unverified (docs/SOURCE_VERIFICATION.md SRC-NEARBLOCKS)"
+      ]
+    },
+    "SRC-PRICE": {
+      "name": "CoinGecko NEAR/USD historical prices",
+      "docs_url": "https://www.coingecko.com/en/api",
+      "base_url": "https://api.coingecko.com",
+      "access_status": "documented",
+      "license_status": "unverified",
+      "lineage": [
+        "Saved daily points cover the analysis window; daily USD valuations are approximations, not execution prices (docs/SOURCE_VERIFICATION.md SRC-PRICE)"
+      ]
+    }
+  },
+  "cohorts": {
+    "near-dollar": {
+      "window_start": "2026-08-06",
+      "window_end_exclusive": "2026-11-04",
+      "coverage_scope": "aggregate_window",
+      "partial_audit": "Daily USD values are provider-price approximations, not execution prices; volume and fees are provider-reported, not independently reconstructed from all exchanges.",
+      "license_status": "unverified",
+      "sources": ["SRC-PRICE", "SRC-LLAMA", "SRC-DASHBOARD"],
+      "basis": "research/near-dollar/README.md and manifest.json window_utc_start/window_utc_end_exclusive"
+    },
+    "near-longitudinal": {
+      "window_start": "2026-08-06",
+      "window_end_exclusive": "2026-11-04",
+      "coverage_scope": "raw_saved_response",
+      "partial_audit": "90-day BigQuery export covers saved rows only; dataset completeness for the window is not proven; legacy payout matching used up to 300s tolerance.",
+      "license_status": "unverified",
+      "sources": ["SRC-BQ"],
+      "basis": "research/near-longitudinal/README.md and manifest.json window_utc/end_exclusive"
+    },
+    "near-pilot": {
+      "window_start": "2026-11-02",
+      "window_end_exclusive": "2026-11-03",
+      "coverage_scope": "partial_raw_audit",
+      "partial_audit": "Single-day bounded pilot: three wallets, 26 receipt actions, 124 second-export records; the FT-events check is recorded as a UI observation, not a full balance-change audit.",
+      "license_status": "unverified",
+      "sources": ["SRC-BQ", "SRC-INTENTS"],
+      "basis": "research/near-pilot/README.md and manifest.json pilot_day_utc/as_of"
+    },
+    "near-provenance": {
+      "window_start": null,
+      "window_end_exclusive": null,
+      "coverage_scope": "partial_raw_audit",
+      "partial_audit": "Creation cohort 2026-11-01..03 with 21,361 SUCCESS affiliate records (pagination complete) plus bounded 2026-11-01..02 on-chain matching and 2026-10-27..11-02 inventory bounds; full 90-day economic attribution is NOT identified (manifest status BOUNDED_PROVENANCE_ESTABLISHED_FULL_90D_NOT_IDENTIFIED).",
+      "license_status": "unverified",
+      "sources": ["SRC-INTENTS", "SRC-BQ", "SRC-NEAR-RPC"],
+      "basis": "research/near-provenance/README.md and manifest.json status/onchain_export_jobs"
+    },
+    "near-supply": {
+      "window_start": "2026-08-06",
+      "window_end_exclusive": "2026-11-04",
+      "coverage_scope": "partial_raw_audit",
+      "partial_audit": "Exact net supply change verified at four boundaries; gross issuance and burn are LOWER bounds - the RPC header audit stopped on HTTP429 after 6 of 297 headers and collectors stay stopped (OQ-10).",
+      "license_status": "unverified",
+      "sources": ["SRC-NEAR-RPC", "SRC-NEARBLOCKS", "SRC-FASTNEAR"],
+      "basis": "research/near-supply/README.md and manifest.json status/window_*/network_collection"
+    },
+    "near-treasury": {
+      "window_start": "2026-10-05",
+      "window_end_exclusive": "2026-11-04",
+      "coverage_scope": "partial_raw_audit",
+      "partial_audit": "30-day FastNear role-index history with exhausted pagination plus one pinned RPC state slice at 2026-11-04T11:31:03Z (height 223010763); staking/lockup are not exhaustively audited.",
+      "license_status": "unverified",
+      "sources": ["SRC-FASTNEAR", "SRC-NEAR-RPC"],
+      "basis": "research/near-treasury/README.md and manifest.json history_period_*/pinned_rpc_*"
+    },
+    "near-weekly": {
+      "window_start": "2026-10-27",
+      "window_end_exclusive": "2026-11-03",
+      "coverage_scope": "partial_raw_audit",
+      "partial_audit": "Seven-day balance reconciliation covers observed account/asset pairs plus wrap.near only; five intent-hash mismatches remain unresolved (PROVIDER_QUESTIONS.md draft); STOP_PUBLIC_COLLECTION is present and collectors stay stopped.",
+      "license_status": "unverified",
+      "sources": ["SRC-BQ", "SRC-FASTNEAR", "SRC-NEAR-RPC"],
+      "basis": "research/near-weekly/README.md and manifest.json period_*/notes"
+    },
+    "revenue-dashboard": {
+      "window_start": null,
+      "window_end_exclusive": null,
+      "coverage_scope": "point_in_time_snapshot",
+      "partial_audit": "Captured third-party public pages of revenue.near.org as of 2026-11-03; the cohort ships no manifest.json; server-side methodology is not verified and captured rows are not independently verified metrics.",
+      "license_status": "unverified",
+      "sources": ["SRC-DASHBOARD"],
+      "basis": "research/revenue-dashboard/README.md"
+    }
+  }
+}
