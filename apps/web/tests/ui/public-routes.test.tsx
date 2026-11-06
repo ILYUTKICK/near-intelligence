@@ -35,14 +35,16 @@ describe("Research route", () => {
       expect(document.getElementById(anchor)).not.toBeNull();
     }
     const mechanism = screen.getByRole("region", { name: /economic mechanism/i });
-    const stages = within(mechanism).getAllByRole("listitem");
-    expect(stages.map((item) => within(item).getByText(/Activity|Fees|Revenue|Conversion|Retention & supply/).textContent)).toEqual([
-      "Activity",
-      "Fees",
-      "Revenue",
-      "Conversion",
-      "Retention & supply",
-    ]);
+    const orderedList = mechanism.querySelector("ol");
+    expect(orderedList).not.toBeNull();
+    const stages = within(orderedList as HTMLElement).getAllByRole("listitem");
+    const titles = ["Activity", "Fees", "Revenue", "Conversion", "Retention & supply"];
+    expect(stages).toHaveLength(titles.length);
+    stages.forEach((item, index) => {
+      // The stage title span is the only element with the exact title text
+      // inside its list item (bodies may repeat the word).
+      expect(within(item).getByText(titles[index], { selector: "span" })).toBeInTheDocument();
+    });
   });
 
   it("explicitly separates purchases from burns", () => {
@@ -53,7 +55,8 @@ describe("Research route", () => {
 
   it("marks unpublished hypothesis sections honestly", async () => {
     const { container } = render(<ResearchPage />);
-    expect(screen.getByText(/Status: to be published with the reviewed findings/i)).toBeInTheDocument();
+    // h1–h4 all carry the honest unpublished status.
+    expect(screen.getAllByText(/Status: to be published with the reviewed findings/i)).toHaveLength(4);
     expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });
 });
