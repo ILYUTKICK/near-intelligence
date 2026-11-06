@@ -313,12 +313,16 @@ Specification: [UI_SCREEN_SPECIFICATIONS.md](UI_SCREEN_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-008, NI-004
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234 (interactive session; a second dispatch runs role B/NI-018 in a separate worktree)
 - **Execution role:** A
 - **Started at:** 2026-11-06T18:38:50+03:00
 - **Branch/worktree:** feat/ni-011-public-routes; /Users/ilyutkinn/Desktop/Near
 - **Dependency verification:** NI-008 DONE (PR #11), NI-004 DONE (PRs #16/#17) — cards verified on origin/main a592a2f.
+- **Verification:** `pnpm --filter web test` — 57/57 pass (5 new): landing standfirst with the no-fake-metrics rule asserted (no percent signs in content) and registry links; research exposes stable anchors #h1–#h4 and #mechanism; the mechanism ordered list renders exactly the five stages in order and carries the explicit cautions "Treasury purchases do not reduce total supply — burns do" and the fees/revenue/payouts separation; unpublished hypothesis sections state their honest status (4 occurrences asserted); methodology carries #sources/#definitions/#collection/#reproduce including the intentional archive-gap sentence; axe passes on all three pages. Anonymous route smoke on the dev server: /, /research, /methodology (+anchor variants) all HTTP 200 with id="h1"/id="mechanism" present in served HTML. Browser visual review 1440×900 and 360×780: no horizontal overflow, active nav item highlighted, serif headings, stage cards render (screenshots in docs/verification/ni-011/). `tsc --noEmit`, `eslint` (0 warnings), `next build` (static routes /, /methodology, /research) pass.
+- **Result:** apps/web/src/app/(public)/ — layout (public shell), page.tsx (landing with standfirst, links, mechanism teaser), research/page.tsx (standfirst, mechanism section, thesis outline with stable anchors h1–h4/limits), methodology/page.tsx (four sections incl. #sources/#reproduce); old root page.tsx removed into the group. apps/web/src/features/public-research/ — content.ts (typed reviewed copy, deliberately metric-free) + MechanismFlow.tsx (semantic ordered value chain with purchases≠burns cautions). No fake metrics, no live claims, no dead controls anywhere.
+- **Reviewer:** pending — role-B review requested on PR #19; CI runs on this PR (web job).
+- **Completed at:** 2026-11-06T19:00:20+03:00
 
 **Description:** Build the real public reading surface and conditional economic value-chain explanation.
 
