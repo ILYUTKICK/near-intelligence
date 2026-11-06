@@ -43,6 +43,7 @@ class FinalizedHeader(EvidenceModel):
     timestamp_nanosec: str = Field(pattern=r"^[0-9]+$")
     total_supply_yocto: str = Field(pattern=r"^[0-9]+$")
     retrieved_at: datetime
+    response_bytes: int = Field(strict=True, ge=0)
     response_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
@@ -87,8 +88,8 @@ class HeaderProbe:
         if source.source_id != approval.source_id or source.endpoint != approval.endpoint:
             raise ProbeDenied("Approval does not match the exact source endpoint")
         if (source.source_id != "SRC-NEAR-RPC" or source.auth != "none"
-                or source.endpoint != "https://free.rpc.fastnear.com" or source.method != "POST"):
-            raise ProbeDenied("Only the documented finalized-header candidate is implemented")
+                or source.endpoint != "https://rpc.mainnet.near.org" or source.method != "POST"):
+            raise ProbeDenied("Only the operator-approved finalized-header endpoint is implemented")
 
     def run(self, *, transport: httpx.BaseTransport | None = None) -> FinalizedHeader:
         with self._lock:
@@ -118,7 +119,7 @@ class HeaderProbe:
                 height=header["height"], block_hash=header["hash"],
                 timestamp_nanosec=header["timestamp_nanosec"],
                 total_supply_yocto=header["total_supply"], retrieved_at=datetime.now(UTC),
-                response_sha256=hashlib.sha256(raw).hexdigest(),
+                response_bytes=len(raw), response_sha256=hashlib.sha256(raw).hexdigest(),
             )
         except ProbeFailed:
             raise

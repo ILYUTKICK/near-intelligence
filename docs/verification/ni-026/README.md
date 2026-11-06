@@ -84,3 +84,18 @@ analysis scripts listed in docs/REPRODUCIBILITY.md, plus each script's transitiv
 saved inputs. The exact closed file list and real hashes must be exported from
 that machine; none can be calculated from the Markdown findings in this clone.
 Raw research remains outside GitHub under the existing sharing policy.
+
+## 2026-11-06 addendum: operator authorization and executed probe
+
+The operator resolved OQ-03 on 2026-11-06 (recorded in
+[OPEN_QUESTIONS.md](../../OPEN_QUESTIONS.md), PR #27): the public NEAR mainnet
+RPC `https://rpc.mainnet.near.org` was approved for one bounded finalized-header
+probe (budget 0, no account/key; adapter-level limit 1 request/minute,
+≤1440/day; public on-chain header data). The probe was executed once the same
+day: HTTP 200, final height 223357966, 18 496 bytes within the 65 536-byte
+approval cap. See [probe evidence](probe-evidence.md).
+
+SRC-NEAR-RPC is the only registry source carrying approved rights and access
+evidence; every other source keeps its recorded OQ blockers and disabled state.
+Current task status lives in [TASKS.md](../../TASKS.md); the section above
+preserves the pre-authorization record of this task's first session.

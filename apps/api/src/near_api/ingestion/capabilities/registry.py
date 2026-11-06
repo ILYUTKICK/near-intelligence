@@ -1,12 +1,23 @@
-"""Documentation-qualified candidates, all operationally disabled.
+"""Capability evidence records.
 
-No historical artifact is asserted present in a fresh checkout. Empty coverage
-and schema hashes deliberately stay unknown until actual inputs are verified.
+SRC-NEAR-RPC carries the 2026-11-06 operator authorization (OQ-03 RESOLVED,
+PR #27): the public NEAR mainnet RPC is approved for bounded finalized-header
+polling at zero cost with public on-chain header data. Its single-use probe
+evidence lives in docs/verification/ni-026/probe-evidence.md.
+Every other candidate stays documentation-qualified and operationally disabled
+with its recorded OQ blockers. No historical artifact is asserted present in a
+fresh checkout; empty coverage and schema hashes deliberately stay unknown
+until actual inputs are verified.
 """
 
 from types import MappingProxyType
 
 from .models import SourceCapability
+
+NEAR_RPC_PROVIDER_DOCS = "https://docs.near.org/api/rpc/providers"
+OPERATOR_OQ03_APPROVAL = (
+    "https://github.com/ILYUTKICK/near-intelligence/blob/main/docs/OPEN_QUESTIONS.md"
+)
 
 
 def _candidate(source_id: str, url: str, auth: str, **fields: object) -> SourceCapability:
@@ -20,8 +31,17 @@ def _candidate(source_id: str, url: str, auth: str, **fields: object) -> SourceC
 
 
 SOURCES = MappingProxyType({source.source_id: source for source in (
-    _candidate("SRC-NEAR-RPC", "https://docs.near.org/api/rpc/providers", "none",
-               endpoint="https://free.rpc.fastnear.com", method="POST"),
+    SourceCapability.model_validate({
+        "source_id": "SRC-NEAR-RPC",
+        "documentation_url": NEAR_RPC_PROVIDER_DOCS,
+        "endpoint": "https://rpc.mainnet.near.org",
+        "method": "POST",
+        "auth": "none",
+        "access_verified": True,
+        "quota_evidence_url": OPERATOR_OQ03_APPROVAL,
+        "rights": "approved",
+        "rights_evidence_url": NEAR_RPC_PROVIDER_DOCS,
+    }),
     _candidate("SRC-BQ", "https://docs.cloud.google.com/bigquery/public-data", "cloud_identity"),
     _candidate("SRC-INTENTS", "https://docs.near-intents.org/llms.txt", "bearer",
                blockers=("OQ-01", "OQ-03", "OQ-08")),

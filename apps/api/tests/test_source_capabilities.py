@@ -23,7 +23,7 @@ class CapabilityTests(unittest.TestCase):
         self.source = SourceCapability(
             source_id="SRC-NEAR-RPC",
             documentation_url="https://docs.near.org/api/rpc/providers",
-            endpoint="https://free.rpc.fastnear.com", method="POST", auth="none",
+            endpoint="https://rpc.mainnet.near.org", method="POST", auth="none",
             access_verified=True,
             quota_evidence_url="https://example.org/synthetic/quota",
             rights="approved", rights_evidence_url="https://example.org/synthetic/rights",
@@ -61,16 +61,37 @@ class CapabilityTests(unittest.TestCase):
             probe.run(transport=httpx.MockTransport(self.response))
         self.assertEqual(self.calls, [])
 
-    def test_all_candidates_remain_disabled_with_explicit_blockers(self):
+    def test_approved_source_carries_operator_evidence(self):
         self.assertEqual(len(SOURCES), 10)
-        for source in SOURCES.values():
-            with self.subTest(source=source.source_id):
+        source = SOURCES["SRC-NEAR-RPC"]
+        self.assertTrue(source.access_verified)
+        self.assertFalse(source.blockers)
+        self.assertEqual(source.endpoint, "https://rpc.mainnet.near.org")
+        self.assertEqual(source.method, "POST")
+        self.assertEqual(source.auth, "none")
+        self.assertEqual(source.rights, "approved")
+        self.assertEqual(
+            source.rights_evidence_url, "https://docs.near.org/api/rpc/providers")
+        self.assertEqual(
+            source.quota_evidence_url,
+            "https://github.com/ILYUTKICK/near-intelligence/blob/main/docs/OPEN_QUESTIONS.md")
+        self.assertEqual(source.documented_requests_per_day, None)
+        self.assertIsNone(source.history_start)
+        self.assertIsNone(source.response_schema_sha256)
+        self.assertEqual(source.raw_redistribution, "pending")
+        # The approved source still needs enabled controls with a local budget.
+        self.assert_denied(self.probe(source=source, controls=ProbeControls()))
+
+    def test_non_approved_candidates_remain_disabled_with_blockers(self):
+        for source_id, source in SOURCES.items():
+            if source_id == "SRC-NEAR-RPC":
+                continue
+            with self.subTest(source=source_id):
                 self.assertFalse(source.access_verified)
                 self.assertTrue(source.blockers)
                 self.assertIsNone(source.history_start)
                 self.assertIsNone(source.response_schema_sha256)
                 self.assertNotEqual(source.raw_redistribution, "approved")
-        self.assert_denied(self.probe(source=SOURCES["SRC-NEAR-RPC"]))
 
     def test_defaults_allowlist_and_budget_prevent_network(self):
         for values in ({}, {"source_allowlist": frozenset()}, {"requests_per_day": 0},
@@ -132,6 +153,8 @@ class CapabilityTests(unittest.TestCase):
         self.assertEqual(result.total_supply_yocto, "1234567890123456789012345678901234")
         self.assertEqual(result.height, 123)
         self.assertEqual(len(result.response_sha256), 64)
+        self.assertGreater(result.response_bytes, 0)
+        self.assertLessEqual(result.response_bytes, 1024)
         self.assertNotIn("synthetic-canary", result.model_dump_json())
         self.assertEqual(len(self.calls), 1)
         self.assertEqual(json.loads(self.calls[0].content)["params"], {"finality": "final"})
