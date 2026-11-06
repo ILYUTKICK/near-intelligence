@@ -26,7 +26,7 @@ import datetime as dt
 import hashlib
 import json
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 from typing import Any
 from uuid import UUID
 
@@ -91,12 +91,22 @@ def parse_decimal(value: Any, *, context: str, scale: int = 30) -> Decimal:
 
 
 def decimal_string(value: Decimal) -> str:
-    """Deterministic decimal rendering: normalized, plain notation, no ``-0``."""
+    """Deterministic decimal rendering: normalized, plain notation, no ``-0``.
+
+    The normalization runs in a local context with at least the value's own
+    digit count, so the rendering is independent of the caller's ambient
+    decimal context: the same value always renders to the same string (the
+    NI-028 digest round trip re-derives manifest hashes from persisted rows
+    in a different call stack, so a context-dependent rendering would be a
+    corruption risk for values beyond 28 significant digits).
+    """
     if not isinstance(value, Decimal) or not value.is_finite():
         raise CanonicalFormatError("Only finite Decimal values are canonical")
     if value == 0:
         return "0"
-    return format(value.normalize(), "f")
+    with localcontext() as context:
+        context.prec = max(len(value.as_tuple().digits), context.prec)
+        return format(value.normalize(), "f")
 
 
 def parse_timestamp(value: Any, *, context: str) -> dt.datetime:

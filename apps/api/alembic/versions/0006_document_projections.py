@@ -25,8 +25,8 @@ targets (same-revision insight/chart block or public immutable artifact).
 
 from alembic import op
 
-revision = "0005_document_projections"
-down_revision = "0004_dataset_staging"
+revision = "0006_document_projections"
+down_revision = "0005_metric_definitions"
 branch_labels = None
 depends_on = None
 
