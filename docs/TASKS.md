@@ -679,11 +679,11 @@ Specification: [DATA_PIPELINE.md](DATA_PIPELINE.md).
 - **Dependencies:** NI-001
 - **Complexity:** M
 - **Status:** IN_PROGRESS (OQ-03 resolved by operator; one bounded probe pending)
-- **Claimed by:** Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b
+- **Claimed by:** Claude agent for role B, dispatch #4 (continuation of the 2026-11-06 role-B work; prior session: Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b)
 - **Execution role:** B
-- **Started at:** 2026-11-06T02:14:00+03:00
-- **Branch/worktree:** feat/ni-026-provider-capabilities; D:/хахатон/near-intelligence
-- **Authorization:** Participant B explicitly authorized role-B implementation and private-repository code/tests/config/docs publication on 6 November 2026. Raw historical archives remain excluded.
+- **Started at:** 2026-11-06T02:14:00+03:00 (re-claimed 2026-11-06T19:11:42+00:00 for the authorized bounded probe)
+- **Branch/worktree:** feat/ni-026-provider-probe; /Users/ilyutkinn/Desktop/near-intelligence-b (git worktree; prior: feat/ni-026-provider-capabilities)
+- **Authorization:** Participant B explicitly authorized role-B implementation and private-repository code/tests/config/docs publication on 6 November 2026. Raw historical archives remain excluded. Operator dispatch #4 (2026-11-06, verbatim): «оператор утвердил источник (OQ-03 RESOLVED, оформляется в PR #27): публичный NEAR mainnet RPC `https://rpc.mainnet.near.org` для finalized-header polling; лимит 1 запрос/мин, ≤1440/сутки; бюджет 0; ответ header-only с байт-капами твоего probe; on-chain header data публична. Это дословная авторизация оператора на ОДИН bounded-запрос».
 - **Dependency verification:** main cfdd914 contains NI-001 DONE with tool/dependency evidence and NI-002 runtime/lock files. Clean checkout verified; no competing NI-026 claim or open PR found at start.
 - **Scope:** Validate source capability records and fail-closed probe controls, refresh documentation/rights evidence, and perform isolated Windows Python compatibility verification. Provider credentials, approved quotas/budgets and the historical input archive are absent. Unresolved operational gates retain their OQ IDs.
 - **Result:** Immutable capability registry for ten sources and a single-use finalized-header probe with disabled defaults, evidence/approval/stop gates, byte caps, no redirect/retry and sanitized output. No provider request, SQL, paid operation, collector or historical import was run. See [verification](verification/ni-026/README.md).
