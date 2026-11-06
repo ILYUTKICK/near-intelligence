@@ -84,6 +84,7 @@ def main() -> int:
         run_pg("psql", "--no-psqlrc", "-d", "near_intelligence_test", "-f", repo / "scripts/db/010-roles.sql")
         environment.update(
             NI_ISOLATED_PG_TEST="1", PYTHONPATH=str(repo / "apps/api/src"),
+            NI_TEST_TMP_DIR=str(directory),
             NI_TEST_ADMIN_URL=url("ni_test_admin", environment["PGPASSWORD"]),
             NI_TEST_RUNTIME_URL=url("near_app", environment["DB_RUNTIME_PASSWORD"]),
             NI_TEST_OPERATOR_URL=url("near_operator", environment["DB_OPERATOR_PASSWORD"]),
@@ -91,12 +92,12 @@ def main() -> int:
             MIGRATION_DATABASE_URL=url("near_migrator", environment["DB_MIGRATION_PASSWORD"]),
         )
         test_log = directory / "test-results.log"
-        # NI-003 identity/RLS, NI-018 bootstrap, NI-019 ownership/RLS and
-        # NI-022 home aggregation suites.
+        # NI-003 identity/RLS, NI-018 bootstrap, NI-019 ownership/RLS,
+        # NI-022 home aggregation and NI-027 archive import suites.
         returncode = 0
         with test_log.open("wb") as log:
             for pattern in ("test_database.py", "test_auth_bootstrap.py", "test_ownership_rls.py",
-                            "test_home_aggregation.py"):
+                            "test_home_aggregation.py", "test_archive_import.py"):
                 result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "apps/api/tests",
                                          "-p", pattern, "-v"], cwd=repo, env=environment,
                                         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
