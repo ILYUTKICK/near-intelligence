@@ -141,6 +141,98 @@
         "pattern": "^-?(?:0|[1-9][0-9]{0,77})(?:\\.[0-9]{1,30})?$",
         "type": "string"
       },
+      "DocumentProgress": {
+        "additionalProperties": false,
+        "description": "Per-document work-completion counters (`{headings,charts,insights}`).\n\nBlock projection regeneration is owned by the document revision service\n(NI-036) and the chart/insight block taxonomy by NI-041/NI-046/NI-047.\nUntil that canonical taxonomy and projection exist, these counters are\nthe documented zero; they are never guessed from a non-canonical block\ntype naming. The counter semantics measure work completion only.",
+        "properties": {
+          "charts": {
+            "minimum": 0.0,
+            "title": "Charts",
+            "type": "integer"
+          },
+          "headings": {
+            "minimum": 0.0,
+            "title": "Headings",
+            "type": "integer"
+          },
+          "insights": {
+            "minimum": 0.0,
+            "title": "Insights",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "headings",
+          "charts",
+          "insights"
+        ],
+        "title": "DocumentProgress",
+        "type": "object"
+      },
+      "DocumentSummary": {
+        "additionalProperties": false,
+        "description": "Current-revision summary of an owned document.\n\n`revision`/`current_version_id` come from the live app.documents row, so\na summary always reflects the document's current revision. A document\nthat has no saved revision yet carries `current_version_id: null`.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/DocumentProgress"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "schema_version": {
+            "minimum": 1.0,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "revision",
+          "schema_version",
+          "current_version_id",
+          "created_at",
+          "updated_at",
+          "progress"
+        ],
+        "title": "DocumentSummary",
+        "type": "object"
+      },
       "ErrorDetail": {
         "additionalProperties": false,
         "properties": {
@@ -172,6 +264,19 @@
           "error"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
         "type": "object"
       },
       "HealthResponse": {
@@ -211,6 +316,72 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "HomeCounts": {
+        "additionalProperties": false,
+        "description": "Owner-scoped workflow totals the workspace shell renders.\n\nOnly the documents total exists today (it is the scoped count of the same\nstatement that pages recent_documents). Sections that arrive with\nNI-035/NI-046/NI-047 extend this object instead of reshaping the response.",
+        "properties": {
+          "documents": {
+            "minimum": 0.0,
+            "title": "Documents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "documents"
+        ],
+        "title": "HomeCounts",
+        "type": "object"
+      },
+      "HomeResponse": {
+        "additionalProperties": false,
+        "description": "`GET /api/home` payload for the verified principal.\n\nOperator-directed addition to the specification row: `counts` exposes the\nowner-scoped totals (NI-022 \"include workflow counts\"). Every list is\ncapped at RECENT_LIST_CAP by the query, not by slicing.",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/HomeCounts"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/PendingHomeSection"
+            },
+            "maxItems": 0,
+            "title": "Indicators",
+            "type": "array"
+          },
+          "recent_charts": {
+            "items": {
+              "$ref": "#/components/schemas/PendingHomeSection"
+            },
+            "maxItems": 0,
+            "title": "Recent Charts",
+            "type": "array"
+          },
+          "recent_documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentSummary"
+            },
+            "maxItems": 5,
+            "title": "Recent Documents",
+            "type": "array"
+          },
+          "recent_insights": {
+            "items": {
+              "$ref": "#/components/schemas/PendingHomeSection"
+            },
+            "maxItems": 0,
+            "title": "Recent Insights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recent_documents",
+          "recent_charts",
+          "recent_insights",
+          "indicators",
+          "counts"
+        ],
+        "title": "HomeResponse",
+        "type": "object"
+      },
       "Observation": {
         "additionalProperties": false,
         "properties": {
@@ -245,6 +416,20 @@
           "quality"
         ],
         "title": "Observation",
+        "type": "object"
+      },
+      "PendingHomeSection": {
+        "additionalProperties": false,
+        "description": "Typed marker element for a home section whose data model arrives later.\n\nrecent_charts arrives with NI-035 (persisted saved charts), recent_insights\nwith NI-046/NI-047 (insight contracts and persistence) and indicators with\nNI-031/NI-032 (versioned chart/metric registries and public series APIs).\nThe owning tasks replace this element type with SavedChart / Insight /\nSeries per API_SPECIFICATION.md. The response schema forbids items\n(`maxItems: 0`) until then: an empty array is the honest answer and\nfabricated placeholder data can never validate.",
+        "properties": {
+          "status": {
+            "const": "pending",
+            "default": "pending",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PendingHomeSection",
         "type": "object"
       },
       "Reason": {
@@ -289,6 +474,46 @@
         "properties": {},
         "title": "SelectionFilters",
         "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
       }
     }
   },
@@ -298,6 +523,86 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/home": {
+      "get": {
+        "description": "Return the verified principal's recent documents and scoped totals.\n\nThe pending sections (recent_charts, recent_insights, indicators) are\nhonest empty arrays until NI-035 / NI-046-047 / NI-031-032 implement\ntheir data pipelines; see schemas/home.py.",
+        "operationId": "getWorkspaceHome",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Owner-scoped workspace home aggregation",
+        "tags": [
+          "workspace"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "description": "Process liveness mirroring the web service /health JSON shape.",
