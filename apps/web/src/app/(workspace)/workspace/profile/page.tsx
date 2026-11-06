@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 
 import { ProfileForm } from "@/app/(workspace)/workspace/profile/ProfileForm";
 import { SESSION_COOKIE, decodeSessionCookie } from "@/lib/auth/session";
