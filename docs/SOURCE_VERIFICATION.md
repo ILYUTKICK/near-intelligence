@@ -9,11 +9,19 @@ capability records, probe guards and operational blockers are recorded in
 [NI-026 verification](verification/ni-026/README.md). No source is operationally
 enabled and no real probe was executed in this follow-up.
 
+**6 November 2026 OQ-03 resolution (operator ILYUTKICK, dispatch #4):** the
+operator approved one bounded finalized-header probe against the public NEAR
+mainnet RPC (OQ-03 RESOLVED; budget 0; 1 request/minute, ≤1440/day for the
+future adapter; public on-chain header data). The probe was executed once at
+2026-11-06T19:13:45Z — see the SRC-NEAR-RPC row and
+[probe evidence](verification/ni-026/probe-evidence.md). All other sources stay
+in their recorded gates.
+
 Status vocabulary: **saved evidence** = local historical response inspected; **documented** = official current docs/source inspected; **probe pending** = no new operational API smoke test; **restricted** = requires access/budget/license review. These dimensions are independent.
 
 | ID | Provider / capability | Access, limits and actual coverage | Update / reliability / license decision |
 | --- | --- | --- | --- |
-| SRC-NEAR-RPC | NEAR block headers, account/protocol state | Documented JSON-RPC `block` and query methods; provider-specific auth. Official directory describes public archival near.org as severely limited with unpublished numeric quota. Local supply boundaries and six mint headers saved; full audit 6/297, stopped after 429. | Point-in-time block data; historical retrieval needs archival provider. No bulk calls enabled. Public chain facts do not grant an API SLA; terms still reviewed. |
+| SRC-NEAR-RPC | NEAR block headers, account/protocol state | **Verified 2026-11-06 (single bounded probe):** `POST https://rpc.mainnet.near.org` JSON-RPC `block` `finality=final` returned HTTP 200, 18 496 bytes (cap 65 536), final height 223357966, hash `7gsbtD5R8A2hasDzVDXWF6hdnV6kKL4VW3Sg5QCXBwZo`; no auth, no retry, no second request ([evidence](verification/ni-026/probe-evidence.md)). Documented JSON-RPC `block` and query methods; provider-specific auth. Official directory describes public archival near.org as severely limited with unpublished numeric quota; [providers page](https://docs.near.org/api/rpc/providers) re-verified live 2026-11-06 (the singular `/provider` variant returns 404). Local supply boundaries and six mint headers saved; full audit 6/297, stopped after 429. | Point-in-time block data; historical retrieval needs archival provider. Rights `approved` via the 2026-11-06 operator authorization (OQ-03 RESOLVED): free tier, no account/key, header-only responses with byte caps, public on-chain header data, derived-metric publication permitted. Scheduled polling stays disabled until NI-030 wires the ≤1440/day adapter budget. No bulk calls. A single 200 does not establish an SLA or a numeric provider quota. |
 | SRC-BQ | NEAR public BigQuery tables used in existing SQL | Saved execution_outcomes/receipt_actions exports cover 90-day cohort; query timestamps/job IDs in manifests. New execution requires cloud identity/project, region, partition limits and bytes cap. Official public-dataset docs do not prove completeness of this NEAR dataset. | Existing export reproducible offline. Daily ingestion candidate only after cost, index lag and schema checks. Dataset-specific terms/redistribution unresolved. |
 | SRC-INTENTS | Explorer API swap records and fee declarations | Official documentation index exposes Explorer and get-transactions routes/OpenAPI. Local creation cohort 1–3 Nov has 21,361 SUCCESS affiliate records, 23 pages, complete=true. Existing script used bearer token; none retained. Current endpoint auth/quota and entitlement remain probe pending. | Historical execution coverage differs from creation-cohort completeness. appFees declaration is not executed revenue. Publish only permitted sanitized artifacts; no token stored/logged. |
 | SRC-LLAMA | Reported fees/volume and revenue methodology | Official API docs/adapter reachable. Open access lists fees/revenue/prices; API subscription has its own access limits; do not apply paid quotas to free endpoints. Existing saved series has 90-day data; start-of-history and missing-date behavior need probe. | Daily provider data, revisable. Current adapter uses Dune inputs and selected wallet flows; not independent confirmation of original Dune/dashboard claims. Redistribution/attribution rights need explicit record. |
@@ -37,4 +45,9 @@ Status vocabulary: **saved evidence** = local historical response inspected; **d
 
 For each enabled adapter store exact endpoint/method/schema hash, auth type and secret location, approved purpose, documented quota plus conservative local cap, oldest/newest dates verified, pagination proof, definition and time convention, expected lag, retry policy, licensing/redistribution evidence URL/date, provider lineage and a small sanitized probe artifact. Unknown limits disable scheduled collection by default. Archive receipts alone do not resolve rights for public raw-data downloads.
 
-Verify a low-cost public finalized-header series first as the live candidate. Its operational probe is future NI-026 work; it was not performed in this documentation phase. Intents/revenue historical refresh remains blocked until actual access and attribution are verified.
+Verify a low-cost public finalized-header series first as the live candidate. Its
+operational probe was performed once on 2026-11-06 under the OQ-03 operator
+authorization ([evidence](verification/ni-026/probe-evidence.md)); scheduled
+refresh enablement remains future NI-030 work within the approved 1 request/minute,
+≤1440/day limit. Intents/revenue historical refresh remains blocked until actual
+access and attribution are verified.
