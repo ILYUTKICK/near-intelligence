@@ -24,6 +24,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The verified principal's own profile */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update the verified principal's own display name/timezone
+         * @description Update the verified subject's own profile row via the near_app role.
+         *
+         *     The profile_self UPDATE policy only ever matches the transaction-local
+         *     subject, so a foreign or disabled profile is unreachable; an empty update
+         *     result is a fail-closed bootstrap error, never a cross-owner write.
+         */
+        patch: operations["updateMe"];
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -243,6 +268,22 @@ export interface components {
              */
             status: "pending";
         };
+        /** ProfileResponse */
+        ProfileResponse: {
+            /** Display Name */
+            display_name: string;
+            /** Display Timezone */
+            display_timezone: string;
+            /** Subject */
+            subject: string;
+        };
+        /** ProfileUpdateRequest */
+        ProfileUpdateRequest: {
+            /** Display Name */
+            display_name: string;
+            /** Display Timezone */
+            display_timezone: string;
+        };
         Reason: string;
         /** Selection */
         Selection: {
@@ -335,6 +376,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    updateMe: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
                 };
             };
             /** @description Validation Error */
