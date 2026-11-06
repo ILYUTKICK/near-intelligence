@@ -746,7 +746,11 @@ Specification: [DATA_PIPELINE.md](DATA_PIPELINE.md).
 - **Priority:** P0
 - **Dependencies:** NI-027
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #6
+- **Execution role:** B
+- **Started at:** 2026-11-06T23:24:00+03:00
+- **Branch/worktree:** feat/ni-028-dataset-staging; /Users/ilyutkinn/Desktop/near-intelligence-b (git worktree off origin/main 3e38b71)
 
 **Description:** Create atomic versioned data delivery and reproducible artifact storage.
 
