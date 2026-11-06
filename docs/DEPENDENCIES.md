@@ -65,6 +65,15 @@ Added 5 November 2026 for `apps/web` accessible interaction primitives; versions
 | @testing-library/react / user-event / jest-dom | 16.3.3 / 14.6.8 / 7.0.1 | Keyboard integration tests | MIT |
 | [jest-axe](https://www.npmjs.com/package/jest-axe/v/11.0.0) | 11.0.0 | Automated axe checks (local vitest types in apps/web/types) | MIT |
 
+### Lint tooling (NI-005)
+
+| Package | Version | Purpose | Declared license |
+| --- | --- | --- | --- |
+| [eslint](https://www.npmjs.com/package/eslint/v/10.14.0) | 10.14.0 | Flat-config lint for apps/web | MIT |
+| [eslint-config-next](https://www.npmjs.com/package/eslint-config-next/v/16.4.5) | 16.4.5 | Next/React/a11y rule sets (flat arrays consumed directly — no eslintrc compat layer) | MIT |
+
+Python linting (Ruff per CONTRIBUTING) is intentionally not wired yet: it would be the first dev dependency of apps/api and is deferred to the first task that touches API code style at scale; the CI baseline covers web lint, web/API tests, contract drift, documentation links and the PostgreSQL 18 database suite.
+
 No UI kit is imported wholesale — components under `apps/web/src/components/ui/` are in-repo code on Radix behavior primitives, per the "no unnecessary UI kit imports" criterion.
 
 ## API contract generation (NI-004, 6 November 2026)

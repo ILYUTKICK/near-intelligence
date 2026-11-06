@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 import { loadServerAuthConfig, AuthConfigError } from "@/lib/auth/config";
 import { CSRF_COOKIE, mintCsrfToken, secureCookies } from "@/lib/auth/session";
@@ -8,7 +8,7 @@ import { CSRF_COOKIE, mintCsrfToken, secureCookies } from "@/lib/auth/session";
  * login form reads it via document.cookie and echoes it in X-CSRF-Token).
  * GET is safe: minting a token grants no privileges by itself.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     loadServerAuthConfig();
   } catch (error) {

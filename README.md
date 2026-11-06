@@ -87,6 +87,15 @@ docker compose up -d db
 uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
 ```
 
+Developer checks (NI-005; CI runs them on every pull request — web, API and a disposable PostgreSQL 18 database job):
+
+```sh
+pnpm lint && pnpm typecheck && pnpm test
+pnpm check:contracts && pnpm check:doc-links
+pnpm test:api:unit          # offline API suites
+pnpm test:api:db            # needs local PostgreSQL 18 binaries
+```
+
 Compose mode and native development mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Web `.env` loading is implemented explicitly in [apps/web/src/lib/env.ts](apps/web/src/lib/env.ts) and API loading in [apps/api/src/near_api/settings.py](apps/api/src/near_api/settings.py); missing required configuration makes `/health` return a readable 503 on both services. Production settings and health gates: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example).
 
 ## Delivery gates

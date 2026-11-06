@@ -145,7 +145,17 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-001, NI-002, NI-003, NI-004
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-06T03:18:32+03:00
+- **Branch/worktree:** feat/ni-005-ci-checks; /Users/ilyutkinn/Desktop/Near
+- **Dependency verification:** NI-001/NI-002 DONE (own evidence), NI-003/NI-004 DONE (PRs #15/#16/#17 merged, cards verified on origin/main 7ba8af1). NI-026 is BLOCKED (provider credentials/quotas, OQ gates) and is not a dependency of this task.
+- **Verification:** every CI step executed locally first: `pnpm install --frozen-lockfile`, `pnpm lint` (0 errors/0 warnings after fixing the three baseline findings), `pnpm typecheck`, `pnpm test` (52/52), `pnpm check:contrast` (22/22), `pnpm build`, `pnpm check:client-secrets` (no .env in CI → exits 0), `pnpm check:doc-links` (528 links resolve), `uv sync --frozen` + `uv lock --check`, `unittest` contracts + source-capabilities suites, `generate.mjs --check` (contract current). Bad-sample drills per the card: injected drift into the generated client **was not caught** — investigation found generate.mjs only exported its function with no CLI entry, so `node generate.mjs --check` was a silent no-op; added the standard CLI entry (affects B's file, flagged for B in the PR), after which the drill fails with exit 1 on drift and passes clean; a broken documentation link fails `check:doc-links` (exit 1) and passes after removal. Failing drift therefore blocks merge by construction. No provider secrets are needed or present in CI; database tests run in a disposable loopback PostgreSQL 18 cluster created by B's runner script (passwords generated inside the job).
+- **Result:** .github/workflows/checks.yml (web: lint/typecheck/tests/contrast/build/secret-scan/doc-links/shared-types checks; api: frozen uv sync + lock --check + offline unittest suites + contract drift; database: PGDG PostgreSQL 18 + run-db-tests.py); root package.json scripts (lint/typecheck/test/build/check:contrast/check:client-secrets/check:doc-links/check:contracts/test:api:unit/test:api:db); apps/web ESLint flat config (eslint 10.14.0 + eslint-config-next 16.4.5, deps recorded in DEPENDENCIES.md) with a zero-warning baseline; scripts/check-doc-links.mjs; CLI entry added to packages/shared-types/scripts/generate.mjs; CONTRIBUTING/README document the real commands. Playwright `test:e2e` and the research `verify` CLI remain their own tasks' deliverables, stated in CONTRIBUTING.
+- **Reviewer:** pending — role-B review requested on PR #18 (NI-005 reviewer per TEAM_PLAN.md).
+- **CI run (the card's "locally or in CI" requirement):** run 42138945747 on this PR, commit 3628ef1 — all three jobs green (web 1m05s: lint/typecheck/52 tests/contrast/build/secret-scan/doc-links/shared-types; api 34s: frozen sync + lock check + offline suites + contract drift; database 1m00s: disposable PostgreSQL 18.6 cluster, migrations/roles/RLS/isolation suite). Iterations before green, all fixed with evidence: (1) lockfile for the eslint deps was forgotten in the first push; (2) api job lacked node deps for the drift check; (3) PG socket directory /var/run/postgresql owned by the postgres system user — chowned to the runner user; (4) secret scanner exited 1 on missing CI .env — now reports "nothing to scan"; (5) doc-links flagged the documented unshared research archive links — now skipped explicitly (research non-.md targets), 518 tracked links verified.
+- **Completed at:** 2026-11-06T00:46:10+03:00
 
 **Description:** Make contributor commands executable and distinguish app correctness from documentation validation.
 

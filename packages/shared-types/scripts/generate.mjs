@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import openapiTS, { astToString } from "openapi-typescript";
 
@@ -42,4 +42,19 @@ export async function generate(args = []) {
     if (dirname(await realpath(temporary)) !== await realpath(local)) throw new Error("Unsafe temporary path");
     await rm(temporary, { recursive: true });
   }
+}
+
+// CLI entry: `node generate.mjs [--check] [--python /absolute/path]`. Without
+// this, a direct invocation would exit 0 without checking anything.
+import { pathToFileURL } from "node:url";
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  generate(process.argv.slice(2))
+    .then(() => {
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : error);
+      process.exit(1);
+    });
 }
