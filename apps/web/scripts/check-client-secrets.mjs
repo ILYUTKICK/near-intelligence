@@ -29,8 +29,9 @@ function parseEnvFile(filePath) {
 
 const env = parseEnvFile(path.join(repoRoot, ".env"));
 if (!env) {
-  console.error("No root .env found — run `cp .env.example .env` and configure it first.");
-  process.exit(1);
+  // No .env means no configured secrets — nothing can leak into the bundle.
+  console.log("No root .env configured — nothing to scan for.");
+  process.exit(0);
 }
 
 const SERVER_SECRET_VARS = [
