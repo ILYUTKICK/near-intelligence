@@ -827,7 +827,11 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-029, NI-004
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #9
+- **Execution role:** B
+- **Started at:** 2026-11-07T01:55:00+03:00
+- **Branch/worktree:** feat/ni-031-registries; /Users/ilyutkinn/Desktop/near-intelligence-b (git worktree off origin/main e69746b)
 
 **Description:** Make charts extensible through definitions instead of custom pages.
 
