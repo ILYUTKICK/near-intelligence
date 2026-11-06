@@ -34,6 +34,10 @@ jobs:
       # "nothing to scan" — the guard stays wired for local verification.
       - run: pnpm check:client-secrets
       - run: pnpm check:doc-links
+      - name: shared-types package checks
+        run: |
+          pnpm --filter @near-intelligence/shared-types typecheck
+          pnpm --filter @near-intelligence/shared-types test
 
   api:
     name: api (frozen env, unit tests, contract drift)
