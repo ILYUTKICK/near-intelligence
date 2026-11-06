@@ -33,8 +33,18 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
+// Full server auth config: rendering the gated layout re-derives the HMAC
+// secret through loadServerAuthConfig, which validates the whole schema.
+// CI has no root .env — these must come from the test environment.
 const ENV = {
   APP_ENV: "test",
+  NEXT_PUBLIC_SUPABASE_URL: "https://dev.supabase.co",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_synthetic_test_key_0123456789",
+  SUPABASE_JWT_ISSUER: "https://dev.supabase.co/auth/v1",
+  SUPABASE_JWKS_URL: "https://dev.supabase.co/auth/v1/.well-known/jwks.json",
+  SUPABASE_JWT_AUDIENCE: "authenticated",
+  SUPABASE_JWT_ALGORITHM: "ES256",
+  AUTH_ALLOWED_REDIRECT_ORIGINS: "http://localhost:3000",
   AUTH_COOKIE_SIGNING_SECRET: "c".repeat(40),
   CSRF_SIGNING_SECRET: "d".repeat(40),
 };
