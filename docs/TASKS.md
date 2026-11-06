@@ -1228,7 +1228,11 @@ Specification: [ECONOMETRIC_METHODOLOGY.md](ECONOMETRIC_METHODOLOGY.md).
 - **Priority:** P0
 - **Dependencies:** NI-026, NI-029
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #11
+- **Execution role:** B
+- **Started at:** 2026-11-07T01:52:13+03:00
+- **Branch/worktree:** feat/ni-051-readiness-gate; /Users/ilyutkinn/Desktop/near-intelligence-b3 (worktree from origin/main e69746b)
 
 **Description:** Choose an admissible empirical question before fitting rather than manufacturing revenue data.
 
