@@ -4,12 +4,15 @@ NI-003 owns the identity tables; NI-019 adds the private document chain
 (documents, document_versions, document_blocks) that the ownership/RLS layer
 operates on. NI-027 adds the operator-zone archive import tables (sources,
 import_batches, imported_files, source_runs): metadata-only lineage for the
-read-only research archive import — file bytes are never stored. Remaining
-domain tables belong to their owning tasks and must keep these declarations
-in sync for the Alembic metadata drift check.
+read-only research archive import — file bytes are never stored. NI-028 adds
+the immutable dataset staging/publication zone (artifacts, dataset_versions,
+dataset_metrics, dataset_inputs, metric_observations, active_datasets).
+Remaining domain tables belong to their owning tasks and must keep these
+declarations in sync for the Alembic metadata drift check.
 """
 
 from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
@@ -22,6 +25,7 @@ from sqlalchemy import (
     Index,
     Integer,
     MetaData,
+    Numeric,
     String,
     UniqueConstraint,
     func,
@@ -260,3 +264,193 @@ class SourceRun(Base):
     byte_count: Mapped[int | None] = mapped_column(BigInteger)
     request_count: Mapped[int | None] = mapped_column(Integer)
     run_metadata: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+
+
+class Artifact(Base):
+    """Immutable content-addressed artifact row; bytes live in operator storage."""
+
+    __tablename__ = "artifacts"
+    __table_args__ = (
+        UniqueConstraint("relative_storage_key", name="uq_artifacts_storage_key"),
+        CheckConstraint(r"sha256 ~ '^[0-9a-f]{64}$'", name="sha256_format"),
+        CheckConstraint("byte_size >= 0", name="byte_size_nonnegative"),
+        CheckConstraint("media_type <> ''", name="media_type_nonempty"),
+        CheckConstraint("scope IN ('public','private','internal')", name="scope"),
+        CheckConstraint(
+            "license_status IN ('unknown','unverified','verified','prohibited')", name="license_status"
+        ),
+        CheckConstraint(
+            "(scope = 'private' AND owner_id IS NOT NULL)"
+            " OR (scope <> 'private' AND owner_id IS NULL)",
+            name="owner_matches_scope",
+        ),
+        CheckConstraint(
+            r"relative_storage_key NOT LIKE '/%' AND relative_storage_key NOT LIKE '%/'"
+            r" AND relative_storage_key !~ '(^|/)\.\.(/|$)'"
+            r" AND strpos(relative_storage_key, chr(92)) = 0",
+            name="storage_key_relative",
+        ),
+        ForeignKeyConstraint(["owner_id"], ["app.users.id"], name="fk_artifacts_owner_id",
+                             ondelete="RESTRICT"),
+        Index("ix_artifacts_sha256", "sha256"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    relative_storage_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    media_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    scope: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'internal'"))
+    owner_id: Mapped[UUID | None]
+    license_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'unverified'"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class DatasetVersion(Base):
+    """One immutable semantic dataset content; the dedup key is (key, content hash)."""
+
+    __tablename__ = "dataset_versions"
+    __table_args__ = (
+        UniqueConstraint("dataset_key", "version", name="uq_dataset_versions_key_version"),
+        UniqueConstraint("dataset_key", "content_sha256", name="uq_dataset_versions_key_content"),
+        UniqueConstraint("id", "dataset_key", name="uq_dataset_versions_id_key"),
+        CheckConstraint(
+            r"dataset_key ~ '^[a-z0-9][a-z0-9-]{0,38}(\.[a-z0-9][a-z0-9-]{0,38}){0,2}$'",
+            name="key_format",
+        ),
+        CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint("status IN ('staged','validated','approved','rejected')", name="status"),
+        CheckConstraint("frequency IN ('daily','weekly','monthly','snapshot')", name="frequency"),
+        CheckConstraint("end_date > start_date", name="window"),
+        CheckConstraint("pipeline_version <> ''", name="pipeline_version_nonempty"),
+        CheckConstraint(r"code_commit IS NULL OR code_commit ~ '^[0-9a-f]{7,64}$'",
+                        name="code_commit_format"),
+        CheckConstraint(r"config_hash IS NULL OR config_hash ~ '^[0-9a-f]{64}$'",
+                        name="config_hash_format"),
+        CheckConstraint(r"dependency_lock_hash IS NULL OR dependency_lock_hash ~ '^[0-9a-f]{64}$'",
+                        name="dependency_lock_hash_format"),
+        CheckConstraint(r"content_sha256 ~ '^[0-9a-f]{64}$'", name="content_sha256_format"),
+        CheckConstraint("octet_length(quality::text) <= 32768", name="quality_size"),
+        ForeignKeyConstraint(["manifest_artifact_id"], ["app.artifacts.id"],
+                             name="fk_dataset_versions_manifest_artifact", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["supersedes_id", "dataset_key"],
+                             ["app.dataset_versions.id", "app.dataset_versions.dataset_key"],
+                             name="fk_dataset_versions_supersedes", ondelete="RESTRICT"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    dataset_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'staged'"))
+    start_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    end_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    frequency: Mapped[str] = mapped_column(String(20), nullable=False)
+    pipeline_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    code_commit: Mapped[str | None] = mapped_column(String(64))
+    config_hash: Mapped[str | None] = mapped_column(String(64))
+    dependency_lock_hash: Mapped[str | None] = mapped_column(String(64))
+    manifest_artifact_id: Mapped[UUID] = mapped_column(nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_as_of: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retrieved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    quality: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    supersedes_id: Mapped[UUID | None]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class DatasetMetric(Base):
+    """Member metric registry for a version; observations may only reference members."""
+
+    __tablename__ = "dataset_metrics"
+    __table_args__ = (
+        ForeignKeyConstraint(["dataset_version_id"], ["app.dataset_versions.id"],
+                             name="fk_dataset_metrics_version", ondelete="RESTRICT"),
+    )
+
+    dataset_version_id: Mapped[UUID] = mapped_column(primary_key=True)
+    metric_definition_id: Mapped[UUID] = mapped_column(primary_key=True)
+
+
+class DatasetInput(Base):
+    """raw/normalized/price/sql/config lineage; ingestion_run FK arrives with NI-030."""
+
+    __tablename__ = "dataset_inputs"
+    __table_args__ = (
+        CheckConstraint("role IN ('raw','normalized','price','sql','config')", name="role"),
+        CheckConstraint(r"query_hash IS NULL OR query_hash ~ '^[0-9a-f]{64}$'",
+                        name="query_hash_format"),
+        ForeignKeyConstraint(["dataset_version_id"], ["app.dataset_versions.id"],
+                             name="fk_dataset_inputs_version", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["artifact_id"], ["app.artifacts.id"],
+                             name="fk_dataset_inputs_artifact", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["source_id"], ["app.sources.id"], name="fk_dataset_inputs_source"),
+        Index("ix_dataset_inputs_artifact", "artifact_id"),
+    )
+
+    dataset_version_id: Mapped[UUID] = mapped_column(primary_key=True)
+    artifact_id: Mapped[UUID] = mapped_column(primary_key=True)
+    role: Mapped[str] = mapped_column(String(20), primary_key=True)
+    source_id: Mapped[str | None] = mapped_column(String(40))
+    ingestion_run_id: Mapped[UUID | None]
+    query_hash: Mapped[str | None] = mapped_column(String(64))
+
+
+class MetricObservation(Base):
+    """Half-open UTC period point with exact NUMERIC value and explicit quality."""
+
+    __tablename__ = "metric_observations"
+    __table_args__ = (
+        CheckConstraint("period_end > period_start", name="period"),
+        CheckConstraint("quality_status IN ('verified','missing','unavailable')",
+                        name="quality_status"),
+        CheckConstraint("bound_kind IN ('exact','estimate','lower','upper')", name="bound_kind"),
+        CheckConstraint(
+            "(quality_status IN ('missing','unavailable')) = (value IS NULL)",
+            name="value_null_consistency",
+        ),
+        CheckConstraint("(bound_kind IS NULL) = (value IS NULL)", name="bound_null_consistency"),
+        CheckConstraint("value IS NOT NULL OR quality ? 'reason'", name="null_reason"),
+        CheckConstraint(r"dimensions_hash ~ '^[0-9a-f]{64}$'", name="dimensions_hash_format"),
+        CheckConstraint("octet_length(dimensions::text) <= 4096", name="dimensions_size"),
+        CheckConstraint("octet_length(quality::text) <= 4096", name="quality_size"),
+        ForeignKeyConstraint(
+            ["dataset_version_id", "metric_definition_id"],
+            ["app.dataset_metrics.dataset_version_id", "app.dataset_metrics.metric_definition_id"],
+            name="fk_metric_observations_member", ondelete="RESTRICT",
+        ),
+        Index("ix_metric_observations_window", "dataset_version_id", "period_start"),
+    )
+
+    dataset_version_id: Mapped[UUID] = mapped_column(primary_key=True)
+    metric_definition_id: Mapped[UUID] = mapped_column(primary_key=True)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    dimensions_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    dimensions: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    value: Mapped[Decimal | None] = mapped_column(Numeric(78, 30))
+    quality_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    bound_kind: Mapped[str | None] = mapped_column(String(20))
+    source_record_ref: Mapped[str | None] = mapped_column(String(200))
+    quality: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+
+
+class ActiveDataset(Base):
+    """Single approved active pointer per dataset key; history stays readable."""
+
+    __tablename__ = "active_datasets"
+    __table_args__ = (
+        CheckConstraint(
+            r"dataset_key ~ '^[a-z0-9][a-z0-9-]{0,38}(\.[a-z0-9][a-z0-9-]{0,38}){0,2}$'",
+            name="key_format",
+        ),
+        ForeignKeyConstraint(
+            ["dataset_version_id", "dataset_key"],
+            ["app.dataset_versions.id", "app.dataset_versions.dataset_key"],
+            name="fk_active_datasets_version", ondelete="RESTRICT",
+        ),
+    )
+
+    dataset_key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    dataset_version_id: Mapped[UUID] = mapped_column(nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                   server_default=func.now())
