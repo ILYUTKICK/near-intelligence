@@ -23,6 +23,8 @@ SavedChart is a user's label/mode/selection and chart-definition version referen
 
 Exact protocol revenue, capture-rate and fee-funded-buyback charts stay unavailable until their metric gates pass. Do not create apparent history from monthly values or publish a trend from three windows as a fitted model.
 
+The registry is implemented (NI-031, `near_api.charts.registry`, migration 0007): immutable `(chart_id, version)` rows bind registered metric definition UUIDs with series roles and units, allowed ranges, closed supported-filter schemas, source lineage and renderer version, and carry an honest `data_status` — the seven metric-driven charts above are `available`, while model-diagnostics (no published model artifact yet) and the gated revenue/capture/buyback charts are registered `unavailable` with their recorded reasons and are never advertised as live. Routes and ChartView resolution remain NI-032 scope.
+
 ## Query/render contract
 
 ChartView resolves one approved prepared dataset containing required metric versions. `start/end/frequency/filters` are validated centrally; date range≤366 days initially. Default presets7/30/90 days relative to latest complete observation, not wall-clock if historical. A custom range outside coverage shows missing values, explains overlap and does not silently shrink. Supported filters include approved recipient/source mappings only; unknown options rejected. Currency switch chooses an actual alternative metric/calculation context.
