@@ -136,8 +136,9 @@ def _show(engine, args) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    engine = create_dataset_operator_engine(args.database_url)
+    engine = None
     try:
+        engine = create_dataset_operator_engine(args.database_url)
         if args.command == "stage":
             result = stage(engine, args.manifest, args.storage_root)
             _print({"staged": True, "deduplicated": result.deduplicated,
@@ -179,7 +180,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"database error: {error}", file=sys.stderr)
         return EXIT_DATABASE
     finally:
-        engine.dispose()
+        if engine is not None:
+            engine.dispose()
 
 
 if __name__ == "__main__":

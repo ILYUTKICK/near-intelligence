@@ -259,7 +259,10 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
         cls.runtime.dispose()
 
     def setUp(self):
-        self.directory = Path(os.environ["NI_TEST_TMP_DIR"]) / f"datasets-{uuid4().hex}"
+        # NOTE: keep every path segment's alphanumeric run below 40 chars —
+        # the NI-027 lineage redactor replaces long secret-looking runs, and a
+        # redacted archive root could not be re-read from disk.
+        self.directory = Path(os.environ["NI_TEST_TMP_DIR"]) / f"datasets-{uuid4().hex[:8]}"
         self.directory.mkdir(parents=True)
         self.addCleanup(shutil.rmtree, self.directory, ignore_errors=True)
         self.storage_root = self.directory / "storage"
@@ -345,8 +348,11 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
         third = stage(self.operator, shuffled, self.storage_root)
         self.assertTrue(third.deduplicated)
         self.assertEqual(third.dataset_version_id, first.dataset_version_id)
-        counts = self.counts()
-        self.assertEqual(counts["dataset_versions"], 1)
+        with self.admin.connect() as connection:
+            key_versions = connection.scalar(text(
+                "SELECT count(*) FROM app.dataset_versions WHERE dataset_key = :key"),
+                {"key": self.key})
+        self.assertEqual(key_versions, 1)
 
         # identical bytes from a DIFFERENT local path also deduplicate
         copy_input = file_input(self.directory, name="input-copy.json")
@@ -539,18 +545,19 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
 
         frozen = (
             ("UPDATE app.dataset_versions SET status = 'validated' WHERE id = :id",
-             "status regression"),
+             "status regression", "immutable"),
             ("UPDATE app.dataset_versions SET quality = '{}'::jsonb WHERE id = :id",
-             "quality rewrite"),
+             "quality rewrite", "immutable"),
+            # the column grant itself refuses identity rewrites before the trigger
             ("UPDATE app.dataset_versions SET content_sha256 = repeat('a', 64) WHERE id = :id",
-             "hash rewrite"),
+             "hash rewrite", "permission denied"),
         )
-        for statement, label in frozen:
+        for statement, label, fragment in frozen:
             with self.subTest(label=label):
                 with self.assertRaises(DBAPIError) as raised:
                     with self.operator.begin() as connection:
                         connection.execute(text(statement), {"id": version_id})
-                self.assertIn("immutable", str(raised.exception.orig).lower())
+                self.assertIn(fragment, str(raised.exception.orig).lower())
 
         # no DELETE grant exists for scientific rows
         with self.assertRaises(DBAPIError) as raised:
@@ -619,8 +626,8 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
             "member_metrics": [str(FROM_IMPORT_METRIC)],
             "inputs": [{"kind": "imported", "batch_manifest_sha256": batch_sha,
                         "relative_path": "research/metrics-cohort/data/response.json",
-                        "role": "normalized", "source_id": None, "query_hash": None,
-                        "license_status": None}],
+                        "role": "normalized", "source_id": "SRC-EXAMPLE",
+                        "query_hash": None, "license_status": None}],
             "aggregate_record_format": "observations_json",
         }
         binding_path = write_json(self.directory / "binding.json", binding)
@@ -657,6 +664,15 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
                 "license_status": "unverified", "sources": ["SRC-EXAMPLE"],
                 "basis": "synthetic fixture",
             },
+            # A second, manifest-less cohort keeps the common manifest prefix
+            # at "research/" so the cohort directory survives classification.
+            "notes-cohort": {
+                "window_start": None, "window_end_exclusive": None,
+                "coverage_scope": "point_in_time_snapshot",
+                "partial_audit": "Synthetic manifest-less cohort.",
+                "license_status": "unverified", "sources": ["SRC-EXAMPLE"],
+                "basis": "synthetic fixture",
+            },
         }
         return registry
 
@@ -686,6 +702,7 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
             f"research/{cohort}/data/response.json": response,
             f"research/{cohort}/manifest.json": (
                 json.dumps(cohort_manifest, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+            "research/notes-cohort/NOTES.md": b"Synthetic manifest-less notes cohort.\n",
         }
         for relative, data in files.items():
             path = root / relative
@@ -714,8 +731,9 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
             missing = get_version(connection, uuid4())
         self.assertEqual([row["version"] for row in history], [1, 2])
         self.assertEqual(history[0]["content_sha256"], first.content_sha256)
-        self.assertEqual(active["id"], str(second.dataset_version_id))
-        self.assertEqual(active["status"], "validated")
+        # only the published version is active; the staged one is history-in-waiting
+        self.assertEqual(active["id"], str(first.dataset_version_id))
+        self.assertEqual(active["status"], "approved")
         self.assertEqual((page["total"], len(page["items"])), (DAILY_PERIODS, 10))
         self.assertEqual(inputs[0]["role"], "config")
         self.assertTrue(inputs[0]["storage_key"].startswith("blobs/"))

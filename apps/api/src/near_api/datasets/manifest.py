@@ -139,13 +139,15 @@ def _fail(message: str) -> None:
     raise ManifestFormatError(message)
 
 
-def _strict_fields(obj: object, allowed: tuple[str, ...], context: str) -> dict:
+def _strict_fields(obj: object, allowed: tuple[str, ...], context: str, *,
+                   required: tuple[str, ...] | None = None) -> dict:
     if not isinstance(obj, dict):
         _fail(f"{context}: expected a JSON object")
     unknown = sorted(set(obj) - set(allowed))
     if unknown:
         _fail(f"{context}: unknown fields {unknown}")
-    missing = [field for field in allowed if field not in obj]
+    missing = [field for field in (required if required is not None else allowed)
+               if field not in obj]
     if missing:
         _fail(f"{context}: missing fields {missing}")
     return obj
@@ -302,31 +304,31 @@ def _parse_header(document: dict, *, context: str, fields: tuple[str, ...]) -> d
 
 
 def _parse_input(obj: object, context: str) -> InputBinding:
-    entry = _strict_fields(obj, INPUT_FIELDS, context)
+    entry = _strict_fields(obj, INPUT_FIELDS, context, required=("kind", "role"))
     kind = entry["kind"]
     if kind not in ("file", "imported"):
         _fail(f"{context}: kind must be 'file' or 'imported'")
     role = entry["role"]
     if role not in INPUT_ROLES:
         _fail(f"{context}: role must be one of {INPUT_ROLES}")
-    source_id = _optional_str(entry["source_id"], 40, f"{context}.source_id")
+    source_id = _optional_str(entry.get("source_id"), 40, f"{context}.source_id")
     if source_id is not None and not SOURCE_ID_PATTERN.match(source_id):
         _fail(f"{context}: source_id must match {SOURCE_ID_PATTERN.pattern}")
-    license_status = entry["license_status"]
+    license_status = entry.get("license_status")
     if license_status is None:
         license_status = "unverified"
     if license_status not in LICENSE_STATUSES:
         _fail(f"{context}: license_status must be one of {LICENSE_STATUSES}")
-    query_hash = _optional_hash(entry["query_hash"], f"{context}.query_hash")
+    query_hash = _optional_hash(entry.get("query_hash"), f"{context}.query_hash")
     if kind == "file":
-        path_value = entry["path"]
-        if entry["batch_manifest_sha256"] is not None or entry["relative_path"] is not None:
+        path_value = entry.get("path")
+        if entry.get("batch_manifest_sha256") is not None or entry.get("relative_path") is not None:
             _fail(f"{context}: file inputs declare path only")
         if not isinstance(path_value, str) or not path_value:
             _fail(f"{context}: file inputs require a path string")
         return InputBinding(kind=kind, role=role, path=Path(path_value), source_id=source_id,
                             query_hash=query_hash, license_status=license_status)
-    if entry["path"] is not None:
+    if entry.get("path") is not None:
         _fail(f"{context}: imported inputs declare batch_manifest_sha256/relative_path only")
     batch = entry["batch_manifest_sha256"]
     if not isinstance(batch, str) or not canonical_sha_pattern.match(batch):

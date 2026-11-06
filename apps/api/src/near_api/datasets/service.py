@@ -73,10 +73,9 @@ MAX_QUERY_PAGE = 1000
 # they can honestly represent (NI-027 file_role -> dataset_inputs.role).
 IMPORTED_FILE_ROLE_COMPATIBILITY = {
     "raw": {"raw"},
-    "normalized": {"aggregate"},
-    "price": {"aggregate"},
-    "sql": {"script", "provenance"},
-    "config": {"script", "provenance"},
+    "aggregate": {"normalized", "price"},
+    "script": {"sql", "config"},
+    "provenance": {"sql", "config"},
 }
 
 
@@ -351,7 +350,7 @@ def _rebuild_manifest_from_rows(connection: Connection, version: dict) -> tuple[
     """Re-derive the exact canonical manifest from persisted rows."""
     input_rows = connection.execute(text("""
         SELECT i.role, i.source_id, i.query_hash, a.relative_storage_key AS storage_key,
-               a.sha256
+               a.sha256, a.license_status
         FROM app.dataset_inputs i
         JOIN app.artifacts a ON a.id = i.artifact_id
         WHERE i.dataset_version_id = :id
@@ -616,18 +615,20 @@ def _stage_locked(connection: Connection, manifest: PreparedManifest,
         "source_as_of": manifest.source_as_of, "retrieved_at": manifest.retrieved_at,
         "quality": _dumps_canonical(quality),
     })
-    connection.execute(text("""
-        INSERT INTO app.dataset_metrics(dataset_version_id, metric_definition_id)
-        VALUES (:version_id, :metric)
-    """), [{"version_id": version_id, "metric": metric}
-           for metric in manifest.member_metrics])
-    connection.execute(text("""
-        INSERT INTO app.dataset_inputs(dataset_version_id, artifact_id, role, source_id,
-                                       ingestion_run_id, query_hash)
-        VALUES (:version_id, :artifact_id, :role, :source_id, NULL, :query_hash)
-    """), [{"version_id": version_id, "artifact_id": artifact_id, "role": item.role,
-            "source_id": item.source_id, "query_hash": item.query_hash}
-           for artifact_id, item in artifact_ids])
+    if manifest.member_metrics:
+        connection.execute(text("""
+            INSERT INTO app.dataset_metrics(dataset_version_id, metric_definition_id)
+            VALUES (:version_id, :metric)
+        """), [{"version_id": version_id, "metric": metric}
+               for metric in manifest.member_metrics])
+    if artifact_ids:
+        connection.execute(text("""
+            INSERT INTO app.dataset_inputs(dataset_version_id, artifact_id, role, source_id,
+                                           ingestion_run_id, query_hash)
+            VALUES (:version_id, :artifact_id, :role, :source_id, NULL, :query_hash)
+        """), [{"version_id": version_id, "artifact_id": artifact_id, "role": item.role,
+                "source_id": item.source_id, "query_hash": item.query_hash}
+               for artifact_id, item in artifact_ids])
     _insert_observations(connection, version_id, manifest.observations)
     version = _load_version(connection, version_id)
     report = _validate_locked(connection, version, current_status="staged")
