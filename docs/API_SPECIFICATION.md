@@ -82,6 +82,23 @@ is `Cache-Control: no-store`.
 
 ## Research documents and versions
 
+Implemented note (NI-036): `GET /documents`, `POST /documents`, `GET /documents/{id}` and
+`POST /documents/{id}/versions` are implemented in `apps/api/src/near_api/documents/` (exposed
+under the `/api` prefix). Creation atomically writes the document plus its first EMPTY revision
+(`revision: 1`, `ETag: "1"`); the ETag is the quoted current revision and `If-Match` must carry
+exactly that quoted value (bare numbers and weak validators are 428). A stale revision is 409
+REVISION_CONFLICT including the current revision for the owned document; invalid content is a
+typed 422 (VALIDATION_ERROR / REFERENCE_INVALID), oversize 413, and a rejected save leaves zero
+rows. Each save re-validates the canonical schema (EDITOR_SPECIFICATION), enforces same-document
+evidence/insight/risk links, requires `dataTable.dataset_version_id` to be an APPROVED dataset
+version, requires citation targets to be public artifacts, and gates liveChart blocks, snapshot
+chart mode and `model_run` evidence targets until the chart registry (NI-031), research
+snapshots (NI-035) and model runs (NI-054) exist — an unverifiable reference is invalid, never
+tolerated. `observed_contexts` must be empty until the chart system (NI-041/NI-043) resolves
+pins server-side. Rename/delete, idempotency keys and version listing/detail remain with
+NI-037; `Idempotency-Key` is not yet honored on the implemented routes. The opaque list cursor
+is a bounded offset over the stable `(updated_at DESC, id)` owner-scoped order.
+
 | Method/path | Request → response | Auth / authorization | Errors |
 | --- | --- | --- | --- |
 | GET `/documents` | query `q?,cursor?,limit?` → paginated DocumentSummary | Owner predicate before pagination/search | 401/422 |

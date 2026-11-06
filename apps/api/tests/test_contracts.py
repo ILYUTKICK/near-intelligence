@@ -77,8 +77,13 @@ class ContractTests(TestCase):
             self.assertEqual(HealthResponse.model_validate(response.json()).service, "api")
             schema = client.get("/openapi.json").json()
             # NI-022 added the first private route; /health stays public.
-            # The contract grows with implemented routes: NI-025 added /api/me.
-            self.assertEqual(set(schema["paths"]), {"/health", "/api/home", "/api/me"})
+            # The contract grows with implemented routes: NI-025 added /api/me
+            # and NI-036 added the document revision routes.
+            self.assertEqual(set(schema["paths"]), {
+                "/health", "/api/home", "/api/me",
+                "/api/documents", "/api/documents/{document_id}",
+                "/api/documents/{document_id}/versions",
+            })
             self.assertIn("DecimalString", schema["components"]["schemas"])
             self.assertFalse(schema["components"]["schemas"]["Selection"]["additionalProperties"])
         with TestClient(app) as client, patch("near_api.main.get_settings", side_effect=SettingsError("Missing APP_ENV")):
