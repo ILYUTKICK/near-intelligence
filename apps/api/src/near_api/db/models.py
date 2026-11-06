@@ -7,6 +7,7 @@ import_batches, imported_files, source_runs): metadata-only lineage for the
 read-only research archive import — file bytes are never stored. NI-028 adds
 the immutable dataset staging/publication zone (artifacts, dataset_versions,
 dataset_metrics, dataset_inputs, metric_observations, active_datasets).
+NI-029 adds the append-only metric definition registry (metric_definitions).
 Remaining domain tables belong to their owning tasks and must keep these
 declarations in sync for the Alembic metadata drift check.
 """
@@ -454,3 +455,41 @@ class ActiveDataset(Base):
     dataset_version_id: Mapped[UUID] = mapped_column(nullable=False)
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
                                                    server_default=func.now())
+
+
+class MetricDefinition(Base):
+    """Immutable versioned metric definition row (NI-029 registry).
+
+    Append-only: no UPDATE/DELETE grant exists; a definition change appends a
+    new (metric_id, version). The dataset_metrics FK stays with NI-031.
+    """
+
+    __tablename__ = "metric_definitions"
+    __table_args__ = (
+        UniqueConstraint("metric_id", "version", name="uq_metric_definitions_metric_version"),
+        CheckConstraint(r"metric_id ~ '^[a-z][a-z0-9_]{2,79}$'", name="metric_id"),
+        CheckConstraint("version >= 1", name="version"),
+        CheckConstraint("name <> ''", name="name_nonempty"),
+        CheckConstraint("unit <> ''", name="unit_nonempty"),
+        CheckConstraint("frequency IN ('daily','weekly','monthly','snapshot')", name="frequency"),
+        CheckConstraint("economic_scope <> ''", name="scope_nonempty"),
+        CheckConstraint("formula_key <> ''", name="formula_nonempty"),
+        CheckConstraint("octet_length(definition::text) <= 16384", name="definition_size"),
+        CheckConstraint("octet_length(quality_rules::text) <= 8192", name="quality_rules_size"),
+        ForeignKeyConstraint(["source_id"], ["app.sources.id"],
+                             name="fk_metric_definitions_source", ondelete="RESTRICT"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    metric_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    unit: Mapped[str] = mapped_column(String(40), nullable=False)
+    frequency: Mapped[str] = mapped_column(String(20), nullable=False)
+    economic_scope: Mapped[str] = mapped_column(String(200), nullable=False)
+    formula_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(40))
+    definition: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    quality_rules: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
