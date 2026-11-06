@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { AuthConfigError, loadPublicAuthConfig, loadServerAuthConfig } from "@/lib/auth/config";
-import { ProviderAuthError } from "@/lib/auth/provider";
 import {
   CSRF_COOKIE,
   CSRF_HEADER,

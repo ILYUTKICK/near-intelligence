@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
  * classes (already registered / validation), never token details.
  */
 export function SignupForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function SignupForm() {
         return;
       }
       if (body.status === "session") {
-        window.location.assign("/");
+        router.push("/");
         return;
       }
       setSentTo(email);
