@@ -145,7 +145,12 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-001, NI-002, NI-003, NI-004
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-06T03:18:32+03:00
+- **Branch/worktree:** feat/ni-005-ci-checks; /Users/ilyutkinn/Desktop/Near
+- **Dependency verification:** NI-001/NI-002 DONE (own evidence), NI-003/NI-004 DONE (PRs #15/#16/#17 merged, cards verified on origin/main 7ba8af1). NI-026 is BLOCKED (provider credentials/quotas, OQ gates) and is not a dependency of this task.
 
 **Description:** Make contributor commands executable and distinguish app correctness from documentation validation.
 
