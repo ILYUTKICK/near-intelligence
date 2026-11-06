@@ -933,7 +933,11 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-019, NI-028, NI-004
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #8
+- **Execution role:** B
+- **Started at:** 2026-11-07T00:27:05+03:00
+- **Branch/worktree:** feat/ni-036-document-schema; /Users/ilyutkinn/Desktop/near-intelligence-b
 
 **Description:** Create one authoritative versioned JSON document and atomic relational projections.
 
