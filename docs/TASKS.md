@@ -805,7 +805,11 @@ Specification: [DATA_PIPELINE.md](DATA_PIPELINE.md).
 - **Priority:** P0
 - **Dependencies:** NI-026, NI-028, NI-029
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #10
+- **Execution role:** B
+- **Started at:** 2026-11-07T02:12:00+03:00
+- **Branch/worktree:** feat/ni-030-refresh-adapter; /Users/ilyutkinn/Desktop/near-intelligence-b2 (based on origin/main e69746b with feat/ni-031-registries b31c6cc merged so migration 0008 chains after 0007; parallel NI-031/NI-051 files untouched)
 
 **Description:** Demonstrate a genuinely regularly updated series with last-good reliability.
 
