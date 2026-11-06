@@ -77,6 +77,9 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y postgresql-18
+          # The runner user (not the postgres system user) runs the cluster.
+          sudo mkdir -p /var/run/postgresql
+          sudo chown -R "$(whoami)" /var/run/postgresql
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --project apps/api --frozen
       # Disposable loopback cluster created and destroyed by the runner
