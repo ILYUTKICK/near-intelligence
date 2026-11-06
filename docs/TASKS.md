@@ -988,7 +988,12 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-002, NI-009, NI-031
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-07T02:31:10+03:00
+- **Branch/worktree:** feat/ni-038-tiptap-prototype; /Users/ilyutkinn/Desktop/Near
+- **Dependency verification:** NI-002✓, NI-009✓, NI-031✓ (PR #39 merged) — cards on origin/main.
 
 **Description:** Validate the editor choice against financial node interactions before broad UI implementation.
 
