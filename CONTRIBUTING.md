@@ -22,7 +22,17 @@ uv run --project apps/api pytest
 uv run --project apps/api python -m near_api.cli research verify --manifest <path>
 ```
 
-These commands are planned, not currently installed. Run checks proportional to the change plus affected integration contracts. Private-resource changes require Alice/Bob ownership tests; monetary changes require exact-precision and duplicate-event tests; editor changes require save/reopen/conflict tests. Data changes require immutable old versions and new provenance hashes. [Testing strategy](docs/TESTING_STRATEGY.md) defines mandatory release checks.
+All of these are implemented as of NI-005 except `test:e2e` (Playwright arrives with its own task) and the research `verify` CLI (NI-054). Quick equivalents:
+
+```sh
+pnpm lint && pnpm typecheck && pnpm test          # web (vitest) + generated-client package
+pnpm test:api:unit                                # API contracts + source capabilities (unittest, offline)
+pnpm test:api:db                                  # disposable PostgreSQL 18 cluster: migrations, RLS, isolation
+pnpm check:contracts && pnpm check:doc-links      # drift + documentation links
+pnpm check:contrast && pnpm check:client-secrets  # token audit and client-bundle secret scan
+```
+
+CI runs these on every pull request (.github/workflows/checks.yml: web, api, database jobs); a failing contract drift check blocks merge. Local `pnpm` invocations need the pinned pnpm on PATH (`corepack enable --install-directory ~/.local/bin` or any install honoring the `packageManager` pin). Run checks proportional to the change plus affected integration contracts. Private-resource changes require Alice/Bob ownership tests; monetary changes require exact-precision and duplicate-event tests; editor changes require save/reopen/conflict tests. Data changes require immutable old versions and new provenance hashes. [Testing strategy](docs/TESTING_STRATEGY.md) defines mandatory release checks.
 
 ## Pull requests
 
