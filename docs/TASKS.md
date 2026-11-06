@@ -647,7 +647,12 @@ Specification: [USER_JOURNEYS.md](USER_JOURNEYS.md).
 - **Priority:** P0
 - **Dependencies:** NI-020, NI-021
 - **Complexity:** S
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A (owner/closer; the /me API is B's zone per TEAM_PLAN, implemented by this agent under the standing parallel-dispatch authorization, following B's established patterns)
+- **Started at:** 2026-11-06T23:18:09+03:00
+- **Branch/worktree:** feat/ni-025-profile-settings; /Users/ilyutkinn/Desktop/Near
+- **Dependency verification:** NI-020 DONE (PR #24), NI-021 DONE (PR #29) — cards on origin/main cead969+.
 
 **Description:** Provide useful account preferences and honest privacy controls.
 
