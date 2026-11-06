@@ -8,6 +8,8 @@ read-only research archive import — file bytes are never stored. NI-028 adds
 the immutable dataset staging/publication zone (artifacts, dataset_versions,
 dataset_metrics, dataset_inputs, metric_observations, active_datasets).
 NI-029 adds the append-only metric definition registry (metric_definitions).
+NI-031 adds the append-only chart definition registry (chart_definitions,
+chart_metrics) and the dataset_metrics referential FK to metric_definitions.
 NI-036 adds the per-revision document projections (insights, hypotheses,
 evidence_links) derived from canonical document_versions.content.
 Remaining domain tables belong to their owning tasks and must keep these
@@ -462,12 +464,19 @@ class DatasetVersion(Base):
 
 
 class DatasetMetric(Base):
-    """Member metric registry for a version; observations may only reference members."""
+    """Member metric registry for a version; observations may only reference members.
+
+    NI-031 binds the member metric UUID to its registered definition: an
+    unregistered metric id is rejected by the referential FK.
+    """
 
     __tablename__ = "dataset_metrics"
     __table_args__ = (
         ForeignKeyConstraint(["dataset_version_id"], ["app.dataset_versions.id"],
                              name="fk_dataset_metrics_version", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["metric_definition_id"], ["app.metric_definitions.id"],
+                             name="fk_dataset_metrics_metric_definition", ondelete="RESTRICT"),
+        Index("ix_dataset_metrics_metric_definition", "metric_definition_id"),
     )
 
     dataset_version_id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -595,3 +604,80 @@ class MetricDefinition(Base):
     quality_rules: Mapped[dict] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
                                                  server_default=func.now())
+
+
+class ChartDefinition(Base):
+    """Immutable versioned chart definition row (NI-031 registry).
+
+    Append-only: no UPDATE/DELETE grant exists; a chart change appends a new
+    (chart_id, version). data_status is the honest advertisement: only
+    'available' charts are advertised as live; unavailable charts carry a
+    recorded reason. Rendering is fully described by the definition
+    (visualization, bindings, units, filters, ranges, renderer version), so a
+    new supported definition needs no new page implementation.
+    """
+
+    __tablename__ = "chart_definitions"
+    __table_args__ = (
+        UniqueConstraint("chart_id", "version", name="uq_chart_definitions_chart_version"),
+        CheckConstraint(r"chart_id ~ '^[a-z][a-z0-9-]{2,79}$'", name="chart_id"),
+        CheckConstraint("version >= 1", name="version"),
+        CheckConstraint("title <> ''", name="title_nonempty"),
+        CheckConstraint("description <> ''", name="description_nonempty"),
+        CheckConstraint("category IN ('activity','fees','treasury','supply','model')",
+                        name="category"),
+        CheckConstraint("visualization_type IN ('line','area','bar','scatter','panels')",
+                        name="visualization_type"),
+        CheckConstraint("data_status IN ('available','unavailable')", name="data_status"),
+        CheckConstraint("(data_status = 'available') = (unavailable_reason IS NULL) "
+                        "AND (unavailable_reason IS NULL OR unavailable_reason <> '')",
+                        name="unavailable_reason"),
+        CheckConstraint("update_frequency IN ('daily','weekly','monthly','snapshot')",
+                        name="frequency"),
+        CheckConstraint("renderer_version <> ''", name="renderer_nonempty"),
+        CheckConstraint("octet_length(allowed_ranges::text) <= 1024", name="allowed_ranges_size"),
+        CheckConstraint("octet_length(filter_schema::text) <= 4096", name="filter_schema_size"),
+        CheckConstraint("octet_length(unit_schema::text) <= 1024", name="unit_schema_size"),
+        CheckConstraint("octet_length(metric_definition_ids::text) <= 4096",
+                        name="metric_ids_size"),
+        CheckConstraint("octet_length(source_lineage::text) <= 2048", name="source_lineage_size"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    chart_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(String(1000), nullable=False)
+    category: Mapped[str] = mapped_column(String(40), nullable=False)
+    visualization_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    data_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    unavailable_reason: Mapped[str | None] = mapped_column(String(500))
+    update_frequency: Mapped[str] = mapped_column(String(20), nullable=False)
+    allowed_ranges: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    filter_schema: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    unit_schema: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    metric_definition_ids: Mapped[list] = mapped_column(JSONB, nullable=False)
+    source_lineage: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    renderer_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+
+
+class ChartMetric(Base):
+    """Chart/metric binding junction; required/optional series roles (NI-031)."""
+
+    __tablename__ = "chart_metrics"
+    __table_args__ = (
+        CheckConstraint("series_role IN ('required_primary','required_secondary',"
+                        "'required_x_axis','required_y_axis','optional_overlay',"
+                        "'optional_context')", name="series_role"),
+        ForeignKeyConstraint(["chart_definition_version_id"], ["app.chart_definitions.id"],
+                             name="fk_chart_metrics_chart", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["metric_definition_id"], ["app.metric_definitions.id"],
+                             name="fk_chart_metrics_metric", ondelete="RESTRICT"),
+        Index("ix_chart_metrics_metric", "metric_definition_id"),
+    )
+
+    chart_definition_version_id: Mapped[UUID] = mapped_column(primary_key=True)
+    metric_definition_id: Mapped[UUID] = mapped_column(primary_key=True)
+    series_role: Mapped[str] = mapped_column(String(40), primary_key=True)
