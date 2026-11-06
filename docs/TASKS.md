@@ -534,6 +534,10 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Branch/worktree:** feat/ni-020-session-boundaries; /Users/ilyutkinn/Desktop/Near
 - **Dependency verification:** NI-017 DONE (PR #22, operator E2E recorded), NI-018 DONE (PR #21), NI-019 DONE (PR #23) — cards on origin/main cead969.
 - **Scope note (operator decision 2026-11-06):** email confirmation is disabled on the dev provider, so the email-verification leg is deferred with that decision; recovery flow, session boundaries (session endpoint, refresh rotation, revoked refresh, disabled users, rate guards, JWKS failure) and expiry documentation are this session's scope. Editor-draft preservation and cross-tab signals are wired where those surfaces exist (workspace/editor tasks).
+- **Verification:** `pnpm --filter web test` — 79/79 pass (5 new): the gate layout redirects anonymous/expired sessions to /login (redirect digest asserted), renders the shell for a valid HMAC-signed session without leaking tokens into markup (access/refresh token absence asserted); the workspace entry page contains no dead links to NI-023/NI-035 routes (queried); AccountMenu posts the CSRF-minted logout and routes to /login, surfacing provider-side revocation failures honestly via role=alert; axe passes on the gated shell. `tsc --noEmit`, `eslint` 0 warnings, `next build` (ƒ /workspace behind the gate) pass. Route protection never replaces backend ownership: the cookie is the HMAC boundary, private API requests re-verify server-side (NI-018/019).
+- **Result:** apps/web/src/app/(workspace)/layout.tsx (server gate via cookies()+decodeSessionCookie, redirect to /login, force-dynamic for private no-store semantics, WorkspaceSidebar + AccountMenu wiring), (workspace)/workspace/page.tsx (honest entry page), components/layout/AccountMenu.tsx (sign-out with fresh CSRF, pending state, honest failures). The gate is the UI boundary only — resource ownership remains server-side.
+- **Reviewer:** pending — role-B review requested on PR #29; CI runs on this PR.
+- **Completed at:** 2026-11-06T23:20:40+03:00
 - **Verification:** `pnpm --filter web test` — 74/74 pass (7 new): session endpoint returns subject+expiry for a valid signed cookie, clears expired/tampered cookies with 401, answers 401 with no cookie and sets nothing; refresh rotation exchanges the refresh token provider-side and re-signs the cookie with the NEW refresh token, clears the session honestly on revoked/expired refresh (401), and keeps the cookie through provider outages (503, no fake rotation); per-IP sliding-window guard allows exactly 5 attempts/min and blocks the sixth while other IPs are unaffected; disabled users fail closed through the NI-018 bootstrap; JWKS/provider outage cases covered in both existing and new suites. `tsc --noEmit`, `eslint` 0 warnings, `next build` (ƒ /api/auth/{session,refresh} added) pass. Rate guard counts hostile requests too (pre-auth rejections consume the bucket) — the pre-provider rejection matrix resets its bucket per case with a recorded rationale.
 - **Result:** apps/web/src/app/api/auth/session/route.ts (HMAC-cookie boundary, honest three-way answer), apps/web/src/app/api/auth/refresh/route.ts (provider refresh rotation, revoked → 401+clear, outage → 503 cookie kept), apps/web/src/lib/auth/rate-limit.ts (sliding-window per-IP guard wired into login/signup/demo/refresh at 5-10/min, single-instance note for NI-067), wired into login/signup/demo routes; expiry window documented in AUTHENTICATION_SECURITY.md (observed provider default 3600s). Deferred with rationale: editor-draft preservation and cross-tab cache signals wire in when workspace/editor state exists (NI-021+); recovery-flow exposure checks return with recovery (needs SMTP decision); two-browser manual pass belongs to NI-064 staging verification.
 - **Reviewer:** pending — role-B review requested on PR #24; CI runs on this PR.
@@ -559,7 +563,12 @@ Specification: [USER_JOURNEYS.md](USER_JOURNEYS.md).
 - **Priority:** P0
 - **Dependencies:** NI-008, NI-020
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-06T22:51:34+03:00
+- **Branch/worktree:** feat/ni-021-workspace-gate; /Users/ilyutkinn/Desktop/Near
+- **Dependency verification:** NI-008 DONE (PR #11), NI-020 DONE (PR #24, session/refresh boundaries in main) — cards on origin/main a594f78.
 
 **Description:** Connect the existing layout to authenticated navigation without relying on UI for resource ownership.
 
