@@ -564,7 +564,11 @@ Specification: [USER_JOURNEYS.md](USER_JOURNEYS.md).
 - **Priority:** P0
 - **Dependencies:** NI-019, NI-004
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #3
+- **Execution role:** B
+- **Started at:** 2026-11-06T21:41:32+03:00
+- **Branch/worktree:** feat/ni-022-home-aggregation at /Users/ilyutkinn/Desktop/near-intelligence-b (from origin/main cead969)
 
 **Description:** Return research continuation data with bounded queries and independent public indicator failures.
 
