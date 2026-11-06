@@ -781,7 +781,11 @@ Specification: [DATA_PIPELINE.md](DATA_PIPELINE.md).
 - **Priority:** P0
 - **Dependencies:** NI-028
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #7
+- **Execution role:** B
+- **Started at:** 2026-11-07T00:27:00+03:00
+- **Branch/worktree:** feat/ni-029-metrics; /Users/ilyutkinn/Desktop/near-intelligence-b2 (git worktree off origin/main c467e6b)
 
 **Description:** Centralize the real P0 amounts and explicit unavailable metric definitions.
 
