@@ -72,7 +72,10 @@ and an explicit migration/backup step under deployment tasks.
 bounded pool. `user_transaction(engine, verified_subject)` requires an internal
 UUID from verified JWT handling (NI-018) or None for an anonymous context. There
 is no HTTP principal/header authorization implementation in NI-003. Callers must
-not pass a client-supplied owner ID. NI-019 wires request ownership.
+not pass a client-supplied owner ID. NI-018's `bootstrap_principal`
+(apps/api/src/near_api/auth/principal.py) is the first consumer: it upserts
+identity rows for the JWT-verified subject and rejects disabled users inside
+this boundary. NI-019 wires request ownership for domain tables.
 
 Before user SQL, the transaction rejects privileged roles, schema/table owners,
 memberships and autocommit. It sets `app.user_id` using parameterized
@@ -112,10 +115,11 @@ apps/api/.venv/bin/python scripts/run-db-tests.py --pg-bin /path/to/postgresql/1
 
 The runner uses a random loopback port, random in-memory test passwords, a fresh
 cluster below ignored .local, the actual bootstrap SQL and SCRAM host auth. It
-stops only its own cluster before removing its verified temporary directory;
-failed shutdown retains files for diagnosis. It never uses an existing DB or
-provider. A direct unittest discovery without the runner skips DB cases, and
-those skips do not count as an integration pass.
+executes both `test_database.py` (NI-003 identity/RLS) and `test_auth_bootstrap.py`
+(NI-018 principal bootstrap). It stops only its own cluster before removing its
+verified temporary directory; failed shutdown retains files for diagnosis. It
+never uses an existing DB or provider. A direct unittest discovery without the
+runner skips DB cases, and those skips do not count as an integration pass.
 
 Verified on 6 November 2026: Windows 11, PostgreSQL 18.6, CPython 3.13.15,
 frozen apps/api/uv.lock. Eight tests passed, including empty upgrade/down/up,
