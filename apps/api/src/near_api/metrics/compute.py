@@ -554,6 +554,44 @@ def effective_fee_bps(volume_usd: Decimal, gross_fees_usd: Decimal) -> Decimal |
                                   volume_usd)
 
 
+@dataclass(frozen=True)
+class PurchaseEstimate:
+    """Exact USD valuation of a purchase flow over one span and basis."""
+
+    by_day: dict
+    missing_days: tuple
+    window_total: Decimal | None
+
+
+@exact_arithmetic
+def estimate_purchase_usd(purchases: DailyFlows, prices: PriceSeries, *, basis: str,
+                          window_start: dt.date,
+                          window_end_exclusive: dt.date) -> PurchaseEstimate:
+    """Exact range valuation used for reconciliations and range queries.
+
+    The daily product is the exact Decimal product; a missing price makes the
+    day missing and the span total unavailable - never zero, never filled.
+    """
+    if basis not in PRICE_BASES:
+        raise MetricComputationError(f"unknown price basis {basis!r}")
+    by_day: dict[dt.date, Decimal] = {}
+    missing: list[dt.date] = []
+    total = Decimal(0)
+    day = window_start
+    while day < window_end_exclusive:
+        price = prices.by_day.get((day, basis))
+        if price is None:
+            missing.append(day)
+        else:
+            product = COMPUTE_CONTEXT.multiply(near_amount(purchases.by_day.get(day, Decimal(0))),
+                                               price)
+            by_day[day] = product
+            total += product
+        day += dt.timedelta(days=1)
+    return PurchaseEstimate(by_day=by_day, missing_days=tuple(missing),
+                            window_total=None if missing else total)
+
+
 @exact_arithmetic
 def _fee_bps_for_period(series: ProviderSeries, source: str, start: dt.datetime,
                         end: dt.datetime) -> tuple[Decimal | None, dict]:
@@ -573,15 +611,15 @@ def _fee_bps_for_period(series: ProviderSeries, source: str, start: dt.datetime,
     if missing_days:
         return None, {"reason": f"the ratio requires a complete {source} series; "
                                 f"{len(missing_days)} day(s) are missing",
-                      "missing_days": [day.isoformat() for day in missing_days[:20]]}
+                      "missing_days": [day.isoformat() for day in missing_days[:20]]}, "missing"
     ratio = effective_fee_bps(volume, fees)
     if ratio is None:
         return None, {"reason": f"zero or negative {source} volume denominator over the "
                                 "period; the ratio is unavailable, not zero",
-                      "volume_usd": decimal_string(volume)}
+                      "volume_usd": decimal_string(volume)}, "unavailable"
     return ratio, {"source": source, "exact_value": decimal_string(ratio),
                    "rounding": "stored at the NUMERIC(78,30) scale",
-                   "method": "ratio of sums over the period"}
+                   "method": "ratio of sums over the period"}, "verified"
 
 
 @exact_arithmetic
@@ -592,13 +630,12 @@ def formula_effective_gross_fee_bps_v1(inputs: MetricInputs, *, shape: str) -> l
     records: list[dict] = []
     for start, end in _shape_periods(inputs, shape):
         for source in PROVIDER_SOURCES:
-            ratio, quality = _fee_bps_for_period(series, source, start, end)
+            ratio, quality, status = _fee_bps_for_period(series, source, start, end)
             records.append(observation_record(
                 definition, period_start=start, period_end=end,
                 dimensions={"source": source}, value=ratio,
                 bound_kind=None if ratio is None else "estimate",
-                quality_status="unavailable" if ratio is None and "missing_days" in quality
-                else ("missing" if ratio is None else "verified"),
+                quality_status=status,
                 quality=quality))
     return records
 
