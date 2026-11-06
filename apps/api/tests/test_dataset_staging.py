@@ -52,10 +52,14 @@ from near_api.datasets.service import (
 from near_api.datasets.storage import ArtifactStorage
 from near_api.db.session import create_runtime_engine, user_transaction
 from near_api.ingestion import archive
+from near_api.metrics.registry import definition_by_metric_id
 
-METRIC_A = uuid4()
-METRIC_B = uuid4()
-FROM_IMPORT_METRIC = uuid4()
+# NI-031 contract change: dataset_metrics.metric_definition_id carries a
+# referential FK to app.metric_definitions, so staging fixtures bind
+# registered metric definitions instead of opaque identifiers.
+METRIC_A = definition_by_metric_id("observed_near_purchases").id
+METRIC_B = definition_by_metric_id("treasury_payouts_near").id
+FROM_IMPORT_METRIC = definition_by_metric_id("conversion_count").id
 WINDOW = ("2026-01-01", "2026-01-31")
 DAILY_PERIODS = 30
 
@@ -251,6 +255,23 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
                                   hide_parameters=True)
         cls.runtime = create_runtime_engine(os.environ["NI_TEST_RUNTIME_URL"], pool_size=1)
         command.upgrade(cls.config, "head")
+        # NI-031 contract change: dataset_metrics.member UUIDs are referentially
+        # bound to the metric definition registry, so the fixtures' registered
+        # definitions must exist before staging.
+        from near_api.metrics import register_definitions
+
+        sources = {"SRC-BQ": "BigQuery export", "SRC-PRICE": "Saved price snapshots",
+                   "SRC-LLAMA": "DefiLlama saved snapshots",
+                   "SRC-FASTNEAR": "FastNear indexed blocks",
+                   "SRC-NEAR-RPC": "NEAR public RPC"}
+        with cls.operator.begin() as connection:
+            for source_id, name in sources.items():
+                connection.execute(text("""
+                    INSERT INTO app.sources(id, name, access_status, license_status)
+                    VALUES (:id, :name, 'documented', 'unverified')
+                    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+                """), {"id": source_id, "name": name})
+            register_definitions(connection)
 
     @classmethod
     def tearDownClass(cls):
