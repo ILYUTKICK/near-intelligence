@@ -498,7 +498,11 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-018, NI-003
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #2
+- **Execution role:** B
+- **Started at:** 2026-11-06T19:36:47+03:00
+- **Branch/worktree:** feat/ni-019-rls-ownership at /Users/ilyutkinn/Desktop/near-intelligence-b (from origin/main 0080576)
 
 **Description:** Centralize authorization for all private repositories and nested references.
 
