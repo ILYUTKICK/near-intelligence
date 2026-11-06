@@ -5,7 +5,7 @@
 import { axe } from "jest-axe";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { Button } from "@/components/ui/button";
 import type { DataQuality } from "@/components/data-state/quality";
