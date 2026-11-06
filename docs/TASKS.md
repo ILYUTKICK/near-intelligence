@@ -647,12 +647,16 @@ Specification: [USER_JOURNEYS.md](USER_JOURNEYS.md).
 - **Priority:** P0
 - **Dependencies:** NI-020, NI-021
 - **Complexity:** S
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A (owner/closer; the /me API is B's zone per TEAM_PLAN, implemented by this agent under the standing parallel-dispatch authorization, following B's established patterns)
 - **Started at:** 2026-11-06T23:18:09+03:00
 - **Branch/worktree:** feat/ni-025-profile-settings; /Users/ilyutkinn/Desktop/Near
 - **Dependency verification:** NI-020 DONE (PR #24), NI-021 DONE (PR #29) — cards on origin/main cead969+.
+- **Verification:** API — `pnpm check:doc-links` OK; unittest offline 117 OK (validation matrix: empty/control names, non-IANA timezones, oversized, payload-cannot-carry-subject); disposable-cluster run: 36 tests OK including 4 new profile round-trips through RLS (own-row update via profile_self, foreign profile unreachable, invalid timezone rejected by the DB CHECK, timezone display-only UTC invariant). Contract regenerated: /api/me in openapi.json + typed client (generate --check green); contract-path pins updated in test_contracts.py and test_home_aggregation.py. Web — /workspace/profile (GET fills via /api/me, PATCH saves with values retained on errors, honest load-error state, subject never rendered or editable) and /workspace/settings (session/logout via AccountMenu, drafts section stating the NI-038/040 arrival, operator-assisted deletion stated without faking success, no billing/team controls). 79/79 web tests, tsc/lint/build green (ƒ /workspace/profile, ƒ /workspace/settings). Local smoke with the real dev provider: GET/PATCH round trip as the demo principal returned 200 and persisted the update (recording in the card).
+- **Result:** apps/api/src/near_api/users/routes.py (GET/PATCH /api/me — verified-principal ownership, pydantic+zoneinfo validation, DB CHECK as second layer, no subject in payloads), wired in main.py; apps/web (workspace)/profile + /settings pages with ProfileForm; settings states drafts-arrival and operator-assisted deletion honestly. No billing/team controls; the verified subject is never editable or displayed as an identity anchor.
+- **Reviewer:** pending — role-B review requested on PR #31; CI runs on this PR.
+- **Completed at:** 2026-11-06T23:40:20+03:00
 
 **Description:** Provide useful account preferences and honest privacy controls.
 
