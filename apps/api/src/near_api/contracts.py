@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic.json_schema import models_json_schema
 from starlette.exceptions import HTTPException
 
+from near_api.db.security import ResourceNotFound
 from near_api.schemas.common import ApiError, CONTRACT_MODELS, ErrorDetail, ErrorResponse
 
 _HTTP_ERRORS = {
@@ -65,6 +66,12 @@ def install_contracts(app: FastAPI) -> None:
                               "BAD_REQUEST" if malformed else "VALIDATION_ERROR",
                               "Malformed JSON" if malformed else "Request failed validation",
                               details=tuple(details))
+
+    @app.exception_handler(ResourceNotFound)
+    async def not_owned_or_missing(request: Request, error: ResourceNotFound):
+        # Absent and not-owned resources share one generic response (NI-019
+        # ResourceNotFound semantics): no exception detail, no existence leak.
+        return error_response(request, 404, *_HTTP_ERRORS[404])
 
     @app.exception_handler(HTTPException)
     async def http_failure(request: Request, error: HTTPException):
