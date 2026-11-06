@@ -527,13 +527,17 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-017, NI-018, NI-019
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A
 - **Started at:** 2026-11-06T21:41:44+03:00
 - **Branch/worktree:** feat/ni-020-session-boundaries; /Users/ilyutkinn/Desktop/Near
 - **Dependency verification:** NI-017 DONE (PR #22, operator E2E recorded), NI-018 DONE (PR #21), NI-019 DONE (PR #23) — cards on origin/main cead969.
 - **Scope note (operator decision 2026-11-06):** email confirmation is disabled on the dev provider, so the email-verification leg is deferred with that decision; recovery flow, session boundaries (session endpoint, refresh rotation, revoked refresh, disabled users, rate guards, JWKS failure) and expiry documentation are this session's scope. Editor-draft preservation and cross-tab signals are wired where those surfaces exist (workspace/editor tasks).
+- **Verification:** `pnpm --filter web test` — 74/74 pass (7 new): session endpoint returns subject+expiry for a valid signed cookie, clears expired/tampered cookies with 401, answers 401 with no cookie and sets nothing; refresh rotation exchanges the refresh token provider-side and re-signs the cookie with the NEW refresh token, clears the session honestly on revoked/expired refresh (401), and keeps the cookie through provider outages (503, no fake rotation); per-IP sliding-window guard allows exactly 5 attempts/min and blocks the sixth while other IPs are unaffected; disabled users fail closed through the NI-018 bootstrap; JWKS/provider outage cases covered in both existing and new suites. `tsc --noEmit`, `eslint` 0 warnings, `next build` (ƒ /api/auth/{session,refresh} added) pass. Rate guard counts hostile requests too (pre-auth rejections consume the bucket) — the pre-provider rejection matrix resets its bucket per case with a recorded rationale.
+- **Result:** apps/web/src/app/api/auth/session/route.ts (HMAC-cookie boundary, honest three-way answer), apps/web/src/app/api/auth/refresh/route.ts (provider refresh rotation, revoked → 401+clear, outage → 503 cookie kept), apps/web/src/lib/auth/rate-limit.ts (sliding-window per-IP guard wired into login/signup/demo/refresh at 5-10/min, single-instance note for NI-067), wired into login/signup/demo routes; expiry window documented in AUTHENTICATION_SECURITY.md (observed provider default 3600s). Deferred with rationale: editor-draft preservation and cross-tab cache signals wire in when workspace/editor state exists (NI-021+); recovery-flow exposure checks return with recovery (needs SMTP decision); two-browser manual pass belongs to NI-064 staging verification.
+- **Reviewer:** pending — role-B review requested on PR #24; CI runs on this PR.
+- **Completed at:** 2026-11-06T22:05:30+03:00
 
 **Description:** Close login/session edge cases before private workflows depend on them.
 
