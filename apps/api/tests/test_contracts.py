@@ -18,7 +18,7 @@ from near_api.settings import Settings, SettingsError
 
 class ContractTests(TestCase):
     def setUp(self):
-        self.fixture = json.loads((Path(__file__).parent / "fixtures/contracts.json").read_text())
+        self.fixture = json.loads((Path(__file__).parent / "fixtures/contracts.json").read_text(encoding="utf-8"))
 
     def observation(self, index=0, **changes):
         value = {key: value for key, value in self.fixture["observations"][index].items() if key != "name"}

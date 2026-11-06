@@ -1,6 +1,6 @@
 # REST API specification
 
-Contract for implementation; no API currently exists. Base `/api/v1`, same-origin Next.js gateway to FastAPI. Generated FastAPI OpenAPI is the future executable contract; TypeScript clients generated from it must match this document. [Schema](DATABASE_SCHEMA.md), [security](AUTHENTICATION_SECURITY.md), [journeys](USER_JOURNEYS.md).
+Contract for implementation. NI-004 supplies strict common Pydantic schemas, the health route/error envelope, read-only OpenAPI and a generated TypeScript client; [executable contract workflow](API_CONTRACT.md). The business endpoints below remain specifications until their owning tasks implement them. Base `/api/v1`, same-origin Next.js gateway to FastAPI. [Schema](DATABASE_SCHEMA.md), [security](AUTHENTICATION_SECURITY.md), [journeys](USER_JOURNEYS.md).
 
 ## Protocol, roles and errors
 

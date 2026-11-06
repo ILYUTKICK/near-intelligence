@@ -4,9 +4,9 @@ Evidence-first blockchain investment research: **Read Research → Explore Data 
 
 The investment question is whether cross-chain adoption translates into sustainable revenue and measurable NEAR token value capture. The product must show contrary evidence and distinguish activity, fees, attributable revenue, observed purchases, treasury transfers and supply changes.
 
-## Current state — 5 November 2026
+## Current state — 6 November 2026
 
-The Git repository is initialized on branch `main` and published privately at [ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence). **GitHub sharing covers documentation and visual mockups, the Python dependency manifests, and — under the 5 November 2026 implementation authorization — new application code, tests, configuration and tooling manifests created by authorized NI-tasks.** Raw research inputs, SQL and calculation/collection scripts remain local and ignored. Some evidence links and offline commands below refer to that unshared local archive and are unavailable in a fresh clone; arrange a separately authorized data handoff before research implementation. The web runtime skeleton exists under [apps/web](apps/web) (NI-002 web part: Next.js App Router, strict TypeScript, pnpm-lock.yaml, `/health`); the API source, database migrations, uv.lock and Docker Compose file do not exist yet — NI-002's API part is handed off to role B. A tested Python dependency baseline is available in requirements.txt, and Node 24 LTS / pnpm 12.16.1 are pinned in [.node-version](.node-version) and [package.json](package.json) with the root [pnpm workspace](pnpm-workspace.yaml). On 5 November 2026 the user (participant A, ILYUTKICK) authorized starting implementation of role-A tasks through [PLAN.md](PLAN.md). Local evidence is historical, principally 6 August–3 November 2026 UTC; it must never be labeled live merely because a page loads.
+The repository is published privately at [ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence). **GitHub sharing covers documentation, visual mockups, dependency manifests and new application source/tests/configuration created by authorized NI-tasks.** Participant A authorized role A on 5 November and participant B authorized role B on 6 November; claims and actual acceptance are recorded in [TASKS.md](docs/TASKS.md) through [PLAN.md](PLAN.md). Web/API runtime skeletons and frozen pnpm/uv locks exist. NI-003 adds the identity-only PostgreSQL/Alembic foundation with native migration/RLS checks and a DB-only Compose definition; Docker execution remains unverified. NI-004 adds strict API schemas and a generated TypeScript client. Node 24 LTS / pnpm 12.16.1 are pinned in [.node-version](.node-version) and [package.json](package.json). The full product/data workflow remains incomplete. Raw historical research inputs, SQL and legacy scripts stay outside GitHub and are absent from this fresh clone; linked offline evidence needs a separately authorized file/hash handoff. Historical findings principally cover 6 August–3 November 2026 UTC and must retain their actual dates.
 
 - **[Mandatory agent execution plan](PLAN.md)** — read before selecting or implementing any task.
 - [Collaboration and repository setup](docs/COLLABORATION.md)
@@ -54,6 +54,12 @@ python3.13 -m venv .venv
 ```
 
 [apps/api/uv.lock](apps/api/uv.lock) is the exact frozen environment at the cutoff recorded in [apps/api/pyproject.toml](apps/api/pyproject.toml); [requirements.txt](requirements.txt) is its generated hash-pinned export. This installs dependencies only; it does not launch an application or supply the unshared research archive. See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for tested platforms and [JUDGE_SETUP.md](docs/JUDGE_SETUP.md) for the remaining deployment gates.
+
+NI-004 API contract checks (after frozen Python/pnpm install): `pnpm api:generate`,
+`pnpm api:check`, `pnpm --filter @near-intelligence/shared-types typecheck` and
+`pnpm --filter @near-intelligence/shared-types test`. These generate from local
+Pydantic/FastAPI source without starting data collection. See the
+[API contract workflow](docs/API_CONTRACT.md).
 
 ## Planned onboarding contract — unavailable until foundation tasks finish
 
