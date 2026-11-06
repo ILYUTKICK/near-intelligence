@@ -7,3 +7,4 @@ FastAPI backend runtime skeleton for NEAR Intelligence (NI-002).
 - Nothing else starts on boot: no collectors, no models, no ingestion, no scheduler.
 - Runbook: [root README](../../README.md), [dependencies](../../docs/DEPENDENCIES.md), [deployment](../../docs/DEPLOYMENT.md).
 - Identity-only PostgreSQL/Alembic foundation and real disposable-cluster checks: [database setup](../../docs/DATABASE_SETUP.md). Migrations are explicit; startup opens no database connection.
+- Common schemas, sanitized errors and generated TypeScript: [API contract](../../docs/API_CONTRACT.md). `/openapi.json` is read-only and generation runs offline.

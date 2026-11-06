@@ -1,0 +1,30 @@
+{
+  "fixture_kind": "synthetic-contract-only",
+  "observations": [
+    {
+      "name": "synthetic-exact-amount",
+      "start": "2026-01-01T00:00:00Z",
+      "end": "2026-01-02T00:00:00Z",
+      "value": "123456789012345678901234567890.000000000000000000000001",
+      "quality": {"status": "ok", "bound_kind": "exact", "reasons": [], "coverage": {"observed": 1, "expected": 1}, "freshness_target_seconds": 86400}
+    },
+    {
+      "name": "synthetic-explicit-missing",
+      "start": "2026-01-01T00:00:00Z",
+      "end": "2026-01-02T00:00:00Z",
+      "value": null,
+      "quality": {"status": "missing", "bound_kind": null, "reasons": ["synthetic_gap"], "coverage": {"observed": 0, "expected": 1}, "freshness_target_seconds": null}
+    },
+    {
+      "name": "synthetic-lower-bound",
+      "start": "2026-01-01T00:00:00Z",
+      "end": "2026-01-02T00:00:00Z",
+      "value": "0.000000000000000000000001",
+      "quality": {"status": "partial", "bound_kind": "lower", "reasons": ["synthetic_incomplete_scope"], "coverage": {"observed": 1, "expected": 2}, "freshness_target_seconds": 86400}
+    }
+  ],
+  "error": {
+    "error": {"code": "DATA_NOT_READY", "message": "Synthetic unavailable fixture", "request_id": "00000000-0000-4000-8000-000000000001", "retryable": false}
+  },
+  "selection": {"start": "2024-01-01", "end": "2025-01-01", "frequency": "day", "filters": {}}
+}

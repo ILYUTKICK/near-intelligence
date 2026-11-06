@@ -87,7 +87,7 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** L
-- **Status:** BLOCKED
+- **Status:** DONE
 - **Claimed by:** Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b
 - **Execution role:** B
 - **Started at:** 2026-11-06T02:32:16+03:00
@@ -96,8 +96,9 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Scope:** Identity tables, Alembic, isolated runtime/migration/operator roles and transaction-local UUID identity; DB-only Compose definition for role-A review. Existing private/research archives are absent and untouched. PostgreSQL 18.6 is installed locally for real disposable-database checks; Docker execution is not available here.
 - **Result:** Identity ORM/Alembic baseline, explicit four-secret role bootstrap, forced RLS/column privileges, bounded lazy runtime pool and transaction-local identity/reset, exact NUMERIC prevalidation, DB-only Compose and setup runbook. No domain tables, auth endpoints or ingestion are added.
 - **Verification (6 November 2026):** `apps/api/.venv/Scripts/python.exe scripts/run-db-tests.py --pg-bin 'C:/Program Files/PostgreSQL/18/bin'` passes all 8 tests on native PostgreSQL 18.6 / CPython 3.13.15 / Windows 11. Fresh cluster bootstrap, empty upgrade/down/up, Alembic metadata drift, Alice/Bob and anonymous isolation, role/RLS/DDL escalation denial, pooled identity reset, disabled user, invalid FK/timezone/length, exact 78-digit NUMERIC, overflow and transaction rollback verified. Cluster stopped; git diff check passes. Docker is unavailable; container startup is explicitly unverified.
-- **Blocker / handoff:** Implementation checks pass; required role-A review of PR #15 (especially the DB-only root Compose/config contribution) is pending. No merge is authorized in this session, so NI-003 is not marked DONE and its dependent tasks stay gated. Full container packaging belongs to NI-066. Independent NI-004 depends only on verified DONE NI-002 and may proceed.
-- **Reviewer:** ILYUTKICK (role A), pending on PR #15. [Database setup and evidence](DATABASE_SETUP.md).
+- **Handoff resolved:** ILYUTKICK merged the verified PR #15 at 2026-11-05T23:47:51Z into main 2111045. The counterpart's merge is recorded as acceptance of the DB-only contribution; no separate GitHub APPROVED review event exists. This role-B agent did not merge main. All original NI-003 native migration/role/RLS criteria passed; full container packaging remains NI-066.
+- **Reviewer:** ILYUTKICK (role A), accepted by merging PR #15; formal review submission not recorded. [Database setup and evidence](DATABASE_SETUP.md).
+- **Completed at:** 2026-11-06T02:47:51+03:00 (counterpart merge verified through GitHub API and fetched main).
 
 **Description:** Create the initial identity/role/migration foundation; later domain tasks add their own dataset, chart, document, model and export tables.
 
@@ -115,7 +116,17 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** BLOCKED
+- **Claimed by:** Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b
+- **Execution role:** B
+- **Started at:** 2026-11-06T02:49:54+03:00
+- **Branch/worktree:** feat/ni-004-openapi-contract; D:/хахатон/near-intelligence
+- **Dependency verification:** NI-002 verified DONE; current main ac59b34 includes PR #14, leaving NI-026 BLOCKED operationally. NI-003 code/checks are submitted in PR #15 and await A review; it is not a dependency of NI-004. No competing NI-004 claim exists.
+- **Scope:** Common strict Pydantic errors/selection/quality/decimal contracts; sanitized HTTP failures and read-only OpenAPI; reproducible generated TypeScript client and drift checks. No unimplemented business endpoint or simulated data is added.
+- **Result:** Strict common errors, selections, UTC observations, decimal/raw string and quality models; sanitized HTTP failures; read-only OpenAPI; generated shared TypeScript/fetch client; deterministic offline generation/drift scripts and consumer runbook. No business endpoint or production fixture was added.
+- **Verification (6 November 2026):** 6 Python contract/ASGI tests and existing 11 capability tests pass on CPython 3.13.15; shared-types filtered frozen pnpm install, strict TS compile and local typed-client test pass on Node 24.22.1 / pinned pnpm 12.16.1. Two generations have identical JSON/TS hashes; api:check and git diff check pass. Financial strings, null/bound metadata, unknown fields and failure redaction are exercised; Python dependencies unchanged.
+- **Blocker / handoff:** Implementation checks pass; PR #16 awaits counterpart acceptance of the generated schema/client and root pnpm lock/scripts. No main merge is performed by this agent. Until acceptance NI-004 is not DONE, so NI-005/NI-031 remain gated. The already-merged NI-003 acceptance/status reconciliation is included here with factual merge evidence.
+- **Reviewer:** ILYUTKICK (role A), pending on PR #16. [API contract workflow and limitations](API_CONTRACT.md).
 
 **Description:** Keep one executable contract for Python boundaries and TypeScript consumers.
 

@@ -1,0 +1,331 @@
+{
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "message": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "request_id",
+          "retryable"
+        ],
+        "title": "ApiError",
+        "type": "object"
+      },
+      "Coverage": {
+        "additionalProperties": false,
+        "properties": {
+          "expected": {
+            "minimum": 0,
+            "title": "Expected",
+            "type": "integer"
+          },
+          "observed": {
+            "minimum": 0,
+            "title": "Observed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "observed",
+          "expected"
+        ],
+        "title": "Coverage",
+        "type": "object"
+      },
+      "DataQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "bound_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "exact",
+                  "estimate",
+                  "lower",
+                  "upper"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bound Kind"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "freshness_target_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness Target Seconds"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "maxItems": 20,
+            "title": "Reasons",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "partial",
+              "missing",
+              "stale",
+              "unavailable",
+              "revised"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "bound_kind",
+          "reasons",
+          "coverage",
+          "freshness_target_seconds"
+        ],
+        "title": "DataQuality",
+        "type": "object"
+      },
+      "DecimalString": {
+        "maxLength": 110,
+        "pattern": "^-?(?:0|[1-9][0-9]{0,77})(?:\\.[0-9]{1,30})?$",
+        "type": "string"
+      },
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          }
+        },
+        "required": [
+          "path",
+          "reason"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ApiError"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "appEnv": {
+            "enum": [
+              "development",
+              "test",
+              "production"
+            ],
+            "title": "Appenv",
+            "type": "string"
+          },
+          "checkedAt": {
+            "format": "date-time",
+            "title": "Checkedat",
+            "type": "string"
+          },
+          "service": {
+            "const": "api",
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "appEnv",
+          "checkedAt"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "Observation": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/DataQuality"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "value",
+          "quality"
+        ],
+        "title": "Observation",
+        "type": "object"
+      },
+      "Reason": {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+      },
+      "Selection": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/SelectionFilters"
+          },
+          "frequency": {
+            "const": "day",
+            "title": "Frequency",
+            "type": "string"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "frequency",
+          "filters"
+        ],
+        "title": "Selection",
+        "type": "object"
+      },
+      "SelectionFilters": {
+        "additionalProperties": false,
+        "description": "No filter is approved at bootstrap; NI-031 adds versioned filter rules.",
+        "properties": {},
+        "title": "SelectionFilters",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "NEAR Intelligence API",
+    "version": "0.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "description": "Process liveness mirroring the web service /health JSON shape.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid server configuration"
+          }
+        },
+        "summary": "Health"
+      }
+    }
+  }
+}

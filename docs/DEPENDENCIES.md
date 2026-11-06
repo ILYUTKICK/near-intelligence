@@ -67,7 +67,22 @@ Added 5 November 2026 for `apps/web` accessible interaction primitives; versions
 
 No UI kit is imported wholesale — components under `apps/web/src/components/ui/` are in-repo code on Radix behavior primitives, per the "no unnecessary UI kit imports" criterion.
 
-## Verified direct packages
+## API contract generation (NI-004, 6 November 2026)
+
+The shared-types package pins `openapi-typescript` **7.13.0** (generation only)
+and `openapi-fetch` **0.17.0** (thin typed fetch transport), both MIT per current
+official npm metadata. Sources: [generator](https://www.npmjs.com/package/openapi-typescript/v/7.13.0),
+[transport](https://www.npmjs.com/package/openapi-fetch/v/0.17.0),
+[maintainer Node API](https://openapi-ts.dev/node). A hand-maintained generator
+would duplicate JSON Schema handling; the maintained generator supports FastAPI
+OpenAPI 3.1 without a running server. No second schema or HTTP framework is added.
+TypeScript stays at the existing **5.9.3**; @types/node follows the locked 24 family.
+Root pnpm-lock changes add this importer/dependencies without changing existing
+web resolutions. The package's strict compile and local transport tests pass
+on Node 24.22.1 with the repository's SHA-512-verified pnpm 12.16.1. Python
+dependencies/uv.lock are unchanged. See [API contract](API_CONTRACT.md).
+
+## Verified direct Python packages
 
 Versions came from the official PyPI index, not remembered version numbers. License strings below are extracted from installed distribution metadata and linked to the matching primary package release; binary distributions may include additional third-party notices. This records a dependency review, not a legal opinion or a guarantee that every bundled license has the same identifier.
 
