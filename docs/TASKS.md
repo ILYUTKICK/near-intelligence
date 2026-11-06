@@ -709,7 +709,13 @@ Specification: [DATA_PIPELINE.md](DATA_PIPELINE.md).
 - **Priority:** P0
 - **Dependencies:** NI-003, NI-026
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #5
+- **Execution role:** B
+- **Started at:** 2026-11-06T22:40:00+03:00
+- **Branch/worktree:** feat/ni-027-archive-import; /Users/ilyutkinn/Desktop/near-intelligence-b (git worktree; main checkout /Users/ilyutkinn/Desktop/Near stays with role A)
+- **Authorization:** Operator dispatch #5 (2026-11-06, participant A ILYUTKICK): role-B work on NI-027 is authorized in the worktree; the authorized archive-owner handoff is local — the archive at /Users/ilyutkinn/Desktop/Near/research/ is READ-ONLY (no modify/delete/move), with the operator-generated hash manifest /Users/ilyutkinn/Desktop/near-archive-manifest.sha256 (380 files, 149 MB, SHA-256 per file, generated 2026-11-06). Original files are never copied into the database nor edited on disk.
+- **Dependency verification:** NI-003 DONE (PR #15 merged, migration/role/RLS evidence in card); NI-026 DONE (PR #28 merged at main a594f78, probe evidence recorded). Branch created from origin/main a594f78; no competing NI-027 claim present.
 
 **Description:** Reuse real saved research without treating its aggregate scope as complete raw-chain data.
 
