@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as signupPost } from "@/app/api/auth/signup/route";
 import { GET as csrfGet } from "@/app/api/auth/csrf/route";
 import { CSRF_COOKIE } from "@/lib/auth/session";
+import { resetRateLimitForTests } from "@/lib/auth/rate-limit";
 
 const ENV = {
   APP_ENV: "test",
@@ -25,6 +26,7 @@ const ENV = {
 const providerFetchMock = vi.fn();
 
 beforeEach(() => {
+  resetRateLimitForTests();
   for (const [key, value] of Object.entries(ENV)) {
     process.env[key] = value;
   }
