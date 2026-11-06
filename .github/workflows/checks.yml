@@ -1,0 +1,77 @@
+name: checks
+
+# Baseline CI (NI-005). Fresh installs from frozen locks, no provider
+# secrets, no archive access: every check is offline — the Supabase
+# environment is absent here by design and all auth tests use mocks.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: web (lint/typecheck/tests/build)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # reads packageManager from root package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:contrast
+      - run: pnpm build
+      # No root .env exists in CI, so this exits 0 after scanning with
+      # "nothing to scan" — the guard stays wired for local verification.
+      - run: pnpm check:client-secrets
+      - run: pnpm check:doc-links
+
+  api:
+    name: api (frozen env, unit tests, contract drift)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --project apps/api --frozen
+      - run: uv lock --check --project apps/api
+      - name: Unit tests (contracts, source capabilities; no external I/O)
+        run: |
+          cd apps/api
+          uv run python -m unittest discover -s tests -p test_contracts.py -v
+          uv run python -m unittest discover -s tests -p test_source_capabilities.py -v
+      - name: Generated client matches the API contract
+        run: node packages/shared-types/scripts/generate.mjs --check
+
+  database:
+    name: database (PostgreSQL 18 migrations, roles, RLS)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL 18 from PGDG
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-18
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --project apps/api --frozen
+      # Disposable loopback cluster created and destroyed by the runner
+      # script itself; generated passwords stay inside the job.
+      - run: uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin
