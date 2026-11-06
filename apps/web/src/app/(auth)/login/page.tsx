@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { LoginForm } from "@/app/(auth)/login/LoginForm";
 import { SkipLink } from "@/components/layout/SkipLink";
@@ -21,6 +22,12 @@ export default function LoginPage() {
             authentication provider; links only work for the origin they were issued for.
           </p>
           <LoginForm />
+          <p className="text-ui leading-ui text-text-secondary mt-6">
+            New here?{" "}
+            <Link href="/signup" className="text-accent underline underline-offset-2 hover:text-accent-hover">
+              Create an account
+            </Link>
+          </p>
         </div>
       </main>
       <PublicFooter />
