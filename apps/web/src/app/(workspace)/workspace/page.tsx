@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 
-import { SESSION_COOKIE, decodeSessionCookie } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Workspace — NEAR Intelligence" };
 
@@ -11,10 +9,7 @@ export const metadata: Metadata = { title: "Workspace — NEAR Intelligence" };
  * shows honest structure with no metrics, no fake documents and no dead
  * controls. Route protection here never replaces backend ownership.
  */
-export default async function WorkspaceHomePage() {
-  const cookieStore = await cookies();
-  const session = decodeSessionCookie(cookieStore.get(SESSION_COOKIE)?.value);
-
+export default function WorkspaceHomePage() {
   return (
     <div className="max-w-(--width-prose)">
       <h1>Workspace</h1>

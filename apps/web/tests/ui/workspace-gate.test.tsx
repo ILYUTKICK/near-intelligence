@@ -6,12 +6,32 @@ import { axe } from "jest-axe";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextResponse } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import WorkspaceLayout from "@/app/(workspace)/layout";
 import WorkspaceHomePage from "@/app/(workspace)/workspace/page";
 import { AccountMenu } from "@/components/layout/AccountMenu";
 import { SESSION_COOKIE, encodeSessionCookie } from "@/lib/auth/session";
+
+const cookieState = vi.hoisted(() => ({ value: undefined as string | undefined }));
+const routerMock = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerMock.push }),
+  usePathname: () => "/workspace",
+  // Mimic the redirect signal: digest carries the target like Next does.
+  redirect: (url: string) => {
+    const error = new Error("NEXT_REDIRECT");
+    (error as Error & { digest?: string }).digest = `NEXT_REDIRECT;replace;${url};307;`;
+    throw error;
+  },
+}));
+
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === SESSION_COOKIE && cookieState.value ? { name, value: cookieState.value } : undefined,
+  }),
+}));
 
 const ENV = {
   APP_ENV: "test",
@@ -31,21 +51,13 @@ afterEach(() => {
   }
 });
 
-// next/headers cookies() is per-request; inject a store for layout tests.
-function withCookieStore(value?: string) {
-  vi.mock("next/headers", () => ({
-    cookies: vi.fn(async () => ({
-      get: (name: string) => (name === SESSION_COOKIE && value ? { name, value } : undefined),
-    })),
-  }));
-}
-
 describe("Workspace gate", () => {
   it("redirects anonymous and expired sessions to /login", async () => {
-    withCookieStore(undefined);
+    cookieState.value = undefined;
     const { default: GatedLayout } = await import("@/app/(workspace)/layout");
+    // The next/navigation redirect signal carries the target in its digest.
     await expect(GatedLayout({ children: <p>secret</p> })).rejects.toMatchObject({
-      digest: "/login", // next/navigation redirect signal
+      digest: expect.stringContaining("/login"),
     });
   });
 
@@ -55,13 +67,11 @@ describe("Workspace gate", () => {
       refreshToken: "refresh-should-not-appear",
       expiresAt: Date.now() + 600_000,
     });
-    withCookieStore(value);
+    cookieState.value = value;
     const { default: GatedLayout } = await import("@/app/(workspace)/layout");
-    const { container } = render(
-      <GatedLayout>
-        <p>workspace body</p>
-      </GatedLayout>,
-    );
+    // Async server components resolve to a tree before rendering.
+    const tree = await GatedLayout({ children: <p>workspace body</p> });
+    const { container } = render(tree);
     expect(screen.getByText("workspace body")).toBeInTheDocument();
     expect(container.textContent).not.toContain("access-token-should-not-appear");
     expect(container.textContent).not.toContain("refresh-should-not-appear");
@@ -72,8 +82,9 @@ describe("Workspace gate", () => {
 });
 
 describe("Workspace entry page", () => {
-  it("has no dead links to unimplemented routes", () => {
-    const { container } = render(<WorkspaceHomePage />);
+  it("has no dead links to unimplemented routes", async () => {
+    const tree = await WorkspaceHomePage();
+    const { container } = render(tree);
     // NI-023/NI-035 pages do not exist yet — no anchors may point at them.
     expect(container.querySelector('a[href="/workspace/research"]')).toBeNull();
     expect(container.querySelector('a[href="/workspace/saved-charts"]')).toBeNull();
@@ -97,6 +108,7 @@ describe("Account menu sign-out", () => {
       expect((call as unknown as [string, RequestInit])[1].headers).toMatchObject({
         "x-csrf-token": "minted",
       });
+      expect(routerMock.push).toHaveBeenCalledWith("/login");
     });
   });
 
