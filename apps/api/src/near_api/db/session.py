@@ -67,4 +67,9 @@ def user_transaction(engine: Engine, verified_subject: UUID | None) -> Iterator[
         _assert_runtime_role(connection)
         connection.execute(text("SELECT set_config('app.user_id', :subject, true)"),
                            {"subject": str(verified_subject) if verified_subject is not None else ""})
+        # Fail closed if the transaction-local identity did not actually take
+        # effect; repositories and RLS both rely on app.current_user_id().
+        identity = connection.execute(text("SELECT app.current_user_id()")).scalar_one_or_none()
+        if identity != verified_subject:
+            raise DatabaseConfigurationError("Transaction-local identity did not take effect")
         yield connection
