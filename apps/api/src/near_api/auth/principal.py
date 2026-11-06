@@ -99,6 +99,16 @@ def _get_engine() -> Engine:
         raise PrincipalConfigurationError(str(error)) from error
 
 
+def get_runtime_engine() -> Engine:
+    """FastAPI dependency: the lazily built near_app runtime engine.
+
+    Kept separate from ``get_principal`` so private routes take identity and
+    database wiring as independent dependencies (tests override the engine
+    without touching identity verification and vice versa).
+    """
+    return _get_engine()
+
+
 @lru_cache(maxsize=1)
 def _get_verifier() -> TokenVerifier:
     settings = get_auth_settings()

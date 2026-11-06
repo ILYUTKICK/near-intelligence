@@ -12,6 +12,7 @@ from near_api import __version__
 from near_api.contracts import error_response, install_contracts
 from near_api.schemas.common import ErrorResponse, HealthResponse
 from near_api.settings import SettingsError, get_settings
+from near_api.workspace.routes import router as workspace_router
 
 app = FastAPI(
     title="NEAR Intelligence API",
@@ -22,6 +23,10 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 install_contracts(app)
+
+# Private workspace routes (NI-022): authenticate via get_principal and emit
+# no-store on every response. Route modules open no connection at import time.
+app.include_router(workspace_router)
 
 
 @app.get("/health", response_model=HealthResponse, operation_id="getHealth",
