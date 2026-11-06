@@ -12,6 +12,8 @@ NI-031 adds the append-only chart definition registry (chart_definitions,
 chart_metrics) and the dataset_metrics referential FK to metric_definitions.
 NI-036 adds the per-revision document projections (insights, hypotheses,
 evidence_links) derived from canonical document_versions.content.
+NI-030 adds the ingestion checkpoint zone (ingestion_checkpoints,
+ingestion_daily_counters) for the bounded scheduled refresh adapter.
 Remaining domain tables belong to their owning tasks and must keep these
 declarations in sync for the Alembic metadata drift check.
 """
@@ -681,3 +683,53 @@ class ChartMetric(Base):
     chart_definition_version_id: Mapped[UUID] = mapped_column(primary_key=True)
     metric_definition_id: Mapped[UUID] = mapped_column(primary_key=True)
     series_role: Mapped[str] = mapped_column(String(40), primary_key=True)
+
+
+class IngestionCheckpoint(Base):
+    """Per-source refresh resume cursor and last-run state (NI-030)."""
+
+    __tablename__ = "ingestion_checkpoints"
+    __table_args__ = (
+        CheckConstraint("last_height IS NULL OR last_height >= 0", name="height_nonnegative"),
+        CheckConstraint(
+            r"last_block_hash IS NULL OR last_block_hash ~ '^[1-9A-HJ-NP-Za-km-z]{32,44}$'",
+            name="block_hash_format"),
+        CheckConstraint("last_failure_kind IS NULL OR last_failure_kind <> ''",
+                        name="failure_kind_nonempty"),
+        CheckConstraint("consecutive_failures >= 0", name="consecutive_nonnegative"),
+        CheckConstraint("(last_height IS NULL) = (last_block_hash IS NULL)",
+                        name="cursor_pair"),
+        ForeignKeyConstraint(["source_id"], ["app.sources.id"], name="fk_ingestion_checkpoints_source", ondelete="RESTRICT"),
+    )
+
+    source_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    last_height: Mapped[int | None] = mapped_column(BigInteger)
+    last_block_hash: Mapped[str | None] = mapped_column(String(44))
+    last_header_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_request_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_failure_kind: Mapped[str | None] = mapped_column(String(40))
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False,
+                                                      server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+
+
+class IngestionDailyCounter(Base):
+    """Persisted per-source daily request counters for the day budget (NI-030)."""
+
+    __tablename__ = "ingestion_daily_counters"
+    __table_args__ = (
+        CheckConstraint("request_count >= 0", name="request_nonnegative"),
+        CheckConstraint("success_count >= 0", name="success_nonnegative"),
+        CheckConstraint("success_count <= request_count", name="success_bounded"),
+        ForeignKeyConstraint(["source_id"], ["app.sources.id"], name="fk_ingestion_daily_counters_source", ondelete="RESTRICT"),
+    )
+
+    source_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    success_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
