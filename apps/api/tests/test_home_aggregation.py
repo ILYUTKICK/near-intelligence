@@ -84,7 +84,8 @@ class HomeContractTests(unittest.TestCase):
 
     def test_01_home_is_documented_in_openapi_with_required_pending_sections(self):
         schema = self.client.get("/openapi.json").json()
-        self.assertEqual(set(schema["paths"]), {"/health", "/api/home"})
+        # The contract grows with implemented routes: NI-025 added /api/me.
+        self.assertEqual(set(schema["paths"]), {"/health", "/api/home", "/api/me"})
         self.assertEqual(schema["paths"]["/api/home"]["get"]["operationId"], "getWorkspaceHome")
         response_schema = schema["components"]["schemas"]["HomeResponse"]
         # Every documented field is always present: empty arrays stay explicit
