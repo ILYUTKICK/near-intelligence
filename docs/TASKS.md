@@ -116,7 +116,7 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** M
-- **Status:** BLOCKED
+- **Status:** DONE
 - **Claimed by:** Codex / BkycnocTbI / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b
 - **Execution role:** B
 - **Started at:** 2026-11-06T02:49:54+03:00
@@ -125,8 +125,9 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Scope:** Common strict Pydantic errors/selection/quality/decimal contracts; sanitized HTTP failures and read-only OpenAPI; reproducible generated TypeScript client and drift checks. No unimplemented business endpoint or simulated data is added.
 - **Result:** Strict common errors, selections, UTC observations, decimal/raw string and quality models; sanitized HTTP failures; read-only OpenAPI; generated shared TypeScript/fetch client; deterministic offline generation/drift scripts and consumer runbook. No business endpoint or production fixture was added.
 - **Verification (6 November 2026):** 6 Python contract/ASGI tests and existing 11 capability tests pass on CPython 3.13.15; shared-types filtered frozen pnpm install, strict TS compile and local typed-client test pass on Node 24.22.1 / pinned pnpm 12.16.1. Two generations have identical JSON/TS hashes; api:check and git diff check pass. Financial strings, null/bound metadata, unknown fields and failure redaction are exercised; Python dependencies unchanged.
-- **Blocker / handoff:** Implementation checks pass; PR #16 awaits counterpart acceptance of the generated schema/client and root pnpm lock/scripts. No main merge is performed by this agent. Until acceptance NI-004 is not DONE, so NI-005/NI-031 remain gated. The already-merged NI-003 acceptance/status reconciliation is included here with factual merge evidence.
-- **Reviewer:** ILYUTKICK (role A), pending on PR #16. [API contract workflow and limitations](API_CONTRACT.md).
+- **Handoff resolved:** ILYUTKICK merged the checked PR #16 at 2026-11-06T00:06:07Z into main 706ff77. The counterpart's merge accepts the generated schema/client and root tooling contribution; no separate GitHub APPROVED review event is asserted. This role-B agent did not merge main. NI-005 is now dependency-ready; NI-031 still requires NI-029.
+- **Reviewer:** ILYUTKICK (role A), accepted by merging PR #16. [API contract workflow and limitations](API_CONTRACT.md).
+- **Completed at:** 2026-11-06T03:06:07+03:00 (counterpart merge verified through GitHub API and fetched main).
 
 **Description:** Keep one executable contract for Python boundaries and TypeScript consumers.
 
@@ -396,7 +397,7 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-002
 - **Complexity:** M
-- **Status:** DONE
+- **Status:** IN_PROGRESS
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A
 - **Started at:** 2026-11-05T23:59:52+03:00
@@ -406,6 +407,7 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Reviewer:** pending — role-B review requested on PR #12 (NI-016 reviewer per TEAM_PLAN.md).
 - **Completed at:** 2026-11-06T00:07:20+03:00
 - **Handoff (user):** create the dev Supabase project per the AUTHENTICATION_SECURITY.md checklist (requires the operator's Supabase account); values go into the local .env only. The provider round-trip smoke is NI-017/NI-020 and needs this project.
+- **Reopened — acceptance gap (2026-11-06T03:07:15+03:00, role-B dependency review):** the original NI-016 testing requirements below include a provider development-project smoke. Its recorded verification covers configuration/synthetic tests and explicitly leaves the actual project to the user; no real smoke evidence is supplied, and this fresh checkout has no .env. Moving that check to NI-017/NI-020 did not change the original NI-016 criterion. The previous code/test results and A's claim are preserved; B does not take over NI-016. DONE is restored by A after recording real dev-project issuer/audience/asymmetric-key matching and bounded provider smoke evidence. Secrets/tokens stay local; only sanitized outcome/time/config identity may be recorded. This gate prevents premature NI-018 implementation.
 
 **Description:** Establish Supabase identity configuration without creating a custom password store.
 
@@ -451,6 +453,7 @@ Specification: [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md).
 - **Dependencies:** NI-016, NI-003
 - **Complexity:** M
 - **Status:** TODO
+- **Dependency audit (6 November 2026):** NI-003 is verified DONE after PR #15. NI-016's original real-provider smoke is unfulfilled and has been reopened under A's existing claim. NI-018 remains unclaimed/unstarted until that dependency is genuinely DONE; no local test key or fake account substitutes for the upstream acceptance evidence. Other available P0 role-B tasks require the blocked data/auth chain. No provider call or account creation was attempted by B.
 
 **Description:** Make the API authenticate independently of gateway trust.
 
