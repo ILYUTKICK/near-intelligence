@@ -94,15 +94,21 @@ def main() -> int:
         test_log = directory / "test-results.log"
         # NI-003 identity/RLS, NI-018 bootstrap, NI-019 ownership/RLS,
         # NI-022 home aggregation, NI-027 archive import, NI-028 dataset
-        # staging/publication, NI-029 metric computations, NI-051 model
-        # readiness gate (offline research code, no database use) and the
-        # NI-036 document revision suites.
+        # staging/publication, NI-029 metric computations, NI-031 chart
+        # registry, NI-051 model readiness gate (offline research code, no
+        # database use) and the NI-036 document revision suites.
         returncode = 0
         with test_log.open("wb") as log:
             for pattern in ("test_database.py", "test_auth_bootstrap.py", "test_ownership_rls.py",
                             "test_home_aggregation.py", "test_archive_import.py",
+<<<<<<< HEAD
                             "test_dataset_staging.py", "test_metrics.py", "test_profile.py",
                             "test_documents.py", "test_models_readiness.py"):
+=======
+                            "test_dataset_staging.py", "test_metrics.py",
+                            "test_chart_registry.py", "test_profile.py",
+                            "test_documents.py"):
+>>>>>>> origin/main
                 result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "apps/api/tests",
                                          "-p", pattern, "-v"], cwd=repo, env=environment,
                                         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
