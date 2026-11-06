@@ -116,16 +116,18 @@ export async function exchangeOtp(
 }
 
 /**
- * Revoke the refresh session server-side. Best-effort: cookies are cleared
- * by the caller regardless, but provider-side revocation failures surface
- * as errors so the response can still report honest logout state.
+ * Revoke the provider session server-side. GoTrue's logout identifies the
+ * session by the Bearer access token (scope=global revokes every session of
+ * the user); failures are thrown so the gateway can report honest logout
+ * state instead of silently keeping a live provider session.
  */
-export async function revokeRefreshSession(refreshToken: string): Promise<void> {
+export async function revokeSession(session: AuthSession): Promise<void> {
   let response: Response;
   try {
     response = await providerFetch("logout?scope=global", {
       method: "POST",
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      headers: { authorization: `Bearer ${session.accessToken}` },
+      body: JSON.stringify({ refresh_token: session.refreshToken }),
     });
   } catch {
     throw new ProviderAuthError("unavailable");

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ensureRootEnvLoaded } from "@/lib/env";
+
 /**
  * Auth environment contract (NI-016), mirroring .env.example and
  * docs/AUTHENTICATION_SECURITY.md.
@@ -122,6 +124,7 @@ const SERVER_VARS = [
 
 /** Browser-safe configuration: publishable values only. Login UI (NI-017) consumes this. */
 export function loadPublicAuthConfig(): PublicAuthConfig {
+  ensureRootEnvLoaded();
   return parseOrThrow(
     publicSchema,
     readEnv(PUBLIC_VARS),
@@ -131,6 +134,7 @@ export function loadPublicAuthConfig(): PublicAuthConfig {
 
 /** Server-only configuration (gateway handlers, NI-017; API verification, NI-018). */
 export function loadServerAuthConfig(): ServerAuthConfig {
+  ensureRootEnvLoaded();
   return parseOrThrow(
     serverSchema,
     readEnv(SERVER_VARS),

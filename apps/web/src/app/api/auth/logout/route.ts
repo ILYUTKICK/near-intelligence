@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { AuthConfigError, loadServerAuthConfig } from "@/lib/auth/config";
-import { ProviderAuthError, revokeRefreshSession } from "@/lib/auth/provider";
+import { ProviderAuthError, revokeSession } from "@/lib/auth/provider";
 import {
   CSRF_COOKIE,
   CSRF_HEADER,
@@ -39,18 +39,18 @@ export async function POST(request: NextRequest) {
   const session = decodeSessionCookie(request.cookies.get(SESSION_COOKIE)?.value);
   if (session) {
     try {
-      await revokeRefreshSession(session.refreshToken);
+      await revokeSession(session);
     } catch (error) {
-      if (error instanceof ProviderAuthError && error.kind === "unavailable") {
-        // Provider unreachable: cookies are still cleared below; the response
-        // reports the honest state so the UI can inform the user.
-        const response = NextResponse.json(
-          { error: "Signed out locally; the provider could not be reached to revoke the session." },
-          { status: 503 },
-        );
-        clearAuthCookies(response);
-        return response;
-      }
+      // Honest logout: cookies are cleared, but a failed provider-side
+      // revocation is reported instead of claiming success — the refresh
+      // session could still be live on the provider.
+      const message =
+        error instanceof ProviderAuthError
+          ? `Signed out locally, but the provider session could not be revoked (${error.kind}).`
+          : "Signed out locally; the provider session could not be revoked.";
+      const response = NextResponse.json({ error: message }, { status: 503 });
+      clearAuthCookies(response);
+      return response;
     }
   }
   const response = NextResponse.json({ ok: true });
