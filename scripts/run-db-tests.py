@@ -31,7 +31,8 @@ def main() -> int:
     environment = os.environ.copy()
     environment["PGPASSWORD"] = secrets.token_urlsafe(32)
     environment["DB_BOOTSTRAP_PASSWORD"] = environment["PGPASSWORD"]
-    for key in ("DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD", "DB_OPERATOR_PASSWORD"):
+    for key in ("DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD", "DB_OPERATOR_PASSWORD",
+                "DB_PUBLIC_PASSWORD"):
         environment[key] = secrets.token_urlsafe(32)
     password_file = directory / "bootstrap-password"
     password_file.write_text(environment["PGPASSWORD"], encoding="utf-8")
@@ -56,7 +57,8 @@ def main() -> int:
                                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         message = output.read_text(encoding="utf-8", errors="replace")
         if result.returncode:
-            for key in ("PGPASSWORD", "DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD", "DB_OPERATOR_PASSWORD"):
+            for key in ("PGPASSWORD", "DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD",
+                        "DB_OPERATOR_PASSWORD", "DB_PUBLIC_PASSWORD"):
                 message = message.replace(environment[key], "[redacted]")
             raise RuntimeError(f"{name} failed: {message}")
         return message
@@ -85,13 +87,14 @@ def main() -> int:
             NI_TEST_ADMIN_URL=url("ni_test_admin", environment["PGPASSWORD"]),
             NI_TEST_RUNTIME_URL=url("near_app", environment["DB_RUNTIME_PASSWORD"]),
             NI_TEST_OPERATOR_URL=url("near_operator", environment["DB_OPERATOR_PASSWORD"]),
+            NI_TEST_PUBLIC_URL=url("near_public", environment["DB_PUBLIC_PASSWORD"]),
             MIGRATION_DATABASE_URL=url("near_migrator", environment["DB_MIGRATION_PASSWORD"]),
         )
         test_log = directory / "test-results.log"
-        # NI-003 identity/RLS suite plus the NI-018 bootstrap suite.
+        # NI-003 identity/RLS, NI-018 bootstrap and NI-019 ownership/RLS suites.
         returncode = 0
         with test_log.open("wb") as log:
-            for pattern in ("test_database.py", "test_auth_bootstrap.py"):
+            for pattern in ("test_database.py", "test_auth_bootstrap.py", "test_ownership_rls.py"):
                 result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "apps/api/tests",
                                          "-p", pattern, "-v"], cwd=repo, env=environment,
                                         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
@@ -100,7 +103,8 @@ def main() -> int:
                 if result.returncode and not returncode:
                     returncode = result.returncode
         report = test_log.read_text(encoding="utf-8", errors="replace")
-        for key in ("PGPASSWORD", "DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD", "DB_OPERATOR_PASSWORD"):
+        for key in ("PGPASSWORD", "DB_RUNTIME_PASSWORD", "DB_MIGRATION_PASSWORD",
+                    "DB_OPERATOR_PASSWORD", "DB_PUBLIC_PASSWORD"):
             report = report.replace(environment[key], "[redacted]")
         print(report, flush=True)
         if not report or "skipped=" in report:
