@@ -382,7 +382,12 @@ Specification: [UI_SCREEN_SPECIFICATIONS.md](UI_SCREEN_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-011, NI-029, NI-051
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role A (ILYUTKICK), session dispatch #19
+- **Execution role:** A
+- **Started at:** 2026-11-08T00:43:38+03:00
+- **Branch/worktree:** feat/ni-014-public-thesis @ /Users/ilyutkinn/Desktop/near-intelligence-a5
+- **Handoff:** apps/api/src/near_api/publications/ remains owned by role B as a separately agreed part (server-side publication of the claim registry). The role-A scope of this task is the web thesis layer plus the claim registry content: quantities are bound through recorded document references (definition version, dataset version reference, source, scope) with honest pending markers where live values are not yet published, and through the existing NI-032 delivery endpoints once NI-033 (PR #49) lands. UI layer is self-contained; no Python publications module is created by this claim.
 
 **Description:** Present the complete original conditional thesis rather than marketing copy.
 
