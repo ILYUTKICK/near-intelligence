@@ -988,12 +988,16 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-002, NI-009, NI-031
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A
 - **Started at:** 2026-11-07T02:31:10+03:00
 - **Branch/worktree:** feat/ni-038-tiptap-prototype; /Users/ilyutkinn/Desktop/Near
 - **Dependency verification:** NI-002✓, NI-009✓, NI-031✓ (PR #39 merged) — cards on origin/main.
+- **Verification:** `pnpm --filter web test` — 82/82 pass (3 new): node-schema JSON round trip identical after reload (canonical JSON is the NI-036 storage path); typing/undo survive React node updates (robust assertion — adjacent inserts may group into one history step); empty doc parses validly (Tiptap normalizes to one empty paragraph — documented constraint in ADR-018). Attributes serialize to HTML data-attributes and parse back (getAttrs) — HTML fidelity holds alongside the JSON path. `tsc --noEmit`, `eslint` 0 warnings, `next build` pass. **Browser IME/paste/selection checks are operator-manual** (jsdom cannot emulate IME composition) — recorded as the remaining manual step before NI-039 relies on the pattern.
+- **Result:** apps/web/src/features/editor/prototype/ — ChartBlock (atomic node, node-view controls: annotate/remove, contentEditable=false islands with keyboard-reachable buttons), InsightCard (nested-editable title input probe + editor-undo escape button), prototype route /workspace/editor-prototype behind the NI-021 gate with synthetic fixtures; Tiptap 3.33.0 (MIT) deps recorded in DEPENDENCIES.md; ADR-018 in DECISIONS.md records the confirmed adoption with verified constraints (empty-paragraph normalization, history grouping, tuple-form renderHTML, JSON as canonical storage path).
+- **Reviewer:** pending — role-B review requested on PR #41; CI runs on this PR.
+- **Completed at:** 2026-11-07T02:52:30+03:00
 
 **Description:** Validate the editor choice against financial node interactions before broad UI implementation.
 
