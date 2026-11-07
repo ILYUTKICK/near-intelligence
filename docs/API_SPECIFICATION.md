@@ -82,22 +82,49 @@ is `Cache-Control: no-store`.
 
 ## Research documents and versions
 
-Implemented note (NI-036): `GET /documents`, `POST /documents`, `GET /documents/{id}` and
-`POST /documents/{id}/versions` are implemented in `apps/api/src/near_api/documents/` (exposed
-under the `/api` prefix). Creation atomically writes the document plus its first EMPTY revision
-(`revision: 1`, `ETag: "1"`); the ETag is the quoted current revision and `If-Match` must carry
-exactly that quoted value (bare numbers and weak validators are 428). A stale revision is 409
-REVISION_CONFLICT including the current revision for the owned document; invalid content is a
-typed 422 (VALIDATION_ERROR / REFERENCE_INVALID), oversize 413, and a rejected save leaves zero
-rows. Each save re-validates the canonical schema (EDITOR_SPECIFICATION), enforces same-document
-evidence/insight/risk links, requires `dataTable.dataset_version_id` to be an APPROVED dataset
-version, requires citation targets to be public artifacts, and gates liveChart blocks, snapshot
-chart mode and `model_run` evidence targets until the chart registry (NI-031), research
-snapshots (NI-035) and model runs (NI-054) exist — an unverifiable reference is invalid, never
-tolerated. `observed_contexts` must be empty until the chart system (NI-041/NI-043) resolves
-pins server-side. Rename/delete, idempotency keys and version listing/detail remain with
-NI-037; `Idempotency-Key` is not yet honored on the implemented routes. The opaque list cursor
-is a bounded offset over the stable `(updated_at DESC, id)` owner-scoped order.
+Implemented note (NI-036 + NI-037): the private document CRUD and version rows below are
+implemented in `apps/api/src/near_api/documents/` (exposed under the `/api` prefix):
+`GET /documents`, `POST /documents`, `GET /documents/{id}`, `POST /documents/{id}/versions`
+(NI-036), plus `PATCH /documents/{id}` (rename), `DELETE /documents/{id}`, `GET
+/documents/{id}/versions` and `GET /documents/{id}/versions/{versionId}` (NI-037). Creation
+atomically writes the document plus its first EMPTY revision (`revision: 1`, `ETag: "1"`);
+the ETag is the quoted current revision and every mutation (save, rename, delete) requires
+`If-Match` to carry exactly that quoted value (bare numbers and weak validators are 428). A
+stale revision is 409 REVISION_CONFLICT including the current revision for the owned document;
+invalid content is a typed 422 (VALIDATION_ERROR / REFERENCE_INVALID), oversize 413, and a
+rejected write leaves zero rows. Each revision-creating write re-validates the canonical
+schema (EDITOR_SPECIFICATION), enforces same-document evidence/insight/risk links, requires
+`dataTable.dataset_version_id` to be an APPROVED dataset version, requires citation targets
+to be public artifacts, and gates liveChart blocks, snapshot chart mode and `model_run`
+evidence targets until the chart registry (NI-031), research snapshots (NI-035) and model
+runs (NI-054) exist — an unverifiable reference is invalid, never tolerated.
+`observed_contexts` must be empty until the chart system (NI-041/NI-043) resolves pins
+server-side.
+
+NI-037 behavior specifics: a rename (`PATCH`) that changes the title creates a full new
+immutable revision with byte-identical canonical content (EDITOR_SPECIFICATION: title and
+content attribution stay consistent) and re-validates the content references; a `PATCH` whose
+title equals the current title is a no-op that returns the current summary and ETag without
+creating a revision. `DELETE` removes the owner-checked document row in one transaction; the
+ON DELETE CASCADE chain removes every private child (versions, blocks, insight/hypothesis/
+evidence projections) while shared scientific data (datasets, observations, registries,
+artifacts) is untouched; there is no revision-delete endpoint — versions are immutable and
+disappear only with their document (export jobs arrive with NI-058 and cascade by their
+documented document FK). Version listing pages the document's revisions newest-first
+(revision DESC — unique per document, so the bounded offset cursor is stable) and version
+detail resolves a revision only through its owned parent document (a foreign document's
+version id is the same generic 404). Reopen/restore has no dedicated endpoint in the
+specification: reopening the working document is `GET /documents/{id}`, historical state is
+`GET /documents/{id}/versions/{versionId}`. `Idempotency-Key: UUID` is honored on
+`POST /documents` and `POST /documents/{id}/versions`: the response snapshot is committed in
+the same transaction as the write, so a repeated identical owner/route/body request replays
+the ORIGINAL 2xx result for 24h (`app.idempotency_records`, migration 0009) instead of
+creating a second document or revision — the timeout-after-commit guarantee; the same key
+with a different body is 409 IDEMPOTENCY_CONFLICT; If-Match is not part of the request
+identity (owner/route/body only, per the protocol section); failed writes store nothing and
+stay retryable; a malformed key is 422. The opaque list cursor is a bounded offset over the
+stable `(updated_at DESC, id)` owner-scoped document order and the revision DESC version
+order.
 
 | Method/path | Request → response | Auth / authorization | Errors |
 | --- | --- | --- | --- |
