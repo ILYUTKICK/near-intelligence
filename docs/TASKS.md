@@ -1312,7 +1312,7 @@ Specification: [ECONOMETRIC_METHODOLOGY.md](ECONOMETRIC_METHODOLOGY.md).
 - **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #18
 - **Execution role:** B
 - **Started at:** 2026-11-08T00:35:39+03:00
-- **Branch/worktree:** feat/ni-052-estimator; /Users/ilyutkinn/Desktop/near-intelligence-b3 (worktree, fast-forwarded to origin/main 8ba8025)
+- **Branch/worktree:** feat/ni-052-estimator; /Users/ilyutkinn/Desktop/near-intelligence-b3 (worktree, fast-forwarded to origin/main 8ba8025); PR #51 into main (open, not merged)
 
 **Description:** Fit one defensible real-data association with declared transformations and covariance.
 
