@@ -34,27 +34,24 @@ export class DocumentApiError extends Error {
 
 const REQUESTED_PAGE_SIZE = 20;
 
-async function parseErrorResponse(response: Response): Promise<DocumentApiError> {
+async function parseErrorResponse(response: Response, body: unknown): Promise<DocumentApiError> {
   let code = "UNKNOWN_ERROR";
   let message = "The request could not be completed.";
   let currentRevision: number | null = null;
-  try {
-    const body: unknown = await response.json();
-    const parsed = apiErrorResponseSchema.safeParse(body);
-    if (parsed.success) {
-      code = parsed.data.error.code;
-      message = parsed.data.error.message;
-      for (const detail of parsed.data.error.details ?? []) {
-        // Owned-document 409 carries the server's current revision
-        // (`current_revision:<n>`), used to refresh a stale action.
-        const match = /^current_revision:(\d+)$/.exec(detail.reason);
-        if (match) {
-          currentRevision = Number(match[1]);
-        }
+  // The body was already read once by the caller (a Response body can only be
+  // consumed once); parse the captured value instead of re-reading.
+  const parsed = apiErrorResponseSchema.safeParse(body);
+  if (parsed.success) {
+    code = parsed.data.error.code;
+    message = parsed.data.error.message;
+    for (const detail of parsed.data.error.details ?? []) {
+      // Owned-document 409 carries the server's current revision
+      // (`current_revision:<n>`), used to refresh a stale action.
+      const match = /^current_revision:(\d+)$/.exec(detail.reason);
+      if (match) {
+        currentRevision = Number(match[1]);
       }
     }
-  } catch {
-    // A body that is not the error envelope keeps the generic message.
   }
   return new DocumentApiError(response.status, code, message, currentRevision);
 }
@@ -95,7 +92,7 @@ export async function listDocuments(
   assertJsonContentType(response);
   const body: unknown = await response.json();
   if (!response.ok) {
-    throw await parseErrorResponse(response);
+    throw await parseErrorResponse(response, body);
   }
   const parsed = documentListResponseSchema.safeParse(body);
   if (!parsed.success) {
@@ -123,7 +120,7 @@ export async function createDocument(input: {
   assertJsonContentType(response);
   const body: unknown = await response.json();
   if (!response.ok) {
-    throw await parseErrorResponse(response);
+    throw await parseErrorResponse(response, body);
   }
   const parsed = documentResponseSchema.safeParse(body);
   if (!parsed.success) {
@@ -151,7 +148,7 @@ export async function renameDocument(input: {
   assertJsonContentType(response);
   const body: unknown = await response.json();
   if (!response.ok) {
-    throw await parseErrorResponse(response);
+    throw await parseErrorResponse(response, body);
   }
   const summary = await validateSummary(body, response.status);
   return summary;
@@ -170,7 +167,13 @@ export async function deleteDocument(input: {
   if (response.status === 204) {
     return;
   }
-  throw await parseErrorResponse(response);
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    // A non-JSON error body keeps the generic message.
+  }
+  throw await parseErrorResponse(response, body);
 }
 
 /** GET /api/documents/{id} — the current document (persisted-editor stub view). */
@@ -183,7 +186,7 @@ export async function getDocument(documentId: string, signal?: AbortSignal): Pro
   assertJsonContentType(response);
   const body: unknown = await response.json();
   if (!response.ok) {
-    throw await parseErrorResponse(response);
+    throw await parseErrorResponse(response, body);
   }
   const parsed = documentResponseSchema.safeParse(body);
   if (!parsed.success) {
