@@ -22,6 +22,16 @@ Accepted for the implementation specification on 5 November 2026; no application
 | ADR-016 | One-writer document revision CAS; conflict UI, no silent merge | CRDT/collaboration deferred. Whole-document autosave transaction is tractable within bounded document limits |
 | ADR-017 | Provide a generated, hash-pinned root requirements.txt for CPython3.13 before API scaffolding | User requested convenient contributor/judge installation. requirements.in is the temporary direct source; NI-002 migrates to pyproject.toml/uv.lock and exports requirements.txt from it. No parallel independent locks; deployment still requires actual app/source/data/config. |
 
+## ADR-018 — NI-038 prototype outcome: Tiptap adoption confirmed (2026-11-07)
+
+**Context:** ADR-005 chose Tiptap with an explicit gate — the NI-038 prototype had to prove that typing, undo and JSON serialization survive custom React node views before the editor build depends on it.
+
+**Outcome (confirmed):** the prototype (`apps/web/src/features/editor/prototype/`) implements two atomic custom nodes (chart block with node-view controls, insight card with a nested-editable title input) and asserts via tests: node-schema JSON round trip is identical after reload; typing/undo survive React node updates; editor commands (`undo`) escape from inside node views; an empty document parses validly. Node views use `contentEditable=false` islands with a nested editable input — the pattern for NI-039/NI-041 evidence nodes.
+
+**Constraints verified:** Tiptap normalizes an empty document to one empty paragraph (doc schema requires block content — the canonical JSON must expect it); adjacent inserts may group into one history step (undo tests must not assume per-command granularity); `renderHTML` must return the tuple form and serialize attrs as data-attributes for HTML-level fidelity, while the canonical storage path is JSON (NI-036).
+
+**Alternatives / consequences:** no custom rich-text engine was considered (ADR-005 stands); BlockNote not re-evaluated — the gate passed, so switching cost is unjustified. Next: production nodes bind to NI-031 chart registry entries (no synthetic fixtures) and NI-032 datasets.
+
 ## Evidence behind tool choices
 
 Official references reviewed: [Tiptap nodes](https://tiptap.dev/docs/editor/extensions/custom-extensions/create-new/node), [BlockNote custom blocks](https://www.blocknotejs.org/docs/features/custom-schemas/custom-blocks), [ECharts accessibility](https://echarts.apache.org/handbook/en/best-practices/aria/), [Supabase JWT verification](https://supabase.com/docs/guides/auth/jwts), and [statsmodels robust covariance](https://www.statsmodels.org/stable/generated/statsmodels.regression.linear_model.OLSResults.get_robustcov_results.html). These support capabilities, not a compatibility guarantee for an unpinned installation. NI-001/NI-002 resolve supported versions and record locks.
