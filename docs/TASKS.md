@@ -864,7 +864,12 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-031
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #15
+- **Execution role:** B
+- **Started at:** 2026-11-07T23:12:19+03:00
+- **Branch/worktree:** feat/ni-032-data-apis; /Users/ilyutkinn/Desktop/near-intelligence-b
+- **Claim basis:** the single dependency NI-031 is implemented and merged into main (registry code + migration 0007; verification reproducible: disposable-cluster suite on main — 13 suites / 202 tests OK incl. test_chart_registry.py and test_metrics.py), but its card is formally IN_PROGRESS pending role-A review; work proceeds on the operator's explicit instruction to "continue per PLAN.md with a dispatched role-B subagent". No other dependency is skipped and no boundary is widened by this claim.
 
 **Description:** Expose one normalized selection/data contract to every UI context.
 
