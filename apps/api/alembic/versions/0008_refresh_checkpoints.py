@@ -103,14 +103,20 @@ def upgrade():
             FOR SELECT TO near_app USING (true);
 
         -- Checkpoints and counters are upserted, never deleted: history of the
-        -- operational state is preserved (no DELETE grant for any role).
+        -- operational state is preserved (no DELETE grant for any role). The
+        -- INSERT column lists cover every column the adapter writes (a
+        -- column-scoped INSERT grant must span all non-defaulted targets).
         GRANT SELECT ON app.ingestion_checkpoints TO near_app, near_operator;
-        GRANT INSERT(source_id), UPDATE(last_height, last_block_hash, last_header_at,
+        GRANT INSERT(source_id, last_height, last_block_hash, last_header_at,
                      last_request_at, last_success_at, last_failure_at,
-                     last_failure_kind, consecutive_failures, updated_at)
+                     last_failure_kind, consecutive_failures),
+            UPDATE(last_height, last_block_hash, last_header_at,
+                   last_request_at, last_success_at, last_failure_at,
+                   last_failure_kind, consecutive_failures, updated_at)
             ON app.ingestion_checkpoints TO near_operator;
         GRANT SELECT ON app.ingestion_daily_counters TO near_app, near_operator;
-        GRANT INSERT(source_id, day), UPDATE(request_count, success_count, updated_at)
+        GRANT INSERT(source_id, day, request_count, success_count),
+            UPDATE(request_count, success_count, updated_at)
             ON app.ingestion_daily_counters TO near_operator;
     """)
 

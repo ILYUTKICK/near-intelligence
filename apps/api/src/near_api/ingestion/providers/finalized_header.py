@@ -206,7 +206,7 @@ class FinalizedHeaderRefresh:
         self.repo_root = Path(repo_root).resolve()
         self.source_id = source_id
         self.stop_paths = tuple(stop_paths)
-        self._storage: ArtifactStorage | None = None
+        self._storage_instance: ArtifactStorage | None = None
 
     # -- guards (before any network I/O) ------------------------------------ #
 
@@ -391,9 +391,9 @@ class FinalizedHeaderRefresh:
     # -- dataset publication (NI-028 pipeline) ------------------------------- #
 
     def _storage(self) -> ArtifactStorage:
-        if self._storage is None:
-            self._storage = ArtifactStorage(self.storage_root)
-        return self._storage
+        if self._storage_instance is None:
+            self._storage_instance = ArtifactStorage(self.storage_root)
+        return self._storage_instance
 
     def _manifest_document(self, header: dict, *, endpoint: str, raw_path: Path,
                            query_hash: str, now: dt.datetime) -> dict:
@@ -525,10 +525,12 @@ class FinalizedHeaderRefresh:
                     day: dt.date) -> dict:
         self._check_stop_markers()
         try:
-            with connection.begin() as guard:
-                _assert_operator(guard)
-                endpoint = self._approved_endpoint(guard)
-                state = self._read_state(guard, day)
+            with connection.begin():
+                # The begin() block owns the transaction; the helpers run on
+                # the connection itself (SQLAlchemy 2.x: no proxy execute).
+                _assert_operator(connection)
+                endpoint = self._approved_endpoint(connection)
+                state = self._read_state(connection, day)
             refusal = evaluate_budget(
                 last_request_at=state["checkpoint"]["last_request_at"]
                 if state["checkpoint"] is not None else None,
@@ -544,11 +546,18 @@ class FinalizedHeaderRefresh:
                                 f"Guard state could not be read: {type(error).__name__}"
                                 ) from None
 
-        raw = self._fetch(endpoint, transport=transport)
-        header = validate_header_response(raw, retrieved_at=now)
+        try:
+            raw = self._fetch(endpoint, transport=transport)
+            header = validate_header_response(raw, retrieved_at=now)
+        except RefreshFailed as failure:
+            # The request was sent: the attempt is honestly consumed even when
+            # the provider answered with a failure.
+            self._record_failure(connection, kind=failure.kind, now=now,
+                                 request_made=True, day=day)
+            raise
         checkpoint_before = (state["checkpoint"] or {}).get("last_height")
         try:
-            with connection.begin() as publish_tx:
+            with connection.begin():
                 last_height = (state["checkpoint"] or {}).get("last_height")
                 if last_height is not None and header["height"] < last_height:
                     raise RefreshFailed(
@@ -556,7 +565,7 @@ class FinalizedHeaderRefresh:
                         f"Advertised finalized height {header['height']} is below the "
                         f"checkpointed height {last_height}; refusing to publish")
                 if last_height is not None and header["height"] == last_height:
-                    request_count = self._record_success(publish_tx, header=header,
+                    request_count = self._record_success(connection, header=header,
                                                          now=now, day=day)
                     return RefreshOutcome(
                         status="unchanged", source_id=self.source_id,
@@ -568,10 +577,10 @@ class FinalizedHeaderRefresh:
                         request_count_today=request_count).report()
                 raw_path = self._write_raw_file(header, raw)
                 query_hash = sha256_hex(_canonical_request_bytes())
-                published = self._publish(publish_tx, header, endpoint=endpoint,
+                published = self._publish(connection, header, endpoint=endpoint,
                                           raw_path=raw_path, query_hash=query_hash,
                                           now=now)
-                request_count = self._record_success(publish_tx, header=header, now=now,
+                request_count = self._record_success(connection, header=header, now=now,
                                                      day=day)
                 staged, report = published["staged"], published["report"]
                 return RefreshOutcome(

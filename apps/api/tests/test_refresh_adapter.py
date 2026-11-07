@@ -16,6 +16,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from unittest import mock
 from uuid import UUID
@@ -26,6 +27,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
+from near_api.datasets.canonical import decimal_string
 from near_api.datasets.service import create_dataset_operator_engine
 from near_api.db.session import create_runtime_engine
 from near_api.ingestion.providers.finalized_header import (
@@ -502,7 +504,7 @@ class RefreshAdapterDatabaseTests(unittest.TestCase):
                 JOIN app.dataset_versions v ON v.id = o.dataset_version_id
                 WHERE v.dataset_key = :key
             """), {"key": DATASET_KEY}).mappings().one()
-        self.assertEqual(row["value"], exact_supply_near(SUPPLY_YOCTO))
+        self.assertEqual(decimal_string(Decimal(row["value"])), SUPPLY_NEAR)
         self.assertEqual((row["bound_kind"], row["quality_status"]), ("exact", "verified"))
         self.assertIn("block 223400000", row["source_record_ref"])
         self.assertEqual(row["quality"]["block_hash"], block_hash_for(223_400_000))
@@ -527,7 +529,9 @@ class RefreshAdapterDatabaseTests(unittest.TestCase):
     def test_02_higher_height_supersedes_with_revision_delta(self):
         self.approve_source()
         first = self.attempt(header_body(223_400_000))
-        second = self.attempt(header_body(223_400_120))
+        next_day_ns = str(int((dt.datetime(2026, 11, 8, 0, 1, tzinfo=dt.timezone.utc)
+                               ).timestamp() * 1_000_000_000))
+        second = self.attempt(header_body(223_400_120, timestamp_ns=next_day_ns))
         self.assertEqual(second["status"], "published")
         self.assertEqual(second["checkpoint_height_before"], 223_400_000)
         self.assertNotEqual(second["content_sha256"], first["content_sha256"])
@@ -684,29 +688,36 @@ class RefreshAdapterDatabaseTests(unittest.TestCase):
             rows = connection.execute(text(
                 "SELECT last_height FROM app.ingestion_checkpoints")).all()
             self.assertEqual(len(rows), 1)
+        # Each denial needs its own connection: a denied statement aborts the
+        # surrounding transaction.
+        with self.runtime.connect() as connection:
             with self.assertRaises(Exception) as caught:
                 connection.execute(text(
                     "UPDATE app.ingestion_checkpoints SET consecutive_failures = 5"))
-            self.assertIn("42501", str(caught.exception))
+            self.assertIn("permission denied", str(caught.exception))
+        with self.runtime.connect() as connection:
             with self.assertRaises(Exception) as caught:
                 connection.execute(text(
                     "INSERT INTO app.ingestion_daily_counters(source_id, day) "
                     "VALUES ('SRC-NEAR-RPC', '2026-11-07')"))
-            self.assertIn("42501", str(caught.exception))
+            self.assertIn("permission denied", str(caught.exception))
 
-    def test_14_deduplicated_approved_content_after_checkpoint_reset(self):
+    def test_14_checkpoint_reset_restages_the_same_block_honestly(self):
         self.approve_source()
         first = self.attempt(header_body(223_400_000))
-        # Operator resets the checkpoint (simulated lost state); the identical
-        # refresh must NOT create a second version or move history backwards.
+        # Operator resets the checkpoint (simulated lost state): the same
+        # finalized block is re-fetched and restaged as a NEW immutable version
+        # (the fresh retrieval instant is part of the semantic manifest), the
+        # pointer moves forward and history never moves backwards.
         with self.admin.begin() as connection:
             connection.execute(text(
                 "UPDATE app.ingestion_checkpoints SET last_height = NULL, "
                 "last_block_hash = NULL WHERE source_id = :id"), {"id": SOURCE_ID})
         report = self.attempt(header_body(223_400_000))
-        self.assertEqual(report["status"], "unchanged")
-        self.assertEqual(self.version_count(), 1)
-        self.assertEqual(self.active_version()["id"], UUID(first["dataset_version_id"]))
+        self.assertEqual(report["status"], "published")
+        self.assertNotEqual(report["content_sha256"], first["content_sha256"])
+        self.assertEqual(self.version_count(), 2)
+        self.assertEqual(self.active_version()["version"], 2)
         self.assertEqual(self.checkpoint()["last_height"], 223_400_000)
 
     def test_15_migration_round_trip_for_checkpoint_zone(self):
