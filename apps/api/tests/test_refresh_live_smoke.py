@@ -22,6 +22,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from uuid import UUID
 
 from alembic import command
 from alembic.config import Config
@@ -96,17 +97,28 @@ class FinalizedHeaderLiveSmoke(unittest.TestCase):
                     "SELECT last_height, last_block_hash, last_failure_kind "
                     "FROM app.ingestion_checkpoints WHERE source_id = :id"),
                     {"id": SOURCE_ID}).mappings().one()
+                response_bytes = connection.execute(text("""
+                    SELECT a.byte_size FROM app.dataset_inputs i
+                    JOIN app.artifacts a ON a.id = i.artifact_id
+                    WHERE i.dataset_version_id = :id AND i.role = 'raw'
+                """), {"id": UUID(report["dataset_version_id"])}).scalar_one()
         finally:
             admin.dispose()
         self.assertEqual(active["status"], "approved")
         self.assertEqual(point["last_height"], height)
         self.assertEqual(point["last_block_hash"], block_hash)
         self.assertIsNone(point["last_failure_kind"])
+        # The preserved raw response is exactly the bytes the one request
+        # returned; the approved 65 536-byte cap must hold.
+        self.assertIsInstance(response_bytes, int)
+        self.assertGreater(response_bytes, 0)
+        self.assertLessEqual(response_bytes, 65_536)
         # Recorded evidence (visible in -v output).
         print(f"\nNI-030 live smoke evidence: request {started_at.isoformat()} -> "
               f"{finished_at.isoformat()} | final block height={height} "
               f"hash={block_hash} header_time={report['block_timestamp_utc']} "
               f"lag_seconds={lag.total_seconds():.3f} "
+              f"response_bytes={response_bytes} (cap 65536) "
               f"dataset_version={report['dataset_version_id']} "
               f"content_sha256={report['content_sha256']}", flush=True)
 
