@@ -1088,7 +1088,12 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-038, NI-037, NI-007
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+
+- **Claimed by:** Claude agent for role A (ILYUTKICK), session dispatch #24
+- **Execution role:** A
+- **Started at:** 2026-11-08T02:16:00+03:00
+- **Branch/worktree:** feat/ni-039-editor-layout (/Users/ilyutkinn/Desktop/near-intelligence-a8, base origin/main 8dfd9c7)
 
 **Description:** Deliver the three-pane research editor and complete P0 block interactions.
 
