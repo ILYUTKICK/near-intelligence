@@ -1212,7 +1212,12 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-036, NI-038
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #23
+- **Execution role:** B
+- **Started at:** 2026-11-08T01:44:41+03:00
+- **Branch/worktree:** feat/ni-046-insight-contracts; /Users/ilyutkinn/Desktop/near-intelligence-b7 (worktree cut from origin/main d25df3e)
+- **Dependency verification:** NI-036 DONE (canonical EditorDocument validator, revision service and the insight/hypothesis/evidence projection tables of migration 0006 on main) and NI-038 DONE (Tiptap custom block prototype) — both verified in docs/TASKS.md on this branch before the claim.
 
 **Description:** Centralize the typed research annotations shared by editor/API/projections.
 
