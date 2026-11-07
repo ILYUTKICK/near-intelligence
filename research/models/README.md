@@ -1,9 +1,12 @@
-# Model dataset readiness gate (NI-051) and fixed estimator (NI-052)
+# Model dataset readiness gate (NI-051), fixed estimator (NI-052) and diagnostics battery (NI-053)
 
 Research code that decides **which empirical question is admissible before any
-fitting happens** — and then fits exactly that question with a fixed
-deterministic estimator. It implements the "Data readiness before any fit"
-section of [docs/ECONOMETRIC_METHODOLOGY.md](../../docs/ECONOMETRIC_METHODOLOGY.md)
+fitting happens**, fits exactly that question with a fixed deterministic
+estimator, and then makes the fit assessable with a preregistered
+diagnostics/robustness/interpretation battery. It implements the "Data
+readiness before any fit", "Estimation and diagnostics" and "Model output
+contract" sections of
+[docs/ECONOMETRIC_METHODOLOGY.md](../../docs/ECONOMETRIC_METHODOLOGY.md)
 and the research feasibility gate of
 [docs/MVP_SCOPE.md](../../docs/MVP_SCOPE.md).
 
@@ -14,7 +17,9 @@ series and evaluates each preregistered specification config against the fixed
 project rules. The estimator itself is NI-052; it must reuse the admitted
 specification unchanged — and it does, by importing the gate's own loaders and
 re-evaluating the same specification on the same archive before anything is
-fitted.
+fitted. The diagnostics battery is NI-053; it reuses both import-only (the
+gate's loaders and evaluation, the estimator's manifest/design/estimation) and
+adds no estimation logic of its own.
 
 ## Decision encoded by the gate
 
@@ -45,6 +50,10 @@ fitted.
 - `fit.py` — the NI-052 fixed deterministic estimator (pure design builder,
   pre-estimation intercept/rank/condition checks, OLS + preregistered HAC,
   deterministic manifest, CLI).
+- `diagnostics.py` — the NI-053 diagnostics/robustness/interpretation battery
+  (stationarity tests with preregistered settings, residual ACF/Ljung–Box/
+  Breusch–Pagan/Cook's distance, prespecified sensitivity presets only,
+  template-rendered bounded interpretation, deterministic report, CLI).
 - `configs/readiness_gate_policy_v1.json` — fixed project gate numbers
   (60 complete daily observations, 10 per parameter including intercept,
   3 substantive slopes max, long-run threshold), the evaluation order and the
@@ -53,9 +62,13 @@ fitted.
   against the versioned metric registry at load time).
 - `fit_configs/*.json` — preregistered estimator settings for one
   specification (covariance type/kernel/maxlags under a fixed
-  `maxlags_rule`, `use_correction`, `use_t`, reproduction tolerances). They
-  live outside `configs/` on purpose: the gate scans `configs/*.json` as
-  specifications, so estimator settings must not share that namespace.
+  `maxlags_rule`, `use_correction`, `use_t`, reproduction tolerances).
+- `diagnostics_configs/*.json` — preregistered battery settings for one
+  specification (declared stationarity series and fixed ADF/KPSS lag
+  settings, decision alpha, residual ACF/Ljung–Box/Breusch–Pagan/Cook's
+  settings, and the only sensitivity presets that may run). They live outside
+  `configs/` on purpose: the gate scans `configs/*.json` as specifications,
+  so estimator and diagnostics settings must not share that namespace.
 - `reports/` — generated output, **local only, never committed** (gitignored).
 
 ## Run
@@ -102,13 +115,51 @@ variables, lags or samples from p-values; the HAC lag count is a fixed
 preregistered number. The real-archive fit run itself is operator-side
 evidence (like the NI-051 gate run), not repository content.
 
+### Diagnostics battery (NI-053)
+
+```bash
+uv run --project apps/api python -m near_api.research diagnostics \
+    --archive-root /path/to/research \
+    --out-dir research/reports/<run> \
+    --code-commit <git sha>
+```
+
+The standalone `uv run --project apps/api python research/models/diagnostics.py ...`
+entry point is equivalent; both exit 0/4/2 and both write
+`diagnostics_report.json`/`diagnostics_report.md` into the operator-provided
+output directory (or print the JSON to stdout without `--out-dir`). The
+battery binds the same specification through the fit config and re-runs it,
+then records: the gate sample/exclusion table verbatim; the coefficient/SE/
+95% CI table cross-checked under the declared tolerances; ADF (fixed maxlag,
+autolag disabled) and KPSS (fixed nlags) on the declared level series with
+settings recorded next to every result and honest `undefined` statuses (null
+with a reason) for short, constant or degenerate series; residual ACF,
+Ljung–Box at the declared lags with `model_df` consuming the estimated
+parameter count, Breusch–Pagan heteroskedasticity and Cook's distance
+influence flags (reported with dates, never removed); the sensitivity
+presets — and only those — declared in
+`research/models/diagnostics_configs/gross_fee_activity_v1_diagnostics.json`
+(HAC maxlags 3 and 14 when the sample supports them, the alternate provider
+source, the alternate price basis), each reported as `estimated`,
+`not_applicable` or `failed` with a reason from a fixed vocabulary; and a
+bounded interpretation rendered only from fixed template sentences and
+recorded numbers (association, not causality; no sustainability or
+valuation wording; the mechanical fee–volume note repeated verbatim). The
+report carries no wall-clock field and re-renders byte-identically on the
+same platform. The real-archive diagnostics run is operator-side evidence,
+not repository content.
+
 Tests: `apps/api/tests/test_models_readiness.py` (gate, synthetic fixtures in
-disposable temp directories, always runs) and
+disposable temp directories, always runs),
 `apps/api/tests/test_models_fit.py` (estimator, synthetic known-behavior
 fixtures strictly separate from the real archive: exact-relationship
 recovery, direct statsmodels HAC equivalence, rank failure, zero policy,
-byte-identical double runs, CLI exit codes); both are part of the
-`scripts/run-db-tests.py` discovery and run without a database.
+byte-identical double runs, CLI exit codes) and
+`apps/api/tests/test_models_diagnostics.py` (battery outputs compared to
+direct statsmodels calls on the same arrays; deliberately nonstationary
+log-random-walk and mechanical fee=rate×volume synthetics honestly marked;
+undefined reason codes; byte-identical double runs; CLI exit codes); all are
+part of the `scripts/run-db-tests.py` discovery and run without a database.
 `apps/api/tests/test_models_readiness_real_archive.py` runs only with
 `NI_REAL_ARCHIVE_ROOT` pointing at a read-only archive handoff, like the
 NI-029 real-archive tests.
@@ -120,11 +171,12 @@ NI-029 real-archive tests.
 - No network, no database access, no new collection, no paid providers, no
   arbitrary user code execution: the only code that ever runs is this
   repository's own research modules behind the fixed CLI.
-- No migration is added by NI-051/NI-052: the artifacts are the reproducible
-  readiness report and the reproducible fit manifest, both rendered locally.
-  A `model_runs` table becomes meaningful with NI-054 when fitted runs are
-  published; that task owns the migration.
-- Reports and fit manifests are evidence artifacts, not application code:
-  they stay local. The gate code, the estimator code, the configs and this
-  README are shared because they are deterministic specifications, not
-  research data.
+- No migration is added by NI-051/NI-052/NI-053: the artifacts are the
+  reproducible readiness report, the reproducible fit manifest and the
+  reproducible diagnostics report, all rendered locally. A `model_runs` table
+  becomes meaningful with NI-054 when fitted runs are published; that task
+  owns the migration.
+- Reports, fit manifests and diagnostics reports are evidence artifacts, not
+  application code: they stay local. The gate code, the estimator code, the
+  diagnostics code, the configs and this README are shared because they are
+  deterministic specifications, not research data.
