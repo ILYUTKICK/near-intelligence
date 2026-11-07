@@ -63,7 +63,14 @@ from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import AfterValidator, AwareDatetime, Field, StringConstraints, field_validator
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BeforeValidator,
+    Field,
+    StringConstraints,
+    field_validator,
+)
 
 from near_api.documents.schema import (
     ASSESSMENTS,
@@ -100,12 +107,22 @@ Sha256Hex = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 """Lowercase SHA-256 context hash (DATABASE_SCHEMA global conventions)."""
 
 
+def _no_epoch_number(value: object) -> object:
+    """Timestamps arrive as ISO 8601 strings with an explicit timezone — the
+    canonical editor schema's own rule — never as epoch numbers (the same
+    fail-closed rule as :class:`near_api.schemas.common.Observation`)."""
+    if not isinstance(value, (str, datetime)):
+        raise ValueError("use an ISO 8601 timestamp with an explicit timezone")
+    return value
+
+
 def _to_utc(value: datetime) -> datetime:
     """Server timestamps are stored/serialized in UTC (API protocol: ISO 8601 UTC)."""
     return value.astimezone(UTC)
 
 
-ServerTimestamp = Annotated[AwareDatetime, AfterValidator(_to_utc)]
+ServerTimestamp = Annotated[AwareDatetime, BeforeValidator(_no_epoch_number),
+                            AfterValidator(_to_utc)]
 """Server-authored annotation timestamp (response side only; never client input)."""
 
 
