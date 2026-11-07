@@ -74,7 +74,15 @@ Added 5 November 2026 for `apps/web` accessible interaction primitives; versions
 
 Python linting (Ruff per CONTRIBUTING) is intentionally not wired yet: it would be the first dev dependency of apps/api and is deferred to the first task that touches API code style at scale; the CI baseline covers web lint, web/API tests, contract drift, documentation links and the PostgreSQL 18 database suite.
 
-No UI kit is imported wholesale — components under `apps/web/src/components/ui/` are in-repo code on Radix behavior primitives, per the "no unnecessary UI kit imports" criterion.
+### Editor dependencies (NI-038 prototype)
+
+| Package | Version | Purpose | Declared license |
+| --- | --- | --- | --- |
+| [@tiptap/core](https://www.npmjs.com/package/@tiptap/core/v/3.33.0) + [@tiptap/react](https://www.npmjs.com/package/@tiptap/react/v/3.33.0) + [@tiptap/pm](https://www.npmjs.com/package/@tiptap/pm/v/3.33.0) + [@tiptap/starter-kit](https://www.npmjs.com/package/@tiptap/starter-kit/v/3.33.0) | 3.33.0 (all four, versioned as one unit per Tiptap release convention) | Editor core, React bindings, ProseMirror packages, base extensions | MIT |
+
+ADR-018 (DECISIONS.md) records the prototype outcome: adoption confirmed with verified constraints. StarterKit is prototype-level convenience — production extensions are added per-node by their owning tasks.
+
+No UI kit is imported wholesale
 
 ## API contract generation (NI-004, 6 November 2026)
 
