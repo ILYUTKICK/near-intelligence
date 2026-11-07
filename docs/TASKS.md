@@ -358,7 +358,11 @@ Specification: [UI_SCREEN_SPECIFICATIONS.md](UI_SCREEN_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-011, NI-026, NI-029, NI-051
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role A (ILYUTKICK), session dispatch #14
+- **Execution role:** A
+- **Started at:** 2026-11-07T22:07:48+03:00
+- **Branch/worktree:** feat/ni-013-methodology; /Users/ilyutkinn/Desktop/near-intelligence-a2 (worktree from origin/main e79953d)
 
 **Description:** Expose technical methods and limitations so a reviewer can assess the data before trusting results.
 
