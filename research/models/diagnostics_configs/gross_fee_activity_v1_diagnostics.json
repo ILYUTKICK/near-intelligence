@@ -1,0 +1,79 @@
+{
+  "diagnostics_config_id": "gross_fee_activity_v1_diagnostics",
+  "diagnostics_config_version": 1,
+  "spec_id": "gross_fee_activity_v1",
+  "spec_config": "gross_fee_activity_v1.json",
+  "fit_config": "gross_fee_activity_v1_fit.json",
+  "gate_policy_config": "readiness_gate_policy_v1.json",
+  "interpretation_template": "bounded_association_v1",
+  "decision_alpha": "0.05",
+  "stationarity": {
+    "series": ["dependent", "explanatory"],
+    "min_observations": 20,
+    "adf": {
+      "regression": "c",
+      "maxlag_rule": "fixed",
+      "maxlag": 7,
+      "rationale": "ADF on the level series with a fixed preregistered lag count (7, matching the documented weekly timing of the baseline) and autolag disabled: the lag count is never selected from the data, and the settings are recorded with the result instead of a pass/fail label (docs/ECONOMETRIC_METHODOLOGY.md 'Specification decision tree' step 2)."
+    },
+    "kpss": {
+      "regression": "c",
+      "nlags_rule": "fixed",
+      "nlags": 7,
+      "rationale": "KPSS on the level series with a fixed preregistered lag count (7) as the complement of ADF (null of stationarity); short-sample disagreement between ADF and KPSS is recorded as a warning, never resolved by choosing the convenient answer."
+    }
+  },
+  "residuals": {
+    "acf": {
+      "nlags": 7,
+      "fft": false,
+      "alpha": "0.05",
+      "bartlett_confint": true
+    },
+    "ljung_box": {
+      "lags": [3, 7],
+      "model_df_rule": "parameters_count",
+      "rationale": "Small lags 3 and the baseline weekly timing 7 (docs/ECONOMETRIC_METHODOLOGY.md 'Estimation and diagnostics': Ljung-Box at justified small lags); model_df consumes the design's estimated parameter count (intercept plus slopes), so the smallest declared lag must exceed it - lags 1/2 would have non-positive adjusted dof and are not declared instead of being reported as undefined."
+    },
+    "heteroskedasticity": {
+      "test": "breusch_pagan",
+      "robust": true,
+      "exog_het": "design_exog",
+      "rationale": "Breusch-Pagan is the methodology's named example ('Estimation and diagnostics'); the fitted design columns are the heteroskedasticity regressors, no extra series is introduced, and the preregistered response to a rejection is the already-declared HAC covariance - no reweighting, no outlier removal."
+    },
+    "influence": {
+      "measure": "cooks_distance",
+      "threshold_rule": "multiplier_over_nobs",
+      "threshold_multiplier": "4",
+      "rationale": "Cook's distance from the plain OLS fit (leverage/residual geometry, independent of the HAC covariance) with the conventional 4/nobs flagging threshold taken from this config; flagged observations are reported with dates and never removed without an operational reason and a with/without report."
+    }
+  },
+  "sensitivity_presets": [
+    {
+      "preset_id": "hac_maxlags_3",
+      "kind": "covariance_maxlags",
+      "maxlags": 3,
+      "rationale": "Preregistered HAC lag sensitivity (docs/ECONOMETRIC_METHODOLOGY.md 'Estimation and diagnostics': baseline maxlags 7, sensitivity 3 and 14 when the sample supports it); a fixed alternative lag count, never selected from the data."
+    },
+    {
+      "preset_id": "hac_maxlags_14",
+      "kind": "covariance_maxlags",
+      "maxlags": 14,
+      "rationale": "Preregistered HAC lag sensitivity (docs/ECONOMETRIC_METHODOLOGY.md 'Estimation and diagnostics': baseline maxlags 7, sensitivity 3 and 14 when the sample supports it); a fixed alternative lag count, never selected from the data."
+    },
+    {
+      "preset_id": "source_dashboard",
+      "kind": "source_alternative",
+      "source": "SRC-DASHBOARD",
+      "applies_to_metric_ids": ["provider_gross_fees_usd", "provider_intents_volume_usd"],
+      "rationale": "Preregistered source sensitivity: re-estimation on the parallel dashboard-reported provider series (same metric definitions, alternate source dimension). The variant is a robustness check, never a second result; both sources share Dune lineage, so agreement is not independent confirmation."
+    },
+    {
+      "preset_id": "price_basis_end",
+      "kind": "price_basis_alternative",
+      "price_basis": "end",
+      "applies_to_metric_ids": ["near_price_usd"],
+      "rationale": "Preregistered price-mark sensitivity: re-estimation with every bound price-basis series moved to the end-of-day mark (docs/ECONOMETRIC_METHODOLOGY.md 'Preparation and transform policy': alternate daily price marks). It applies only where a bound variable is valued through a declared daily price basis; a model whose variables are provider-reported USD as-is records the preset as not applicable instead of inventing a variant."
+    }
+  ]
+}

@@ -68,6 +68,11 @@ private-exports/
 # (never committed, never published).
 !/research/models/fit.py
 !/research/models/fit_configs/*.json
+# NI-053 diagnostics/robustness/interpretation battery: the module and its
+# preregistered diagnostics configs are shared; generated diagnostics reports
+# stay local (never committed, never published).
+!/research/models/diagnostics.py
+!/research/models/diagnostics_configs/*.json
 research/models/reports/
 /product-plan/**
 !/product-plan/**/
