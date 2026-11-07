@@ -53,10 +53,18 @@ describe("Research route", () => {
     expect(screen.getByText(/never relabels one as another/i)).toBeInTheDocument();
   });
 
-  it("marks unpublished hypothesis sections honestly", async () => {
+  it("carries explicit per-hypothesis status lines (NI-014 published the thesis)", async () => {
     const { container } = render(<ResearchPage />);
-    // h1–h4 all carry the honest unpublished status.
-    expect(screen.getAllByText(/Status: to be published with the reviewed findings/i)).toHaveLength(4);
+    // h1–h4 each carry an honest current status instead of the old
+    // unpublished placeholder; the detailed claim-level assertions live in
+    // thesis.test.tsx.
+    for (const status of [
+      "Unresolved",
+      "Partial evidence",
+      "Not supported on current evidence",
+    ]) {
+      expect(screen.getAllByText(status).length).toBeGreaterThan(0);
+    }
     expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });
 });
