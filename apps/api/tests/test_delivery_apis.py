@@ -449,7 +449,9 @@ class DeliveryDatabaseTests(unittest.TestCase):
                                             license_status, lineage)
                     VALUES (:id, :name, :docs_url, :base_url, 'documented', 'unverified',
                             CAST(:lineage AS jsonb))
-                    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+                    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name,
+                        docs_url = EXCLUDED.docs_url, base_url = EXCLUDED.base_url,
+                        lineage = EXCLUDED.lineage
                 """), {"id": source_id, "name": name,
                        "docs_url": ("https://user:pass@example.test/docs" if
                                     source_id == "SRC-SECRET-PROVIDER" else
@@ -501,7 +503,7 @@ class DeliveryDatabaseTests(unittest.TestCase):
             value = None if index == 3 else f"{10 + index}.5"
             observations.append(observation(METRIC_PURCHASES, day, value=value))
             observations.append(observation(METRIC_CONVERSIONS, day,
-                                            value=str(index + 1), bound_kind=None))
+                                            value=str(index + 1)))
             observations.append(observation(METRIC_VOLUME, day, value="100.5",
                                             dimensions={"source": "SRC-LLAMA"}))
             observations.append(observation(METRIC_VOLUME, day, value="120.75",
@@ -586,8 +588,11 @@ class DeliveryDatabaseTests(unittest.TestCase):
         self.assertEqual(by_id["intents-volume"]["available_ranges"]["max_days"], 366)
 
         searched = self.get_json("/api/charts", q="fees")
+        # the search covers title, description and chart_id, so the gated
+        # fee/buyback charts (whose descriptions mention fees) match too
         self.assertEqual({item["chart_id"] for item in searched.json()["items"]},
-                         {"gross-fees", "fee-volume-association"})
+                         {"gross-fees", "fee-volume-association", "protocol-revenue",
+                          "fee-funded-buybacks"})
         categorized = self.get_json("/api/charts", category="treasury")
         self.assertEqual({item["chart_id"] for item in categorized.json()["items"]},
                          {"treasury-payouts", "fee-funded-buybacks"})
@@ -957,8 +962,7 @@ class DeliveryDatabaseTests(unittest.TestCase):
     def test_12_failed_publication_keeps_serving_last_good(self):
         key = f"ni032-outage-{uuid4().hex[:10]}"
         observations = [observation(METRIC_PAYOUT_COUNT, dt.date.fromisoformat(WINDOW[0])
-                                    + dt.timedelta(days=index), value="2",
-                                    bound_kind=None)
+                                    + dt.timedelta(days=index), value="2")
                         for index in range(DAILY_PERIODS)]
         first = self.stage_fixture(key, observations, [METRIC_PAYOUT_COUNT])
         document = json.loads((self.directory /

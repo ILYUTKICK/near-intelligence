@@ -589,13 +589,13 @@ def chart_response(row: Mapping) -> ChartDefinitionResponse:
 # Catalog queries
 # --------------------------------------------------------------------------- #
 
-_METRIC_COLUMNS = """id, metric_id, version, name, unit, frequency, economic_scope,
-       formula_key, source_id, definition"""
+_METRIC_COLUMNS = """m.id, m.metric_id, m.version, m.name, m.unit, m.frequency,
+       m.economic_scope, m.formula_key, m.source_id, m.definition"""
 
-_CHART_COLUMNS = """id, chart_id, version, title, description, category,
-       visualization_type, data_status, unavailable_reason, update_frequency,
-       allowed_ranges, filter_schema, unit_schema, metric_definition_ids,
-       source_lineage, renderer_version"""
+_CHART_COLUMNS = """c.id, c.chart_id, c.version, c.title, c.description, c.category,
+       c.visualization_type, c.data_status, c.unavailable_reason, c.update_frequency,
+       c.allowed_ranges, c.filter_schema, c.unit_schema, c.metric_definition_ids,
+       c.source_lineage, c.renderer_version"""
 
 _SOURCE_COLUMNS = """s.id, s.name, s.docs_url, s.verified_at, s.license_status,
        s.access_status, s.lineage, cp.last_success_at"""
@@ -633,9 +633,10 @@ def list_metric_definitions(connection: Connection, *, availability: str | None,
 def get_metric_definition(connection: Connection, metric_id: str,
                           version: int | None) -> MetricResponse:
     statement = f"""
-        SELECT {_METRIC_COLUMNS} FROM app.metric_definitions
-        WHERE metric_id = :metric_id {"AND version = :version" if version is not None else ""}
-        ORDER BY version DESC LIMIT 1
+        SELECT {_METRIC_COLUMNS} FROM app.metric_definitions m
+        WHERE m.metric_id = :metric_id
+              {"AND m.version = :version" if version is not None else ""}
+        ORDER BY m.version DESC LIMIT 1
     """
     params: dict = {"metric_id": metric_id}
     if version is not None:
@@ -722,7 +723,8 @@ def load_chart_view_inputs(connection: Connection, chart_id: str, version: int |
     metric_ids = [metric_id for metric_id, _role in bindings]
     if metric_ids:
         for metric_row in connection.execute(text(f"""
-                SELECT {_METRIC_COLUMNS} FROM app.metric_definitions WHERE id = ANY(:ids)
+                SELECT {_METRIC_COLUMNS} FROM app.metric_definitions m
+                WHERE m.id = ANY(:ids)
         """), {"ids": metric_ids}).mappings().all():
             metric_rows[metric_row["id"]] = metric_row
     return row, tuple(bindings), metric_rows
