@@ -768,6 +768,101 @@ export interface components {
         ErrorResponse: {
             error: components["schemas"]["ApiError"];
         };
+        /**
+         * Evidence
+         * @description API_SPECIFICATION ``Evidence``: EvidenceInput plus server fields.
+         *
+         *     ``authored_at``/``modified_at`` are response metadata authored by the
+         *     server; the canonical evidence node itself stays timestamp-free per
+         *     EDITOR_SPECIFICATION (timestamps live on the revision that carries it).
+         */
+        Evidence: {
+            /**
+             * Authored At
+             * Format: date-time
+             */
+            authored_at: string;
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "supporting" | "contradicting" | "uncertain";
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Explanation */
+            explanation: string;
+            /**
+             * Hypothesis Id
+             * Format: uuid
+             */
+            hypothesis_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Modified At
+             * Format: date-time
+             */
+            modified_at: string;
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "insight" | "chart_block" | "model_run" | "citation";
+        };
+        /**
+         * EvidenceInput
+         * @description POST /documents/{id}/evidence body (API_SPECIFICATION ``EvidenceInput``).
+         *
+         *     ``target_kind``/``target_id`` must resolve to an allowed typed target in
+         *     the same revision or to a public immutable artifact; that visibility/
+         *     reference validation is service scope (NI-049) — this contract rejects the
+         *     shapes it can reject (unknown kinds, non-UUID ids, unbounded explanation).
+         */
+        EvidenceInput: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "supporting" | "contradicting" | "uncertain";
+            /** Explanation */
+            explanation: string;
+            /**
+             * Hypothesis Id
+             * Format: uuid
+             */
+            hypothesis_id: string;
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "insight" | "chart_block" | "model_run" | "citation";
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -827,6 +922,153 @@ export interface components {
             /** Recent Insights */
             recent_insights: components["schemas"]["PendingHomeSection"][];
         };
+        /**
+         * Hypothesis
+         * @description API_SPECIFICATION ``Hypothesis``: HypothesisInput plus server fields.
+         */
+        Hypothesis: {
+            /**
+             * Assessment
+             * @enum {string}
+             */
+            assessment: "untested" | "supported" | "mixed" | "weakened" | "insufficient_data";
+            /**
+             * Authored At
+             * Format: date-time
+             */
+            authored_at: string;
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Modified At
+             * Format: date-time
+             */
+            modified_at: string;
+            /** Statement */
+            statement: string;
+        };
+        /**
+         * HypothesisInput
+         * @description POST /documents/{id}/hypotheses body (API_SPECIFICATION ``HypothesisInput``).
+         *
+         *     ``assessment`` is an authored state with rationale in the document, never
+         *     an automatic truth badge; unsupported values are rejected.
+         */
+        HypothesisInput: {
+            /**
+             * Assessment
+             * @enum {string}
+             */
+            assessment: "untested" | "supported" | "mixed" | "weakened" | "insufficient_data";
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /** Statement */
+            statement: string;
+        };
+        /**
+         * Insight
+         * @description API_SPECIFICATION ``Insight``: InsightInput plus server-authored fields.
+         *
+         *     ``id`` is the stable entity id allocated once at creation (uuid4) and kept
+         *     unchanged across revisions so outline anchors and evidence references stay
+         *     valid; ``document_id`` comes from the verified parent; the timestamps are
+         *     authored by the server (``PATCH`` preserves the original ``authored_at``).
+         */
+        Insight: {
+            /**
+             * Authored At
+             * Format: date-time
+             */
+            authored_at: string;
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /** Body */
+            body: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList"])[];
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "supporting" | "contradicting" | "uncertain";
+            /** Context */
+            context: components["schemas"]["ResolvedContext"] | components["schemas"]["ModelContext"];
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Hypothesis Id */
+            hypothesis_id?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Modified At
+             * Format: date-time
+             */
+            modified_at: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "observation" | "hypothesis" | "risk" | "conclusion";
+        };
+        /**
+         * InsightInput
+         * @description POST /documents/{id}/insights body (API_SPECIFICATION ``InsightInput``).
+         *
+         *     The insight TYPE carries the research role (observation/hypothesis/risk/
+         *     conclusion); ``classification`` records how the observation relates to the
+         *     linked hypothesis (supporting/contradicting/uncertain — a classification,
+         *     never an inferred causal claim). ``body`` is bounded/sanitized rich text
+         *     (max 10k plain-text-equivalent characters); ``context`` is the frozen
+         *     inspection record the insight must stay tied to after live refresh.
+         *     ``authored_at``/``modified_at`` do not exist here by construction: the
+         *     server authors them.
+         */
+        InsightInput: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /** Body */
+            body: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList"])[];
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "supporting" | "contradicting" | "uncertain";
+            /** Context */
+            context: components["schemas"]["ResolvedContext"] | components["schemas"]["ModelContext"];
+            /** Hypothesis Id */
+            hypothesis_id?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "observation" | "hypothesis" | "risk" | "conclusion";
+        };
         /** MetricListResponse */
         MetricListResponse: {
             /** Items */
@@ -875,6 +1117,26 @@ export interface components {
             unit: string;
             /** Version */
             version: number;
+        };
+        /**
+         * ModelContext
+         * @description Frozen model-run inspection record (API_SPECIFICATION ``ModelContext``).
+         */
+        ModelContext: {
+            /** Context Hash */
+            context_hash: string;
+            /**
+             * Dataset Version Id
+             * Format: uuid
+             */
+            dataset_version_id: string;
+            /**
+             * Model Run Id
+             * Format: uuid
+             */
+            model_run_id: string;
+            /** Specification Version */
+            specification_version: string;
         };
         /** Observation */
         Observation: {
@@ -929,6 +1191,42 @@ export interface components {
         };
         Reason: string;
         /**
+         * ResolvedContext
+         * @description Frozen chart inspection record (API_SPECIFICATION ``ResolvedContext``).
+         *
+         *     Contains the selected range (``selection.start``/``selection.end`` with the
+         *     half-open UTC window rules of :class:`near_api.schemas.common.Selection`),
+         *     the filters as passed (the approved filter domain is empty until a filter
+         *     schema is registered), the immutable pinned dataset version and the stable
+         *     version identifiers whose ``context_hash`` binds them together. Server
+         *     resolution/verification of every id happens where the context is created;
+         *     this contract keeps a stored context from drifting afterwards.
+         */
+        ResolvedContext: {
+            /**
+             * Chart Definition Version Id
+             * Format: uuid
+             */
+            chart_definition_version_id: string;
+            /** Context Hash */
+            context_hash: string;
+            /**
+             * Dataset Version Id
+             * Format: uuid
+             */
+            dataset_version_id: string;
+            /** Metric Definition Versions */
+            metric_definition_versions: string[];
+            /** Renderer Version */
+            renderer_version: string;
+            /**
+             * Resolved At
+             * Format: date-time
+             */
+            resolved_at: string;
+            selection: components["schemas"]["Selection"];
+        };
+        /**
          * ResolvedSelection
          * @description The resolved selection echoed back on series/chart-view responses.
          *
@@ -968,6 +1266,118 @@ export interface components {
          */
         ResolvedSelectionFilters: {
             [key: string]: unknown;
+        };
+        /** RichTextBoldMark */
+        RichTextBoldMark: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bold";
+        };
+        /** RichTextItalicMark */
+        RichTextItalicMark: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "italic";
+        };
+        /**
+         * RichTextLinkAttrs
+         * @description Canonical link mark attributes. Scheme/credential rules for the target
+         *     are enforced by the canonical rich text parser, which validates every body
+         *     before these shapes are constructed.
+         */
+        RichTextLinkAttrs: {
+            /** Href */
+            href: string;
+        };
+        /** RichTextLinkMark */
+        RichTextLinkMark: {
+            attrs: components["schemas"]["RichTextLinkAttrs"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "link";
+        };
+        /** RichTextList */
+        RichTextList: {
+            /** Content */
+            content: components["schemas"]["RichTextListItem"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bullet_list" | "ordered_list";
+        };
+        /**
+         * RichTextListItem
+         * @description One list item. The canonical parser enforces the ordering rule (a nested
+         *     list must follow a paragraph) and the depth <= 3 bound before these shapes
+         *     are constructed.
+         */
+        RichTextListItem: {
+            /** Content */
+            content: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList"])[];
+            /**
+             * Type
+             * @constant
+             */
+            type: "list_item";
+        };
+        /** RichTextParagraph */
+        RichTextParagraph: {
+            /** Content */
+            content: components["schemas"]["RichTextRun"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "paragraph";
+        };
+        /**
+         * RichTextRun
+         * @description One text node with its (bounded, deduplicated) inline marks.
+         */
+        RichTextRun: {
+            /**
+             * Marks
+             * @default []
+             */
+            marks: (components["schemas"]["RichTextBoldMark"] | components["schemas"]["RichTextItalicMark"] | components["schemas"]["RichTextLinkMark"])[];
+            /** Text */
+            text: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "text";
+        };
+        /**
+         * RiskInput
+         * @description Canonical risk node contract (EDITOR_SPECIFICATION ``risk`` row).
+         *
+         *     An explicit counterargument card: ``title`` + bounded rich text ``body``
+         *     with an optional same-document hypothesis link. There is deliberately no
+         *     algorithmic probability score field. No convenience REST route is
+         *     specified for risk blocks; risk nodes are edited through the document
+         *     revision flow (NI-039/NI-040), so this contract serves the editor, the
+         *     projections and the export path.
+         */
+        RiskInput: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /** Body */
+            body: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList"])[];
+            /** Related Hypothesis Id */
+            related_hypothesis_id?: string | null;
+            /** Title */
+            title: string;
         };
         /** Selection */
         Selection: {

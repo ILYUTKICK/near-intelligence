@@ -11,6 +11,7 @@ from pydantic.json_schema import models_json_schema
 from starlette.exceptions import HTTPException
 
 from near_api.db.security import ResourceNotFound
+from near_api.insights.schemas import INSIGHT_CONTRACT_MODELS
 from near_api.schemas.common import ApiError, CONTRACT_MODELS, ErrorDetail, ErrorResponse
 
 _HTTP_ERRORS = {
@@ -98,8 +99,14 @@ def install_contracts(app: FastAPI) -> None:
         if app.openapi_schema is None:
             schema = get_openapi(title=app.title, version=app.version, routes=app.routes,
                                  openapi_version=app.openapi_version)
-            _, common = models_json_schema([(model, "validation") for model in CONTRACT_MODELS],
-                                          ref_template="#/components/schemas/{model}")
+            # NI-046: the insight/evidence/hypothesis/risk contracts are
+            # published in components before their convenience routes exist
+            # (NI-047/048/049), so the generated TypeScript client already
+            # carries the validation types.
+            _, common = models_json_schema(
+                [(model, "validation")
+                 for model in (*CONTRACT_MODELS, *INSIGHT_CONTRACT_MODELS)],
+                ref_template="#/components/schemas/{model}")
             common = jsonable_encoder(common, exclude_none=True)
             definitions = schema.setdefault("components", {}).setdefault("schemas", {})
             for name, definition in common.get("$defs", {}).items():

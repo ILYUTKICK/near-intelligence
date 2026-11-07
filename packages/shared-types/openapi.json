@@ -956,6 +956,142 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "Evidence": {
+        "additionalProperties": false,
+        "description": "API_SPECIFICATION ``Evidence``: EvidenceInput plus server fields.\n\n``authored_at``/``modified_at`` are response metadata authored by the\nserver; the canonical evidence node itself stays timestamp-free per\nEDITOR_SPECIFICATION (timestamps live on the revision that carries it).",
+        "properties": {
+          "authored_at": {
+            "format": "date-time",
+            "title": "Authored At",
+            "type": "string"
+          },
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "supporting",
+              "contradicting",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "explanation": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Explanation",
+            "type": "string"
+          },
+          "hypothesis_id": {
+            "format": "uuid",
+            "title": "Hypothesis Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "modified_at": {
+            "format": "date-time",
+            "title": "Modified At",
+            "type": "string"
+          },
+          "target_id": {
+            "format": "uuid",
+            "title": "Target Id",
+            "type": "string"
+          },
+          "target_kind": {
+            "enum": [
+              "insight",
+              "chart_block",
+              "model_run",
+              "citation"
+            ],
+            "title": "Target Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "hypothesis_id",
+          "classification",
+          "target_kind",
+          "target_id",
+          "explanation",
+          "id",
+          "document_id",
+          "authored_at",
+          "modified_at"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "EvidenceInput": {
+        "additionalProperties": false,
+        "description": "POST /documents/{id}/evidence body (API_SPECIFICATION ``EvidenceInput``).\n\n``target_kind``/``target_id`` must resolve to an allowed typed target in\nthe same revision or to a public immutable artifact; that visibility/\nreference validation is service scope (NI-049) \u2014 this contract rejects the\nshapes it can reject (unknown kinds, non-UUID ids, unbounded explanation).",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "supporting",
+              "contradicting",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "explanation": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Explanation",
+            "type": "string"
+          },
+          "hypothesis_id": {
+            "format": "uuid",
+            "title": "Hypothesis Id",
+            "type": "string"
+          },
+          "target_id": {
+            "format": "uuid",
+            "title": "Target Id",
+            "type": "string"
+          },
+          "target_kind": {
+            "enum": [
+              "insight",
+              "chart_block",
+              "model_run",
+              "citation"
+            ],
+            "title": "Target Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "hypothesis_id",
+          "classification",
+          "target_kind",
+          "target_id",
+          "explanation"
+        ],
+        "title": "EvidenceInput",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1070,6 +1206,294 @@
           "counts"
         ],
         "title": "HomeResponse",
+        "type": "object"
+      },
+      "Hypothesis": {
+        "additionalProperties": false,
+        "description": "API_SPECIFICATION ``Hypothesis``: HypothesisInput plus server fields.",
+        "properties": {
+          "assessment": {
+            "enum": [
+              "untested",
+              "supported",
+              "mixed",
+              "weakened",
+              "insufficient_data"
+            ],
+            "title": "Assessment",
+            "type": "string"
+          },
+          "authored_at": {
+            "format": "date-time",
+            "title": "Authored At",
+            "type": "string"
+          },
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "modified_at": {
+            "format": "date-time",
+            "title": "Modified At",
+            "type": "string"
+          },
+          "statement": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Statement",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "statement",
+          "assessment",
+          "id",
+          "document_id",
+          "authored_at",
+          "modified_at"
+        ],
+        "title": "Hypothesis",
+        "type": "object"
+      },
+      "HypothesisInput": {
+        "additionalProperties": false,
+        "description": "POST /documents/{id}/hypotheses body (API_SPECIFICATION ``HypothesisInput``).\n\n``assessment`` is an authored state with rationale in the document, never\nan automatic truth badge; unsupported values are rejected.",
+        "properties": {
+          "assessment": {
+            "enum": [
+              "untested",
+              "supported",
+              "mixed",
+              "weakened",
+              "insufficient_data"
+            ],
+            "title": "Assessment",
+            "type": "string"
+          },
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "statement": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Statement",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "statement",
+          "assessment"
+        ],
+        "title": "HypothesisInput",
+        "type": "object"
+      },
+      "Insight": {
+        "additionalProperties": false,
+        "description": "API_SPECIFICATION ``Insight``: InsightInput plus server-authored fields.\n\n``id`` is the stable entity id allocated once at creation (uuid4) and kept\nunchanged across revisions so outline anchors and evidence references stay\nvalid; ``document_id`` comes from the verified parent; the timestamps are\nauthored by the server (``PATCH`` preserves the original ``authored_at``).",
+        "properties": {
+          "authored_at": {
+            "format": "date-time",
+            "title": "Authored At",
+            "type": "string"
+          },
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "body": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList",
+                  "ordered_list": "#/components/schemas/RichTextList",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Body",
+            "type": "array"
+          },
+          "classification": {
+            "enum": [
+              "supporting",
+              "contradicting",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedContext"
+              },
+              {
+                "$ref": "#/components/schemas/ModelContext"
+              }
+            ],
+            "title": "Context"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "hypothesis_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "modified_at": {
+            "format": "date-time",
+            "title": "Modified At",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "observation",
+              "hypothesis",
+              "risk",
+              "conclusion"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "type",
+          "classification",
+          "body",
+          "context",
+          "id",
+          "document_id",
+          "authored_at",
+          "modified_at"
+        ],
+        "title": "Insight",
+        "type": "object"
+      },
+      "InsightInput": {
+        "additionalProperties": false,
+        "description": "POST /documents/{id}/insights body (API_SPECIFICATION ``InsightInput``).\n\nThe insight TYPE carries the research role (observation/hypothesis/risk/\nconclusion); ``classification`` records how the observation relates to the\nlinked hypothesis (supporting/contradicting/uncertain \u2014 a classification,\nnever an inferred causal claim). ``body`` is bounded/sanitized rich text\n(max 10k plain-text-equivalent characters); ``context`` is the frozen\ninspection record the insight must stay tied to after live refresh.\n``authored_at``/``modified_at`` do not exist here by construction: the\nserver authors them.",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "body": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList",
+                  "ordered_list": "#/components/schemas/RichTextList",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Body",
+            "type": "array"
+          },
+          "classification": {
+            "enum": [
+              "supporting",
+              "contradicting",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedContext"
+              },
+              {
+                "$ref": "#/components/schemas/ModelContext"
+              }
+            ],
+            "title": "Context"
+          },
+          "hypothesis_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis Id"
+          },
+          "type": {
+            "enum": [
+              "observation",
+              "hypothesis",
+              "risk",
+              "conclusion"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "type",
+          "classification",
+          "body",
+          "context"
+        ],
+        "title": "InsightInput",
         "type": "object"
       },
       "MetricListResponse": {
@@ -1207,6 +1631,41 @@
         "title": "MetricResponse",
         "type": "object"
       },
+      "ModelContext": {
+        "additionalProperties": false,
+        "description": "Frozen model-run inspection record (API_SPECIFICATION ``ModelContext``).",
+        "properties": {
+          "context_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Context Hash",
+            "type": "string"
+          },
+          "dataset_version_id": {
+            "format": "uuid",
+            "title": "Dataset Version Id",
+            "type": "string"
+          },
+          "model_run_id": {
+            "format": "uuid",
+            "title": "Model Run Id",
+            "type": "string"
+          },
+          "specification_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Specification Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_run_id",
+          "dataset_version_id",
+          "specification_version",
+          "context_hash"
+        ],
+        "title": "ModelContext",
+        "type": "object"
+      },
       "Observation": {
         "additionalProperties": false,
         "properties": {
@@ -1307,6 +1766,61 @@
         "minLength": 1,
         "type": "string"
       },
+      "ResolvedContext": {
+        "additionalProperties": false,
+        "description": "Frozen chart inspection record (API_SPECIFICATION ``ResolvedContext``).\n\nContains the selected range (``selection.start``/``selection.end`` with the\nhalf-open UTC window rules of :class:`near_api.schemas.common.Selection`),\nthe filters as passed (the approved filter domain is empty until a filter\nschema is registered), the immutable pinned dataset version and the stable\nversion identifiers whose ``context_hash`` binds them together. Server\nresolution/verification of every id happens where the context is created;\nthis contract keeps a stored context from drifting afterwards.",
+        "properties": {
+          "chart_definition_version_id": {
+            "format": "uuid",
+            "title": "Chart Definition Version Id",
+            "type": "string"
+          },
+          "context_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Context Hash",
+            "type": "string"
+          },
+          "dataset_version_id": {
+            "format": "uuid",
+            "title": "Dataset Version Id",
+            "type": "string"
+          },
+          "metric_definition_versions": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Metric Definition Versions",
+            "type": "array"
+          },
+          "renderer_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Renderer Version",
+            "type": "string"
+          },
+          "resolved_at": {
+            "format": "date-time",
+            "title": "Resolved At",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/Selection"
+          }
+        },
+        "required": [
+          "chart_definition_version_id",
+          "dataset_version_id",
+          "selection",
+          "context_hash",
+          "renderer_version",
+          "metric_definition_versions",
+          "resolved_at"
+        ],
+        "title": "ResolvedContext",
+        "type": "object"
+      },
       "ResolvedSelection": {
         "additionalProperties": false,
         "description": "The resolved selection echoed back on series/chart-view responses.\n\nSame window rules as the shared bootstrap ``Selection`` (ISO dates,\nfrequency ``day``, non-empty half-open window of at most 366 days), but\n``filters`` carries the chart-version-validated values instead of the\nstrict-empty bootstrap object.",
@@ -1344,6 +1858,271 @@
         "description": "Chart-version-validated filters carried inside a resolved selection.\n\nRequest filters arrive as the urlencoded ``filters`` query parameter and\nare validated server-side against the resolved chart definition version's\nclosed ``filter_schema`` (the NI-031 versioned allowlist: string enums\nfrom approved source/recipient/price-basis mappings only). Unknown keys\nand unlisted values are rejected before any resolution happens, so this\npermissive container never serializes an unapproved filter value.",
         "properties": {},
         "title": "ResolvedSelectionFilters",
+        "type": "object"
+      },
+      "RichTextBoldMark": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "bold",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "RichTextBoldMark",
+        "type": "object"
+      },
+      "RichTextItalicMark": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "italic",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "RichTextItalicMark",
+        "type": "object"
+      },
+      "RichTextLinkAttrs": {
+        "additionalProperties": false,
+        "description": "Canonical link mark attributes. Scheme/credential rules for the target\nare enforced by the canonical rich text parser, which validates every body\nbefore these shapes are constructed.",
+        "properties": {
+          "href": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Href",
+            "type": "string"
+          }
+        },
+        "required": [
+          "href"
+        ],
+        "title": "RichTextLinkAttrs",
+        "type": "object"
+      },
+      "RichTextLinkMark": {
+        "additionalProperties": false,
+        "properties": {
+          "attrs": {
+            "$ref": "#/components/schemas/RichTextLinkAttrs"
+          },
+          "type": {
+            "const": "link",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "attrs"
+        ],
+        "title": "RichTextLinkMark",
+        "type": "object"
+      },
+      "RichTextList": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/RichTextListItem"
+            },
+            "minItems": 1,
+            "title": "Content",
+            "type": "array"
+          },
+          "type": {
+            "enum": [
+              "bullet_list",
+              "ordered_list"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "RichTextList",
+        "type": "object"
+      },
+      "RichTextListItem": {
+        "additionalProperties": false,
+        "description": "One list item. The canonical parser enforces the ordering rule (a nested\nlist must follow a paragraph) and the depth <= 3 bound before these shapes\nare constructed.",
+        "properties": {
+          "content": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList",
+                  "ordered_list": "#/components/schemas/RichTextList",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Content",
+            "type": "array"
+          },
+          "type": {
+            "const": "list_item",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "RichTextListItem",
+        "type": "object"
+      },
+      "RichTextParagraph": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/RichTextRun"
+            },
+            "title": "Content",
+            "type": "array"
+          },
+          "type": {
+            "const": "paragraph",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "RichTextParagraph",
+        "type": "object"
+      },
+      "RichTextRun": {
+        "additionalProperties": false,
+        "description": "One text node with its (bounded, deduplicated) inline marks.",
+        "properties": {
+          "marks": {
+            "default": [],
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bold": "#/components/schemas/RichTextBoldMark",
+                  "italic": "#/components/schemas/RichTextItalicMark",
+                  "link": "#/components/schemas/RichTextLinkMark"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextBoldMark"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextItalicMark"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextLinkMark"
+                }
+              ]
+            },
+            "maxItems": 3,
+            "title": "Marks",
+            "type": "array"
+          },
+          "text": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "text",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "title": "RichTextRun",
+        "type": "object"
+      },
+      "RiskInput": {
+        "additionalProperties": false,
+        "description": "Canonical risk node contract (EDITOR_SPECIFICATION ``risk`` row).\n\nAn explicit counterargument card: ``title`` + bounded rich text ``body``\nwith an optional same-document hypothesis link. There is deliberately no\nalgorithmic probability score field. No convenience REST route is\nspecified for risk blocks; risk nodes are edited through the document\nrevision flow (NI-039/NI-040), so this contract serves the editor, the\nprojections and the export path.",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "body": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList",
+                  "ordered_list": "#/components/schemas/RichTextList",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Body",
+            "type": "array"
+          },
+          "related_hypothesis_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Hypothesis Id"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "title",
+          "body"
+        ],
+        "title": "RiskInput",
         "type": "object"
       },
       "Selection": {
