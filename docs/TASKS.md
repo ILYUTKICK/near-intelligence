@@ -1306,9 +1306,13 @@ Specification: [ECONOMETRIC_METHODOLOGY.md](ECONOMETRIC_METHODOLOGY.md).
 
 - **Epic:** 11 — Econometric Models
 - **Priority:** P0
-- **Dependencies:** NI-051
+- **Dependencies:** NI-051 (DONE on main 8ba8025, merged PR #40; the gate verdict PROXY_ONLY_READY_WITH_LIMITS with admitted spec `gross_fee_activity_v1` is the admissibility base for this task)
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #18
+- **Execution role:** B
+- **Started at:** 2026-11-08T00:35:39+03:00
+- **Branch/worktree:** feat/ni-052-estimator; /Users/ilyutkinn/Desktop/near-intelligence-b3 (worktree, fast-forwarded to origin/main 8ba8025)
 
 **Description:** Fit one defensible real-data association with declared transformations and covariance.
 
