@@ -21,8 +21,6 @@ import { defaultChartFactory } from "./chart-factory";
 import type { ChartDefinitionResponse, ChartViewResponse } from "./view-types";
 import { RENDERER_VERSION } from "./view-types";
 
-import { cn } from "@/lib/utils";
-
 /** The selection the renderer resolves (dates are "YYYY-MM-DD", half-open). */
 export interface ChartSelection {
   start: string;
@@ -169,9 +167,9 @@ export function ChartView({
     }
     const controller = new AbortController();
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     const timer = setTimeout(() => {
+      setLoading(true);
+      setError(null);
       loader({
         chartId: definition.chart_id,
         definitionId: definition.id,
@@ -375,3 +373,4 @@ export function ChartView({
 /** Re-exported so contexts can display the registry renderer version. */
 export { RENDERER_VERSION };
 export type { ChartDefinitionResponse, ChartViewResponse };
+export type { ChartFactory, EChartsLike } from "./chart-factory";

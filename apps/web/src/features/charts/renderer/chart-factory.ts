@@ -39,14 +39,17 @@ export type ChartFactory = (
  * bundle and lets the bundler code-split it.
  */
 export const defaultChartFactory: ChartFactory = async (container, context) => {
-  const [{ init, use }, charts, components, renderers, features] = await Promise.all([
-    import("echarts/core"),
-    import("echarts/charts"),
-    import("echarts/components"),
-    import("echarts/renderers"),
-    import("echarts/features"),
-  ]);
-  use([
+  // ECharts' component registration function is named `use`, which trips the
+  // React hooks lint rules; alias it to its documented meaning.
+  const [{ init, use: registerComponents }, charts, components, renderers, features] =
+    await Promise.all([
+      import("echarts/core"),
+      import("echarts/charts"),
+      import("echarts/components"),
+      import("echarts/renderers"),
+      import("echarts/features"),
+    ]);
+  registerComponents([
     charts.LineChart,
     charts.BarChart,
     charts.ScatterChart,

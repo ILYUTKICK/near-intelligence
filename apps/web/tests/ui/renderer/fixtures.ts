@@ -49,7 +49,7 @@ export function lowerBoundQuality() {
 export function observation(
   day: string,
   value: string | null,
-  quality = value === null ? missingQuality() : okQuality(),
+  quality: Observation["quality"] = value === null ? missingQuality() : okQuality(),
 ): Observation {
   return {
     start: `${day}T00:00:00Z`,

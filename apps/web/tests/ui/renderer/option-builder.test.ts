@@ -15,6 +15,7 @@ import type { TooltipComponentOption } from "echarts/components";
 import { describe, expect, it } from "vitest";
 
 import { buildChart, CHART_SERIES_COLORS, displayUnits } from "@/features/charts/renderer/option-builder";
+import type { ChartOption } from "@/features/charts/renderer/option-builder";
 import { RENDERER_VERSION } from "@/features/charts/renderer/view-types";
 import type { SeriesResponse } from "@/features/charts/renderer/view-types";
 import {
@@ -28,7 +29,22 @@ import {
 } from "./fixtures";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../../..");
-const WINDOW = { start: "2026-11-01", end: "2026-11-06" };
+
+// ECharts option fields are `Arrayable<T>` (single object | array); these
+// helpers normalize access so the tests read like the rendered structure.
+type AnyOption = Record<string, unknown>;
+function seriesAt(option: ChartOption, index: number): AnyOption | undefined {
+  const list = option.series === undefined ? [] : Array.isArray(option.series) ? option.series : [option.series];
+  return list[index] as AnyOption | undefined;
+}
+function yAxisAt(option: ChartOption, index: number): AnyOption | undefined {
+  const list = option.yAxis === undefined ? [] : Array.isArray(option.yAxis) ? option.yAxis : [option.yAxis];
+  return list[index] as AnyOption | undefined;
+}
+function legendData(option: ChartOption): string[] {
+  const legend = Array.isArray(option.legend) ? option.legend[0] : option.legend;
+  return (legend as { data?: string[] } | undefined)?.data ?? [];
+}
 
 describe("buildChart — cartesian charts", () => {
   it("builds a gap-preserving line series: missing points stay null, connectNulls false", () => {
@@ -44,7 +60,7 @@ describe("buildChart — cartesian charts", () => {
     const built = buildChart(view(definition(), seriesList));
     expect(built.kind).toBe("ok");
     if (built.kind !== "ok") return;
-    const line = built.option.series?.[0] as { type: string; connectNulls: boolean; data: (number | null)[] };
+    const line = seriesAt(built.option, 0) as { type: string; connectNulls: boolean; data: (number | null)[] };
     expect(line.type).toBe("line");
     expect(line.connectNulls).toBe(false);
     expect(line.data[0]).toBe(1000);
@@ -60,7 +76,7 @@ describe("buildChart — cartesian charts", () => {
     );
     expect(areaBuilt.kind).toBe("ok");
     if (areaBuilt.kind === "ok") {
-      expect((areaBuilt.option.series?.[0] as { areaStyle?: unknown }).areaStyle).toBeDefined();
+      expect(seriesAt(areaBuilt.option, 0)?.areaStyle).toBeDefined();
     }
     const fees = metric("USD", "Synthetic fees (fixture)", "synthetic_fees");
     const barBuilt = buildChart(
@@ -70,11 +86,11 @@ describe("buildChart — cartesian charts", () => {
     );
     expect(barBuilt.kind).toBe("ok");
     if (barBuilt.kind === "ok") {
-      const bar = barBuilt.option.series?.[0] as { type: string; barMaxWidth: number };
+      const bar = seriesAt(barBuilt.option, 0) as { type: string; barMaxWidth: number };
       expect(bar.type).toBe("bar");
       expect(bar.barMaxWidth).toBe(32);
       // Bars are zero-anchored: no hidden truncation.
-      expect((barBuilt.option.yAxis as { min: number }[])[0].min).toBe(0);
+      expect(yAxisAt(barBuilt.option, 0)?.min).toBe(0);
     }
   });
 
@@ -94,12 +110,12 @@ describe("buildChart — cartesian charts", () => {
     if (built.kind !== "ok") return;
     expect(built.panelCount).toBe(2);
     expect((built.option.grid as unknown[]).length).toBe(2);
-    expect((built.option.series?.[0] as { xAxisIndex: number }).xAxisIndex).toBe(0);
-    expect((built.option.series?.[1] as { xAxisIndex: number }).xAxisIndex).toBe(1);
-    const yAxis = built.option.yAxis as { name: string; type: string }[];
-    expect(yAxis.map((axis) => axis.name)).toEqual(["NEAR", "USD"]);
+    expect(seriesAt(built.option, 0)?.xAxisIndex).toBe(0);
+    expect(seriesAt(built.option, 1)?.xAxisIndex).toBe(1);
+    const yAxisNames = [0, 1].map((index) => yAxisAt(built.option, index)?.name);
+    expect(yAxisNames).toEqual(["NEAR", "USD"]);
     // Multi-series charts carry a legend for the panel titles.
-    expect(built.option.legend?.data).toEqual(["Synthetic purchases (fixture)", "Synthetic estimate (fixture)"]);
+    expect(legendData(built.option)).toEqual(["Synthetic purchases (fixture)", "Synthetic estimate (fixture)"]);
   });
 
   it("keeps same-unit series on one axis with grouped bars", () => {
@@ -114,7 +130,7 @@ describe("buildChart — cartesian charts", () => {
     expect(built.kind).toBe("ok");
     if (built.kind !== "ok") return;
     expect(built.panelCount).toBe(1);
-    expect(built.option.legend?.data).toHaveLength(2);
+    expect(legendData(built.option)).toHaveLength(2);
   });
 });
 
@@ -138,7 +154,7 @@ describe("buildChart — scatter", () => {
     );
     expect(built.kind).toBe("ok");
     if (built.kind !== "ok") return;
-    const scatter = built.option.series?.[0] as { type: string; data: [number, number][] };
+    const scatter = seriesAt(built.option, 0) as { type: string; data: [number, number][] };
     expect(scatter.type).toBe("scatter");
     expect(scatter.data).toEqual([
       [100, 10],
@@ -178,7 +194,7 @@ describe("buildChart — exact values, bounds and honesty", () => {
     expect(cell.kind === "value" && cell.display).toBe(
       "123\u202f456\u202f789\u202f012\u202f345\u202f678\u202f901\u202f234\u202f567\u202f890.5",
     );
-    const line = built.option.series?.[0] as { data: (number | null)[] };
+    const line = seriesAt(built.option, 0) as { data: (number | null)[] };
     // The documented coordinate boundary: Number() for plot position only.
     expect(line.data[0]).toBe(Number(HUGE_DECIMAL));
   });

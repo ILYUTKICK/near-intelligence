@@ -28,6 +28,13 @@ import {
   HUGE_DECIMAL,
 } from "./fixtures";
 
+/** ECharts option fields are `Arrayable<T>`; normalize indexed access. */
+function seriesAt(option: ChartOption | null, index: number): Record<string, unknown> | undefined {
+  const single = option?.series;
+  const list = single === undefined ? [] : Array.isArray(single) ? single : [single];
+  return list[index] as Record<string, unknown> | undefined;
+}
+
 interface FakeInstance {
   option: ChartOption | null;
   disposed: boolean;
@@ -128,7 +135,7 @@ describe("ChartView — plot and accessible table integration", () => {
     const { instances } = renderChart();
     await waitFor(() => expect(instances.length).toBe(1));
     expect(instances[0].option).not.toBeNull();
-    expect(instances[0].option?.series?.[0]).toMatchObject({ type: "line" });
+    expect(seriesAt(instances[0].option, 0)).toMatchObject({ type: "line" });
 
     // Exact values are in the table (no hover needed): raw strings, bounds
     // labels, and gap rows are all visible text.
@@ -146,7 +153,7 @@ describe("ChartView — plot and accessible table integration", () => {
     const table = screen.getByRole("region", { name: /exact data table/ });
     const grouped = "123\u202f456\u202f789\u202f012\u202f345\u202f678\u202f901\u202f234\u202f567\u202f890.5";
     expect(cellWith(table, grouped)).toBeInTheDocument();
-    const coordinate = (instances[0].option?.series?.[0] as { data: (number | null)[] }).data[2];
+    const coordinate = (seriesAt(instances[0].option, 0) as { data: (number | null)[] }).data[2];
     expect(coordinate).toBe(Number(HUGE_DECIMAL));
   });
 
@@ -330,7 +337,6 @@ describe("ChartView — range selection (keyboard/touch)", () => {
   });
 
   it("marks the active preset with aria-pressed and describes custom ranges", async () => {
-    const user = userEvent.setup();
     const { rerender } = renderChart({ onSelectionChange: () => {} });
     await screen.findByRole("region", { name: /exact data table/ });
     // No preset matches the initial window, so none is pressed yet.
