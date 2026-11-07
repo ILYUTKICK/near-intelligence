@@ -136,6 +136,44 @@ Whole-document save creates a new revision for all structural editing including 
 
 `filters` are canonicalized before hash/cache computation. A missing series still returns its metric and quality with null points. Charts cannot request arbitrary provider URLs, SQL or currency conversions.
 
+**Implemented (NI-032):** the metrics/charts/datasets/data-sources rows above are
+implemented under the `/api` prefix (`/api/metrics`, `/api/charts`,
+`/api/data-sources`, `/api/datasets`; the spec's `/api/v1` base stays the same
+contract, and route-path aliases remain a review decision as recorded for
+`/workspace/home`). They are public reads through the unprivileged `near_app`
+role with no authorization and no user-identifying input; private saved-chart
+rows remain NI-035 scope. Implemented deltas against the rows above, recorded
+here for consumers: `ChartDefinition` responses carry `data_status` +
+`unavailable_reason` (unavailable charts are never advertised as live),
+`source_lineage`, and `available_ranges` as the bounded
+`{presets_days:number[],max_days:number}` object (the plain preset-string list
+would lose the max-range bound); `Metric.formula` is the registered
+computation identifier (`formula_key`), not executable content; `Metric`
+list filtering supports `availability` (A/P/B/G) while `category` is rejected
+422 FILTER_UNSUPPORTED because definitions carry no category axis. Series and
+chart views resolve ONE approved dataset version per request — explicit
+`dataset_version` UUIDs are 404 unless `approved` (staged/validated/rejected
+never leak existence), and `latest` picks among `active_datasets` rows whose
+approved version contains every required metric definition (most recent
+`published_at`, then lowest `dataset_key`; cached ≤60 s; no result is a typed
+retryable 503 DATA_NOT_READY, never a substitution). Responses carry decimal
+strings, per-point quality with explicit reasons, UTC half-open timestamps and
+a `context_hash` over definition version + dataset version + canonical
+selection + bound metric definition versions; identical selections resolve
+identically. Chart `filters` (urlencoded JSON) are validated against the
+resolved chart version's closed `filter_schema`; unknown keys/values are 422
+FILTER_UNSUPPORTED. A period holding several dimension variants without a
+disambiguating approved filter is an explicit null/unavailable point with a
+reason — values are never averaged, summed or picked silently. Metric-level
+series accept only empty filters until a metric filter domain is registered.
+Source projections never serialize the provider endpoint or credentials
+(`docs_url` is nulled unless credential-free http(s)); the dataset manifest is
+served sanitized from persisted rows (content-addressed storage keys, no
+operator paths) and is 404 when the version is not approved or its artifact is
+license-`prohibited`. Approved content is served with immutable public cache
+headers and a `content_sha256` ETag; latest pointers with `max-age=60`.
+
+
 ## Insights, hypotheses and evidence
 
 These are convenience operations on the current document JSON; all writes require If-Match and return a new document revision. Stable IDs persist across versions; GET can take `version_id` for historical views. PATCH schemas are partial corresponding Input schemas, with required final-state validation.
