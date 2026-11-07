@@ -168,6 +168,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@near-intelligence/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
       '@next/env':
         specifier: 16.4.5
         version: 16.4.5

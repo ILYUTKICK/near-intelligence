@@ -24,13 +24,15 @@ const partialLowerQuality: DataQuality = {
 };
 
 // Synthetic test fixture — fake provider shape, not production data.
+// license/access are the generated contract's enums (NI-032 alignment);
+// the fixture labels live in the name/lineage strings.
 const syntheticSource: DataSource = {
   id: "00000000-0000-0000-0000-000000000001",
   name: "Synthetic chain explorer (test fixture)",
   docs_url: "https://docs.example.com/near-feeds",
   verified_at: "2026-11-05T12:00:00Z",
-  license_status: "CC BY 4.0 (fixture)",
-  access_status: "public, rate-limited (fixture)",
+  license_status: "verified",
+  access_status: "approved",
   lineage: ["fixture step 1: node export", "fixture step 2: daily aggregation"],
   expected_update_frequency: "daily (fixture)",
   last_success_at: "2026-11-05T06:00:00Z",
@@ -124,7 +126,7 @@ describe("ChartFrame", () => {
     const dialog = await screen.findByRole("dialog", { name: "Sources and definitions" });
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByText("Synthetic chain explorer (test fixture)")).toBeInTheDocument();
-    expect(within(dialog).getByText("CC BY 4.0 (fixture)")).toBeInTheDocument();
+    expect(within(dialog).getByText("verified")).toBeInTheDocument();
     expect(within(dialog).getByText("2026-11-05T06:00:00Z")).toBeInTheDocument();
     expect(within(dialog).getByText("fixture step 1: node export")).toBeInTheDocument();
     expect(await axe(document.body, { rules: { region: { enabled: false } } })).toHaveNoViolations();

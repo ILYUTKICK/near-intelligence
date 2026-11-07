@@ -6,6 +6,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The generated shared-types package exports TypeScript source directly;
+  // Next must compile it like first-party app code (NI-033 renderer contract).
+  transpilePackages: ["@near-intelligence/shared-types"],
 };
 
 export default nextConfig;
