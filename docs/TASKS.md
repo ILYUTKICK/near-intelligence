@@ -148,6 +148,7 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Status:** IN_PROGRESS
 - **Reopened — PostgreSQL suite omission:** Merge resolution `cf1f6fc` for PR #40 dropped `test_chart_registry.py` from the disposable-cluster runner. CI at `e79953d` passed without exercising the NI-031 PostgreSQL checks.
 - **Backend repair claim:** Codex / BkycnocTbI / role B reviewer / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b, started 2026-11-07T15:27:01+03:00, `fix/ni-005-chart-registry-db-checks`. Scope: restore the omitted suite in the Python runner and verify it locally. A remains the NI-005 acceptance lead; the NI-031 and NI-051 claims are unchanged.
+- **Backend repair verification:** On Windows with frozen CPython 3.13.15 and disposable PostgreSQL 18.6, `scripts/run-db-tests.py` ran 170 tests without skips. All 26 chart registry tests passed, including all five PostgreSQL cases (migration/RLS, registration, immutability and FK checks); the model readiness suite still ran. The overall run had one pre-existing failure in `test_08_stage_from_import_is_offline_and_deduplicates`: NI-027 `parse_manifest` hashes text after universal newline conversion, whereas NI-028 looks up the SHA-256 of the original file bytes. A separate synthetic LF/CRLF reproduction confirmed the mismatch. This PR restores the test runner entry; the archive importer and its claim are unchanged. A acceptance and PR CI are pending.
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A
 - **Started at:** 2026-11-06T03:18:32+03:00
