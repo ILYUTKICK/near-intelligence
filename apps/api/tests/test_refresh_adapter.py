@@ -546,6 +546,31 @@ class RefreshAdapterDatabaseTests(unittest.TestCase):
         self.assertEqual(revision["added"], 1)
         self.assertEqual(revision["previous_version_id"], first["dataset_version_id"])
 
+    def test_02b_same_day_higher_height_supersedes_with_changed_observation(self):
+        self.approve_source()
+        first = self.attempt(header_body(223_400_000))
+        # The production cadence case: the next scheduled attempt (61 s later on
+        # the run clock) sees the finalized head advanced WITHIN the same UTC
+        # day. The observation identity (metric, period_start, dimensions) is
+        # unchanged, so the revision delta records a change of the day's
+        # observation instead of a new date, and the pointer still moves forward.
+        second = self.attempt(header_body(223_400_005))
+        self.assertEqual(second["status"], "published")
+        self.assertEqual(second["checkpoint_height_before"], 223_400_000)
+        self.assertNotEqual(second["content_sha256"], first["content_sha256"])
+        active = self.active_version()
+        self.assertEqual(active["version"], 2)
+        self.assertEqual(self.checkpoint()["last_height"], 223_400_005)
+        with self.admin.connect() as connection:
+            revision = connection.execute(text(
+                "SELECT quality->'revision' AS revision FROM app.dataset_versions "
+                "WHERE id = :id"), {"id": UUID(second["dataset_version_id"])}
+            ).scalar_one()
+        self.assertEqual(revision["previous_version_id"], first["dataset_version_id"])
+        self.assertEqual(revision["changed"], 1)
+        self.assertEqual(revision["added"], 0)
+        self.assertEqual(revision["removed"], 0)
+
     def test_03_unchanged_height_publishes_nothing(self):
         self.approve_source()
         first = self.attempt(header_body(223_400_000))
