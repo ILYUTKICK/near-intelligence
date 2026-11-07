@@ -1,0 +1,45 @@
+{
+  "spec_id": "gross_fee_activity_v1",
+  "spec_version": 1,
+  "family": "proxy",
+  "declared_target": "gross_provider_fees",
+  "frequency": "daily",
+  "dependent_variable": {
+    "metric_id": "provider_gross_fees_usd",
+    "source": "SRC-LLAMA"
+  },
+  "explanatory_variables": [
+    {
+      "metric_id": "provider_intents_volume_usd",
+      "source": "SRC-LLAMA",
+      "role": "activity"
+    }
+  ],
+  "transformations": {
+    "baseline": "difference_log",
+    "strictly_positive_required": true,
+    "difference_adjacency": "calendar_adjacent_only",
+    "float64_conversion": "explicit_finite_required"
+  },
+  "parameters": {
+    "substantive_slopes": 1,
+    "intercept": true,
+    "controls": []
+  },
+  "sample_window": {
+    "start": "2026-08-06",
+    "end_exclusive": "2026-11-04"
+  },
+  "prohibited_labels": [
+    "protocol_revenue",
+    "token_valuation",
+    "causal_effect",
+    "demand_elasticity",
+    "sustainable_revenue"
+  ],
+  "limitation_notes": [
+    "Mechanical construction warning (docs/ECONOMETRIC_METHODOLOGY.md): provider gross fees are reported as a fee applied to the same provider's reported volume, so a fee-on-volume association largely restates the effective fee rate and must be displayed before any coefficient interpretation.",
+    "Both variables share one provider lineage (Dune); the association is not independent confirmation of anything.",
+    "The output is the named proxy association only; it is never protocol revenue (OQ-01) and H1/H4 stay unresolved (OQ-02 judging risk)."
+  ]
+}

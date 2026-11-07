@@ -995,7 +995,16 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-002, NI-009, NI-031
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
+- **Execution role:** A
+- **Started at:** 2026-11-07T02:31:10+03:00
+- **Branch/worktree:** feat/ni-038-tiptap-prototype; /Users/ilyutkinn/Desktop/Near
+- **Dependency verification:** NI-002✓, NI-009✓, NI-031✓ (PR #39 merged) — cards on origin/main.
+- **Verification:** `pnpm --filter web test` — 82/82 pass (3 new): node-schema JSON round trip identical after reload (canonical JSON is the NI-036 storage path); typing/undo survive React node updates (robust assertion — adjacent inserts may group into one history step); empty doc parses validly (Tiptap normalizes to one empty paragraph — documented constraint in ADR-018). Attributes serialize to HTML data-attributes and parse back (getAttrs) — HTML fidelity holds alongside the JSON path. `tsc --noEmit`, `eslint` 0 warnings, `next build` pass. **Browser IME/paste/selection checks are operator-manual** (jsdom cannot emulate IME composition) — recorded as the remaining manual step before NI-039 relies on the pattern.
+- **Result:** apps/web/src/features/editor/prototype/ — ChartBlock (atomic node, node-view controls: annotate/remove, contentEditable=false islands with keyboard-reachable buttons), InsightCard (nested-editable title input probe + editor-undo escape button), prototype route /workspace/editor-prototype behind the NI-021 gate with synthetic fixtures; Tiptap 3.33.0 (MIT) deps recorded in DEPENDENCIES.md; ADR-018 in DECISIONS.md records the confirmed adoption with verified constraints (empty-paragraph normalization, history grouping, tuple-form renderHTML, JSON as canonical storage path).
+- **Reviewer:** pending — role-B review requested on PR #41; CI runs on this PR.
+- **Completed at:** 2026-11-07T02:52:30+03:00
 
 **Description:** Validate the editor choice against financial node interactions before broad UI implementation.
 
@@ -1241,7 +1250,11 @@ Specification: [ECONOMETRIC_METHODOLOGY.md](ECONOMETRIC_METHODOLOGY.md).
 - **Priority:** P0
 - **Dependencies:** NI-026, NI-029
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #11
+- **Execution role:** B
+- **Started at:** 2026-11-07T01:52:13+03:00
+- **Branch/worktree:** feat/ni-051-readiness-gate; /Users/ilyutkinn/Desktop/near-intelligence-b3 (worktree from origin/main e69746b)
 
 **Description:** Choose an admissible empirical question before fitting rather than manufacturing revenue data.
 
@@ -1252,6 +1265,12 @@ Specification: [ECONOMETRIC_METHODOLOGY.md](ECONOMETRIC_METHODOLOGY.md).
 **Acceptance criteria:** No gross-fee/payout proxy passes as protocol_revenue; gaps/exclusions explicit; short attribution dataset rejected for daily long-run inference.
 
 **Testing requirements:** Real archive readiness report; missing/zero/nonadjacent days; lower-bound outcome rejected; reproducible reason codes.
+
+**Verification (2026-11-07, this claim):** 1) Full offline discovery `uv run --project apps/api python -m unittest discover -s apps/api/tests -p "test_*.py"` — 232 tests OK; without `NI_REAL_ARCHIVE_ROOT` 82 skip (cluster/handoff-dependent), with the env set the 17 synthetic gate tests and 10 real-archive gate tests all execute (232 OK / 65 skipped). 2) `NI_REAL_ARCHIVE_ROOT=…/research uv run --project apps/api python scripts/run-db-tests.py --pg-bin /opt/homebrew/opt/postgresql@18/bin` — PostgreSQL 18 disposable loopback cluster, all ten discovered suites OK with no skips, including the new `test_models_readiness.py` suite (17 tests; the suite needs no database and runs offline inside the frozen environment). 3) `uv lock --check --project apps/api` — OK; `pnpm check:doc-links` — 575 links resolve. 4) Real-archive readiness run (read-only, report generated into gitignored `research/models/reports/`): overall verdict `PROXY_ONLY_READY_WITH_LIMITS`, selected spec `gross_fee_activity_v1`; `true_revenue_daily_v1` NOT_READY (`GATED_METRIC_NO_OBSERVATIONS`, `PROTOCOL_REVENUE_NOT_ESTABLISHED_OQ01`); `supply_bounds_activity_v1` REJECTED (`LOWER_BOUND_SERIES_NOT_EXACT_OUTCOME`, `WINDOW_AGGREGATE_NOT_DAILY`, `MINT_HEADER_AUDIT_INCOMPLETE` with the archive numbers 6 of 297); `purchases_activity_v1` READY_WITH_LIMITS with cohort limits only; the 90-day window profiles show zero missing/zero/negative days in both provider series, sources disagreeing on all 90 overlapping days (kept unsummed), and all four report invariants held. Double runs over the real archive render byte-identical JSON/Markdown reports (no wall-clock fields; inputs pinned by SHA-256).
+
+**Result:** `research/models/readiness.py` — the offline readiness gate (research code, outside apps/api): strict archive loading through the NI-029 loaders (import only, no duplication); one calendar-aligned prepared table (90 days + atomic 30-day supply windows and the total period kept in saved shapes; missing rows/series values stay explicit `None` reasons, verified zeros only where extract coverage proves them); per-series profiles (present/missing/zero/negative days, calendar gaps, adjacency, float64 finiteness, bound status from the versioned metric registry); source-disagreement and descriptive fee-rate regime profiles; typed spec registry validating preregistered configs against `near_api.metrics.registry`; gate policy with fixed numbers (60 complete daily observations, 10 per parameter incl. intercept, 3 substantive slopes max, 365-day long-run threshold); evaluation with a fixed reason-code catalog (rejecting/limit/informational severities); hard invariants (no proxy passes as protocol_revenue, gaps/exclusions explicit, short attribution rejected, all codes cataloged) that fail closed; deterministic JSON+Markdown report rendering and CLI (exit 0/4). `research/models/configs/` — five preregistered JSONs: gate policy (window 2026-08-06..11-04, input bindings) plus `true_revenue_daily_v1` (NOT_READY while OQ-01 open), `gross_fee_activity_v1` (the named proxy; mechanical fee-volume relationship, OQ-02 judging risk, single lineage, short-sample and no-causal limits attached verbatim), `purchases_activity_v1` (optional cohort fallback, never market demand), `supply_bounds_activity_v1` (documented standing rejection of bound-only outcomes). Tests: `apps/api/tests/test_models_readiness.py` (17 synthetic temp-dir tests: missing/zero/nonadjacent days, absent rows, 7-day short-window rejection, mislabeled proxy always rejected, over-parameterized spec refused at load, unknown metric refused, double-run byte-identical, read-only archive, catalog/hash/registry checks, CLI exit codes) added to the `scripts/run-db-tests.py` discovery list, and `apps/api/tests/test_models_readiness_real_archive.py` (10 env-gated tests pinning the real-archive verdicts, 6/297 audit numbers, invariants and reproducibility). `.gitignore` gains narrow exceptions so the gate code and configs are shared while `research/models/reports/` stays local. Docs: ECONOMETRIC_METHODOLOGY.md and MVP_SCOPE.md record the implemented gate without claiming fitted results. Migration decision: no `0009_model_runs` is added — the gate's artifact is the reproducible readiness report and no fit run exists to persist; the model_runs table belongs to NI-052/NI-054 when fitted runs and published artifacts exist. Limitations: the gate decides admissibility only and fits nothing (NI-052 owns the estimator and any future run persistence); the admitted proxy association cannot support causal, demand-elasticity or sustainable-revenue claims (OQ-02 judging risk recorded); the readiness report is not committed by design; PR not merged, DONE pending role-A review.
+
+**Reviewer:** role A review pending (requested for the NI-051 gate decision and spec registry).
 
 ### NI-052 — Implement fixed deterministic econometric estimator
 
