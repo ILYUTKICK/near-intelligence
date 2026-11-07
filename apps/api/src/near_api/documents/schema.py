@@ -434,6 +434,21 @@ def _require_rich_body(value, path: str) -> tuple[RichNode, ...]:
     return fragment
 
 
+def canonical_rich_body_json(value: object, *, path: str = "body") -> list[dict]:
+    """Validate one bounded, sanitized rich text body; return its canonical JSON.
+
+    NI-046 reuse point for the structured annotation contracts
+    (:mod:`near_api.insights.schemas`): the grammar (paragraph/list nodes with
+    bold/italic/link marks), the sanitization whitelist (no arbitrary HTML,
+    unsupported marks, non-http(s) or credential-bearing link targets) and the
+    bounds (nesting depth, node counts, :data:`MAX_BODY_PLAIN_CHARS`) stay
+    defined HERE once — this wrapper only exposes them so a contract module can
+    validate annotation bodies without re-implementing any rule. Raises
+    :class:`DocumentSchemaError` on every violation.
+    """
+    return _rich_to_json(_require_rich_body(value, path))
+
+
 # --------------------------------------------------------------------------- #
 # Contexts (frozen inspection records: ResolvedContext | ModelContext)
 # --------------------------------------------------------------------------- #
