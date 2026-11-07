@@ -1000,7 +1000,12 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-036
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #17
+- **Execution role:** B
+- **Started at:** 2026-11-08T00:00:41+03:00
+- **Branch/worktree:** feat/ni-037-document-crud; /Users/ilyutkinn/Desktop/near-intelligence-b4
+- **Dependency verification:** NI-036 code is implemented and merged into main (commit 4d46951 inside main 64174b0; this branch is cut from it) with the disposable-cluster db-suite verified on main (13 suites / 233 tests OK, including test_documents 21) and role-A review approved in open PR #47 (review/role-a-review-batch-2); the NI-036 card flips to DONE at that PR's merge. Work proceeds on the operator's explicit instruction to continue role-B dispatch in parallel with that review merge.
 
 **Description:** Expose real create/list/rename/delete/save/reopen operations.
 
