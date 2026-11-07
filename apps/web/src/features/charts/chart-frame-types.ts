@@ -1,23 +1,15 @@
 /**
- * Interim typed mirror of the canonical DataSource contract from
- * docs/API_SPECIFICATION.md (NI-010 interim state).
+ * Chart frame shared types.
  *
- * The API projection is already sanitized upstream ("no auth header/base URL
- * with token"); this UI layer additionally refuses to render non-http(s)
- * URLs as links (see sanitizeSourceUrl in SourceDrawer). When NI-004 lands
- * the generated shared types, this module must be replaced by them.
+ * `DataSource` is now the generated API contract (packages/shared-types,
+ * NI-032/NI-004) — the NI-010 interim mirror was replaced by it as this
+ * module always instructed. The API projection is sanitized upstream ("no
+ * auth header/base URL with token"); this UI layer additionally refuses to
+ * render non-http(s) URLs as links (see sanitizeSourceUrl in SourceDrawer).
  */
-export interface DataSource {
-  id: string;
-  name: string;
-  docs_url: string;
-  verified_at: string;
-  license_status: string;
-  access_status: string;
-  lineage: string[];
-  expected_update_frequency: string;
-  last_success_at: string | null;
-}
+import type { components } from "@near-intelligence/shared-types";
+
+export type DataSource = components["schemas"]["DataSourceResponse"];
 
 /** A row of the frame's equivalent accessible data table. */
 export interface FrameTableRow {

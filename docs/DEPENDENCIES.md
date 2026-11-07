@@ -84,6 +84,27 @@ ADR-018 (DECISIONS.md) records the prototype outcome: adoption confirmed with ve
 
 No UI kit is imported wholesale
 
+### Chart rendering (NI-033)
+
+Added 8 November 2026 for the reusable interactive chart renderer; version from
+the npm registry on that date (`dist-tags.latest`, published 2026-05-19 — well
+past pnpm's `minimumReleaseAge` window). ADR-019 (DECISIONS.md) records the
+choice and its constraints: modular entry points only (`echarts/core`,
+`echarts/charts`, `echarts/components`, `echarts/renderers`), SVG renderer, no
+React wrapper — a pure option builder is the single adapter shared with the
+future Node static-export path (NI-057). The NI-031 registry pins the renderer
+capability string `echarts-modular-svg@1`; the renderer module exports the same
+constant and refuses a definition pinned to a different capability set.
+
+| Package | Version | Purpose | Declared license |
+| --- | --- | --- | --- |
+| [echarts](https://www.npmjs.com/package/echarts/v/6.1.0) | 6.1.0 | Interactive charts (line/area/bar/scatter/panels), SVG renderer, ARIA component, Node SSR for exports | Apache-2.0 |
+| [zrender](https://www.npmjs.com/package/zrender/v/6.1.0) | 6.1.0 (transitive, exact) | ECharts rendering engine | BSD-3-Clause |
+| [tslib](https://www.npmjs.com/package/tslib/v/2.3.0) | 2.3.0 (transitive, exact) | ECharts runtime helper | 0BSD |
+
+Lockfile diff was contained to the echarts/zrender/tslib subtree. Recharts,
+Chart.js and uPlot were considered and rejected in ADR-019/ADR-006.
+
 ## API contract generation (NI-004, 6 November 2026)
 
 The shared-types package pins `openapi-typescript` **7.13.0** (generation only)

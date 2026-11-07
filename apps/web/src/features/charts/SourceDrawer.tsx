@@ -58,14 +58,14 @@ function SourceEntry({ source }: { source: DataSource }) {
         <dt className="font-medium">Access</dt>
         <dd>{source.access_status}</dd>
         <dt className="font-medium">Verified</dt>
-        <dd>{source.verified_at}</dd>
+        <dd>{source.verified_at ?? "not yet recorded"}</dd>
         <dt className="font-medium">Update cadence</dt>
-        <dd>{source.expected_update_frequency}</dd>
+        <dd>{source.expected_update_frequency ?? "not yet recorded"}</dd>
         <dt className="font-medium">Last success</dt>
         <dd>{source.last_success_at ?? "never (no successful retrieval yet)"}</dd>
         <dt className="font-medium">Documentation</dt>
         <dd>
-          <SourceLink url={source.docs_url}>{source.docs_url}</SourceLink>
+          <SourceLink url={source.docs_url ?? ""}>{source.docs_url ?? "—"}</SourceLink>
         </dd>
       </dl>
       {source.lineage.length > 0 ? (
