@@ -49,6 +49,247 @@
         "title": "ApiError",
         "type": "object"
       },
+      "AvailableRanges": {
+        "additionalProperties": false,
+        "description": "Bounded query ranges of a chart definition (registry ``allowed_ranges``).",
+        "properties": {
+          "max_days": {
+            "maximum": 366.0,
+            "minimum": 1.0,
+            "title": "Max Days",
+            "type": "integer"
+          },
+          "presets_days": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Presets Days",
+            "type": "array"
+          }
+        },
+        "required": [
+          "presets_days",
+          "max_days"
+        ],
+        "title": "AvailableRanges",
+        "type": "object"
+      },
+      "ChartDefinitionResponse": {
+        "additionalProperties": false,
+        "description": "One immutable chart definition version (API_SPECIFICATION ``ChartDefinition``).\n\n``data_status`` is the honest advertisement: only ``available`` charts may\nbe rendered as live; ``unavailable`` charts always carry their recorded\nreason and are never advertised as live.",
+        "properties": {
+          "available_ranges": {
+            "$ref": "#/components/schemas/AvailableRanges"
+          },
+          "category": {
+            "enum": [
+              "activity",
+              "fees",
+              "treasury",
+              "supply",
+              "model"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "chart_id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Chart Id",
+            "type": "string"
+          },
+          "data_status": {
+            "enum": [
+              "available",
+              "unavailable"
+            ],
+            "title": "Data Status",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "filter_schema": {
+            "additionalProperties": true,
+            "title": "Filter Schema",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metric_definition_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Metric Definition Ids",
+            "type": "array"
+          },
+          "renderer_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Renderer Version",
+            "type": "string"
+          },
+          "source_lineage": {
+            "additionalProperties": true,
+            "title": "Source Lineage",
+            "type": "object"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          },
+          "units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Units",
+            "type": "object"
+          },
+          "update_frequency": {
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "snapshot"
+            ],
+            "title": "Update Frequency",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          },
+          "visualization_type": {
+            "enum": [
+              "line",
+              "area",
+              "bar",
+              "scatter",
+              "panels"
+            ],
+            "title": "Visualization Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "chart_id",
+          "version",
+          "title",
+          "description",
+          "category",
+          "metric_definition_ids",
+          "visualization_type",
+          "units",
+          "filter_schema",
+          "available_ranges",
+          "renderer_version",
+          "update_frequency",
+          "data_status",
+          "source_lineage"
+        ],
+        "title": "ChartDefinitionResponse",
+        "type": "object"
+      },
+      "ChartListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChartDefinitionResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ChartListResponse",
+        "type": "object"
+      },
+      "ChartViewResponse": {
+        "additionalProperties": false,
+        "description": "Resolved renderer-agnostic chart view (API_SPECIFICATION ``ChartView``).\n\n``context_hash`` covers the chart definition version, the pinned dataset\nversion, the canonical selection (including validated filters) and the\nbound metric definition versions, so identical selections hash identically\nand any changed input changes the hash.",
+        "properties": {
+          "context_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Context Hash",
+            "type": "string"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetResponse"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ChartDefinitionResponse"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/DataQuality"
+          },
+          "resolved_at": {
+            "format": "date-time",
+            "title": "Resolved At",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/ResolvedSelection"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesResponse"
+            },
+            "title": "Series",
+            "type": "array"
+          }
+        },
+        "required": [
+          "definition",
+          "selection",
+          "dataset",
+          "series",
+          "resolved_at",
+          "context_hash",
+          "quality"
+        ],
+        "title": "ChartViewResponse",
+        "type": "object"
+      },
       "Coverage": {
         "additionalProperties": false,
         "properties": {
@@ -134,6 +375,254 @@
           "freshness_target_seconds"
         ],
         "title": "DataQuality",
+        "type": "object"
+      },
+      "DataSourceListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DataSourceResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "DataSourceListResponse",
+        "type": "object"
+      },
+      "DataSourceResponse": {
+        "additionalProperties": false,
+        "description": "Sanitized source projection (API_SPECIFICATION ``DataSource``).\n\nThe provider endpoint (``base_url``) and every credential-bearing value\nare never serialized: ``docs_url`` is nulled unless it is a credential-free\nhttp(s) URL. ``expected_update_frequency`` stays null until the operator\ncatalog records it (missing is not fabricated); ``last_success_at`` comes\nfrom the ingestion checkpoint zone when the source has been refreshed.",
+        "properties": {
+          "access_status": {
+            "enum": [
+              "disabled",
+              "documented",
+              "approved"
+            ],
+            "title": "Access Status",
+            "type": "string"
+          },
+          "docs_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docs Url"
+          },
+          "expected_update_frequency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Update Frequency"
+          },
+          "id": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "license_status": {
+            "enum": [
+              "unknown",
+              "unverified",
+              "verified",
+              "prohibited"
+            ],
+            "title": "License Status",
+            "type": "string"
+          },
+          "lineage": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Lineage",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "docs_url",
+          "verified_at",
+          "license_status",
+          "access_status",
+          "lineage",
+          "expected_update_frequency",
+          "last_success_at"
+        ],
+        "title": "DataSourceResponse",
+        "type": "object"
+      },
+      "DatasetResponse": {
+        "additionalProperties": false,
+        "description": "One approved immutable dataset version (API_SPECIFICATION ``Dataset``).\n\nPublic delivery serves ``approved`` versions only: staged, validated and\nrejected versions are indistinguishable from absent ones (404) and can\nnever appear under ``latest``.",
+        "properties": {
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "dataset_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Dataset Key",
+            "type": "string"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "manifest_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Url"
+          },
+          "pipeline_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Pipeline Version",
+            "type": "string"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/DataQuality"
+          },
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At"
+          },
+          "source_as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source As Of"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "status": {
+            "const": "approved",
+            "title": "Status",
+            "type": "string"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "dataset_key",
+          "version",
+          "status",
+          "start",
+          "end",
+          "source_as_of",
+          "retrieved_at",
+          "pipeline_version",
+          "content_sha256",
+          "quality",
+          "manifest_url",
+          "supersedes_id"
+        ],
+        "title": "DatasetResponse",
         "type": "object"
       },
       "DecimalString": {
@@ -566,6 +1055,141 @@
         "title": "HomeResponse",
         "type": "object"
       },
+      "MetricListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MetricResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "MetricListResponse",
+        "type": "object"
+      },
+      "MetricResponse": {
+        "additionalProperties": false,
+        "description": "One immutable metric definition version (API_SPECIFICATION ``Metric``).\n\n``formula`` is the registered computation identifier (``formula_key``) \u2014\na stable provenance label, never executable user input.",
+        "properties": {
+          "availability": {
+            "enum": [
+              "A",
+              "P",
+              "B",
+              "G"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "definition": {
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "economic_scope": {
+            "minLength": 1,
+            "title": "Economic Scope",
+            "type": "string"
+          },
+          "formula": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Formula",
+            "type": "string"
+          },
+          "frequency": {
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "snapshot"
+            ],
+            "title": "Frequency",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "metric_id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Metric Id",
+            "type": "string"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "metric_id",
+          "version",
+          "title",
+          "definition",
+          "formula",
+          "unit",
+          "frequency",
+          "economic_scope",
+          "availability",
+          "limitations"
+        ],
+        "title": "MetricResponse",
+        "type": "object"
+      },
       "Observation": {
         "additionalProperties": false,
         "properties": {
@@ -666,6 +1290,45 @@
         "minLength": 1,
         "type": "string"
       },
+      "ResolvedSelection": {
+        "additionalProperties": false,
+        "description": "The resolved selection echoed back on series/chart-view responses.\n\nSame window rules as the shared bootstrap ``Selection`` (ISO dates,\nfrequency ``day``, non-empty half-open window of at most 366 days), but\n``filters`` carries the chart-version-validated values instead of the\nstrict-empty bootstrap object.",
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/ResolvedSelectionFilters"
+          },
+          "frequency": {
+            "const": "day",
+            "title": "Frequency",
+            "type": "string"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "frequency",
+          "filters"
+        ],
+        "title": "ResolvedSelection",
+        "type": "object"
+      },
+      "ResolvedSelectionFilters": {
+        "additionalProperties": true,
+        "description": "Chart-version-validated filters carried inside a resolved selection.\n\nRequest filters arrive as the urlencoded ``filters`` query parameter and\nare validated server-side against the resolved chart definition version's\nclosed ``filter_schema`` (the NI-031 versioned allowlist: string enums\nfrom approved source/recipient/price-basis mappings only). Unknown keys\nand unlisted values are rejected before any resolution happens, so this\npermissive container never serializes an unapproved filter value.",
+        "properties": {},
+        "title": "ResolvedSelectionFilters",
+        "type": "object"
+      },
       "Selection": {
         "additionalProperties": false,
         "properties": {
@@ -702,6 +1365,44 @@
         "description": "No filter is approved at bootstrap; NI-031 adds versioned filter rules.",
         "properties": {},
         "title": "SelectionFilters",
+        "type": "object"
+      },
+      "SeriesResponse": {
+        "additionalProperties": false,
+        "description": "One metric's resolved series (API_SPECIFICATION ``Series``).\n\n``points`` carry explicit nulls with gap reasons; a point's null value is\nnever converted to zero and every point keeps its UTC half-open interval,\nquality status, bound kind and reasons.",
+        "properties": {
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetResponse"
+          },
+          "metric": {
+            "$ref": "#/components/schemas/MetricResponse"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/Observation"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/ResolvedSelection"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/DataSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "metric",
+          "dataset",
+          "selection",
+          "points",
+          "sources"
+        ],
+        "title": "SeriesResponse",
         "type": "object"
       },
       "ValidationError": {
@@ -809,6 +1510,481 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/charts": {
+      "get": {
+        "description": "List the latest registered version of every chart definition.",
+        "operationId": "listCharts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Request failed validation"
+          }
+        },
+        "summary": "Public chart definition catalog",
+        "tags": [
+          "charts"
+        ]
+      }
+    },
+    "/api/charts/{chart_id}": {
+      "get": {
+        "description": "Return one registered chart definition (latest version by default).",
+        "operationId": "getChart",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chart_id",
+            "required": true,
+            "schema": {
+              "title": "Chart Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartDefinitionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Chart definition not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One chart definition version",
+        "tags": [
+          "charts"
+        ]
+      }
+    },
+    "/api/charts/{chart_id}/view": {
+      "get": {
+        "description": "Resolve the chart view: definition, series, quality and context hash.",
+        "operationId": "getChartView",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chart_id",
+            "required": true,
+            "schema": {
+              "title": "Chart Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "definition_version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Definition Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dataset_version",
+            "required": false,
+            "schema": {
+              "default": "latest",
+              "title": "Dataset Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "frequency",
+            "required": false,
+            "schema": {
+              "default": "day",
+              "title": "Frequency",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filters",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Filters"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartViewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Chart or dataset not found"
+          },
+          "422": {
+            "description": "Range, filter or reference invalid"
+          },
+          "503": {
+            "description": "No approved dataset exists for latest"
+          }
+        },
+        "summary": "Resolved chart view pinned to one approved dataset version",
+        "tags": [
+          "charts"
+        ]
+      }
+    },
+    "/api/data-sources": {
+      "get": {
+        "description": "List the sanitized source projections (never provider endpoints).",
+        "operationId": "listDataSources",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSourceListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Request failed validation"
+          }
+        },
+        "summary": "Sanitized public source catalog",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/data-sources/{source_id}": {
+      "get": {
+        "description": "Return one source's sanitized projection (missing sources are 404).",
+        "operationId": "getDataSource",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "pattern": "^SRC-[A-Z0-9]+(-[A-Z0-9]+)*$",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSourceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Data source not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One sanitized source projection",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/datasets/{version_id}": {
+      "get": {
+        "description": "Return one approved dataset version; non-approved versions are 404.",
+        "operationId": "getDataset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Approved dataset version not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One approved immutable dataset version",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/datasets/{version_id}/manifest": {
+      "get": {
+        "description": "Serve the sanitized manifest: storage digests, never operator paths.",
+        "operationId": "getDatasetManifest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Sanitized prepared manifest JSON"
+          },
+          "404": {
+            "description": "Approved version or servable manifest not found"
+          },
+          "413": {
+            "description": "Manifest exceeds the bounded public payload size"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sanitized prepared manifest of one approved dataset version",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
     "/api/documents": {
       "get": {
         "description": "List the verified principal's documents, newest first, owner-scoped.",
@@ -1539,6 +2715,273 @@
         "summary": "Update the verified principal's own display name/timezone",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/metrics": {
+      "get": {
+        "description": "List the latest registered version of every metric definition.",
+        "operationId": "listMetrics",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "availability",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Availability"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Request failed validation"
+          }
+        },
+        "summary": "Public metric definition catalog",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
+    "/api/metrics/{metric_id}": {
+      "get": {
+        "description": "Return one registered metric definition (latest version by default).",
+        "operationId": "getMetric",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "metric_id",
+            "required": true,
+            "schema": {
+              "title": "Metric Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Metric definition not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One metric definition version",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
+    "/api/metrics/{metric_id}/series": {
+      "get": {
+        "description": "Resolve the metric's series over the selection from one approved dataset.",
+        "operationId": "getMetricSeries",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "metric_id",
+            "required": true,
+            "schema": {
+              "title": "Metric Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "definition_version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Definition Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dataset_version",
+            "required": false,
+            "schema": {
+              "default": "latest",
+              "title": "Dataset Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "frequency",
+            "required": false,
+            "schema": {
+              "default": "day",
+              "title": "Frequency",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filters",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Filters"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Metric or dataset not found"
+          },
+          "422": {
+            "description": "Range, filter or reference invalid"
+          },
+          "503": {
+            "description": "No approved dataset exists for latest"
+          }
+        },
+        "summary": "Resolved metric series from one approved dataset version",
+        "tags": [
+          "metrics"
         ]
       }
     },

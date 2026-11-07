@@ -95,6 +95,12 @@ class AvailableRanges(ContractModel):
     presets_days: tuple[int, ...] = Field(min_length=1, max_length=8)
     max_days: int = Field(strict=True, ge=1, le=366)
 
+    @model_validator(mode="after")
+    def presets_within_bound(self):
+        if any(day > self.max_days for day in self.presets_days):
+            raise ValueError("a preset cannot exceed the chart's maximum range")
+        return self
+
 
 class ChartDefinitionResponse(ContractModel):
     """One immutable chart definition version (API_SPECIFICATION ``ChartDefinition``).

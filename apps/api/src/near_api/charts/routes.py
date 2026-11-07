@@ -14,7 +14,8 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import ValidationError
 from sqlalchemy.engine import Engine
 
 from near_api.auth.principal import get_runtime_engine
@@ -47,6 +48,14 @@ def _resolve_dataset_version(raw: str) -> UUID | None:
     except (ValueError, AttributeError):
         raise DeliveryInvalidFilter(
             "dataset_version must be 'latest' or an immutable dataset version id") from None
+
+
+def _selection_window(start: date, end: date) -> None:
+    """Validate the half-open UTC selection window through the shared contract."""
+    try:
+        Selection(start=start, end=end, frequency="day", filters={})
+    except ValidationError:
+        raise HTTPException(422, "Request failed validation") from None
 
 
 @router.get("/charts", response_model=ChartListResponse, operation_id="listCharts",
@@ -85,7 +94,7 @@ def get_chart_view(engine: RuntimeEngineDependency, response: Response, chart_id
     """Resolve the chart view: definition, series, quality and context hash."""
     if frequency != "day":
         raise DeliveryInvalidFilter("frequency must be day")
-    Selection(start=start, end=end, frequency="day", filters={})
+    _selection_window(start, end)
     parsed_filters = delivery.parse_filters_document(filters)
     requested_version = _resolve_dataset_version(dataset_version)
     with user_transaction(engine, None) as connection:

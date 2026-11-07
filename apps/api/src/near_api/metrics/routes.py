@@ -15,7 +15,8 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import ValidationError
 from sqlalchemy.engine import Engine
 
 from near_api.auth.principal import get_runtime_engine
@@ -38,7 +39,10 @@ _AVAILABILITY_CODES = ("A", "P", "B", "G")
 
 def _selection_window(start: date, end: date) -> None:
     """Validate the half-open UTC selection window through the shared contract."""
-    Selection(start=start, end=end, frequency="day", filters={})
+    try:
+        Selection(start=start, end=end, frequency="day", filters={})
+    except ValidationError:
+        raise HTTPException(422, "Request failed validation") from None
 
 
 def _resolve_dataset_version(raw: str) -> UUID | None:
