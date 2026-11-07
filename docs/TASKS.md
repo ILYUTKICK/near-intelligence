@@ -340,7 +340,11 @@ Specification: [UI_SCREEN_SPECIFICATIONS.md](UI_SCREEN_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-011, NI-029, NI-033
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role A (ILYUTKICK), session dispatch #20
+- **Execution role:** A
+- **Started at:** 2026-11-08T01:15:30+03:00
+- **Branch/worktree:** feat/ni-012-landing-metrics; /Users/ilyutkinn/Desktop/near-intelligence-a6 (worktree) — stacked on feat/ni-014-public-thesis (open PR #52, role-B review approved; PR base is feat/ni-014-public-thesis and retargets to main after #52 merges). Dependency basis: NI-011 ✓ and NI-029 ✓ verified in this branch's ancestry; NI-033 ✓ is on main and is not needed by the landing's value-focused rendering (no chart embedding; charts arrive with NI-034/NI-015), so the stacked base without the renderer commits is acceptable for this task's file scope.
 
 **Description:** Turn landing into an evidence-bearing introduction with source-qualified real values.
 
