@@ -77,12 +77,18 @@ class ContractTests(TestCase):
             self.assertEqual(HealthResponse.model_validate(response.json()).service, "api")
             schema = client.get("/openapi.json").json()
             # NI-022 added the first private route; /health stays public.
-            # The contract grows with implemented routes: NI-025 added /api/me
-            # and NI-036 added the document revision routes.
+            # The contract grows with implemented routes: NI-025 added /api/me,
+            # NI-036 added the document revision routes and NI-032 added the
+            # public metrics/chart/dataset/source delivery routes.
             self.assertEqual(set(schema["paths"]), {
                 "/health", "/api/home", "/api/me",
                 "/api/documents", "/api/documents/{document_id}",
                 "/api/documents/{document_id}/versions",
+                "/api/metrics", "/api/metrics/{metric_id}",
+                "/api/metrics/{metric_id}/series",
+                "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",
+                "/api/data-sources", "/api/data-sources/{source_id}",
+                "/api/datasets/{version_id}", "/api/datasets/{version_id}/manifest",
             })
             self.assertIn("DecimalString", schema["components"]["schemas"])
             self.assertFalse(schema["components"]["schemas"]["Selection"]["additionalProperties"])
