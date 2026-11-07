@@ -1358,7 +1358,12 @@ Specification: [ECONOMETRIC_METHODOLOGY.md](ECONOMETRIC_METHODOLOGY.md).
 - **Priority:** P0
 - **Dependencies:** NI-052
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #21
+- **Execution role:** B
+- **Started at:** 2026-11-08T01:12:02+03:00
+- **Branch/worktree:** feat/ni-053-diagnostics; /Users/ilyutkinn/Desktop/near-intelligence-b6
+- **Dependency verification:** NI-052 is DONE on main (merged PR #51 at 13867b2): `research/models/fit.py` with the deterministic OLS+HAC estimator, `research/models/fit_configs/gross_fee_activity_v1_fit.json` preregistered settings and the `near_api.research` CLI dispatcher are present and verified (345 offline tests OK, 14/14 cluster suites OK). No competing claim on NI-053 exists.
 
 **Description:** Make the model assessable beyond a single coefficient or high R².
 
