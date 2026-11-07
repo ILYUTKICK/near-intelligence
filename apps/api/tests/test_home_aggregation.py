@@ -84,12 +84,22 @@ class HomeContractTests(unittest.TestCase):
 
     def test_01_home_is_documented_in_openapi_with_required_pending_sections(self):
         schema = self.client.get("/openapi.json").json()
-        # The contract grows with implemented routes: NI-025 added /api/me and
-        # NI-036 added the document revision routes.
+        # The contract grows with implemented routes: NI-025 added /api/me,
+        # NI-036 added the document revision routes and NI-032 added the
+        # public metrics/chart/dataset/source delivery routes.
         self.assertEqual(set(schema["paths"]), {"/health", "/api/home", "/api/me",
                                                 "/api/documents",
                                                 "/api/documents/{document_id}",
-                                                "/api/documents/{document_id}/versions"})
+                                                "/api/documents/{document_id}/versions",
+                                                "/api/metrics",
+                                                "/api/metrics/{metric_id}",
+                                                "/api/metrics/{metric_id}/series",
+                                                "/api/charts", "/api/charts/{chart_id}",
+                                                "/api/charts/{chart_id}/view",
+                                                "/api/data-sources",
+                                                "/api/data-sources/{source_id}",
+                                                "/api/datasets/{version_id}",
+                                                "/api/datasets/{version_id}/manifest"})
         self.assertEqual(schema["paths"]["/api/home"]["get"]["operationId"], "getWorkspaceHome")
         response_schema = schema["components"]["schemas"]["HomeResponse"]
         # Every documented field is always present: empty arrays stay explicit
