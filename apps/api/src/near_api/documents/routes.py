@@ -1,17 +1,24 @@
-"""Document HTTP routes implemented by NI-036.
+"""Document HTTP routes (NI-036 revision service + NI-037 CRUD and versions).
 
-Implements the first four rows of the API_SPECIFICATION "Research documents
-and versions" section on the revision service: list/create/get/save. Every
-route authenticates through ``get_principal`` (NI-018), opens the
-transaction-local verified identity (``principal_transaction``, NI-019) and
-emits ``Cache-Control: no-store`` — private content is never cacheable.
+Implements the "Research documents and versions" rows of API_SPECIFICATION:
+list/create/get/save (NI-036) plus rename (PATCH), delete (DELETE), version
+listing/detail (GET) and Idempotency-Key replay on the create/save POSTs
+(NI-037). Every route authenticates through ``get_principal`` (NI-018), opens
+the transaction-local verified identity (``principal_transaction``, NI-019)
+and emits ``Cache-Control: no-store`` — private content is never cacheable.
 
-Compare-and-set: create/get return ``ETag: "<revision>"``; the save route
-REQUIRES ``If-Match: "<revision>"`` (428 without it), rejects a stale revision
-with 409 REVISION_CONFLICT (including the current revision for the owned
-document only) and never overwrites. Not-owned and absent ids are the same
-generic 404. Idempotency keys, rename/delete and version listing are NI-037
-scope and are deliberately absent here.
+Compare-and-set: create/get return ``ETag: "<revision>"``; every document
+mutation (save, rename, delete) REQUIRES ``If-Match: "<revision>"`` (428
+without it), rejects a stale revision with 409 REVISION_CONFLICT (including
+the current revision for the owned document only) and never overwrites.
+Not-owned and absent ids are the same generic 404 on every route.
+
+Idempotency (NI-037): ``POST /documents`` and ``POST /documents/{id}/versions``
+honor ``Idempotency-Key: UUID`` — the response snapshot is committed in the
+same transaction as the write, so a repeated identical owner/route/body
+request replays the ORIGINAL result (24h) instead of creating a second
+document or revision; the same key with a different body is a 409
+IDEMPOTENCY_CONFLICT. Failures are never stored, so they stay retryable.
 """
 
 from __future__ import annotations
@@ -21,11 +28,12 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.engine import Engine
 
 from near_api.auth.principal import Principal, get_principal, get_runtime_engine
 from near_api.contracts import error_response
-from near_api.documents import service
+from near_api.documents import idempotency, service
 from near_api.documents.schema import (
     SCHEMA_VERSION,
     DocumentSchemaError,
@@ -37,10 +45,13 @@ from near_api.schemas.common import ErrorDetail, ErrorResponse
 from near_api.schemas.documents import (
     DocumentCreateRequest,
     DocumentListResponse,
+    DocumentRenameRequest,
     DocumentResponse,
     DocumentSaveRequest,
     DocumentSaveResponse,
     VersionDetailResponse,
+    VersionListResponse,
+    VersionSummaryResponse,
 )
 from near_api.schemas.home import DocumentProgress, DocumentSummary
 
@@ -55,7 +66,8 @@ _PRIVATE_ERROR_RESPONSES = {
         (401, "Missing or invalid session"),
         (403, "Verified account is disabled"),
         (404, "Referenced target does not exist for this owner"),
-        (409, "Revision conflict: the document moved since the request was built"),
+        (409, "Revision conflict (document moved) or Idempotency-Key reused "
+              "with a different request"),
         (413, "Document exceeds a hard size limit"),
         (422, "Request failed validation or references an unavailable target"),
         (428, "If-Match precondition is required"),
@@ -132,6 +144,28 @@ def _parse_if_match(if_match: str | None) -> int | None:
     return int(inner)
 
 
+def _replay_response(outcome: idempotency.IdempotentOutcome, *,
+                     etag_revision_path: tuple) -> JSONResponse:
+    """Re-emit the stored original result of an idempotent write.
+
+    The snapshot is returned byte-for-byte with no-store and the ETag derived
+    from the recorded body (the client must never guess the new revision). A
+    missing/unreadable revision field simply omits the ETag — the stored body
+    itself is always authoritative.
+    """
+    revision: int | None = outcome.body
+    for key in etag_revision_path:
+        if not isinstance(revision, dict) or key not in revision:
+            revision = None
+            break
+        revision = revision[key]
+    headers = {"Cache-Control": "no-store"}
+    if isinstance(revision, int) and not isinstance(revision, bool):
+        headers["ETag"] = _etag(revision)
+    return JSONResponse(status_code=outcome.status, content=outcome.body,
+                        headers=headers)
+
+
 @router.get("/documents", response_model=DocumentListResponse, operation_id="listDocuments",
             summary="Owner-scoped document list", responses=_PRIVATE_ERROR_RESPONSES)
 def list_documents(principal: PrincipalDependency, engine: RuntimeEngineDependency,
@@ -156,14 +190,54 @@ def list_documents(principal: PrincipalDependency, engine: RuntimeEngineDependen
              responses=_PRIVATE_ERROR_RESPONSES)
 def create_document(request: Request, principal: PrincipalDependency,
                     engine: RuntimeEngineDependency, response: Response,
-                    payload: DocumentCreateRequest):
-    """Create an owned document whose first revision is the empty document."""
+                    payload: DocumentCreateRequest,
+                    idempotency_key: Annotated[str | None, Header()] = None):
+    """Create an owned document whose first revision is the empty document.
+
+    With an ``Idempotency-Key`` header the created result is stored in the
+    write transaction and a repeated identical owner/route/body request
+    replays the original 201 response (24h) instead of creating a second
+    document; the same key with a different body is a 409 idempotency
+    collision.
+    """
     if payload.template_id is not None:
         # P1 templates are feature-gated: 422 FEATURE_UNAVAILABLE, never a
         # simulated template (API_SPECIFICATION).
         return error_response(request, 422, "FEATURE_UNAVAILABLE",
                               "Document templates are not available yet")
-    detail = service.create_document(engine, principal, title=payload.title)
+    try:
+        key = idempotency.parse_idempotency_key(idempotency_key)
+    except DocumentSchemaError as error:
+        return _schema_error(request, error)
+    if key is not None:
+        try:
+            outcome = idempotency.execute_idempotent(
+                engine, principal, route_key=idempotency.ROUTE_CREATE_DOCUMENT,
+                idempotency_key=key,
+                request_hash=idempotency.request_fingerprint(
+                    idempotency.ROUTE_CREATE_DOCUMENT, principal.id,
+                    payload.model_dump(mode="json")),
+                operation=lambda connection: (
+                    201, _document_response(service.create_document_in_transaction(
+                        connection, principal, title=payload.title)
+                    ).model_dump(mode="json")))
+        except idempotency.IdempotencyConflict:
+            return error_response(
+                request, 409, "IDEMPOTENCY_CONFLICT",
+                "This Idempotency-Key was already used with a different request; "
+                "a new key is required for a new payload")
+        except DocumentSchemaError as error:
+            # Nothing was stored: a failed create stays retryable with the key.
+            return _schema_error(request, error)
+        if outcome.replay:
+            return _replay_response(outcome, etag_revision_path=("revision",))
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["ETag"] = _etag(int(outcome.body["revision"]))
+        return DocumentResponse.model_validate(outcome.body)
+    try:
+        detail = service.create_document(engine, principal, title=payload.title)
+    except DocumentSchemaError as error:
+        return _schema_error(request, error)
     response.headers["Cache-Control"] = "no-store"
     response.headers["ETag"] = _etag(detail.document.revision)
     return _document_response(detail)
@@ -181,6 +255,100 @@ def get_document(principal: PrincipalDependency, engine: RuntimeEngineDependency
     return _document_response(detail)
 
 
+@router.patch("/documents/{document_id}", response_model=DocumentSummary,
+              operation_id="renameDocument",
+              summary="Rename an owned document (a title change creates a new revision)",
+              responses=_PRIVATE_ERROR_RESPONSES)
+def rename_document(request: Request, principal: PrincipalDependency,
+                    engine: RuntimeEngineDependency, response: Response,
+                    document_id: UUID, payload: DocumentRenameRequest,
+                    if_match: Annotated[str | None, Header()] = None) -> DocumentSummary:
+    """Rename the owned document; the title change is a full new revision."""
+    expected = _parse_if_match(if_match)
+    if expected is None:
+        return error_response(request, 428, "PRECONDITION_REQUIRED",
+                              "If-Match with the current document revision is required")
+    try:
+        detail = service.rename_document(engine, principal, document_id,
+                                         expected_revision=expected,
+                                         title=payload.title)
+    except service.RevisionConflict as conflict:
+        # Owned-document 409: the current revision is included for the owner.
+        return error_response(
+            request, 409, "REVISION_CONFLICT", str(conflict),
+            details=(ErrorDetail(path="If-Match",
+                                 reason=f"current_revision:{conflict.current_revision}"),))
+    except DocumentSchemaError as error:
+        return _schema_error(request, error)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["ETag"] = _etag(detail.document.revision)
+    return _document_summary(detail.document)
+
+
+@router.delete("/documents/{document_id}", status_code=204, operation_id="deleteDocument",
+               summary="Delete an owned document with its private revisions and projections",
+               responses=_PRIVATE_ERROR_RESPONSES)
+def delete_document(request: Request, principal: PrincipalDependency,
+                    engine: RuntimeEngineDependency, document_id: UUID,
+                    if_match: Annotated[str | None, Header()] = None) -> Response:
+    """Delete the owned document; private children cascade, scientific data stays."""
+    expected = _parse_if_match(if_match)
+    if expected is None:
+        return error_response(request, 428, "PRECONDITION_REQUIRED",
+                              "If-Match with the current document revision is required")
+    try:
+        service.delete_document(engine, principal, document_id,
+                                expected_revision=expected)
+    except service.RevisionConflict as conflict:
+        return error_response(
+            request, 409, "REVISION_CONFLICT", str(conflict),
+            details=(ErrorDetail(path="If-Match",
+                                 reason=f"current_revision:{conflict.current_revision}"),))
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/documents/{document_id}/versions", response_model=VersionListResponse,
+            operation_id="listDocumentVersions",
+            summary="List an owned document's immutable revisions (newest first)",
+            responses=_PRIVATE_ERROR_RESPONSES)
+def list_document_versions(principal: PrincipalDependency, engine: RuntimeEngineDependency,
+                           response: Response, document_id: UUID,
+                           cursor: Annotated[str | None, Query(max_length=64)] = None,
+                           limit: Annotated[int | None, Query(ge=1, le=100)] = None,
+                           ) -> VersionListResponse:
+    """Page the owned document's revisions over the stable revision DESC order."""
+    offset = _decode_cursor(cursor)
+    page = service.list_document_versions(engine, principal, document_id,
+                                          limit=limit, offset=offset)
+    response.headers["Cache-Control"] = "no-store"
+    next_cursor = _encode_cursor(page.offset + page.limit) \
+        if page.offset + page.limit < page.total else None
+    return VersionListResponse(
+        items=tuple(VersionSummaryResponse(
+            id=row["id"], document_id=row["document_id"], revision=row["revision"],
+            schema_version=row["schema_version"],
+            content_sha256=row["content_sha256"], created_at=row["created_at"])
+            for row in page.items),
+        next_cursor=next_cursor)
+
+
+@router.get("/documents/{document_id}/versions/{version_id}",
+            response_model=VersionDetailResponse, operation_id="getDocumentVersion",
+            summary="Fetch one immutable revision of an owned document",
+            responses=_PRIVATE_ERROR_RESPONSES)
+def get_document_version(principal: PrincipalDependency, engine: RuntimeEngineDependency,
+                         response: Response, document_id: UUID, version_id: UUID,
+                         ) -> VersionDetailResponse:
+    """Return the revision only through its owned parent document."""
+    row = service.get_document_version(engine, principal, document_id, version_id)
+    response.headers["Cache-Control"] = "no-store"
+    return VersionDetailResponse(
+        id=row.id, document_id=row.document_id, revision=row.revision,
+        schema_version=row.schema_version, content_sha256=row.content_sha256,
+        created_at=row.created_at, content=row.content,
+        resolved_contexts=row.resolved_contexts or {})
+
+
 @router.post("/documents/{document_id}/versions", response_model=DocumentSaveResponse,
              operation_id="saveDocumentVersion", status_code=201,
              summary="Save a new immutable revision (compare-and-set via If-Match)",
@@ -189,8 +357,15 @@ def save_document_version(request: Request, principal: PrincipalDependency,
                           engine: RuntimeEngineDependency, response: Response,
                           document_id: UUID, payload: DocumentSaveRequest,
                           if_match: Annotated[str | None, Header()] = None,
-                          ) -> DocumentSaveResponse:
-    """Append one immutable revision; CAS against If-Match, zero rows on failure."""
+                          idempotency_key: Annotated[str | None, Header()] = None,
+                          ) -> DocumentSaveResponse | JSONResponse:
+    """Append one immutable revision; CAS against If-Match, zero rows on failure.
+
+    With an ``Idempotency-Key`` the new revision's response snapshot is stored
+    in the save transaction, so a retry of the identical owner/route/body
+    request after a lost response replays the original 201 (same version, no
+    second revision) instead of a spurious 409 against the advanced document.
+    """
     expected = _parse_if_match(if_match)
     if expected is None:
         return error_response(request, 428, "PRECONDITION_REQUIRED",
@@ -210,6 +385,55 @@ def save_document_version(request: Request, principal: PrincipalDependency,
             "schema_version does not match the content's own schema_version",
             details=(ErrorDetail(path="content.schema_version",
                                  reason="schema_version_mismatch"),))
+    try:
+        key = idempotency.parse_idempotency_key(idempotency_key)
+    except DocumentSchemaError as error:
+        return _schema_error(request, error)
+
+    def execute(connection):
+        detail = service.save_revision_in_transaction(
+            connection, principal, document_id, expected_revision=expected,
+            document_payload=payload.content,
+            observed_contexts=list(payload.observed_contexts))
+        body = DocumentSaveResponse(
+            version=VersionDetailResponse(
+                id=detail.version.id, document_id=detail.version.document_id,
+                revision=detail.version.revision,
+                schema_version=detail.version.schema_version,
+                content_sha256=detail.version.content_sha256,
+                created_at=detail.version.created_at, content=detail.content,
+                resolved_contexts=detail.resolved_contexts),
+            document=_document_summary(detail.document))
+        return 201, body.model_dump(mode="json")
+
+    if key is not None:
+        try:
+            outcome = idempotency.execute_idempotent(
+                engine, principal, route_key=idempotency.ROUTE_SAVE_DOCUMENT_VERSION,
+                idempotency_key=key,
+                request_hash=idempotency.request_fingerprint(
+                    idempotency.ROUTE_SAVE_DOCUMENT_VERSION, principal.id,
+                    payload.model_dump(mode="json")),
+                operation=execute)
+        except idempotency.IdempotencyConflict:
+            return error_response(
+                request, 409, "IDEMPOTENCY_CONFLICT",
+                "This Idempotency-Key was already used with a different request; "
+                "a new key is required for a new payload")
+        except service.RevisionConflict as conflict:
+            # Owned-document 409: the current revision is included for the owner.
+            return error_response(
+                request, 409, "REVISION_CONFLICT", str(conflict),
+                details=(ErrorDetail(path="If-Match",
+                                     reason=f"current_revision:{conflict.current_revision}"),))
+        except DocumentSchemaError as error:
+            # Nothing was stored: a rejected save stays retryable with the key.
+            return _schema_error(request, error)
+        if outcome.replay:
+            return _replay_response(outcome, etag_revision_path=("document", "revision"))
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["ETag"] = _etag(int(outcome.body["document"]["revision"]))
+        return DocumentSaveResponse.model_validate(outcome.body)
     try:
         detail = service.save_revision(engine, principal, document_id,
                                        expected_revision=expected,

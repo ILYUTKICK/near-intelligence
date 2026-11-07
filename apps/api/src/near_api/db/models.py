@@ -14,6 +14,8 @@ NI-036 adds the per-revision document projections (insights, hypotheses,
 evidence_links) derived from canonical document_versions.content.
 NI-030 adds the ingestion checkpoint zone (ingestion_checkpoints,
 ingestion_daily_counters) for the bounded scheduled refresh adapter.
+NI-037 adds the Idempotency-Key replay store (idempotency_records) for the
+document write routes.
 Remaining domain tables belong to their owning tasks and must keep these
 declarations in sync for the Alembic metadata drift check.
 """
@@ -253,6 +255,37 @@ class EvidenceLink(Base):
     target_kind: Mapped[str] = mapped_column(String(40), nullable=False)
     target_id: Mapped[UUID] = mapped_column(nullable=False)
     explanation: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class IdempotencyRecord(Base):
+    """Stored result of one Idempotency-Key write for replay (NI-037).
+
+    Mirrors migration 0009 exactly (DATABASE_SCHEMA.md "idempotency_records"):
+    the response snapshot of a successful document write, committed in the
+    same transaction as the write itself, so a repeated identical
+    owner/route/body request returns the original result for 24h instead of
+    creating a second document/revision. Write-once for the runtime role (no
+    UPDATE grant); expired rows are replaced lazily by DELETE + INSERT.
+    """
+
+    __tablename__ = "idempotency_records"
+    __table_args__ = (
+        CheckConstraint("route_key <> ''", name="route_nonempty"),
+        CheckConstraint(r"request_hash ~ '^[0-9a-f]{64}$'", name="request_hash_format"),
+        CheckConstraint("response_status >= 200 AND response_status < 300",
+                        name="response_success"),
+    )
+
+    owner_id: Mapped[UUID] = mapped_column(
+        ForeignKey("app.users.id", ondelete="CASCADE"), primary_key=True)
+    route_key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    idempotency_key: Mapped[UUID] = mapped_column(primary_key=True)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_status: Mapped[int] = mapped_column(Integer, nullable=False)
+    response_body: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
 
 
 class Source(Base):

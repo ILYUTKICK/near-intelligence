@@ -48,6 +48,13 @@ class DocumentSaveRequest(ContractModel):
     observed_contexts: tuple[dict, ...] = ()
 
 
+class DocumentRenameRequest(ContractModel):
+    """PATCH /documents/{id} body: the new title (a title change creates a
+    full new revision — EDITOR_SPECIFICATION; an unchanged title is a no-op)."""
+
+    title: str = Field(min_length=1, max_length=200)
+
+
 class VersionSummaryResponse(ContractModel):
     id: UUID
     document_id: UUID
@@ -67,3 +74,10 @@ class DocumentSaveResponse(ContractModel):
 
     version: VersionDetailResponse
     document: DocumentSummary
+
+
+class VersionListResponse(ContractModel):
+    """GET /documents/{id}/versions response: bounded page, newest first."""
+
+    items: tuple[VersionSummaryResponse, ...]
+    next_cursor: str | None
