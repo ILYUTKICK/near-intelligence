@@ -39,11 +39,12 @@ export type ChartFactory = (
  * bundle and lets the bundler code-split it.
  */
 export const defaultChartFactory: ChartFactory = async (container, context) => {
-  const [{ init, use }, charts, components, renderers] = await Promise.all([
+  const [{ init, use }, charts, components, renderers, features] = await Promise.all([
     import("echarts/core"),
     import("echarts/charts"),
     import("echarts/components"),
     import("echarts/renderers"),
+    import("echarts/features"),
   ]);
   use([
     charts.LineChart,
@@ -54,6 +55,9 @@ export const defaultChartFactory: ChartFactory = async (container, context) => {
     components.AriaComponent,
     components.LegendComponent,
     components.AxisPointerComponent,
+    // v6 moved `grid.containLabel` behind this legacy feature; the panel
+    // layout relies on it so axis labels never clip.
+    features.LegacyGridContainLabel,
     renderers.SVGRenderer,
   ]);
 

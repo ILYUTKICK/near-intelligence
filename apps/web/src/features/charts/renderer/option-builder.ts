@@ -67,7 +67,7 @@ type GridList = Extract<NonNullable<ChartOption["grid"]>, unknown[]>;
  * (accent = series 1, then chart-2/3/4); a test asserts these strings still
  * exist in apps/web/src/styles/tokens.css so the two cannot drift silently.
  */
-export const CHART_SERIES_COLORS = ["#214d3b", "#5A7189", "#99662D", "#86657E"] as const;
+export const CHART_SERIES_COLORS = ["#214D3B", "#5A7189", "#99662D", "#86657E"] as const;
 
 const AXIS_TEXT = "#4B5C54"; // color.text-secondary
 const AXIS_LINE = "#D8DDD2"; // color.border
