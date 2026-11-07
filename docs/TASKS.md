@@ -633,7 +633,12 @@ Specification: [USER_JOURNEYS.md](USER_JOURNEYS.md).
 - **Priority:** P0
 - **Dependencies:** NI-021, NI-037
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role A (ILYUTKICK), session dispatch #22
+- **Execution role:** A
+- **Started at:** 2026-11-08T01:40:49+03:00
+- **Branch/worktree:** feat/ni-023-my-research; /Users/ilyutkinn/Desktop/near-intelligence-a7 (from origin/main d25df3e)
+- **Dependency verification:** NI-021 DONE (workspace gate + shell on main), NI-037 DONE (document CRUD/version endpoints + regenerated typed client on main; card records disposable-cluster 13 suites / 243 tests OK and review approved) — both verified DONE on origin/main d25df3e, the base of this branch. Worktree is clean; NI-022/NI-032 also DONE so GET /api/home and the delivery APIs exist for reuse decisions.
 
 **Description:** Give users a usable entry point to persisted documents.
 
