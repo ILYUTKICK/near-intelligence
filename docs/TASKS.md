@@ -899,7 +899,12 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-032, NI-010
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role A (ILYUTKICK), session dispatch #16
+- **Execution role:** A
+- **Started at:** 2026-11-08T00:00:14+03:00
+- **Branch/worktree:** feat/ni-033-echarts-renderer; /Users/ilyutkinn/Desktop/near-intelligence-a4 (worktree from origin/main 64174b0)
+- **Dependency verification:** NI-032 DONE (PR #46 merged, card completed 2026-11-07T23:59:00+03:00) and NI-010 DONE (PR #10) — both verified on main 64174b0, the base of this branch. Generated contracts (ChartDefinitionResponse/ChartViewResponse/SeriesResponse/Observation) are present in packages/shared-types/src/generated/api.ts. No competing claim on NI-033.
 
 **Description:** Render real daily/comparison/scatter data with consistent interaction and accessible alternatives.
 
