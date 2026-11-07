@@ -664,9 +664,15 @@ def _load_preset(document: dict, context: str) -> SensitivityPreset:
 def load_diagnostics_config(path: Path) -> DiagnosticsConfig:
     """Load and validate one preregistered diagnostics config (fail closed)."""
     try:
-        document = readiness._load_json(path, context="diagnostics config")
+        return _load_diagnostics_config(path)
     except readiness.ReadinessGateError as error:
+        # The strict JSON helpers belong to the gate; the battery surfaces
+        # every contract failure as DiagnosticsError.
         raise DiagnosticsError(str(error)) from error
+
+
+def _load_diagnostics_config(path: Path) -> DiagnosticsConfig:
+    document = readiness._load_json(path, context="diagnostics config")
     context = f"diagnostics config {path.name}"
     readiness._reject_unknown_fields(document, {
         "diagnostics_config_id", "diagnostics_config_version", "spec_id",
