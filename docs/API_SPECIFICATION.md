@@ -203,6 +203,8 @@ headers and a `content_sha256` ETag; latest pointers with `max-age=60`.
 
 ## Insights, hypotheses and evidence
 
+Implemented contracts (NI-046, routes pending): `apps/api/src/near_api/insights/schemas.py` implements the `InsightInput`/`Insight`, `HypothesisInput`/`Hypothesis`, `EvidenceInput`/`Evidence` and `RiskInput` models below (plus frozen `ResolvedContext`/`ModelContext` and the typed rich-text shapes) and publishes them in the OpenAPI `components` so the generated TypeScript client already carries the validation types; the convenience routes themselves arrive with NI-047/NI-048/NI-049 and must reuse these models. Fixed rules already enforced at the contract boundary: input models carry no `authored_at`/`modified_at` (server authors timestamps; unknown fields — including client timestamps and `owner_id`/`user_id` — are rejected 422), response models add `id`/`document_id` plus UTC-normalized server timestamps, insight/hypothesis bodies are bounded sanitized rich text (max 10k plain-text-equivalent characters, canonical editor grammar via `documents/schema`), and contexts are the frozen inspection records with selected range/filters/dataset pin/stable ids exactly as the reusable schemas table defines.
+
 These are convenience operations on the current document JSON; all writes require If-Match and return a new document revision. Stable IDs persist across versions; GET can take `version_id` for historical views. PATCH schemas are partial corresponding Input schemas, with required final-state validation.
 
 | Method/path | Request → response | Auth / authorization | Errors |
