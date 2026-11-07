@@ -145,7 +145,9 @@ Specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Priority:** P0
 - **Dependencies:** NI-001, NI-002, NI-003, NI-004
 - **Complexity:** M
-- **Status:** DONE
+- **Status:** IN_PROGRESS
+- **Reopened — PostgreSQL suite omission:** Merge resolution `cf1f6fc` for PR #40 dropped `test_chart_registry.py` from the disposable-cluster runner. CI at `e79953d` passed without exercising the NI-031 PostgreSQL checks.
+- **Backend repair claim:** Codex / BkycnocTbI / role B reviewer / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b, started 2026-11-07T15:27:01+03:00, `fix/ni-005-chart-registry-db-checks`. Scope: restore the omitted suite in the Python runner and verify it locally. A remains the NI-005 acceptance lead; the NI-031 and NI-051 claims are unchanged.
 - **Claimed by:** ZCode agent for ILYUTKICK, role A, session 42d29234
 - **Execution role:** A
 - **Started at:** 2026-11-06T03:18:32+03:00
