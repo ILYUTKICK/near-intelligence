@@ -16,7 +16,7 @@ Canonical product name: NEAR Intelligence. Labels and routes below override the 
 | Sign in | `/login` | Email/password sign-in and registration links |
 | Sign up / recovery | `/signup`, `/reset-password`, `/auth/callback` | Provider auth flows |
 
-Use `/research#h1` through `#h4`, `/methodology#sources` and `#reproduce` as stable editorial anchors. Unpublished model runs never resolve publicly.
+Use `/research#h1` through `#h4`, `/methodology#sources` and `#reproduce` as stable editorial anchors. The research route (NI-014) additionally exposes fifteen thesis-section anchors (`#executive-summary`, `#question`, `#ecosystem`, `#intents-mechanism`, `#adoption`, `#revenue-generation`, `#revenue-capture`, `#token-economics`, `#econometrics`, `#alternative-explanations`, `#risks`, `#scenarios`, `#assessment`, `#limits`, `#sources-reproducibility`); the hypothesis anchors live inside `#question`. Unpublished model runs never resolve publicly.
 
 ## Workspace sidebar
 
