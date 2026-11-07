@@ -1,0 +1,21 @@
+{
+  "fit_config_id": "gross_fee_activity_v1_fit",
+  "fit_config_version": 1,
+  "spec_id": "gross_fee_activity_v1",
+  "spec_config": "gross_fee_activity_v1.json",
+  "gate_policy_config": "readiness_gate_policy_v1.json",
+  "estimator": "ols",
+  "covariance": {
+    "type": "HAC",
+    "kernel": "bartlett",
+    "maxlags_rule": "fixed",
+    "maxlags": 7,
+    "use_correction": true,
+    "use_t": true,
+    "rationale": "Newey-West HAC on daily observations with the documented baseline weekly timing (docs/ECONOMETRIC_METHODOLOGY.md 'Estimation and diagnostics': baseline maxlags 7); the lag count is a fixed preregistered number, never selected from the sample or from p-values; sensitivity lags (3 and 14) belong to the NI-053 robustness artifacts, not to this baseline fit."
+  },
+  "reproduction": {
+    "coefficient_rtol": "1e-8",
+    "coefficient_atol": "1e-10"
+  }
+}
