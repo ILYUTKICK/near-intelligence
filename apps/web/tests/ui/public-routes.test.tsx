@@ -1,27 +1,61 @@
 /**
  * NI-011 public routes: server-side shells render without login, mechanism
  * separates purchases from burns, stable anchors exist, no fake metrics.
+ *
+ * NI-012 made the landing an async server component that fetches the three
+ * evidence metrics through the delivery APIs; this file pins the honest
+ * fresh-environment default (delivery API reports no approved dataset), so
+ * the landing renders typed unavailability — no fabricated digits. The
+ * fetch-backed matrix (approved input, 503, empty, stale, unreachable,
+ * malformed) lives in landing-metrics.test.tsx.
  */
 import { axe } from "jest-axe";
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import HomePage from "@/app/(public)/page";
 import MethodologyPage from "@/app/(public)/methodology/page";
 import ResearchPage from "@/app/(public)/research/page";
 import { publicNav } from "@/lib/navigation";
 
+vi.mock("@/features/public-research/landing-metrics", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/features/public-research/landing-metrics")
+  >();
+  return {
+    ...actual,
+    fetchLandingMetrics: vi.fn(async () =>
+      actual.landingMetricSources.map((source) => ({
+        kind: "unavailable" as const,
+        metricId: source.metricId,
+        metricTitle: source.metricId,
+        reason:
+          "The delivery API reports no approved dataset for this metric yet. This is not zero.",
+      })),
+    ),
+  };
+});
+
 describe("Landing", () => {
-  it("renders the standfirst and registry links with no metric digits", async () => {
-    const { container } = render(<HomePage />);
+  it("renders the standfirst, registry links and honest unavailability with no fabricated values", async () => {
+    const { container } = render(await HomePage());
     expect(screen.getByRole("heading", { level: 1, name: "NEAR Intelligence" })).toBeInTheDocument();
     expect(screen.getByText(/missing value is never shown as zero/i)).toBeInTheDocument();
     for (const link of ["Read the research", "How the numbers are made"]) {
       const anchor = screen.getByRole("link", { name: link });
-      expect(publicNav.map((item) => item.href).concat(["/research", "/methodology"])).toContain(
-        anchor.getAttribute("href"),
-      );
+      expect(
+        publicNav.map((item) => item.href).concat(["/research", "/methodology", "/workspace"]),
+      ).toContain(anchor.getAttribute("href"));
     }
+    // Two workspace CTAs (header list and closing section) reach /workspace.
+    const workspaceLinks = screen.getAllByRole("link", { name: "Open the workspace" });
+    expect(workspaceLinks.length).toBeGreaterThanOrEqual(1);
+    for (const workspaceLink of workspaceLinks) {
+      expect(workspaceLink.getAttribute("href")).toBe("/workspace");
+    }
+    // The fresh-environment default: every metric strip card is the typed
+    // unavailable state ("not zero"), never a fabricated value.
+    expect(screen.getAllByText(/Unavailable — this is not zero/)).toHaveLength(3);
     // No fabricated quantitative claims: no percent signs in the content.
     expect(container.textContent).not.toMatch(/%/);
     expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
