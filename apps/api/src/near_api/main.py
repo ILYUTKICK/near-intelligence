@@ -15,6 +15,7 @@ from near_api.datasets.delivery import DeliveryError, delivery_error_shape
 from near_api.datasets.routes import router as datasets_router
 from near_api.documents.routes import router as documents_router
 from near_api.metrics.routes import router as metrics_router
+from near_api.models.routes import router as models_router
 from near_api.schemas.common import ErrorResponse, HealthResponse
 from near_api.settings import SettingsError, get_settings
 from near_api.users.routes import router as me_router
@@ -23,7 +24,8 @@ from near_api.workspace.routes import router as workspace_router
 app = FastAPI(
     title="NEAR Intelligence API",
     version=__version__,
-    # Remaining public endpoints (model runs/publications) arrive with NI-054.
+    # Public model endpoints (NI-054) serve published runs only; public
+    # editorial publications remain their owning task's scope.
     docs_url=None,
     redoc_url=None,
     openapi_url="/openapi.json",
@@ -53,6 +55,7 @@ app.include_router(me_router)
 app.include_router(metrics_router)
 app.include_router(charts_router)
 app.include_router(datasets_router)
+app.include_router(models_router)
 
 
 @app.get("/health", response_model=HealthResponse, operation_id="getHealth",
