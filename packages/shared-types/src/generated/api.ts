@@ -156,6 +156,12 @@ export interface paths {
         /**
          * Create an owned document with its first revision
          * @description Create an owned document whose first revision is the empty document.
+         *
+         *     With an ``Idempotency-Key`` header the created result is stored in the
+         *     write transaction and a repeated identical owner/route/body request
+         *     replays the original 201 response (24h) instead of creating a second
+         *     document; the same key with a different body is a 409 idempotency
+         *     collision.
          */
         post: operations["createDocument"];
         delete?: never;
@@ -178,10 +184,18 @@ export interface paths {
         get: operations["getDocument"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete an owned document with its private revisions and projections
+         * @description Delete the owned document; private children cascade, scientific data stays.
+         */
+        delete: operations["deleteDocument"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Rename an owned document (a title change creates a new revision)
+         * @description Rename the owned document; the title change is a full new revision.
+         */
+        patch: operations["renameDocument"];
         trace?: never;
     };
     "/api/documents/{document_id}/versions": {
@@ -191,13 +205,42 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List an owned document's immutable revisions (newest first)
+         * @description Page the owned document's revisions over the stable revision DESC order.
+         */
+        get: operations["listDocumentVersions"];
         put?: never;
         /**
          * Save a new immutable revision (compare-and-set via If-Match)
          * @description Append one immutable revision; CAS against If-Match, zero rows on failure.
+         *
+         *     With an ``Idempotency-Key`` the new revision's response snapshot is stored
+         *     in the save transaction, so a retry of the identical owner/route/body
+         *     request after a lost response replays the original 201 (same version, no
+         *     second revision) instead of a spurious 409 against the advanced document.
          */
         post: operations["saveDocumentVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fetch one immutable revision of an owned document
+         * @description Return the revision only through its owned parent document.
+         */
+        get: operations["getDocumentVersion"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -608,6 +651,15 @@ export interface components {
             insights: number;
         };
         /**
+         * DocumentRenameRequest
+         * @description PATCH /documents/{id} body: the new title (a title change creates a
+         *     full new revision — EDITOR_SPECIFICATION; an unchanged title is a no-op).
+         */
+        DocumentRenameRequest: {
+            /** Title */
+            title: string;
+        };
+        /**
          * DocumentResponse
          * @description `Document` = DocumentSummary plus current canonical content.
          */
@@ -1003,6 +1055,40 @@ export interface components {
             /** Schema Version */
             schema_version: number;
         };
+        /**
+         * VersionListResponse
+         * @description GET /documents/{id}/versions response: bounded page, newest first.
+         */
+        VersionListResponse: {
+            /** Items */
+            items: components["schemas"]["VersionSummaryResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** VersionSummaryResponse */
+        VersionSummaryResponse: {
+            /** Content Sha256 */
+            content_sha256: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revision */
+            revision: number;
+            /** Schema Version */
+            schema_version: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -1338,7 +1424,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Revision conflict: the document moved since the request was built */
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1380,6 +1466,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                "idempotency-key"?: string | null;
                 authorization?: string | null;
             };
             path?: never;
@@ -1427,7 +1514,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Revision conflict: the document moved since the request was built */
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1514,7 +1601,275 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Revision conflict: the document moved since the request was built */
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteDocument: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    renameDocument: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentRenameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSummary"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listDocumentVersions: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionListResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1557,6 +1912,7 @@ export interface operations {
             query?: never;
             header?: {
                 "if-match"?: string | null;
+                "idempotency-key"?: string | null;
                 authorization?: string | null;
             };
             path: {
@@ -1606,7 +1962,95 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Revision conflict: the document moved since the request was built */
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getDocumentVersion: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionDetailResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
             409: {
                 headers: {
                     [name: string]: unknown;
