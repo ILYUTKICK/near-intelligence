@@ -85,12 +85,14 @@ class HomeContractTests(unittest.TestCase):
     def test_01_home_is_documented_in_openapi_with_required_pending_sections(self):
         schema = self.client.get("/openapi.json").json()
         # The contract grows with implemented routes: NI-025 added /api/me,
-        # NI-036 added the document revision routes and NI-032 added the
-        # public metrics/chart/dataset/source delivery routes.
+        # NI-036 added the document revision routes, NI-037 added the version
+        # detail route and NI-032 added the public
+        # metrics/chart/dataset/source delivery routes.
         self.assertEqual(set(schema["paths"]), {"/health", "/api/home", "/api/me",
                                                 "/api/documents",
                                                 "/api/documents/{document_id}",
                                                 "/api/documents/{document_id}/versions",
+                                                "/api/documents/{document_id}/versions/{version_id}",
                                                 "/api/metrics",
                                                 "/api/metrics/{metric_id}",
                                                 "/api/metrics/{metric_id}/series",

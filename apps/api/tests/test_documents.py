@@ -38,7 +38,7 @@ from near_api.auth.principal import Principal
 from near_api.auth.verification import VerifiedToken
 from near_api.db.security import ResourceNotFound
 from near_api.db.session import create_runtime_engine, user_transaction
-from near_api.documents import service
+from near_api.documents import idempotency, service
 from near_api.documents.projections import build_projections
 from near_api.documents.schema import (
     MAX_TOP_LEVEL_BLOCKS,
@@ -426,6 +426,7 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/health", "/api/home", "/api/me",
             "/api/documents", "/api/documents/{document_id}",
             "/api/documents/{document_id}/versions",
+            "/api/documents/{document_id}/versions/{version_id}",
             "/api/metrics", "/api/metrics/{metric_id}",
             "/api/metrics/{metric_id}/series",
             "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",
@@ -434,6 +435,20 @@ class DocumentRouteContractTests(unittest.TestCase):
         })
         self.assertEqual(schema["paths"]["/api/documents"]["post"]["operationId"],
                          "createDocument")
+        # NI-037 CRUD rows: rename/delete on the document, version list/detail.
+        document_path = schema["paths"]["/api/documents/{document_id}"]
+        self.assertEqual(set(document_path), {"get", "patch", "delete"})
+        self.assertEqual(document_path["patch"]["operationId"], "renameDocument")
+        self.assertEqual(document_path["delete"]["operationId"], "deleteDocument")
+        versions_path = schema["paths"]["/api/documents/{document_id}/versions"]
+        self.assertEqual(versions_path["get"]["operationId"], "listDocumentVersions")
+        self.assertEqual(versions_path["post"]["operationId"], "saveDocumentVersion")
+        self.assertEqual(
+            schema["paths"]["/api/documents/{document_id}/versions/{version_id}"]["get"]
+            ["operationId"], "getDocumentVersion")
+        for component in ("DocumentRenameRequest", "VersionListResponse",
+                          "VersionDetailResponse", "VersionSummaryResponse"):
+            self.assertIn(component, schema["components"]["schemas"])
         self.assertIn("DocumentResponse", schema["components"]["schemas"])
         self.assertIn("DocumentSaveResponse", schema["components"]["schemas"])
 
@@ -442,6 +457,10 @@ class DocumentRouteContractTests(unittest.TestCase):
             ("get", "/api/documents", None),
             ("post", "/api/documents", {"title": "Synthetic"}),
             ("get", f"/api/documents/{uuid4()}", None),
+            ("patch", f"/api/documents/{uuid4()}", {"title": "Synthetic"}),
+            ("delete", f"/api/documents/{uuid4()}", None),
+            ("get", f"/api/documents/{uuid4()}/versions", None),
+            ("get", f"/api/documents/{uuid4()}/versions/{uuid4()}", None),
             ("post", f"/api/documents/{uuid4()}/versions",
              {"schema_version": 1, "content": empty_document()}),
         ):
@@ -1038,6 +1057,440 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             """)).scalars().all()
         self.assertEqual(sorted(names),
                          ["evidence_links", "hypotheses", "insights"])
+
+    # -- NI-037: rename, delete, version list/detail, idempotency ------------ #
+
+    def test_12_http_rename_creates_revision_noop_keeps_history(self):
+        alice_headers = {"Authorization": "Bearer t.alice"}
+        full_payload = full_document()
+        with self.as_session(self.alice_id):
+            created = self.client.post("/api/documents",
+                                       json={"title": "Original title"},
+                                       headers=alice_headers)
+            document_id = created.json()["id"]
+            saved = self.client.post(
+                f"/api/documents/{document_id}/versions",
+                json={"schema_version": SCHEMA_VERSION, "content": full_payload},
+                headers={"If-Match": '"1"', **alice_headers})
+            self.assertEqual(saved.status_code, 201)
+            revision_two_id = saved.json()["version"]["id"]
+            revision_two_sha = saved.json()["version"]["content_sha256"]
+            # Missing If-Match is 428; malformed is the same precondition failure.
+            missing = self.client.patch(f"/api/documents/{document_id}",
+                                        json={"title": "Renamed"},
+                                        headers=alice_headers)
+            self.assertEqual(missing.status_code, 428)
+            self.assertEqual(ErrorResponse.model_validate(missing.json()).error.code,
+                             "PRECONDITION_REQUIRED")
+            malformed = self.client.patch(
+                f"/api/documents/{document_id}", json={"title": "Renamed"},
+                headers={"If-Match": "2", **alice_headers})
+            self.assertEqual(malformed.status_code, 428)
+            # Stale revision is 409 without any change.
+            stale = self.client.patch(
+                f"/api/documents/{document_id}", json={"title": "Renamed"},
+                headers={"If-Match": '"1"', **alice_headers})
+            self.assertEqual(stale.status_code, 409)
+            conflict = ErrorResponse.model_validate(stale.json())
+            self.assertEqual(conflict.error.code, "REVISION_CONFLICT")
+            self.assertIn("2", conflict.error.message)
+            # A title change creates a full new revision: same content, new id.
+            renamed = self.client.patch(
+                f"/api/documents/{document_id}", json={"title": "Renamed title"},
+                headers={"If-Match": '"2"', **alice_headers})
+            self.assertEqual(renamed.status_code, 200)
+            self.assertEqual(renamed.headers["ETag"], '"3"')
+            self.assertEqual(renamed.headers["Cache-Control"], "no-store")
+            body = renamed.json()
+            self.assertEqual(body["title"], "Renamed title")
+            self.assertEqual(body["revision"], 3)
+            self.assertNotEqual(body["current_version_id"], revision_two_id)
+            # The revision content is byte-identical; only the title moved.
+            detail = self.client.get(
+                f"/api/documents/{document_id}/versions/{body['current_version_id']}",
+                headers=alice_headers)
+            self.assertEqual(detail.status_code, 200)
+            self.assertEqual(detail.json()["content_sha256"], revision_two_sha)
+            self.assertEqual(detail.json()["content"],
+                             parse_document(full_payload).canonical)
+            # A PATCH without a title change is a no-op: no revision is created.
+            noop = self.client.patch(
+                f"/api/documents/{document_id}", json={"title": "Renamed title"},
+                headers={"If-Match": '"3"', **alice_headers})
+            self.assertEqual(noop.status_code, 200)
+            self.assertEqual(noop.headers["ETag"], '"3"')
+            self.assertEqual(noop.json()["current_version_id"],
+                             body["current_version_id"])
+            # Whitespace-only title is a typed validation error, not a rename.
+            blank = self.client.patch(
+                f"/api/documents/{document_id}", json={"title": "   "},
+                headers={"If-Match": '"3"', **alice_headers})
+            self.assertEqual(blank.status_code, 422)
+            self.assertEqual(ErrorResponse.model_validate(blank.json()).error.code,
+                             "VALIDATION_ERROR")
+        # Bob cannot rename Alice's document (one generic 404).
+        with self.as_session(self.bob_id):
+            foreign = self.client.patch(
+                f"/api/documents/{document_id}", json={"title": "Bob was here"},
+                headers={"If-Match": '"3"',
+                         "Authorization": "Bearer t.bob"})
+            self.assertEqual(foreign.status_code, 404)
+        counts = self.table_counts(UUID(document_id))
+        # rev1 empty; rev2 full content; rev3 identical rename content. The
+        # no-op and rejected attempts created no rows.
+        self.assertEqual(counts, {"document_versions": 3, "document_blocks": 18,
+                                  "insights": 2, "hypotheses": 2, "evidence_links": 2})
+
+    def test_13_delete_cascades_children_and_retains_shared_scientific_data(self):
+        dataset_id = self.insert_dataset_version("synthetic-delete-retention")
+        content = full_document()
+        content["content"][-1] = data_table_attrs(dataset_version_id=str(dataset_id))
+        alice_headers = {"Authorization": "Bearer t.alice"}
+        with self.as_session(self.alice_id):
+            created = self.client.post("/api/documents", json={"title": "Doomed"},
+                                       headers=alice_headers)
+            document_id = UUID(created.json()["id"])
+            saved = self.client.post(
+                f"/api/documents/{document_id}/versions",
+                json={"schema_version": SCHEMA_VERSION, "content": content},
+                headers={"If-Match": '"1"', **alice_headers})
+            self.assertEqual(saved.status_code, 201)
+        before = self._scientific_counts(dataset_id)
+        children_before = sum(self.table_counts(document_id).values())
+        self.assertEqual(before, {"dataset_versions": 1, "manifest_artifacts": 1,
+                                  "documents": 1})
+        self.assertGreater(children_before, 0)
+        # Missing/stale If-Match and a foreign session delete nothing.
+        with self.as_session(self.alice_id):
+            missing = self.client.delete(f"/api/documents/{document_id}",
+                                         headers=alice_headers)
+            self.assertEqual(missing.status_code, 428)
+            stale = self.client.delete(f"/api/documents/{document_id}",
+                                       headers={"If-Match": '"1"', **alice_headers})
+            self.assertEqual(stale.status_code, 409)
+            self.assertEqual(ErrorResponse.model_validate(stale.json()).error.code,
+                             "REVISION_CONFLICT")
+        with self.as_session(self.bob_id):
+            foreign = self.client.delete(f"/api/documents/{document_id}",
+                                         headers={"If-Match": '"2"',
+                                                  "Authorization": "Bearer t.bob"})
+            self.assertEqual(foreign.status_code, 404)
+        self.assertEqual(self._scientific_counts(dataset_id), before)
+        self.assertEqual(sum(self.table_counts(document_id).values()), children_before)
+        # The owner's delete is a 204 with no body; private children cascade.
+        with self.as_session(self.alice_id):
+            deleted = self.client.delete(f"/api/documents/{document_id}",
+                                         headers={"If-Match": '"2"', **alice_headers})
+            self.assertEqual(deleted.status_code, 204)
+            self.assertEqual(deleted.content, b"")
+            self.assertEqual(deleted.headers["Cache-Control"], "no-store")
+            gone = self.client.get(f"/api/documents/{document_id}",
+                                   headers=alice_headers)
+            self.assertEqual(gone.status_code, 404)
+            versions = self.client.get(f"/api/documents/{document_id}/versions",
+                                       headers=alice_headers)
+            self.assertEqual(versions.status_code, 404)
+            repeat = self.client.delete(f"/api/documents/{document_id}",
+                                        headers={"If-Match": '"2"', **alice_headers})
+            self.assertEqual(repeat.status_code, 404)
+        after = self._scientific_counts(dataset_id)
+        self.assertEqual(after["dataset_versions"], 1)
+        self.assertEqual(after["manifest_artifacts"], 1)
+        self.assertEqual(after["documents"], 0)
+        with self.admin.connect() as connection:
+            remaining = connection.execute(text("""
+                SELECT (SELECT count(*) FROM app.document_versions
+                         WHERE document_id = :id) +
+                       (SELECT count(*) FROM app.document_blocks
+                         WHERE document_id = :id) +
+                       (SELECT count(*) FROM app.insights
+                         WHERE document_id = :id) +
+                       (SELECT count(*) FROM app.hypotheses
+                         WHERE document_id = :id) +
+                       (SELECT count(*) FROM app.evidence_links
+                         WHERE document_id = :id)
+            """), {"id": document_id}).scalar_one()
+        self.assertEqual(remaining, 0)
+
+    def test_14_version_list_order_cursor_and_detail(self):
+        alice_headers = {"Authorization": "Bearer t.alice"}
+        with self.as_session(self.alice_id):
+            created = self.client.post("/api/documents",
+                                       json={"title": "Versioned"},
+                                       headers=alice_headers)
+            document_id = created.json()["id"]
+            first_version_id = created.json()["current_version_id"]
+            second_payload = full_document()
+            for payload in (second_payload, empty_document()):
+                saved = self.client.post(
+                    f"/api/documents/{document_id}/versions",
+                    json={"schema_version": SCHEMA_VERSION, "content": payload},
+                    headers={"If-Match": '"1"' if payload is second_payload else '"2"',
+                             **alice_headers})
+                self.assertEqual(saved.status_code, 201)
+            third_version_id = saved.json()["version"]["id"]
+            page_one = self.client.get(f"/api/documents/{document_id}/versions",
+                                       params={"limit": 2}, headers=alice_headers)
+            self.assertEqual(page_one.status_code, 200)
+            payload = page_one.json()
+            self.assertEqual([item["revision"] for item in payload["items"]], [3, 2])
+            self.assertIsNotNone(payload["next_cursor"])
+            for item in payload["items"]:
+                self.assertNotIn("content", item)
+                self.assertNotIn("resolved_contexts", item)
+                self.assertEqual(len(item["content_sha256"]), 64)
+            page_two = self.client.get(
+                f"/api/documents/{document_id}/versions",
+                params={"limit": 2, "cursor": payload["next_cursor"]},
+                headers=alice_headers)
+            self.assertEqual([item["revision"] for item in page_two.json()["items"]],
+                             [1])
+            self.assertIsNone(page_two.json()["next_cursor"])
+            broken = self.client.get(f"/api/documents/{document_id}/versions",
+                                     params={"cursor": "%%%bad%%%"},
+                                     headers=alice_headers)
+            self.assertEqual(broken.status_code, 422)
+            # Version detail returns the immutable canonical content.
+            detail = self.client.get(
+                f"/api/documents/{document_id}/versions/{first_version_id}",
+                headers=alice_headers)
+            self.assertEqual(detail.status_code, 200)
+            self.assertEqual(detail.json()["content"], empty_document())
+            self.assertEqual(detail.json()["revision"], 1)
+            self.assertEqual(detail.json()["resolved_contexts"], {})
+            second_detail = self.client.get(
+                f"/api/documents/{document_id}/versions/{third_version_id}",
+                headers=alice_headers)
+            self.assertEqual(second_detail.json()["content"], empty_document())
+        # A version id from another document never resolves (compositional 404).
+        with self.as_session(self.alice_id):
+            other = self.client.post("/api/documents", json={"title": "Other"},
+                                     headers=alice_headers)
+            other_id = other.json()["id"]
+            cross = self.client.get(
+                f"/api/documents/{other_id}/versions/{first_version_id}",
+                headers=alice_headers)
+            self.assertEqual(cross.status_code, 404)
+        with self.as_session(self.bob_id):
+            foreign_list = self.client.get(f"/api/documents/{document_id}/versions",
+                                           headers={"Authorization": "Bearer t.bob"})
+            self.assertEqual(foreign_list.status_code, 404)
+            foreign_detail = self.client.get(
+                f"/api/documents/{document_id}/versions/{first_version_id}",
+                headers={"Authorization": "Bearer t.bob"})
+            self.assertEqual(foreign_detail.status_code, 404)
+
+    def test_15_http_idempotent_create_timeout_after_commit_replay(self):
+        key = str(uuid4())
+        alice_headers = {"Authorization": "Bearer t.alice", "Idempotency-Key": key}
+        with self.as_session(self.alice_id):
+            first = self.client.post("/api/documents",
+                                     json={"title": "Idempotent create"},
+                                     headers=alice_headers)
+            self.assertEqual(first.status_code, 201)
+            self.assertEqual(first.headers["ETag"], '"1"')
+            # The response was "lost": the identical retry replays the ORIGINAL
+            # result — same document, no second revision.
+            retry = self.client.post("/api/documents",
+                                     json={"title": "Idempotent create"},
+                                     headers=alice_headers)
+            self.assertEqual(retry.status_code, 201)
+            self.assertEqual(retry.json(), first.json())
+            self.assertEqual(retry.headers["ETag"], '"1"')
+            counts = self.table_counts(UUID(first.json()["id"]))
+            self.assertEqual(counts["document_versions"], 1)
+            # A different body with the same key is a collision, not a replay.
+            conflict = self.client.post("/api/documents",
+                                        json={"title": "Different body"},
+                                        headers=alice_headers)
+            self.assertEqual(conflict.status_code, 409)
+            self.assertEqual(ErrorResponse.model_validate(conflict.json()).error.code,
+                             "IDEMPOTENCY_CONFLICT")
+            # A malformed key is a typed validation error, never ignored.
+            malformed = self.client.post(
+                "/api/documents", json={"title": "Malformed key"},
+                headers={"Authorization": "Bearer t.alice",
+                         "Idempotency-Key": "not-a-uuid"})
+            self.assertEqual(malformed.status_code, 422)
+            # A failed create stores nothing: the key stays usable for the
+            # corrected retry (whitespace title 422, then a valid 201).
+            retryable_key = str(uuid4())
+            failed = self.client.post(
+                "/api/documents", json={"title": "   "},
+                headers={"Authorization": "Bearer t.alice",
+                         "Idempotency-Key": retryable_key})
+            self.assertEqual(failed.status_code, 422)
+            recovered = self.client.post(
+                "/api/documents", json={"title": "Recovered"},
+                headers={"Authorization": "Bearer t.alice",
+                         "Idempotency-Key": retryable_key})
+            self.assertEqual(recovered.status_code, 201)
+        # Keys are owner-scoped: Bob's use of the same UUID is independent.
+        with self.as_session(self.bob_id):
+            bob_create = self.client.post(
+                "/api/documents", json={"title": "Bob independent"},
+                headers={"Authorization": "Bearer t.bob", "Idempotency-Key": key})
+            self.assertEqual(bob_create.status_code, 201)
+            self.assertNotEqual(bob_create.json()["id"], first.json()["id"])
+        with self.admin.connect() as connection:
+            documents = connection.execute(text(
+                "SELECT count(*) FROM app.documents WHERE owner_id = :owner"),
+                {"owner": self.alice_id}).scalar_one()
+        # Alice: the idempotent create + the recovered create = 2 documents.
+        self.assertEqual(documents, 2)
+
+    def test_16_http_idempotent_save_replay_prevents_second_revision(self):
+        key = str(uuid4())
+        alice_headers = {"Authorization": "Bearer t.alice"}
+        save_headers = {"If-Match": '"1"', "Idempotency-Key": key, **alice_headers}
+        payload = {"schema_version": SCHEMA_VERSION, "content": full_document()}
+        with self.as_session(self.alice_id):
+            created = self.client.post("/api/documents", json={"title": "Autosave"},
+                                       headers=alice_headers)
+            document_id = UUID(created.json()["id"])
+            first_save = self.client.post(
+                f"/api/documents/{document_id}/versions", json=payload,
+                headers=save_headers)
+            self.assertEqual(first_save.status_code, 201)
+            self.assertEqual(first_save.headers["ETag"], '"2"')
+            version_id = first_save.json()["version"]["id"]
+            # Timeout-after-commit retry: same key, same body — the replay
+            # returns the stored original result and creates NO third revision.
+            retry = self.client.post(
+                f"/api/documents/{document_id}/versions", json=payload,
+                headers=save_headers)
+            self.assertEqual(retry.status_code, 201)
+            self.assertEqual(retry.json(), first_save.json())
+            self.assertEqual(retry.headers["ETag"], '"2"')
+            # The same body with a refreshed If-Match is the same logical
+            # request (identity is owner/route/body): it replays the result.
+            refreshed = self.client.post(
+                f"/api/documents/{document_id}/versions", json=payload,
+                headers={**save_headers, "If-Match": '"2"'})
+            self.assertEqual(refreshed.status_code, 201)
+            self.assertEqual(refreshed.json()["version"]["id"], version_id)
+            # A different body with the same key is a 409 collision.
+            conflict = self.client.post(
+                f"/api/documents/{document_id}/versions",
+                json={"schema_version": SCHEMA_VERSION,
+                      "content": empty_document()},
+                headers=save_headers)
+            self.assertEqual(conflict.status_code, 409)
+            self.assertEqual(ErrorResponse.model_validate(conflict.json()).error.code,
+                             "IDEMPOTENCY_CONFLICT")
+            # A different key never replays: plain CAS against revision 1 is
+            # now stale and the conflict is the honest 409.
+            stale = self.client.post(
+                f"/api/documents/{document_id}/versions",
+                json={"schema_version": SCHEMA_VERSION, "content": full_document()},
+                headers={"If-Match": '"1"', "Idempotency-Key": str(uuid4()),
+                         **alice_headers})
+            self.assertEqual(stale.status_code, 409)
+            self.assertEqual(ErrorResponse.model_validate(stale.json()).error.code,
+                             "REVISION_CONFLICT")
+            # Saves without a key keep the plain CAS behavior.
+            plain = self.client.post(
+                f"/api/documents/{document_id}/versions",
+                json={"schema_version": SCHEMA_VERSION, "content": empty_document()},
+                headers={"If-Match": '"2"', **alice_headers})
+            self.assertEqual(plain.status_code, 201)
+            self.assertEqual(plain.headers["ETag"], '"3"')
+        counts = self.table_counts(document_id)
+        self.assertEqual(counts, {"document_versions": 3, "document_blocks": 9,
+                                  "insights": 1, "hypotheses": 1, "evidence_links": 1})
+
+    def test_17_idempotent_create_concurrent_same_key_single_document(self):
+        key = uuid4()
+        route = idempotency.ROUTE_CREATE_DOCUMENT
+        fingerprint = idempotency.request_fingerprint(route, self.alice_id,
+                                                      {"title": "Race create"})
+        barrier = threading.Barrier(2)
+        outcomes = {}
+
+        def run(engine, tag):
+            barrier.wait()
+            outcomes[tag] = idempotency.execute_idempotent(
+                engine, self.alice, route_key=route, idempotency_key=key,
+                request_hash=fingerprint,
+                operation=lambda connection: (
+                    201, {"document_id": str(
+                        service.create_document_in_transaction(
+                            connection, self.alice, title="Race create").document.id)}))
+
+        threads = [threading.Thread(target=run, args=(self.engine, "a")),
+                   threading.Thread(target=run, args=(self.engine_b, "b"))]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual({outcome.status for outcome in outcomes.values()}, {201})
+        document_ids = {outcome.body["document_id"] for outcome in outcomes.values()}
+        self.assertEqual(document_ids, {outcomes["a"].body["document_id"]})
+        self.assertTrue(outcomes["a"].replay != outcomes["b"].replay)
+        with self.admin.connect() as connection:
+            created = connection.execute(text(
+                "SELECT count(*) FROM app.documents WHERE title = 'Race create'"
+            )).scalar_one()
+            versions = connection.execute(text("""
+                SELECT count(*) FROM app.document_versions v
+                  JOIN app.documents d ON d.id = v.document_id
+                 WHERE d.title = 'Race create'
+            """)).scalar_one()
+        self.assertEqual((created, versions), (1, 1))
+
+    def test_18_disabled_account_is_403_on_crud_routes(self):
+        alice_headers = {"Authorization": "Bearer t.alice"}
+        with self.as_session(self.alice_id):
+            created = self.client.post("/api/documents", json={"title": "Gate"},
+                                       headers=alice_headers)
+            document_id = created.json()["id"]
+            version_id = created.json()["current_version_id"]
+        with self.operator.begin() as connection:
+            connection.execute(text(
+                "UPDATE app.users SET disabled_at = now() WHERE id = :id"),
+                {"id": self.alice_id})
+        with self.as_session(self.alice_id):
+            for method, path, payload, headers in (
+                ("patch", f"/api/documents/{document_id}", {"title": "x"},
+                 {"If-Match": '"1"', **alice_headers}),
+                ("delete", f"/api/documents/{document_id}", None,
+                 {"If-Match": '"1"', **alice_headers}),
+                ("get", f"/api/documents/{document_id}/versions", None, alice_headers),
+                ("get", f"/api/documents/{document_id}/versions/{version_id}",
+                 None, alice_headers),
+            ):
+                response = self.client.request(method, path, json=payload,
+                                               headers=headers) \
+                    if payload is not None else self.client.request(method, path,
+                                                                    headers=headers)
+                with self.subTest(method=method):
+                    self.assertEqual(response.status_code, 403)
+                    self.assertEqual(
+                        ErrorResponse.model_validate(response.json()).error.code,
+                        "FORBIDDEN")
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+        with self.operator.begin() as connection:
+            connection.execute(text(
+                "UPDATE app.users SET disabled_at = NULL WHERE id = :id"),
+                {"id": self.alice_id})
+        with self.as_session(self.alice_id):
+            recovered = self.client.get(f"/api/documents/{document_id}/versions",
+                                        headers=alice_headers)
+            self.assertEqual(recovered.status_code, 200)
+
+    def _scientific_counts(self, dataset_id: UUID) -> dict:
+        with self.admin.connect() as connection:
+            return {
+                "dataset_versions": connection.execute(text(
+                    "SELECT count(*) FROM app.dataset_versions WHERE id = :id"),
+                    {"id": dataset_id}).scalar_one(),
+                "manifest_artifacts": connection.execute(text(
+                    "SELECT count(*) FROM app.artifacts a "
+                    "JOIN app.dataset_versions dv ON dv.manifest_artifact_id = a.id "
+                    "WHERE dv.id = :id"), {"id": dataset_id}).scalar_one(),
+                "documents": connection.execute(text(
+                    "SELECT count(*) FROM app.documents")).scalar_one(),
+            }
 
 
 class _StubVerifier:
