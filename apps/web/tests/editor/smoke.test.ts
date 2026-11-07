@@ -5,13 +5,13 @@
 import { Editor } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
 
-import { canonicalToTiptapDoc, tiptapToCanonicalDocument } from "@/features/editor/serialize";
 import type { CanonicalDocument } from "@/features/editor/canonical";
 import { EDITOR_EXTENSIONS } from "@/features/editor/extensions";
+import { canonicalToTiptapDoc, tiptapToCanonicalDocument } from "@/features/editor/serialize";
 
 const BLOCK = "11111111-1111-4111-8111-111111111111";
 
-export const FIXTURE_DOC = {
+export const FIXTURE_DOC: CanonicalDocument = {
   schema_version: 1,
   type: "doc",
   content: [
@@ -88,7 +88,7 @@ describe("canonical serialize/load (smoke)", () => {
   it("keeps the editor round trip stable (load -> getJSON -> serialize -> reload -> serialize)", () => {
     const editor = new Editor({ extensions: EDITOR_EXTENSIONS, content: canonicalToTiptapDoc(FIXTURE_DOC) });
     const first = tiptapToCanonicalDocument(editor.getJSON());
-    const reloaded = new Editor({ extensions: EDITOR_EXTENSIONS, content: canonicalToTiptapDoc(first as CanonicalDocument) });
+    const reloaded = new Editor({ extensions: EDITOR_EXTENSIONS, content: canonicalToTiptapDoc(first) });
     const second = tiptapToCanonicalDocument(reloaded.getJSON());
     editor.destroy();
     reloaded.destroy();

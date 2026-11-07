@@ -49,3 +49,75 @@
   --radius-surface: var(--radius-surface);
   --radius-dialog: var(--radius-dialog);
 }
+
+/*
+ * Research editor paper typography (NI-039). Scoped to the editor content
+ * element: Tiptap renders plain h1-h3/p/ul/ol, so the document scale from
+ * tokens.css is applied here once — never per-page duplication.
+ */
+.editor-paper {
+  color: var(--color-text);
+  font-size: var(--text-document-size);
+  line-height: var(--text-document-leading);
+  min-height: 12rem;
+}
+.editor-paper:focus-visible,
+.editor-paper:focus {
+  outline: none;
+}
+.editor-paper p {
+  margin: var(--space-2) 0;
+}
+.editor-paper h1,
+.editor-paper h2,
+.editor-paper h3 {
+  font-family: var(--font-serif);
+  color: var(--color-text);
+  margin: var(--space-6) 0 var(--space-2);
+}
+.editor-paper h1 {
+  font-size: var(--text-title-size);
+  line-height: var(--text-title-leading);
+}
+.editor-paper h2 {
+  font-size: var(--text-heading-size);
+  line-height: var(--text-heading-leading);
+}
+.editor-paper h3 {
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
+  font-weight: 600;
+}
+.editor-paper ul,
+.editor-paper ol {
+  margin: var(--space-2) 0;
+  padding-inline-start: var(--space-8);
+}
+.editor-paper ul {
+  list-style: disc;
+}
+.editor-paper ul ul {
+  list-style: circle;
+}
+.editor-paper ol {
+  list-style: decimal;
+}
+.editor-paper li p {
+  margin: 0;
+}
+.editor-paper li {
+  margin: var(--space-1) 0;
+}
+.editor-paper a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.editor-paper .editor-divider {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-6) 0;
+}
+.editor-paper.ProseMirror-focused {
+  outline: 2px solid transparent;
+}

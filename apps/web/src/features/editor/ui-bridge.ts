@@ -24,6 +24,16 @@ export interface EditorUiBridgeStorage {
   requestBlockDelete: (topLevelIndex: number) => boolean;
 }
 
+/** Storage of the slash-menu trigger extension (see slash-menu.ts). */
+export interface SlashMenuStorage {
+  /**
+   * Called when the user types "/" at the start of an empty top-level text
+   * block; the argument is the document position of the trigger. The shell
+   * replaces this no-op at mount to open the positioned insert menu.
+   */
+  onTrigger: (position: number) => void;
+}
+
 export const EditorUiBridge = Extension.create({
   name: "editorUiBridge",
 
@@ -38,5 +48,6 @@ export const EditorUiBridge = Extension.create({
 declare module "@tiptap/core" {
   interface Storage {
     editorUiBridge: EditorUiBridgeStorage;
+    slashMenuTrigger: SlashMenuStorage;
   }
 }

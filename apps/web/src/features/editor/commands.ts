@@ -196,6 +196,11 @@ function topLevelRange(doc: ProseMirrorNode, index: number): { from: number; to:
   return { from, to: from + doc.child(index).nodeSize };
 }
 
+/** Start position of the top-level block at `index` (for updateAttributes). */
+export function topLevelNodePosition(editor: Editor, index: number): number {
+  return topLevelRange(editor.state.doc, index).from;
+}
+
 /**
  * Canonical snapshot of the current editor state (validated). Throws
  * CanonicalDocumentError when the state is not canonically representable —

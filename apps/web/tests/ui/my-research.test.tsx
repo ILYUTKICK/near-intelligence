@@ -13,7 +13,6 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DocumentList } from "@/features/documents/list/DocumentList";
-import { DocumentStubView } from "@/features/documents/list/DocumentStubView";
 
 const routerPush = vi.hoisted(() => vi.fn());
 
@@ -479,57 +478,5 @@ describe("My Research actions — create, rename, delete", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/could not be renamed/i);
     expect(within(dialog).getByLabelText("Title")).toHaveValue("Offline edit (fixture)");
-  });
-});
-
-describe("Persisted document stub route", () => {
-  const DOCUMENT_RESPONSE = {
-    ...CREATED_DOC,
-    updated_at: "2026-11-08T00:00:00Z",
-  };
-
-  it("shows the persisted metadata and the honest editor-pending note", async () => {
-    const requests = mockApi([
-      (url) => (url === `/api/documents/${DOC_CREATED_ID}` ? jsonResponse(DOCUMENT_RESPONSE) : undefined),
-    ]);
-
-    const { container } = render(<DocumentStubView documentId={DOC_CREATED_ID} />);
-
-    expect(await screen.findByRole("heading", { name: "Brand new research (fixture)" })).toBeInTheDocument();
-    expect(screen.getByRole("note", { name: "Editor availability" })).toHaveTextContent(
-      /NI-039\/NI-040/,
-    );
-    expect(screen.getByText(/Revision 1/)).toBeInTheDocument();
-    // No fake editor: no editable surface is rendered.
-    expect(screen.queryByRole("textbox")).toBeNull();
-    const fetched = requests[0];
-    expect(fetched.url).toBe(`/api/documents/${DOC_CREATED_ID}`);
-    expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
-  });
-
-  it("answers an inaccessible document with the same honest not-found state", async () => {
-    mockApi([
-      (url) =>
-        url === `/api/documents/${DOC_CREATED_ID}`
-          ? errorResponse(404, "RESOURCE_NOT_FOUND", "Resource not found")
-          : undefined,
-    ]);
-
-    render(<DocumentStubView documentId={DOC_CREATED_ID} />);
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      /does not exist or does not belong to your account/i,
-    );
-  });
-
-  it("rejects a malformed document id without any request", async () => {
-    const requests = mockApi([]);
-
-    render(<DocumentStubView documentId="not-a-uuid" />);
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      /does not exist or does not belong to your account/i,
-    );
-    expect(requests).toHaveLength(0);
   });
 });
