@@ -98,14 +98,15 @@ def main() -> int:
         # adapter, NI-031 chart registry, NI-032 public delivery APIs,
         # NI-051 model readiness gate (offline research code, no database
         # use), the NI-052 deterministic estimator (also offline research
-        # code) and the NI-036 document revision suites.
+        # code), the NI-053 diagnostics battery (same) and the NI-036
+        # document revision suites.
         patterns = ["test_database.py", "test_auth_bootstrap.py", "test_ownership_rls.py",
                     "test_home_aggregation.py", "test_archive_import.py",
                     "test_dataset_staging.py", "test_metrics.py",
                     "test_refresh_adapter.py", "test_chart_registry.py",
                     "test_delivery_apis.py",
                     "test_profile.py", "test_documents.py", "test_models_readiness.py",
-                    "test_models_fit.py"]
+                    "test_models_fit.py", "test_models_diagnostics.py"]
         # NI-030 bounded authorized live smoke: only when the operator
         # explicitly sets NI_LIVE_SMOKE=1 in the invoking environment (the same
         # gate the smoke file itself requires) does one real finalized-header
