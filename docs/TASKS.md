@@ -1431,7 +1431,12 @@ Specification: [ECONOMETRIC_METHODOLOGY.md](ECONOMETRIC_METHODOLOGY.md).
 - **Priority:** P0
 - **Dependencies:** NI-053, NI-004, NI-028
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #25
+- **Execution role:** B
+- **Started at:** 2026-11-08T02:21:56+03:00
+- **Branch/worktree:** feat/ni-054-model-artifacts; /Users/ilyutkinn/Desktop/near-intelligence-b8
+- **Dependency verification:** NI-053 is DONE on main (merged PR #54 at 77126c8): `research/models/diagnostics.py` + the `diagnostics` CLI verb are present and reviewed (382 offline tests OK, 15/15 cluster suites OK). NI-004 is DONE on main (OpenAPI generation, typed client, `check:contracts`). NI-028 is DONE on main (immutable dataset staging/publication; the delivery `near_app` read-only pattern NI-054 reuses). No competing claim on NI-054 exists; worktrees a5–a7 and a8 (parallel NI-039, role A) are left untouched.
 
 **Description:** Expose only reviewed immutable results that reviewers can actually rerun offline.
 
