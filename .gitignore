@@ -63,6 +63,11 @@ private-exports/
 # reports stay local (never committed, never published).
 !/research/models/readiness.py
 !/research/models/configs/*.json
+# NI-052 fixed deterministic estimator: the estimator code and its
+# preregistered fit configs are shared; generated fit manifests stay local
+# (never committed, never published).
+!/research/models/fit.py
+!/research/models/fit_configs/*.json
 research/models/reports/
 /product-plan/**
 !/product-plan/**/

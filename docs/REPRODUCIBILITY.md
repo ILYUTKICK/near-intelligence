@@ -36,17 +36,37 @@ Dataset immutability: only staged artifacts mutate; approved dataset bytes/rows 
 
 For document revision, include editor schema/content hash, publication source if copied, every chart definition/renderer/metric version, selection/filter/mode, exact dataset pin and context hash, insight/evidence metadata and model run references. Snapshots reconstruct the same evidence; live mode is merely a working-view resolution policy.
 
-## Planned deterministic commands — implement in NI-028/NI-051–NI-054
+## Deterministic model commands — implemented subset and remaining plan
+
+Implemented so far (offline research commands; the archive is opened read-only and reports are written only to the operator-provided output directory):
 
 ```sh
 uv sync --project apps/api --frozen
+# NI-051 readiness gate (decides which empirical question is admissible):
+uv run --project apps/api python research/models/readiness.py \
+    --archive-root /path/to/research --configs-dir research/models/configs \
+    --out-dir research/models/reports
+# NI-052 fixed deterministic estimator (same specification, unchanged):
+uv run --project apps/api python -m near_api.research fit \
+    --archive-root /path/to/research --out-dir research/models/reports \
+    --code-commit <git sha>
+# equivalent standalone research entry point:
+uv run --project apps/api python research/models/fit.py \
+    --archive-root /path/to/research --out-dir research/models/reports \
+    --code-commit <git sha>
+```
+
+The estimator refuses to fit unless the gate verdict for the bound specification (`research/models/configs/gross_fee_activity_v1.json` with settings in `research/models/fit_configs/gross_fee_activity_v1_fit.json`) is `READY`/`READY_WITH_LIMITS`. Exit codes are 0 success, 4 contract/policy failure, 2 usage. The same inputs/config/lock render a byte-identical manifest on one platform; fitted floats compare under the documented tolerance (rtol1e-8/atol1e-10). The real-archive fit run is operator-side evidence, not repository content.
+
+Remaining planned (do not describe as working until implemented):
+
+```sh
 uv run --project apps/api python -m near_api.cli datasets build --config research/models/configs/intents_daily_v1.json --offline
 uv run --project apps/api python -m near_api.cli research readiness --model gross-fee-activity-v1 --dataset <UUID>
-uv run --project apps/api python -m near_api.cli research run --model gross-fee-activity-v1 --dataset <UUID> --config research/models/configs/gross_fee_activity_v1.json --offline
 uv run --project apps/api python -m near_api.cli research verify --manifest research/reports/<run-id>/manifest.json
 ```
 
-Config paths and CLI do not exist yet; tasks must create them. Models for true protocol revenue are enabled only after their readiness gates pass. `--offline` rejects provider HTTP and cloud access, not merely omits an API key. Publication command must validate that artifact/code/lock/config inputs are all resolvable and licensed for their intended distribution.
+The `near_api.cli` surface and dataset-UUID binding do not exist yet; tasks must create them (NI-054 owns `research verify` and publication). Models for true protocol revenue are enabled only after their readiness gates pass. `--offline` rejects provider HTTP and cloud access, not merely omits an API key. Publication command must validate that artifact/code/lock/config inputs are all resolvable and licensed for their intended distribution.
 
 Model bundle adds model version, sample/exclusions, transformed design, coefficient/SE/CI/test outputs, covariance/lag settings, diagnostics, interpretation/limitations, Python/OS/BLAS versions and seeds. Exact data hashes must match; fitted floats use documented tolerance (initial rtol1e-8/atol1e-10); rendering pixels/ZIP timestamps may differ while canonical values/pins match.
 
