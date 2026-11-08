@@ -1338,7 +1338,12 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-042, NI-028
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex `/root`, chat `01a1bd1f-f988-7c82-9339-80fb05e336c0`
+- **Execution role:** B
+- **Started at:** 2026-11-09T00:48:34+03:00
+- **Branch/worktree:** `feat/ni-043-frozen-revision-evidence`, `D:/хахатон/near-intelligence`
+- **Dependency verification:** NI-042 and NI-028 are DONE on `origin/main` (`a1f35b3`); the private repository had no open PRs when claimed.
 
 **Description:** Guarantee that old research and exports reconstruct exactly the data inspected at save.
 
