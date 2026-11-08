@@ -119,7 +119,7 @@ export function DataTableBlockView({ node, editor, getPos }: NodeViewProps) {
             block&apos;s structural operations are active now.
           </p>
         )}
-        <button
+        {editor.isEditable ? <button
           type="button"
           className="mt-2 min-h-11 rounded-control border border-control-border bg-surface px-3 text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           onClick={() => {
@@ -131,7 +131,7 @@ export function DataTableBlockView({ node, editor, getPos }: NodeViewProps) {
           }}
         >
           Edit properties
-        </button>
+        </button> : null}
       </div>
     </NodeViewWrapper>
   );

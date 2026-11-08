@@ -43,7 +43,7 @@ import threading
 import time
 from collections import OrderedDict
 from decimal import Decimal
-from typing import Callable, Mapping
+from typing import Callable, Iterable, Mapping
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -51,12 +51,18 @@ from sqlalchemy import Connection, text
 
 from near_api.charts.registry import SERIES_ROLES
 from near_api.datasets.canonical import (
+    CanonicalFormatError,
     canonical_timestamp,
     decimal_string,
     dump_canonical,
     sha256_hex,
 )
-from near_api.datasets.service import list_inputs, list_observations
+from near_api.datasets.service import (
+    DatasetVerificationError,
+    list_inputs,
+    list_observations,
+    verify_stored_digest,
+)
 from near_api.schemas.common import DataQuality, Observation
 from near_api.schemas.delivery import (
     AvailableRanges,
@@ -373,20 +379,16 @@ def aggregate_quality(points: list[dict]) -> DataQuality:
 # --------------------------------------------------------------------------- #
 
 
-def _load_version_content(connection: Connection, version_id: UUID) -> dict:
-    rows = connection.execute(text("""
-        SELECT metric_definition_id, period_start, period_end, dimensions, dimensions_hash,
-               value, quality_status, bound_kind, source_record_ref, quality
-        FROM app.metric_observations WHERE dataset_version_id = :id
-        ORDER BY metric_definition_id, period_start, dimensions_hash
-    """), {"id": version_id}).mappings().all()
+def _project_version_content(rows: Iterable[Mapping], input_source_ids: Iterable[str]) -> dict:
     observations: dict[UUID, list[dict]] = {}
     verified = 0
+    total = 0
     reasons: set[str] = set()
     for row in rows:
-        value = None
-        if row["value"] is not None:
-            value = decimal_string(row["value"])
+        total += 1
+        value = row["value"]
+        if isinstance(value, Decimal):
+            value = decimal_string(value)
         record = {"metric_definition_id": row["metric_definition_id"],
                   "period_start": row["period_start"].astimezone(UTC),
                   "period_end": row["period_end"].astimezone(UTC),
@@ -401,18 +403,29 @@ def _load_version_content(connection: Connection, version_id: UUID) -> dict:
             verified += 1
         else:
             reasons.add(_truncate_reason((row["quality"] or {}).get("reason")))
-    input_source_ids = connection.execute(text("""
-        SELECT DISTINCT source_id FROM app.dataset_inputs
-        WHERE dataset_version_id = :id AND source_id IS NOT NULL
-    """), {"id": version_id}).scalars().all()
     return {"observations": {metric: tuple(items)
                              for metric, items in observations.items()},
-            "verified_count": verified, "total_count": len(rows),
+            "verified_count": verified, "total_count": total,
             "reasons": tuple(sorted(reasons)[:20]),
             "input_source_ids": tuple(sorted(input_source_ids))}
 
 
-def load_approved_dataset(connection: Connection, version_id: UUID) -> tuple[dict, dict]:
+def _load_version_content(connection: Connection, version_id: UUID) -> dict:
+    rows = connection.execute(text("""
+        SELECT metric_definition_id, period_start, period_end, dimensions, dimensions_hash,
+               value, quality_status, bound_kind, source_record_ref, quality
+        FROM app.metric_observations WHERE dataset_version_id = :id
+        ORDER BY metric_definition_id, period_start, dimensions_hash
+    """), {"id": version_id}).mappings().all()
+    input_source_ids = connection.execute(text("""
+        SELECT DISTINCT source_id FROM app.dataset_inputs
+        WHERE dataset_version_id = :id AND source_id IS NOT NULL
+    """), {"id": version_id}).scalars().all()
+    return _project_version_content(rows, input_source_ids)
+
+
+def load_approved_dataset(connection: Connection, version_id: UUID, *,
+                          verify_content: bool = False) -> tuple[dict, dict]:
     """Return the approved version row and its (cached) observation content.
 
     Any version that is not ``approved`` — staged, validated, rejected or
@@ -427,6 +440,22 @@ def load_approved_dataset(connection: Connection, version_id: UUID) -> tuple[dic
     """), {"id": version_id}).mappings().first()
     if version is None or version["status"] != "approved":
         raise DeliveryNotFound("approved dataset version was not found")
+    if verify_content:
+        # Verify the prepared database content once and use those same rows for
+        # delivery. A stale cache hit cannot mask a lost/corrupt artifact.
+        artifact_digest = connection.execute(text("""
+            SELECT sha256 FROM app.artifacts WHERE id = :id
+            AND scope <> 'private' AND license_status <> 'prohibited'
+        """), {"id": version["manifest_artifact_id"]}).scalar_one_or_none()
+        if artifact_digest != version["content_sha256"]:
+            raise DeliveryReferenceInvalid("the approved dataset manifest is missing or mismatched")
+        try:
+            manifest, inputs = verify_stored_digest(connection, dict(version))
+        except (DatasetVerificationError, CanonicalFormatError):
+            raise DeliveryReferenceInvalid("the prepared dataset does not match its manifest") from None
+        return dict(version), _project_version_content(
+            (vars(row) for row in manifest.observations),
+            {item.source_id for item in inputs if item.source_id is not None})
     content = _version_cache.get(version_id)
     if content is None:
         content = _load_version_content(connection, version_id)
@@ -435,7 +464,8 @@ def load_approved_dataset(connection: Connection, version_id: UUID) -> tuple[dic
 
 
 def resolve_latest_version(connection: Connection,
-                           required_metric_ids: tuple[UUID, ...]) -> UUID:
+                           required_metric_ids: tuple[UUID, ...], *,
+                           use_cache: bool = True) -> UUID:
     """Resolve the latest approved dataset version containing every metric.
 
     Deterministic total order: most recent ``published_at`` first, then the
@@ -449,9 +479,10 @@ def resolve_latest_version(connection: Connection,
             "no approved dataset exists for this selection: the request binds no "
             "metric series that a prepared dataset could satisfy")
     key = frozenset(required_metric_ids)
-    cached = _latest_cache.get(key)
-    if cached is not None:
-        return cached
+    if use_cache:
+        cached = _latest_cache.get(key)
+        if cached is not None:
+            return cached
     row = connection.execute(text("""
         SELECT a.dataset_version_id AS id
         FROM app.active_datasets a
@@ -469,7 +500,8 @@ def resolve_latest_version(connection: Connection,
         raise DeliveryDataNotReady(
             "no approved dataset exists for this selection yet; the last good "
             "published dataset is served once publication completes")
-    _latest_cache.put(key, row[0])
+    if use_cache:
+        _latest_cache.put(key, row[0])
     return row[0]
 
 
@@ -598,7 +630,7 @@ _CHART_COLUMNS = """c.id, c.chart_id, c.version, c.title, c.description, c.categ
        c.source_lineage, c.renderer_version"""
 
 _SOURCE_COLUMNS = """s.id, s.name, s.docs_url, s.verified_at, s.license_status,
-       s.access_status, s.lineage, cp.last_success_at"""
+       s.access_status, s.lineage"""
 
 
 def list_metric_definitions(connection: Connection, *, availability: str | None,
@@ -733,7 +765,7 @@ def load_chart_view_inputs(connection: Connection, chart_id: str, version: int |
 def list_source_rows(connection: Connection, *, limit: int,
                      offset: int) -> tuple[tuple[Mapping, ...], int]:
     rows = connection.execute(text(f"""
-        SELECT {_SOURCE_COLUMNS}
+        SELECT {_SOURCE_COLUMNS}, cp.last_success_at
         FROM app.sources s
         LEFT JOIN app.ingestion_checkpoints cp ON cp.source_id = s.id
         ORDER BY s.id
@@ -745,7 +777,7 @@ def list_source_rows(connection: Connection, *, limit: int,
 
 def get_source_row(connection: Connection, source_id: str) -> Mapping:
     row = connection.execute(text(f"""
-        SELECT {_SOURCE_COLUMNS}
+        SELECT {_SOURCE_COLUMNS}, cp.last_success_at
         FROM app.sources s
         LEFT JOIN app.ingestion_checkpoints cp ON cp.source_id = s.id
         WHERE s.id = :id
@@ -755,16 +787,19 @@ def get_source_row(connection: Connection, source_id: str) -> Mapping:
     return dict(row)
 
 
-def source_responses(connection: Connection,
-                     source_ids: tuple[str, ...]) -> tuple[DataSourceResponse, ...]:
+def source_responses(connection: Connection, source_ids: tuple[str, ...], *,
+                     include_checkpoint: bool = True) -> tuple[DataSourceResponse, ...]:
     """Sanitized projections for the given source ids (sorted, deduplicated)."""
     unique = sorted({source_id for source_id in source_ids if source_id})
     if not unique:
         return ()
+    checkpoint_column = "cp.last_success_at" if include_checkpoint else "NULL AS last_success_at"
+    checkpoint_join = "LEFT JOIN app.ingestion_checkpoints cp ON cp.source_id = s.id" \
+        if include_checkpoint else ""
     rows = connection.execute(text(f"""
-        SELECT {_SOURCE_COLUMNS}
+        SELECT {_SOURCE_COLUMNS}, {checkpoint_column}
         FROM app.sources s
-        LEFT JOIN app.ingestion_checkpoints cp ON cp.source_id = s.id
+        {checkpoint_join}
         WHERE s.id = ANY(:ids)
     """), {"ids": unique}).mappings().all()
     by_id = {row["id"]: row for row in rows}
@@ -841,11 +876,12 @@ def build_series_points(version: Mapping, content: Mapping, metric_id: UUID,
 
 
 def _series_sources(connection: Connection, metric_source_id: str | None,
-                    dataset_source_ids: tuple[str, ...]) -> tuple[DataSourceResponse, ...]:
+                    dataset_source_ids: tuple[str, ...], *,
+                    include_checkpoint: bool = True) -> tuple[DataSourceResponse, ...]:
     ids = list(dataset_source_ids)
     if metric_source_id:
         ids.append(metric_source_id)
-    return source_responses(connection, tuple(ids))
+    return source_responses(connection, tuple(ids), include_checkpoint=include_checkpoint)
 
 
 def _context_hash(chart_row: Mapping, dataset_version_id: UUID,
@@ -865,8 +901,10 @@ def _context_hash(chart_row: Mapping, dataset_version_id: UUID,
 
 def build_chart_view(connection: Connection, *, chart_id: str, version: int | None,
                      start: dt.date, end: dt.date, dataset_version: UUID | None,
-                     filters: dict[str, str]) -> ChartViewResponse:
+                     filters: dict[str, str], verify_content: bool = False) -> ChartViewResponse:
     """Resolve the complete renderer-agnostic ChartView for one selection."""
+    if verify_content and (version is None or dataset_version is None):
+        raise DeliveryReferenceInvalid("verified chart reads require immutable versions")
     chart_row, bindings, metric_rows = load_chart_view_inputs(connection, chart_id, version)
     resolved_filters = validate_filters_against_schema(filters, chart_row["filter_schema"])
 
@@ -876,7 +914,8 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
         dataset_version_id = resolve_latest_version(connection, required_ids)
     else:
         dataset_version_id = dataset_version
-    version_row, content = load_approved_dataset(connection, dataset_version_id)
+    version_row, content = load_approved_dataset(connection, dataset_version_id,
+                                                 verify_content=verify_content)
     if dataset_version is not None:
         missing = [str(metric_id) for metric_id in required_ids
                    if metric_id not in content["observations"]]
@@ -902,7 +941,8 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
             metric=metric_response(metric_row), dataset=dataset, selection=selection,
             points=tuple(Observation.model_validate(point) for point in points),
             sources=_series_sources(connection, metric_row["source_id"],
-                                    content["input_source_ids"])))
+                                    content["input_source_ids"],
+                                    include_checkpoint=not verify_content)))
     return ChartViewResponse(
         definition=chart_response(chart_row), selection=selection, dataset=dataset,
         series=tuple(series), resolved_at=dt.datetime.now(UTC),

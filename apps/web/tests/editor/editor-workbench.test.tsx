@@ -9,7 +9,7 @@
 import { axe } from "jest-axe";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResearchDocumentEditor } from "@/features/editor/workbench";
 import type { CanonicalDocument } from "@/features/editor/canonical";
@@ -21,6 +21,20 @@ const routerPush = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: routerPush }),
 }));
+
+// ProseMirror scrolls a focused text selection. jsdom supplies no Range geometry.
+const rangeRects = Object.getOwnPropertyDescriptor(Range.prototype, "getClientRects");
+const rangeRect = Object.getOwnPropertyDescriptor(Range.prototype, "getBoundingClientRect");
+beforeEach(() => {
+  Object.defineProperty(Range.prototype, "getClientRects", { configurable: true, value: () => [new DOMRect(0, 0, 1, 1)] });
+  Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => new DOMRect(0, 0, 1, 1) });
+});
+afterEach(() => {
+  if (rangeRects) Object.defineProperty(Range.prototype, "getClientRects", rangeRects);
+  else Reflect.deleteProperty(Range.prototype, "getClientRects");
+  if (rangeRect) Object.defineProperty(Range.prototype, "getBoundingClientRect", rangeRect);
+  else Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+});
 
 const DOC_ID = "22222222-2222-4222-8222-222222222222";
 

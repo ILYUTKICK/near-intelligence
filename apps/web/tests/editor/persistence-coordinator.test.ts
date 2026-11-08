@@ -132,6 +132,27 @@ function makeHarness(initialRevision = 7, baseline: SaveRequestBody = BODY_A): H
 const ACK = (revision: number): SaveAck => ({ revision, savedAt: "2026-11-08T10:00:00Z" });
 
 describe("save scheduling (1s idle / 5s max)", () => {
+  it("does not save an extra revision when Undo restores the content without its inspection claim", async () => {
+    const h = makeHarness();
+    h.coordinator.adoptBaseline(7);
+    const inspected: SaveRequestBody = { ...BODY_B, observed_contexts: [{
+      chart_definition_version_id: "11111111-1111-4111-8111-111111111111",
+      dataset_version_id: "22222222-2222-4222-8222-222222222222",
+      selection: { start: "2026-11-01", end: "2026-11-02", frequency: "day", filters: {} },
+      context_hash: "a".repeat(64), renderer_version: "synthetic@1", metric_definition_versions: [],
+      resolved_at: "2026-11-08T10:00:00Z",
+    }] };
+    h.type(inspected);
+    h.advance(1000);
+    expect(h.requests[0].body).toEqual(inspected);
+    await h.respond(ACK(8));
+    h.type(BODY_C);
+    h.type(BODY_B);
+    h.advance(5000);
+    expect(h.requests).toHaveLength(1);
+    expect(h.coordinator.getStatus()).toMatchObject({ kind: "clean", revision: 8 });
+  });
+
   it("autosaves once after the 1s idle window, not before", async () => {
     const h = makeHarness();
     h.coordinator.adoptBaseline(7);

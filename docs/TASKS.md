@@ -1344,6 +1344,7 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Started at:** 2026-11-09T00:48:34+03:00
 - **Branch/worktree:** `feat/ni-043-frozen-revision-evidence`, `D:/хахатон/near-intelligence`
 - **Dependency verification:** NI-042 and NI-028 are DONE on `origin/main` (`a1f35b3`); the private repository had no open PRs when claimed.
+- **Handoff:** Codex `/root/ni043` implemented the B resolver and API. Codex `/root` implemented the A history view, gateway and production HTTP test in the same checkout.
 
 **Description:** Guarantee that old research and exports reconstruct exactly the data inspected at save.
 
@@ -1354,6 +1355,11 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 **Acceptance criteria:** Source revision leaves old document/context hashes unchanged; no silent latest substitution; missing pinned artifact produces reconstruction error.
 
 **Testing requirements:** Publish new dataset after save and compare old revision/chart CSV; race between preview/save; source definition version mismatch.
+
+- **Result:** Save validates typed inspection claims and retains unchanged version pins. Historical charts and exact CSV resolve through the owned revision and block, verify the document and prepared-data digests, and return `RECONSTRUCTION_ERROR` for missing or inconsistent evidence. Revision history opens the saved paper read-only. The working editor shows newer compatible data and adopts it on explicit Refresh.
+- **Verification:** 39 focused web tests and all 433 web tests passed. Cases include save equality after Undo, the post-save dataset notice, read-only history and cancellation across accounts. Strict source typecheck, lint, contrast, shared-types test and OpenAPI drift passed. The 36 offline API checks and all 22 chart-block tests passed on disposable PostgreSQL 18.6 with synthetic fixtures. The latter cover republishing around save, byte-identical old CSV and hashes, invalid metric pins, missing artifacts and Alice/Bob isolation.
+- **Reviewer:** Codex `/root` reviewed the B resolver, scoped routes and tests. Codex `/root/ni043` independently reviewed the A diff, identified Undo, late metadata and CSV cancellation races, and rechecked the fixes.
+- **Limits:** The full Windows database suite passed 393/394. The existing NI-027 CRLF manifest bug fails one NI-028 fixture before staging. Local production Next.js failed on Windows before chart requests; the production gateway test is included in the Linux CI database job. The Windows documentation checker misclassifies ten intentionally unshared archive links. CI and desktop evidence are pending.
 
 ### NI-044 — Add explicit snapshot management UX
 

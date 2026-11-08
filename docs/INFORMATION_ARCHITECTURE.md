@@ -37,7 +37,7 @@ Use `/research#h1` through `#h4`, `/methodology#sources` and `#reproduce` as sta
 | Account | Profile | `/workspace/profile` | P0 |
 | Account | Settings | `/workspace/settings` | P0 |
 
-Research editor route: `/workspace/research/[documentId]`. Model detail links to the public read-only model; private arbitrary execution is excluded. No dead chart entries for unverified metrics; an empty category explains why and links to definitions.
+The research editor opens at `/workspace/research/[documentId]`. Its Revision history link opens `/workspace/research/[documentId]/versions`. The optional `version` UUID selects a saved read-only revision with its pinned charts and CSV. Model detail links to the public read-only model; private arbitrary execution is excluded. No dead chart entries for unverified metrics; an empty category explains why and links to definitions.
 
 ## Context and orientation
 

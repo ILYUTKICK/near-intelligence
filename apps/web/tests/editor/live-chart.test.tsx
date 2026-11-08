@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 afterEach(() => { vi.resetAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); sessionStorage.clear(); });
-function resolveNormally() { loader.mockImplementation(async (_doc, _def, selection, dataset) => ({ ...resolved, selection: { ...selection, filters: selection.filters ?? {}, frequency: "day" }, dataset: { ...resolved.dataset, id: dataset === "latest" ? "33333333-3333-4333-8333-333333333333" : dataset } })); }
+function resolveNormally(pointer: () => string | null = () => null) { loader.mockImplementation(async (_doc, _def, selection, dataset) => ({ ...resolved, selection: { ...selection, filters: selection.filters ?? {}, frequency: "day" }, dataset: { ...resolved.dataset, id: dataset === "latest" ? "33333333-3333-4333-8333-333333333333" : dataset }, latest_approved_dataset_version_id: pointer() })); }
 
 describe("Interactive editor chart", () => {
   it("renders the shared exact table, sources, definition and honest gated insight action", async () => {
@@ -121,14 +121,29 @@ describe("Interactive editor chart", () => {
     expect(screen.getByRole("button", { name: "Refresh to latest and save observation" })).toBeEnabled();
   });
   it("uses the actual Tiptap node, saves applied context, and Escape returns focus without losing prose", async () => {
-    resolveNormally(); const user = userEvent.setup(); const savedBodies: Record<string, unknown>[] = [];
+    let newerDataset: string | null = null;
+    resolveNormally(() => newerDataset); const user = userEvent.setup(); const savedBodies: Record<string, unknown>[] = [];
+    const normalLoad = loader.getMockImplementation()!;
+    let changedReads = 0;
+    let finishStale: (() => void) | undefined;
+    loader.mockImplementation(async (...args) => {
+      const result = await normalLoad(...args);
+      if (args[2].start === "2026-11-02" && ++changedReads === 2) {
+        return new Promise(resolve => { finishStale = () => resolve(result); });
+      }
+      return result;
+    });
     const content = { schema_version: 1, type: "doc", content: [{ type: "paragraph", attrs: { block_id: "44444444-4444-4444-8444-444444444444" }, content: [{ type: "text", text: "Synthetic local prose" }] }, { type: "liveChart", attrs: { ...attrs, snapshot_id: null } }] };
     const summary = { id: context.documentId, title: "Synthetic chart document", revision: 2, schema_version: 1, current_version_id: null, created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-08T00:00:00Z", progress: { headings: 0, charts: 1, insights: 0 } };
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input instanceof Request ? input.url : String(input);
       if (url.endsWith("/api/auth/session")) return Response.json({ subject: "synthetic-alice" });
       if (url.endsWith("/api/auth/csrf")) return Response.json({ token: "synthetic-csrf" });
-      if (url.endsWith("/versions")) { savedBodies.push(JSON.parse(String(init?.body))); return Response.json({ document: { ...summary, revision: 3, updated_at: "2026-11-08T12:00:00Z" }, version: { revision: 3 } }, { status: 201, headers: { etag: '"3"' } }); }
+      if (url.endsWith("/versions")) {
+        savedBodies.push(JSON.parse(String(init?.body)));
+        newerDataset = "33333333-3333-4333-8333-333333333333";
+        return Response.json({ document: { ...summary, revision: 3, updated_at: "2026-11-08T12:00:00Z" }, version: { revision: 3 } }, { status: 201, headers: { etag: '"3"' } });
+      }
       return Response.json({ ...summary, content, resolved_contexts: {} });
     }));
     render(<ResearchDocumentEditor documentId={context.documentId} />);
@@ -150,6 +165,17 @@ describe("Interactive editor chart", () => {
     expect(JSON.stringify(savedBodies[0])).toContain('"source":"synthetic-a"');
     expect(JSON.stringify(savedBodies[0])).toContain('"start":"2026-11-02"');
     expect(JSON.stringify(savedBodies[0])).toContain("Synthetic local prose");
+    expect(savedBodies[0].observed_contexts).toEqual([{
+      chart_definition_version_id: definitionFixture.id, dataset_version_id: attrs.observed_dataset_version_id,
+      selection: { start: "2026-11-02", end: attrs.selection.end, frequency: "day", filters: { source: "synthetic-a" } },
+      context_hash: resolved.context_hash, renderer_version: definitionFixture.renderer_version,
+      metric_definition_versions: definitionFixture.metric_definition_ids, resolved_at: resolved.resolved_at,
+    }]);
+    expect(await screen.findByText("Newer approved data available")).toBeInTheDocument();
+    expect(finishStale).toBeDefined();
+    await act(async () => finishStale?.());
+    expect(screen.getByText("Newer approved data available")).toBeInTheDocument();
+    expect(loader.mock.calls.every(call => call[3] === attrs.observed_dataset_version_id)).toBe(true);
     const paper = screen.getByRole("textbox", { name: "Research paper editor" });
     paper.focus(); fireEvent.keyDown(paper, { key: "z", ctrlKey: true });
     await waitFor(() => expect(screen.getByLabelText("Start date")).toHaveValue(attrs.selection.start));

@@ -13,6 +13,13 @@ async function handle(request: NextRequest, context: Context) {
     if (segments.length === 2 && segments[1] === "chart-blocks") allowed = ["POST"];
     if (segments.length === 2 && segments[1] === "chart-view") allowed = ["GET"];
     if (segments.length === 3 && segments[1] === "versions" && uuid(segments[2])) allowed = ["GET"];
+    if (segments.length === 6 && segments[1] === "versions" && uuid(segments[2])
+      && segments[3] === "chart-blocks" && uuid(segments[4])
+      && (segments[5] === "view" || segments[5] === "csv")) {
+      if (request.nextUrl.search) return NextResponse.json({ error: "Historical chart requests use saved pins." },
+        { status: 422, headers: { "cache-control": "no-store" } });
+      allowed = ["GET"];
+    }
   }
   if (segments.length === 2 && segments[1] === "chart-view") {
     const keys = new Set(["chart_definition_version_id", "start", "end", "dataset_version", "filters"]);

@@ -49,6 +49,7 @@ class ResolvedSelectionFilters(ContractModel):
     """
 
     model_config = ContractModel.model_config | {"extra": "allow"}
+    __pydantic_extra__: dict[str, str] = Field(init=False)
 
 
 class ResolvedSelection(Selection):

@@ -92,4 +92,26 @@ describe("Saved charts same-origin gateway", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("forwards revision CSV as a private attachment and rejects pin overrides", async () => {
+    const documentId = "44444444-4444-4444-8444-444444444444";
+    const versionId = "55555555-5555-4555-8555-555555555555";
+    const blockId = "66666666-6666-4666-8666-666666666666";
+    const path = `/api/documents/${documentId}/versions/${versionId}/chart-blocks/${blockId}/csv`;
+    const csv = "value\n12.000000000000000001\n";
+    const headers = { "content-type": "text/csv", "content-disposition": "attachment; filename=synthetic.csv" };
+    const fetcher = vi.fn(async () => new Response(csv, { headers }));
+    vi.stubGlobal("fetch", fetcher);
+    const context = { params: Promise.resolve({ segments: path.split("/").slice(3) }) };
+    const url = `http://localhost:3000${path}`;
+    const requestHeaders = request().headers;
+    const response = await getDocument(new NextRequest(url, { headers: requestHeaders }), context);
+    expect(await response.text()).toBe(csv);
+    expect(response.headers.get("content-disposition")).toBe(headers["content-disposition"]);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect((fetcher.mock.calls[0] as unknown as [URL])[0].pathname).toBe(path);
+    expect((await getDocument(new NextRequest(`${url}?dataset_version=latest`, { headers: requestHeaders }), context)).status).toBe(422);
+    expect((await getDocument(new NextRequest(url), context)).status).toBe(401);
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
 });

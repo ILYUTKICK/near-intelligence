@@ -1,6 +1,8 @@
-"""NI-041/042 real gateway/JWT/DB insertion, interactive edits and frozen pins."""
+"""NI-041/042/043 real gateway/JWT/DB insertion, edits and frozen reads."""
 import copy
+import csv
 import datetime as dt
+import io
 import json
 from unittest.mock import patch
 from uuid import uuid4
@@ -8,7 +10,7 @@ from uuid import uuid4
 import test_saved_charts_http as gateway_fixture
 import test_delivery_apis as data_fixture
 from near_api.datasets import delivery
-from near_api.schemas.delivery import ChartViewResponse
+from near_api.schemas.chart_blocks import DocumentChartViewResponse
 
 
 class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
@@ -67,13 +69,29 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         pinned_response = client.get(chart_path, params=query)
         self.assertEqual(pinned_response.status_code, 200, pinned_response.text)
         self.assertEqual(pinned_response.headers["cache-control"], "no-store")
-        pinned = ChartViewResponse.model_validate(pinned_response.json())
+        pinned = DocumentChartViewResponse.model_validate(pinned_response.json())
         self.assertEqual(str(pinned.definition.id), payload["chart_definition_version_id"])
         self.assertEqual(str(pinned.dataset.id), payload["dataset_version_id"])
         self.assertEqual(pinned.context_hash, context["context_hash"])
+        self.assertIsNotNone(pinned.latest_approved_dataset_version_id)
+        self.assertNotEqual(pinned.latest_approved_dataset_version_id, pinned.dataset.id)
         exact_values = [point.value for series in pinned.series for point in series.points
                         if point.value is not None]
         self.assertEqual(exact_values, ["12.123456789012345678901234"])
+
+        revision_two_id = opened["current_version_id"]
+        historical = f"{path}/versions/{revision_two_id}/chart-blocks/{block['attrs']['block_id']}"
+        frozen_view = client.get(historical + "/view")
+        self.assertEqual(frozen_view.status_code, 200, frozen_view.text)
+        self.assertEqual(frozen_view.json()["context_hash"], context["context_hash"])
+        self.assertEqual(frozen_view.json()["dataset"]["id"], payload["dataset_version_id"])
+        frozen_csv = client.get(historical + "/csv")
+        self.assertEqual(frozen_csv.status_code, 200, frozen_csv.text)
+        self.assertEqual(frozen_csv.headers["cache-control"], "no-store")
+        self.assertTrue(frozen_csv.headers["content-disposition"].startswith("attachment;"))
+        rows = list(csv.DictReader(io.StringIO(frozen_csv.text)))
+        self.assertEqual([row["value"] for row in rows], exact_values)
+        self.assertEqual(client.get(historical + "/view", params={"dataset_version": "latest"}).status_code, 422)
 
         # Range + filter change is inspected first, then one explicit saved
         # document edit. A source was published after the old inspection, but
@@ -86,8 +104,19 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         attrs = changed_content["content"][0]["attrs"]
         attrs["selection"] = inspected["selection"]
         attrs["observed_dataset_version_id"] = inspected["dataset"]["id"]
+        published_after_preview = data_fixture.DeliveryDatabaseTests.stage_fixture(
+            self, f"ni043-http.{uuid4().hex[:12]}",
+            [data_fixture.observation(data_fixture.METRIC_VOLUME, dt.date(2026, 1, 1),
+                                      value="1234", dimensions={"source": "SRC-LLAMA"})],
+            [data_fixture.METRIC_VOLUME], window=("2026-01-01", "2026-01-02"))
         headers.update({"If-Match": '"3"', "Idempotency-Key": str(uuid4())})
-        edit_body = {"schema_version": 1, "content": changed_content, "observed_contexts": []}
+        edit_body = {"schema_version": 1, "content": changed_content, "observed_contexts": [{
+            "chart_definition_version_id": inspected["definition"]["id"],
+            "dataset_version_id": inspected["dataset"]["id"], "selection": inspected["selection"],
+            "context_hash": inspected["context_hash"], "resolved_at": inspected["resolved_at"],
+            "renderer_version": inspected["definition"]["renderer_version"],
+            "metric_definition_versions": inspected["definition"]["metric_definition_ids"],
+        }]}
         edited = client.post(path + "/versions", json=edit_body, headers=headers)
         self.assertEqual(edited.status_code, 201, edited.text)
         self.assertEqual(client.post(path + "/versions", json=edit_body,
@@ -99,10 +128,13 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         saved_context = reopened["resolved_contexts"][block["attrs"]["block_id"]]
         self.assertEqual(saved_context["context_hash"], inspected["context_hash"])
         self.assertEqual(saved_context["dataset_version_id"], payload["dataset_version_id"])
-        revision_two_id = next(item["id"] for item in client.get(path + "/versions").json()["items"]
-                               if item["revision"] == 2)
         old = client.get(path + "/versions/" + revision_two_id).json()
         self.assertEqual(old["resolved_contexts"][block["attrs"]["block_id"]], context)
+        self.assertEqual(client.get(historical + "/csv").content, frozen_csv.content)
+        self.assertEqual(client.get(historical + "/view").json(), frozen_view.json())
+        self.assertEqual(client.get(chart_path, params=changed_query).json()["latest_approved_dataset_version_id"],
+                         str(published_after_preview.dataset_version_id))
+        self.assertEqual(client.get(f"/workspace/research/{document['id']}/versions?version={revision_two_id}").status_code, 200)
 
         # Preview latest is read-only. Only adopting its returned UUID into
         # the canonical node and saving makes a new pin.
@@ -154,7 +186,9 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         self.assertEqual(client.get(path).status_code, 404)
         self.assertEqual(client.post(path + "/chart-blocks", json=payload, headers=headers).status_code, 404)
         self.assertEqual(client.get(chart_path, params=query).status_code, 404)
+        self.assertEqual(client.get(historical + "/view").status_code, 404)
+        self.assertEqual(client.get(historical + "/csv").status_code, 404)
         denied_save = client.post(path + "/versions", json=edit_body, headers=headers)
         self.assertEqual(denied_save.status_code, 404, denied_save.text)
-        print("NI-041/042 gateway E2E: insert/retry, pinned renderer context, range/filter save/reopen, "
-              "explicit refresh, old context unchanged, chart outage + prose save, Bob denied", flush=True)
+        print("NI-041/042/043 gateway E2E: insert/retry, observed save after publication, "
+              "identical old view/CSV, explicit refresh, chart outage + prose save, Bob denied", flush=True)

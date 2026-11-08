@@ -858,6 +858,65 @@
         "pattern": "^-?(?:0|[1-9][0-9]{0,77})(?:\\.[0-9]{1,30})?$",
         "type": "string"
       },
+      "DocumentChartViewResponse": {
+        "additionalProperties": false,
+        "description": "Working-view data plus the current compatible approved dataset pointer.",
+        "properties": {
+          "context_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Context Hash",
+            "type": "string"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetResponse"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ChartDefinitionResponse"
+          },
+          "latest_approved_dataset_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Approved Dataset Version Id"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/DataQuality"
+          },
+          "resolved_at": {
+            "format": "date-time",
+            "title": "Resolved At",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/ResolvedSelection"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesResponse"
+            },
+            "title": "Series",
+            "type": "array"
+          }
+        },
+        "required": [
+          "definition",
+          "selection",
+          "dataset",
+          "series",
+          "resolved_at",
+          "context_hash",
+          "quality",
+          "latest_approved_dataset_version_id"
+        ],
+        "title": "DocumentChartViewResponse",
+        "type": "object"
+      },
       "DocumentCreateRequest": {
         "additionalProperties": false,
         "description": "POST /documents body. `template_id` is P1: providing it is a typed 422.",
@@ -1050,9 +1109,9 @@
           "observed_contexts": {
             "default": [],
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/ResolvedContext"
             },
+            "maxItems": 200,
             "title": "Observed Contexts",
             "type": "array"
           },
@@ -2666,7 +2725,9 @@
         "type": "object"
       },
       "ResolvedSelectionFilters": {
-        "additionalProperties": true,
+        "additionalProperties": {
+          "type": "string"
+        },
         "description": "Chart-version-validated filters carried inside a resolved selection.\n\nRequest filters arrive as the urlencoded ``filters`` query parameter and\nare validated server-side against the resolved chart definition version's\nclosed ``filter_schema`` (the NI-031 versioned allowlist: string enums\nfrom approved source/recipient/price-basis mappings only). Unknown keys\nand unlisted values are rejected before any resolution happens, so this\npermissive container never serializes an unapproved filter value.",
         "properties": {},
         "title": "ResolvedSelectionFilters",
@@ -4880,7 +4941,7 @@
     },
     "/api/documents/{document_id}/chart-view": {
       "get": {
-        "description": "Resolve an editor inspection through the canonical public chart adapter.\n\nThe dataset choice is REQUIRED: normal reopen/range/filter requests send\nthe observed immutable UUID; only an explicit Refresh sends ``latest``.\nResolution does not mutate the document. A successful explicit editor\naction adopts the returned selection + dataset UUID in one undoable edit,\nand the ordinary CAS revision save validates and freezes those attrs.\nNew/duplicated unsaved blocks can be inspected too, without requiring a\npersisted block id or accepting arbitrary routes/URLs. Historical readers\nmust use their revision pin (NI-043), never this working-view refresh.",
+        "description": "Resolve an editor inspection through the canonical public chart adapter.\n\nThe dataset choice is REQUIRED: normal reopen/range/filter requests send\nthe observed immutable UUID; only an explicit Refresh sends ``latest``.\nResolution does not mutate the document. A successful explicit editor\naction adopts the returned selection + dataset UUID in one undoable edit,\nand the ordinary CAS revision save validates and freezes those attrs.\nNew/duplicated unsaved blocks can be inspected too, without requiring a\npersisted block id. The latest approved UUID is separate metadata so a\npublication can be signaled while the inspected data stays pinned.",
         "operationId": "getDocumentChartView",
         "parameters": [
           {
@@ -4972,7 +5033,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ChartViewResponse"
+                  "$ref": "#/components/schemas/DocumentChartViewResponse"
                 }
               }
             },
@@ -5498,6 +5559,244 @@
           }
         },
         "summary": "Fetch one immutable revision of an owned document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/csv": {
+      "get": {
+        "operationId": "getDocumentVersionChartCsv",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "block_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Block Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Frozen chart evidence could not be reconstructed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "Download exact chart data from an owned immutable revision",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/view": {
+      "get": {
+        "operationId": "getDocumentVersionChartView",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "block_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Block Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartViewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Frozen chart evidence could not be reconstructed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "Reconstruct one chart from an owned immutable revision",
         "tags": [
           "documents"
         ]

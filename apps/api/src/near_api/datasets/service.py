@@ -51,7 +51,10 @@ from near_api.datasets.canonical import (
     sha256_hex,
 )
 from near_api.datasets.manifest import (
+    MAX_INPUTS,
     MAX_INPUT_FILE_BYTES,
+    MAX_METRICS,
+    MAX_OBSERVATIONS,
     InputBinding,
     Observation,
     PreparedManifest,
@@ -348,6 +351,9 @@ def _canonical_inputs_from_rows(input_rows: list) -> list[ResolvedInput]:
 def _rebuild_manifest_from_rows(connection: Connection, version: dict) -> tuple[
         PreparedManifest, list[ResolvedInput]]:
     """Re-derive the exact canonical manifest from persisted rows."""
+    quality = version["quality"]
+    if not isinstance(quality, dict) or not isinstance(quality.get("operator", {}), dict):
+        raise DatasetVerificationError("Persisted dataset quality metadata is malformed")
     input_rows = connection.execute(text("""
         SELECT i.role, i.source_id, i.query_hash, a.relative_storage_key AS storage_key,
                a.sha256, a.license_status
@@ -355,16 +361,22 @@ def _rebuild_manifest_from_rows(connection: Connection, version: dict) -> tuple[
         JOIN app.artifacts a ON a.id = i.artifact_id
         WHERE i.dataset_version_id = :id
         ORDER BY a.relative_storage_key, i.role
-    """), {"id": version["id"]}).all()
+        LIMIT :limit
+    """), {"id": version["id"], "limit": MAX_INPUTS + 1}).all()
     metric_rows = connection.execute(text("""
         SELECT metric_definition_id FROM app.dataset_metrics
         WHERE dataset_version_id = :id ORDER BY metric_definition_id
-    """), {"id": version["id"]}).all()
+        LIMIT :limit
+    """), {"id": version["id"], "limit": MAX_METRICS + 1}).all()
     observation_rows = connection.execute(text("""
         SELECT metric_definition_id, period_start, period_end, dimensions, dimensions_hash,
                value::text AS value_text, quality_status, bound_kind, source_record_ref, quality
         FROM app.metric_observations WHERE dataset_version_id = :id
-    """), {"id": version["id"]}).all()
+        LIMIT :limit
+    """), {"id": version["id"], "limit": MAX_OBSERVATIONS + 1}).all()
+    if (len(input_rows) > MAX_INPUTS or len(metric_rows) > MAX_METRICS
+            or len(observation_rows) > MAX_OBSERVATIONS):
+        raise DatasetVerificationError("Persisted dataset rows exceed the manifest limits")
     resolved = _canonical_inputs_from_rows(input_rows)
     observations = []
     for row in observation_rows:
@@ -389,7 +401,7 @@ def _rebuild_manifest_from_rows(connection: Connection, version: dict) -> tuple[
         dependency_lock_hash=version["dependency_lock_hash"],
         source_as_of=version["source_as_of"],
         retrieved_at=version["retrieved_at"],
-        quality=version["quality"].get("operator", {}),
+        quality=quality.get("operator", {}),
         member_metrics=tuple(row.metric_definition_id for row in metric_rows),
         inputs=(),
         observations=tuple(observations),
@@ -397,13 +409,15 @@ def _rebuild_manifest_from_rows(connection: Connection, version: dict) -> tuple[
     return manifest, resolved
 
 
-def _verify_stored_digest(connection: Connection, version: dict) -> None:
+def verify_stored_digest(connection: Connection, version: dict) -> tuple[
+        PreparedManifest, list[ResolvedInput]]:
+    """Verify and return the prepared rows used to reconstruct the digest."""
     manifest, resolved = _rebuild_manifest_from_rows(connection, version)
     _bytes, digest = content_digest(manifest, resolved)
     if digest != version["content_sha256"]:
         raise DatasetVerificationError(
-            "Persisted dataset rows no longer hash to the recorded content_sha256; "
-            "the version is corrupt and cannot be validated or published")
+            "Persisted dataset rows no longer hash to the recorded content_sha256")
+    return manifest, resolved
 
 
 # --------------------------------------------------------------------------- #
@@ -690,7 +704,7 @@ def _revision_delta(connection: Connection, previous_id: UUID | None,
 
 
 def _publish_locked(connection: Connection, version: dict) -> dict:
-    _verify_stored_digest(connection, version)
+    verify_stored_digest(connection, version)
     status = version["status"]
     if status == "approved":
         active = connection.execute(text(

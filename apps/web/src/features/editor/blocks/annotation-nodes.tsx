@@ -34,6 +34,7 @@ function EditPropertiesButton({ editor, getPos, blockId }: {
   getPos: NodeViewProps["getPos"];
   blockId: string | null;
 }) {
+  if (!editor.isEditable) return null;
   return (
     <button
       type="button"
@@ -364,22 +365,22 @@ function RiskBlockView({ node, updateAttributes, editor, getPos }: NodeViewProps
         {/* Title editing follows the NI-038 nested-input pattern: an island
             inside the atomic node, controlled by updateAttributes so the
             canonical attr stays the single source. */}
-        <input
+        {editor.isEditable ? <input
           aria-label="Risk title"
           value={attrs.title ?? ""}
           onChange={(event) => updateAttributes({ title: event.target.value })}
           className="mt-2 w-full rounded-control border border-control-border bg-surface px-2 py-1 font-ui text-ui leading-ui text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-        />
+        /> : <p>{attrs.title}</p>}
         <div className="mt-2 text-body leading-body text-text">
           {attrs.body ? <RichFragmentView fragment={attrs.body} /> : null}
         </div>
         <p className="mt-2 text-metadata leading-metadata text-text-secondary">
           {attrs.related_hypothesis_id ? `Related hypothesis: ${shortId(attrs.related_hypothesis_id)}` : "No related hypothesis"}
         </p>
-        <p className="mt-1 text-metadata leading-metadata text-text-secondary italic">
+        {editor.isEditable ? <p className="mt-1 text-metadata leading-metadata text-text-secondary italic">
           Risk body rich-text editing arrives with the annotation tasks; the title, block and its
           structural operations are active now.
-        </p>
+        </p> : null}
         <EditPropertiesButton editor={editor} getPos={getPos} blockId={attrs.block_id} />
       </div>
     </NodeViewWrapper>

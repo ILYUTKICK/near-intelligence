@@ -41,7 +41,7 @@ export async function forwardPrivate(request: NextRequest, apiPath: string) {
     const response = await fetch(url, { method: request.method, headers, body: body || undefined,
       cache: "no-store", redirect: "error", signal: AbortSignal.timeout(15_000) });
     const resultHeaders = new Headers({ "cache-control": "no-store" });
-    for (const key of ["content-type", "etag", "x-request-id"]) {
+    for (const key of ["content-type", "content-disposition", "etag", "x-request-id"]) {
       const value = response.headers.get(key);
       if (value) resultHeaders.set(key, value);
     }

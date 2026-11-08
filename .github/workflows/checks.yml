@@ -102,3 +102,5 @@ jobs:
       - run: pnpm build
       - name: Landing HTTP integration (synthetic data, isolated database)
         run: uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --suite landing
+      - name: Frozen research chart HTTP integration (synthetic data, isolated database)
+        run: uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --chart-insertion-http

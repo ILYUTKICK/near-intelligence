@@ -36,8 +36,8 @@ Contract (API_SPECIFICATION row + protocol):
   explicit decision, not a silent mutation (EDITOR_SPECIFICATION "Live versus
   fixed evidence"). Whole-document saves carry unchanged chart contexts
   forward verbatim; NI-042 explicit changed/new chart blocks build a context
-  from their validated inspected pin (general observed-context validation
-  and historical reconstruction remain NI-043).
+  from their validated inspected pin. NI-043 validates supplied observation
+  claims against those server-resolved pins.
 - **Idempotency.** ``Idempotency-Key: UUID`` reuses the NI-037 write-once
   replay store (migration 0009): a repeated identical owner/route/body
   request replays the ORIGINAL 201 result instead of appending a second
@@ -52,26 +52,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Annotated, Mapping
+from typing import Annotated
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
-from sqlalchemy import Connection, Engine, func, select
+from sqlalchemy import Connection, Engine
 
 from near_api.auth.principal import Principal, get_principal, get_runtime_engine
 from near_api.charts.routes import _resolve_dataset_version
 from near_api.contracts import error_response
 from near_api.datasets import delivery
-from near_api.datasets.delivery import (
-    DeliveryInvalidFilter,
-    _context_hash,
-    validate_filters_against_schema,
-)
-from near_api.db.models import ChartDefinition, ChartMetric, MetricObservation
 from near_api.db.security import principal_transaction
 from near_api.documents import idempotency, service
+from near_api.documents.context_resolver import (
+    build_resolved_context,
+    load_chart_definition,
+    require_approved_dataset,
+    require_live_chart_mode,
+    require_metric_coverage,
+    resolve_revision_contexts,
+    validate_selection_against_definition,
+)
 # The document HTTP vocabulary (error map, ETag, summary, If-Match/replay
 # handling) is shared with the NI-036/NI-037 routes module on purpose: one
 # error surface, no second implementation.
@@ -86,19 +89,17 @@ from near_api.documents.routes import (
 from near_api.documents.schema import (
     SCHEMA_VERSION,
     DocumentSchemaError,
-    LiveChartNode,
     ReferenceInvalid,
-    canonical_context_json,
     parse_document,
 )
 from near_api.schemas.chart_blocks import (
     ChartBlockInsertRequest,
     ChartBlockMutationResponse,
     ChartBlockValue,
+    DocumentChartViewResponse,
 )
 from near_api.schemas.common import ErrorDetail
 from near_api.schemas.chart_selection import ChartSelection
-from near_api.schemas.delivery import ChartViewResponse, ResolvedSelection
 
 router = APIRouter(prefix="/api", tags=["documents"])
 
@@ -106,191 +107,6 @@ PrincipalDependency = Annotated[Principal, Depends(get_principal)]
 RuntimeEngineDependency = Annotated[Engine, Depends(get_runtime_engine)]
 
 ROUTE_ADD_CHART_BLOCK = idempotency.ROUTE_ADD_CHART_BLOCK
-
-
-# --------------------------------------------------------------------------- #
-# Registry-backed inspection inputs (one rule set for insert + save paths)
-# --------------------------------------------------------------------------- #
-
-
-@dataclass(frozen=True)
-class ChartDefinitionRow:
-    """The registry facts the insertion and save gates verify against."""
-
-    id: UUID
-    chart_id: str
-    version: int
-    data_status: str
-    unavailable_reason: str | None
-    renderer_version: str
-    max_days: int
-    filter_schema: dict
-    metric_definition_versions: tuple[UUID, ...]
-    required_metric_versions: tuple[UUID, ...]
-
-
-def load_chart_definition(connection: Connection, chart_definition_version_id: UUID,
-                          *, error_path: str) -> ChartDefinitionRow:
-    """Load one registered chart definition version; reject unknown/unavailable.
-
-    An unknown definition id is a dangling reference (422 REFERENCE_INVALID,
-    no registry existence leak beyond the typed reason), and an
-    ``unavailable`` definition is rejected because it is never advertised as
-    live (CHART_SYSTEM): a liveChart block must resolve to real data.
-    """
-    row = connection.execute(
-        select(ChartDefinition.id, ChartDefinition.chart_id, ChartDefinition.version,
-               ChartDefinition.data_status, ChartDefinition.unavailable_reason,
-               ChartDefinition.renderer_version, ChartDefinition.allowed_ranges,
-               ChartDefinition.filter_schema, ChartDefinition.metric_definition_ids)
-        .where(ChartDefinition.id == chart_definition_version_id)
-    ).mappings().first()
-    if row is None:
-        raise ReferenceInvalid(
-            "Referenced chart definition version does not exist in the registered "
-            "chart catalog",
-            [(error_path, "dangling_chart_definition")])
-    if row["data_status"] != "available":
-        reason = row["unavailable_reason"]
-        raise ReferenceInvalid(
-            "The referenced chart definition is registered unavailable and is never "
-            "advertised as live" + (f": {reason}" if reason else ""),
-            [(error_path, "chart_unavailable")])
-    ranges = row["allowed_ranges"]
-    bindings = connection.execute(
-        select(ChartMetric.metric_definition_id, ChartMetric.series_role)
-        .where(ChartMetric.chart_definition_version_id == row["id"])
-    ).all()
-    return ChartDefinitionRow(
-        id=row["id"], chart_id=row["chart_id"], version=row["version"],
-        data_status=row["data_status"], unavailable_reason=row["unavailable_reason"],
-        renderer_version=row["renderer_version"],
-        max_days=int(ranges["max_days"]), filter_schema=dict(row["filter_schema"]),
-        metric_definition_versions=tuple(
-            UUID(item) for item in row["metric_definition_ids"]),
-        required_metric_versions=tuple({metric_id for metric_id, role in bindings
-                                        if role.startswith("required")}),
-    )
-
-
-def validate_selection_against_definition(definition: ChartDefinitionRow,
-                                          start: date, end: date,
-                                          filters: Mapping[str, str]) -> None:
-    """Range/filter rules of one chart version (the NI-032 view rules, reused).
-
-    The window may not exceed the definition's allowed maximum (the shared
-    ``Selection`` contract already bounds it at 366 days), and the filters are validated against the
-    definition's closed filter schema, so an inserted block can never carry a
-    selection the explorer view itself would reject.
-    """
-    if (end - start).days > definition.max_days:
-        raise DeliveryInvalidFilter(
-            "the selection range exceeds this chart version's allowed maximum")
-    validate_filters_against_schema(dict(filters), definition.filter_schema)
-
-
-def require_metric_coverage(connection: Connection, definition: ChartDefinitionRow,
-                            dataset_version_id: UUID, *, error_path: str) -> None:
-    """The pinned dataset must contain every required metric of the chart.
-
-    NI-032 refuses an explicit dataset version whose observations lack a
-    required metric (incompatible metric versions are never mixed silently);
-    the insertion pin is verified against the same rule so an embedded chart
-    cannot reference a dataset that could never render it.
-    """
-    required = definition.required_metric_versions
-    if not required:
-        return
-    covered = connection.execute(
-        select(func.count(func.distinct(MetricObservation.metric_definition_id)))
-        .where(MetricObservation.dataset_version_id == dataset_version_id,
-               MetricObservation.metric_definition_id.in_(required))
-    ).scalar_one()
-    if covered != len(set(required)):
-        raise ReferenceInvalid(
-            "The pinned dataset version does not contain every required metric "
-            "definition of the chart; incompatible metric versions are never mixed "
-            "silently",
-            [(error_path, "dataset_missing_required_metrics")])
-
-
-def validate_document_chart(connection: Connection, chart: LiveChartNode) -> None:
-    """Database-backed reference rules for one canonical liveChart node.
-
-    This is the lifted NI-036 save gate: a whole-document save that carries a
-    liveChart block verifies it exactly like the insertion endpoint does
-    (registered available definition, allowed selection, approved pinned
-    dataset with the required metrics). Snapshot mode stays gated on the
-    P1 research snapshot registry (NI-044). Runs inside the save transaction.
-    """
-    if chart.mode == "snapshot":
-        raise ReferenceInvalid(
-            "Snapshot chart blocks require the research snapshot registry, which is "
-            "not available yet (P1 NI-044)",
-            [("content", "reference_unavailable")])
-    definition = load_chart_definition(connection, chart.chart_definition_version_id,
-                                       error_path="content")
-    validate_selection_against_definition(
-        definition, date.fromisoformat(chart.selection["start"]),
-        date.fromisoformat(chart.selection["end"]),
-        dict(chart.selection["filters"]))
-    service.require_approved_dataset(connection, chart.observed_dataset_version_id,
-                                     "liveChart.observed_dataset_version_id")
-    require_metric_coverage(connection, definition,
-                            chart.observed_dataset_version_id, error_path="content")
-
-
-def chart_inspection_state(chart: LiveChartNode) -> tuple:
-    """The inspection identity of a liveChart node.
-
-    Everything whose change would alter the inspected evidence — and
-    therefore require a NEW frozen context instead of the carried one. The
-    ``block_id`` leads so the identity is keyed per block; the remaining
-    fields are exactly the canonical liveChart attributes.
-    """
-    return (chart.block_id, chart.chart_definition_version_id, chart.mode,
-            chart.selection, chart.observed_dataset_version_id, chart.snapshot_id)
-
-
-# --------------------------------------------------------------------------- #
-# Frozen inspection context (ResolvedContext; NI-046 contract shape)
-# --------------------------------------------------------------------------- #
-
-
-def _canonical_selection(selection: ChartSelection) -> dict:
-    """The canonical selection JSON of a validated request Selection."""
-    return {
-        "start": selection.start.isoformat(),
-        "end": selection.end.isoformat(),
-        "frequency": selection.frequency,
-        "filters": dict(selection.filters),
-    }
-
-
-def build_resolved_context(definition: ChartDefinitionRow, dataset_version_id: UUID,
-                           selection: ChartSelection, *, resolved_at: datetime) -> dict:
-    """Resolve the frozen inspection context of one inserted chart block.
-
-    ``context_hash`` uses the NI-032 ChartView algorithm verbatim (canonical
-    bytes over definition version + dataset version + canonical selection +
-    sorted bound metric definition versions), so the stored context and the
-    view the user inspected hash identically. The result is validated through
-    :func:`near_api.documents.schema.canonical_context_json` — the canonical
-    grammar stays the one authority for the stored shape.
-    """
-    selection_json = _canonical_selection(selection)
-    metric_versions = sorted(str(item) for item in definition.metric_definition_versions)
-    return canonical_context_json({
-        "chart_definition_version_id": str(definition.id),
-        "dataset_version_id": str(dataset_version_id),
-        "selection": selection_json,
-        "context_hash": _context_hash({"id": definition.id}, dataset_version_id,
-                                      ResolvedSelection.model_validate(selection_json),
-                                      definition.metric_definition_versions),
-        "renderer_version": definition.renderer_version,
-        "metric_definition_versions": metric_versions,
-        "resolved_at": resolved_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
-    }, path="resolved_context")
 
 
 # --------------------------------------------------------------------------- #
@@ -345,21 +161,14 @@ def append_chart_block_in_transaction(connection: Connection, principal: Princip
         raise ReferenceInvalid(
             "after_block_id does not reference a top-level block of this document",
             [("after_block_id", "dangling_after_block_reference")])
-    # Snapshot mode is an unverifiable reference until P1 NI-044 lands (the same
-    # gate the whole-document save path enforces for canonical nodes).
-    if payload.mode == "snapshot":
-        raise ReferenceInvalid(
-            "Snapshot chart blocks require the research snapshot registry, which is "
-            "not available yet (P1 NI-044)",
-            [("mode", "reference_unavailable")])
+    require_live_chart_mode(payload.mode, error_path="mode")
 
     definition = load_chart_definition(connection, payload.chart_definition_version_id,
                                        error_path="chart_definition_version_id")
     validate_selection_against_definition(
         definition, payload.selection.start, payload.selection.end,
         dict(payload.selection.filters))
-    service.require_approved_dataset(connection, payload.dataset_version_id,
-                                     "dataset_version_id")
+    require_approved_dataset(connection, payload.dataset_version_id, "dataset_version_id")
     require_metric_coverage(connection, definition, payload.dataset_version_id,
                             error_path="dataset_version_id")
 
@@ -370,7 +179,7 @@ def append_chart_block_in_transaction(connection: Connection, principal: Princip
             "block_id": str(block_id),
             "chart_definition_version_id": str(definition.id),
             "mode": payload.mode,
-            "selection": _canonical_selection(payload.selection),
+            "selection": payload.selection.model_dump(mode="json"),
             "observed_dataset_version_id": str(payload.dataset_version_id),
         },
     }
@@ -385,8 +194,8 @@ def append_chart_block_in_transaction(connection: Connection, principal: Princip
     })
     context = build_resolved_context(definition, payload.dataset_version_id,
                                      payload.selection, resolved_at=datetime.now(UTC))
-    resolved_contexts = dict(previous.resolved_contexts or {})
-    resolved_contexts[str(block_id)] = context
+    resolved_contexts = resolve_revision_contexts(connection, previous_document, previous)
+    resolved_contexts[str(block_id)] = context.model_dump(mode="json")
     detail = service._commit_new_revision(connection, principal, document,
                                           canonical=canonical,
                                           resolved_contexts=resolved_contexts)
@@ -399,7 +208,7 @@ def append_chart_block_in_transaction(connection: Connection, principal: Princip
 
 
 @router.get("/documents/{document_id}/chart-view",
-            response_model=ChartViewResponse, operation_id="getDocumentChartView",
+            response_model=DocumentChartViewResponse, operation_id="getDocumentChartView",
             summary="Inspect one canonical chart context for an owned working document",
             responses={**_PRIVATE_ERROR_RESPONSES,
                        503: {"description": "Approved chart data is unavailable"}})
@@ -409,7 +218,7 @@ def get_document_chart_view(request: Request, principal: PrincipalDependency,
                             start: date, end: date,
                             dataset_version: Annotated[str, Query(max_length=36)],
                             filters: Annotated[str | None, Query(max_length=2048)] = None,
-                            ) -> ChartViewResponse | JSONResponse:
+                            ) -> DocumentChartViewResponse | JSONResponse:
     """Resolve an editor inspection through the canonical public chart adapter.
 
     The dataset choice is REQUIRED: normal reopen/range/filter requests send
@@ -418,8 +227,8 @@ def get_document_chart_view(request: Request, principal: PrincipalDependency,
     action adopts the returned selection + dataset UUID in one undoable edit,
     and the ordinary CAS revision save validates and freezes those attrs.
     New/duplicated unsaved blocks can be inspected too, without requiring a
-    persisted block id or accepting arbitrary routes/URLs. Historical readers
-    must use their revision pin (NI-043), never this working-view refresh.
+    persisted block id. The latest approved UUID is separate metadata so a
+    publication can be signaled while the inspected data stays pinned.
     """
     with principal_transaction(engine, principal) as connection:
         # Check ownership BEFORE resolving the requested scientific reference.
@@ -433,9 +242,16 @@ def get_document_chart_view(request: Request, principal: PrincipalDependency,
             validate_selection_against_definition(definition, start, end,
                                                    selection.filters)
             requested_version = _resolve_dataset_version(dataset_version)
+            try:
+                latest_version = delivery.resolve_latest_version(
+                    connection, definition.required_metric_versions, use_cache=False)
+            except delivery.DeliveryDataNotReady:
+                if requested_version is None:
+                    raise
+                latest_version = None
             view = delivery.build_chart_view(
                 connection, chart_id=definition.chart_id, version=definition.version,
-                start=start, end=end, dataset_version=requested_version,
+                start=start, end=end, dataset_version=requested_version or latest_version,
                 filters=dict(selection.filters))
         except ValidationError:
             return error_response(request, 422, "VALIDATION_ERROR",
@@ -443,7 +259,8 @@ def get_document_chart_view(request: Request, principal: PrincipalDependency,
         except DocumentSchemaError as error:
             return _schema_error(request, error)
     response.headers["Cache-Control"] = "no-store"
-    return view
+    return DocumentChartViewResponse(
+        **dict(view), latest_approved_dataset_version_id=latest_version)
 
 
 @router.post("/documents/{document_id}/chart-blocks",

@@ -104,6 +104,8 @@ class HomeContractTests(unittest.TestCase):
                                                 "/api/documents/{document_id}",
                                                 "/api/documents/{document_id}/versions",
                                                 "/api/documents/{document_id}/versions/{version_id}",
+                                                "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/view",
+                                                "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/csv",
                                                 "/api/documents/{document_id}/chart-blocks",
                                                 "/api/documents/{document_id}/chart-view",
                                                 "/api/metrics",

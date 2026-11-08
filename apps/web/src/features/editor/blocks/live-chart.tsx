@@ -1,9 +1,10 @@
-import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Component, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ChartView, type ChartSelection, type ChartViewResponse } from "@/features/charts/renderer/ChartView";
 import { filterEnumOptions, filterLabel } from "@/features/charts/library/filter-controls";
 import { isIsoCalendarDate, windowDays } from "@/features/charts/library/selection-url";
-import { useChartEditorContext } from "./chart-context";
-import { loadDocumentChart } from "./chart-api";
+import { HistoricalRevisionContext, useChartEditorContext } from "./chart-context";
+import { loadDocumentChart, type DocumentChartView } from "./chart-api";
+import { HistoricalChart } from "./historical-chart";
 import { Node, mergeAttributes } from "@tiptap/core";
 import {
   NodeViewWrapper,
@@ -56,6 +57,11 @@ export const LiveChart = Node.create({
 function LiveChartBlockView({ node, editor, getPos, updateAttributes }: NodeViewProps) {
   const attrs = node.attrs as ChartBlockAttrs;
   const context = useChartEditorContext();
+  const historical = useContext(HistoricalRevisionContext);
+  if (historical) return <NodeViewWrapper className="not-prose my-4 min-w-0" aria-label="Saved chart block">
+    {attrs.block_id ? <HistoricalChart {...historical} blockId={attrs.block_id} />
+      : <p role="alert">Chart reconstruction failed. This saved block has no identity.</p>}
+  </NodeViewWrapper>;
   return <NodeViewWrapper data-live-chart-block className="my-4 min-w-0 max-w-full" aria-label="Live chart block">
     <div contentEditable={false} className="not-prose min-w-0" onKeyDown={(event) => {
       if (event.key === "Escape" && !event.defaultPrevented && !(event.target as HTMLElement).closest('[role="dialog"]')) {
@@ -82,7 +88,7 @@ export interface ChartBlockAttrs {
   observed_dataset_version_id: string;
 }
 const CONTROL_CLASS = "min-h-11 max-w-full rounded-control border border-control-border bg-surface px-3 py-2 font-ui text-base sm:text-ui touch-manipulation leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 aria-disabled:opacity-60";
-function inspectionKey(definitionId: string, selection: ChartSelection | ChartViewResponse["selection"], datasetId: string) {
+export function inspectionKey(definitionId: string, selection: ChartSelection | ChartViewResponse["selection"], datasetId: string) {
   return JSON.stringify([definitionId, selection.start, selection.end, Object.entries(selection.filters ?? {}).sort(), datasetId]);
 }
 type Context = NonNullable<ReturnType<typeof useChartEditorContext>>;
@@ -100,9 +106,10 @@ class ChartBoundary extends Component<{ children: ReactNode; resetKey: string },
 export function InteractiveChart({ attrs, context, onApply }: {
   attrs: ChartBlockAttrs; context: Context; onApply: (attrs: Record<string, unknown>) => void;
 }) {
-  const [loaded, setLoaded] = useState<{ key: string; view: ChartViewResponse } | null>(null);
-  const [candidate, setCandidate] = useState<{ key: string; view: ChartViewResponse; attempt: number; signal: AbortSignal; subject: string | null; documentId: string } | null>(null);
-  const applied = useRef<object | null>(null);
+  const [loaded, setLoaded] = useState<{ key: string; view: DocumentChartView; order: number } | null>(null);
+  const [candidate, setCandidate] = useState<{ key: string; view: DocumentChartView; attempt: number; order: number; signal: AbortSignal; subject: string | null; documentId: string } | null>(null);
+  const applied = useRef<{ candidate: object; revision: number | undefined } | null>(null);
+  const checkedAfterSave = useRef<object | null>(null);
   const [openedDataset] = useState(attrs.observed_dataset_version_id);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +117,10 @@ export function InteractiveChart({ attrs, context, onApply }: {
   const [retry, setRetry] = useState(0);
   const request = useRef<AbortController | null>(null);
   const generation = useRef(0);
+  const readOrder = useRef(0);
+  const acceptView = useCallback((key: string, view: DocumentChartView, order: number) => {
+    setLoaded(current => current && current.order > order ? current : { key, view, order });
+  }, []);
   const attrsKey = inspectionKey(attrs.chart_definition_version_id, attrs.selection, attrs.observed_dataset_version_id);
   const currentKey = useRef(attrsKey);
   const readyRef = useRef(context.ready);
@@ -118,20 +129,30 @@ export function InteractiveChart({ attrs, context, onApply }: {
   // Async responses propose an edit; commit only after React reconciles current
   // props/identity. A batched auth change or Undo wins over a late response.
   useLayoutEffect(() => {
-    if (!candidate || applied.current === candidate || !context.ready || candidate.signal.aborted
+    if (!candidate || applied.current?.candidate === candidate || !context.ready || candidate.signal.aborted
       || candidate.key !== attrsKey || candidate.attempt !== generation.current
       || candidate.subject !== context.subject || candidate.documentId !== context.documentId) return;
-    applied.current = candidate;
-    onApply({ selection: candidate.view.selection, observed_dataset_version_id: candidate.view.dataset.id });
-  }, [candidate, attrsKey, context.ready, context.subject, context.documentId, onApply]);
+    const { definition, dataset, selection, context_hash, resolved_at } = candidate.view;
+    const nextKey = inspectionKey(definition.id, selection, dataset.id);
+    applied.current = { candidate, revision: context.revision };
+    if (nextKey === attrsKey) return;
+    if (attrs.block_id) context.onObserve?.(attrs.block_id, {
+      chart_definition_version_id: definition.id, dataset_version_id: dataset.id,
+      selection, context_hash, resolved_at, renderer_version: definition.renderer_version,
+      metric_definition_versions: definition.metric_definition_ids,
+    });
+    onApply({ selection, observed_dataset_version_id: dataset.id });
+  }, [candidate, attrsKey, attrs.block_id, context, onApply]);
   const candidateMatchesNode = candidate && candidate.subject === context.subject && candidate.documentId === context.documentId
     && inspectionKey(candidate.view.definition.id, candidate.view.selection, candidate.view.dataset.id) === attrsKey;
-  const view = candidateMatchesNode ? candidate.view : loaded?.key === attrsKey ? loaded.view : null;
+  const view = loaded?.key === attrsKey && (!candidateMatchesNode || loaded.order > candidate.order)
+    ? loaded.view : candidateMatchesNode ? candidate.view : null;
 
   const resolve = useCallback(async (selection: ChartSelection, dataset: string, commit: boolean) => {
     request.current?.abort();
     const controller = new AbortController(); request.current = controller;
     const attempt = ++generation.current;
+    const order = ++readOrder.current;
     const inspectedKey = attrsKey;
     setLoading(true); setError(null);
     try {
@@ -140,25 +161,43 @@ export function InteractiveChart({ attrs, context, onApply }: {
       const nextKey = inspectionKey(next.definition.id, next.selection, next.dataset.id);
       // A prospective edit stays separate until attrs reconcile, so the old
       // matching renderer/controls stay mounted and keyboard focus is retained.
-      if (!commit) setLoaded({ key: nextKey, view: next });
+      if (!commit) acceptView(nextKey, next, order);
       setLoading(false);
       if (commit) {
         // Only a successful canonical resolution becomes a single undoable document edit.
         setDraft(null);
-        setCandidate({ key: inspectedKey, view: next, attempt, signal: controller.signal, subject: context.subject, documentId: context.documentId });
+        setCandidate({ key: inspectedKey, view: next, attempt, order, signal: controller.signal, subject: context.subject, documentId: context.documentId });
       }
     } catch (cause) {
       if (!controller.signal.aborted && attempt === generation.current) {
         setLoading(false); setError(cause instanceof Error ? cause.message : "Chart unavailable. Prose editing remains available.");
       }
     }
-  }, [attrsKey, attrs.chart_definition_version_id, context.documentId, context.subject]);
+  }, [acceptView, attrsKey, attrs.chart_definition_version_id, context.documentId, context.subject]);
 
   useEffect(() => {
     if (!context.ready || attrs.mode !== "live") { request.current?.abort(); return; }
     const timer = setTimeout(() => void resolve(attrs.selection, attrs.observed_dataset_version_id, false), 0);
     return () => { clearTimeout(timer); request.current?.abort(); };
   }, [resolve, attrs.selection, attrs.observed_dataset_version_id, context.ready, context.subject, retry, attrs.mode]);
+
+  // Recheck once after an inspected edit is acknowledged. A publication
+  // between inspection and save only changes the working-view notice.
+  useEffect(() => {
+    if (!candidateMatchesNode || checkedAfterSave.current === candidate || !context.ready || !context.saved
+      || applied.current?.candidate !== candidate || applied.current?.revision === context.revision) return;
+    const controller = new AbortController();
+    const order = ++readOrder.current;
+    void loadDocumentChart(context.documentId, attrs.chart_definition_version_id, attrs.selection,
+      attrs.observed_dataset_version_id, controller.signal).then(next => {
+      if (!controller.signal.aborted) {
+        checkedAfterSave.current = candidate;
+        acceptView(attrsKey, next, order);
+      }
+    }).catch(() => { /* The inspected pin remains visible if the status check fails. */ });
+    return () => controller.abort();
+  }, [acceptView, candidate, candidateMatchesNode, context.documentId, context.ready, context.saved, context.revision,
+    attrsKey, attrs.chart_definition_version_id, attrs.selection, attrs.observed_dataset_version_id]);
   const selection = draft ?? attrs.selection;
   const definition = view?.definition;
   const properties = definition?.filter_schema["properties"];
@@ -172,6 +211,8 @@ export function InteractiveChart({ attrs, context, onApply }: {
       <span>{attrs.mode === "live" ? "Live chart · saved observation" : "Snapshot chart · reconstruction unavailable"}</span>
       <span role="status">{context.saved ? "Saved in document revision" : "Changed — document has unsaved edits"}</span>
       {openedDataset !== attrs.observed_dataset_version_id ? <span>Changed dataset — explicit observation edit</span> : null}
+      {context.ready && view?.latest_approved_dataset_version_id && view.latest_approved_dataset_version_id !== view.dataset.id
+        ? <span role="status">Newer approved data available</span> : null}
     </div>
     <p className="break-all text-metadata leading-metadata text-text-secondary">Observed dataset: {attrs.observed_dataset_version_id}. Opening or typing never refreshes this pin.</p>
     {!context.ready ? <p role="status">Chart controls are suspended while your document account is checked. Reopen the document after an account change.</p> : null}

@@ -51,7 +51,7 @@ const BlockIdNodeAttrs = Extension.create({
  * dropped to the grammar by the schema itself. `trailingNode` is disabled so
  * the editor never appends blocks the author did not write.
  */
-export const EDITOR_EXTENSIONS = [
+export const DOCUMENT_EXTENSIONS = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
     horizontalRule: false,
@@ -92,7 +92,10 @@ export const EDITOR_EXTENSIONS = [
   Hypothesis,
   Evidence,
   Risk,
-  // Stable top-level identities and the structural operations.
+];
+
+export const EDITOR_EXTENSIONS = [
+  ...DOCUMENT_EXTENSIONS,
   StableBlockIds,
   BlockOperationShortcuts,
   SlashMenuTrigger,

@@ -240,8 +240,8 @@ export interface paths {
          *     action adopts the returned selection + dataset UUID in one undoable edit,
          *     and the ordinary CAS revision save validates and freezes those attrs.
          *     New/duplicated unsaved blocks can be inspected too, without requiring a
-         *     persisted block id or accepting arbitrary routes/URLs. Historical readers
-         *     must use their revision pin (NI-043), never this working-view refresh.
+         *     persisted block id. The latest approved UUID is separate metadata so a
+         *     publication can be signaled while the inspected data stays pinned.
          */
         get: operations["getDocumentChartView"];
         put?: never;
@@ -293,6 +293,40 @@ export interface paths {
          * @description Return the revision only through its owned parent document.
          */
         get: operations["getDocumentVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download exact chart data from an owned immutable revision */
+        get: operations["getDocumentVersionChartCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reconstruct one chart from an owned immutable revision */
+        get: operations["getDocumentVersionChartView"];
         put?: never;
         post?: never;
         delete?: never;
@@ -947,6 +981,27 @@ export interface components {
         };
         DecimalString: string;
         /**
+         * DocumentChartViewResponse
+         * @description Working-view data plus the current compatible approved dataset pointer.
+         */
+        DocumentChartViewResponse: {
+            /** Context Hash */
+            context_hash: string;
+            dataset: components["schemas"]["DatasetResponse"];
+            definition: components["schemas"]["ChartDefinitionResponse"];
+            /** Latest Approved Dataset Version Id */
+            latest_approved_dataset_version_id: string | null;
+            quality: components["schemas"]["DataQuality"];
+            /**
+             * Resolved At
+             * Format: date-time
+             */
+            resolved_at: string;
+            selection: components["schemas"]["ResolvedSelection"];
+            /** Series */
+            series: components["schemas"]["SeriesResponse"][];
+        };
+        /**
          * DocumentCreateRequest
          * @description POST /documents body. `template_id` is P1: providing it is a typed 422.
          */
@@ -1043,9 +1098,7 @@ export interface components {
              * Observed Contexts
              * @default []
              */
-            observed_contexts: {
-                [key: string]: unknown;
-            }[];
+            observed_contexts: components["schemas"]["ResolvedContext"][];
             /** Schema Version */
             schema_version: number;
         };
@@ -1867,7 +1920,7 @@ export interface components {
          *     permissive container never serializes an unapproved filter value.
          */
         ResolvedSelectionFilters: {
-            [key: string]: unknown;
+            [key: string]: string;
         };
         /** RichTextBoldMark */
         RichTextBoldMark: {
@@ -3098,7 +3151,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ChartViewResponse"];
+                    "application/json": components["schemas"]["DocumentChartViewResponse"];
                 };
             };
             /** @description Missing or invalid session */
@@ -3435,6 +3488,148 @@ export interface operations {
             };
             /** @description If-Match precondition is required */
             428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getDocumentVersionChartCsv: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                version_id: string;
+                block_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Frozen chart evidence could not be reconstructed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getDocumentVersionChartView: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                version_id: string;
+                block_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChartViewResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Frozen chart evidence could not be reconstructed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

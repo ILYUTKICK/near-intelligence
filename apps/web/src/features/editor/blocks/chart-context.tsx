@@ -1,14 +1,25 @@
 "use client";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import type { components } from "@near-intelligence/shared-types";
 import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
 
-interface ChartEditorContextValue { documentId: string; saved: boolean; subject: string | null; ready: boolean }
+export type ChartObservation = components["schemas"]["ResolvedContext"];
+interface ChartEditorContextValue {
+  documentId: string;
+  saved: boolean;
+  subject: string | null;
+  ready: boolean;
+  revision?: number;
+  onObserve?: (blockId: string, observation: ChartObservation) => void;
+}
 const ChartEditorContext = createContext<ChartEditorContextValue | null>(null);
 export const useChartEditorContext = () => useContext(ChartEditorContext);
+export const HistoricalRevisionContext = createContext<{ documentId: string; versionId: string; sessionSignal: AbortSignal } | null>(null);
 
 /** One identity guard per editor, shared by every chart; no private cache. */
-export function ChartEditorProvider({ documentId, saved, enabled, children }: {
-  documentId: string; saved: boolean; enabled: boolean; children: ReactNode;
+export function ChartEditorProvider({ documentId, saved, enabled, revision, onObserve, children }: {
+  documentId: string; saved: boolean; enabled: boolean; revision?: number;
+  onObserve?: ChartEditorContextValue["onObserve"]; children: ReactNode;
 }) {
   const [session, setSession] = useState<{ subject: string | null; ready: boolean }>({ subject: null, ready: false });
   const owner = useRef<string | null>(null);
@@ -37,5 +48,5 @@ export function ChartEditorProvider({ documentId, saved, enabled, children }: {
     return () => { controller.abort(); window.removeEventListener(AUTH_CHANGE, check); window.removeEventListener("focus", check);
       window.removeEventListener("storage", storage); document.removeEventListener("visibilitychange", check); };
   }, [documentId, enabled]);
-  return <ChartEditorContext value={{ documentId, saved, ...session }}>{children}</ChartEditorContext>;
+  return <ChartEditorContext value={{ documentId, saved, revision, onObserve, ...session }}>{children}</ChartEditorContext>;
 }
