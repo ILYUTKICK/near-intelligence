@@ -66,15 +66,40 @@ uv run --project apps/api python research/models/diagnostics.py \
 
 The estimator refuses to fit unless the gate verdict for the bound specification (`research/models/configs/gross_fee_activity_v1.json` with settings in `research/models/fit_configs/gross_fee_activity_v1_fit.json`) is `READY`/`READY_WITH_LIMITS`. The diagnostics battery binds the same specification (`research/models/diagnostics_configs/gross_fee_activity_v1_diagnostics.json`), re-runs the estimator and records the sample/exclusion table verbatim, ADF/KPSS with preregistered fixed lag settings, residual ACF/Ljung–Box/Breusch–Pagan/Cook's distance, the preregistered sensitivity presets (HAC maxlags 3/14, alternate provider source, alternate price basis) and a template-rendered bounded interpretation; every defined diagnostic is present or undefined/failed with a recorded reason. Exit codes are 0 success, 4 contract/policy failure, 2 usage. The same inputs/config/lock render a byte-identical manifest on one platform; fitted floats compare under the documented tolerance (rtol1e-8/atol1e-10). The real-archive fit and diagnostics runs are operator-side evidence, not repository content.
 
+## Operator publication gate and offline verification — implemented (NI-054)
+
+Publication is an operator CLI flow, never a browser route (API_SPECIFICATION: "Creating datasets/models/publications uses the operator CLI, not a browser POST API"). The gate lives in `apps/api/src/near_api/research/` and is pure-file work until the final database write:
+
+```sh
+# 1. Verify a run bundle offline (no network, no database, no re-fit):
+uv run --project apps/api python -m near_api.research verify \
+    --bundle research/reports/<run> --offline
+# The bundle directory holds fit_manifest.json (NI-052), diagnostics_report.json
+# (NI-053), readiness_report.json (NI-051) and publication_approval.json.
+# A passing verification prints the canonical SHA-256 of the three manifests.
+
+# 2. Record the operator approval binding those exact hashes
+#    (publication_approval.json: approval_type model_run_publication_approval,
+#    decision "approve", reviewer, review_reference, approved_artifacts{...}).
+
+# 3. Publish — verify runs again, then the run is written once:
+uv run --project apps/api python -m near_api.research publish \
+    --bundle research/reports/<run> \
+    --database-url <near_operator psycopg URL>
+```
+
+The verifier checks, fail-closed and offline: bundle completeness and artifact types; the approval binding (decision `approve`, non-empty reviewer and review reference, and the approved SHA-256 matching the canonical rendering of every manifest — the reviewed bytes and the published bytes must be identical); the data manifest (one archive state pinned by name/SHA-256/bytes identically across fit, diagnostics and readiness artifacts); the code manifest (one recorded commit); the lock manifest (the recorded `apps/api/uv.lock` hash must match this checkout); config identity (every recorded spec/fit/diagnostics/policy hash must match the committed preregistered file, so a run publishes only under the checked-in configs); cross-manifest identity (one specification, one sample window and size, one gate verdict shared with the readiness report); the design manifest (declared columns, row count equal to the sample, finite rank/condition, exact-decimal and float64 design hashes); the result manifest (finite coefficients bound to the declared columns, ordered 95% intervals containing the estimates, and the diagnostics report's rebuilt coefficient table equal to the fit manifest's under the declared tolerances); diagnostics completeness (every declared diagnostic present exactly once with a status or an undefined reason, the reported sensitivity presets exactly the preregistered ones — no surfing, template-rendered interpretation only); limitations attached verbatim to both artifacts; and the reproduction tolerances. A served bundle (from `GET /api/model-runs/{run_id}/manifest`) verifies with the same command — `verify --bundle <downloaded manifest.json> --offline` — so a reviewer re-checks the published artifact without any operator tooling.
+
+Publication writes one immutable row into `app.model_runs` (migration 0010): the content-derived `run_id` (UUIDv5 over the three manifest hashes — identical content is a no-op, a re-approval of identical content under a different approval is a conflict), the specification identity, the NI-051 gate verdict, the full manifest set as JSONB, the per-artifact SHA-256 map, the approval record and the denormalized identity columns re-asserted by CHECK constraints against the stored manifests. The table is published-only by CHECK, write-once (no UPDATE/DELETE grant for any role) and FORCE-RLS with `near_operator` as the only writer; a refused bundle reaches no database row, so unpublished, failed and rejected runs never look like results. Exit codes for `verify`/`publish`: 0 success, 4 gate/contract refusal, 2 usage.
+
 Remaining planned (do not describe as working until implemented):
 
 ```sh
 uv run --project apps/api python -m near_api.cli datasets build --config research/models/configs/intents_daily_v1.json --offline
 uv run --project apps/api python -m near_api.cli research readiness --model gross-fee-activity-v1 --dataset <UUID>
-uv run --project apps/api python -m near_api.cli research verify --manifest research/reports/<run-id>/manifest.json
 ```
 
-The `near_api.cli` surface and dataset-UUID binding do not exist yet; tasks must create them (NI-054 owns `research verify` and publication). Models for true protocol revenue are enabled only after their readiness gates pass. `--offline` rejects provider HTTP and cloud access, not merely omits an API key. Publication command must validate that artifact/code/lock/config inputs are all resolvable and licensed for their intended distribution.
+The `near_api.cli` surface and dataset-UUID binding do not exist yet. Models for true protocol revenue are enabled only after their readiness gates pass. `--offline` rejects provider HTTP and cloud access, not merely omits an API key. The publication gate validates that artifact/code/lock/config inputs are all resolvable and pinned; redistribution licensing of the saved inputs remains an operator responsibility recorded on the dataset/source artifacts (NI-027/NI-028), not something a hash can prove.
 
 Model bundle adds model version, sample/exclusions, transformed design, coefficient/SE/CI/test outputs, covariance/lag settings, diagnostics, interpretation/limitations, Python/OS/BLAS versions and seeds. Exact data hashes must match; fitted floats use documented tolerance (initial rtol1e-8/atol1e-10); rendering pixels/ZIP timestamps may differ while canonical values/pins match.
 

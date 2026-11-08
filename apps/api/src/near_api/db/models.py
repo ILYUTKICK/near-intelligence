@@ -766,3 +766,83 @@ class IngestionDailyCounter(Base):
     success_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
                                                  server_default=func.now())
+
+
+class ModelRun(Base):
+    """One published immutable model run (NI-054).
+
+    Mirrors migration 0010 exactly (DATABASE_SCHEMA.md "model_runs", the
+    recorded NI-054 implemented shape): write-once rows written only by the
+    operator publication gate, published-only by CHECK, with the full manifest
+    set as JSONB and the denormalized identity columns re-asserted by CHECK
+    constraints against the stored manifests. near_operator writes; near_app
+    reads for the public model APIs; no UPDATE/DELETE grant exists for any
+    role.
+    """
+
+    __tablename__ = "model_runs"
+    __table_args__ = (
+        CheckConstraint(r"spec_id ~ '^[a-z][a-z0-9_]{2,79}$'", name="spec_id"),
+        CheckConstraint("spec_version >= 1", name="spec_version"),
+        CheckConstraint("status = 'published'", name="published"),
+        CheckConstraint("gate_verdict IN ('READY','READY_WITH_LIMITS')", name="gate_verdict"),
+        CheckConstraint(r"code_commit ~ '^[0-9a-f]{40}$|^[0-9a-f]{64}$'", name="code_commit"),
+        CheckConstraint(r"dependency_lock_sha256 ~ '^[0-9a-f]{64}$'", name="lock_hash"),
+        CheckConstraint(r"coefficient_rtol ~ '^[0-9]+(\.[0-9]+)?$' "
+                        r"AND coefficient_atol ~ '^[0-9]+(\.[0-9]+)?$'",
+                        name="tolerance_format"),
+        CheckConstraint("sample_end_exclusive > sample_start", name="sample_window"),
+        CheckConstraint("nobs > 0", name="nobs"),
+        CheckConstraint("published_by <> ''", name="published_by"),
+        CheckConstraint("octet_length(manifests::text) <= 4194304", name="manifests_size"),
+        CheckConstraint("manifests ? 'fit_manifest' AND manifests ? 'diagnostics_report' "
+                        "AND manifests ? 'readiness_report'", name="manifests_keys"),
+        CheckConstraint("artifacts ? 'fit_manifest' AND artifacts ? 'diagnostics_report' "
+                        "AND artifacts ? 'readiness_report' "
+                        "AND artifacts ? 'publication_approval'", name="artifacts_keys"),
+        CheckConstraint("spec_id = manifests->'fit_manifest'->'model'->>'model_id'",
+                        name="spec_id_matches"),
+        CheckConstraint("spec_version = "
+                        "(manifests->'fit_manifest'->'model'->>'model_version')::int",
+                        name="spec_version_matches"),
+        CheckConstraint("gate_verdict = "
+                        "manifests->'fit_manifest'->'admission'->>'verdict'",
+                        name="gate_verdict_matches"),
+        CheckConstraint("code_commit = "
+                        "manifests->'fit_manifest'->'inputs'->>'code_commit'",
+                        name="code_commit_matches"),
+        CheckConstraint("dependency_lock_sha256 = "
+                        "manifests->'fit_manifest'->'inputs'->'dependency_lock'->>'sha256'",
+                        name="lock_hash_matches"),
+        CheckConstraint("nobs = (manifests->'fit_manifest'->'sample'->>'nobs')::int",
+                        name="nobs_matches"),
+        CheckConstraint("sample_start = (manifests->'fit_manifest'->'sample'->'window'"
+                        "->>'start')::date AND sample_end_exclusive = "
+                        "(manifests->'fit_manifest'->'sample'->'window'"
+                        "->>'end_exclusive')::date", name="sample_window_matches"),
+        CheckConstraint("coefficient_rtol = manifests->'fit_manifest'->'reproduction'"
+                        "->>'coefficient_rtol' AND coefficient_atol = "
+                        "manifests->'fit_manifest'->'reproduction'"
+                        "->>'coefficient_atol'", name="tolerance_matches"),
+        Index("ix_model_runs_spec_published", "spec_id", "published_at"),
+        Index("ix_model_runs_published_at", "published_at"),
+    )
+
+    run_id: Mapped[UUID] = mapped_column(primary_key=True)
+    spec_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    spec_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    gate_verdict: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    manifests: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    artifacts: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    publication_approval: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    code_commit: Mapped[str] = mapped_column(String(64), nullable=False)
+    dependency_lock_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    coefficient_rtol: Mapped[str] = mapped_column(String(40), nullable=False)
+    coefficient_atol: Mapped[str] = mapped_column(String(40), nullable=False)
+    sample_start: Mapped[date] = mapped_column(Date, nullable=False)
+    sample_end_exclusive: Mapped[date] = mapped_column(Date, nullable=False)
+    nobs: Mapped[int] = mapped_column(Integer, nullable=False)
+    published_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+                                                   nullable=False, server_default=func.now())

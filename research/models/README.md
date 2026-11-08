@@ -164,6 +164,32 @@ part of the `scripts/run-db-tests.py` discovery and run without a database.
 `NI_REAL_ARCHIVE_ROOT` pointing at a read-only archive handoff, like the
 NI-029 real-archive tests.
 
+## Publication (NI-054)
+
+The three artifacts of one real run become a reviewable, publishable bundle
+in `apps/api/src/near_api/research/` (implementation lives there, not here —
+this README records the flow):
+
+1. Collect the run bundle directory: `fit_manifest.json` (NI-052),
+   `diagnostics_report.json` (NI-053), `readiness_report.json` (NI-051) and
+   an operator-authored `publication_approval.json` whose `approved_artifacts`
+   hashes bind the reviewed manifest bytes (the `research verify` output
+   prints them).
+2. `python -m near_api.research verify --bundle <dir> --offline` verifies the
+   complete data/code/lock/config/design/result manifest set fail-closed —
+   no network, no database, no re-fit — and exits 0/4/2.
+3. `python -m near_api.research publish --bundle <dir> --database-url
+   <near_operator URL>` re-verifies and only then writes the immutable run
+   into `app.model_runs`. Rejected, failed or unreviewed runs never reach the
+   database.
+4. The public APIs (`GET /api/model-runs[/{run_id}[/manifest]]`,
+   `GET /api/model-definitions[/{model_id}[/readiness]]`) serve published rows
+   only; the manifest endpoint serves the verified bundle verbatim so a
+   reviewer re-runs `research verify --bundle <downloaded.json> --offline`.
+
+The bundle contract, the approval mechanics and every gate check are
+documented in [docs/REPRODUCIBILITY.md](../../docs/REPRODUCIBILITY.md).
+
 ## Boundaries
 
 - The archive is opened read-only; the gate and the estimator write only into
