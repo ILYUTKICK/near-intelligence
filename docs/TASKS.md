@@ -759,7 +759,9 @@ Specification: [DATA_PIPELINE.md](DATA_PIPELINE.md).
 - **Priority:** P0
 - **Dependencies:** NI-003, NI-026
 - **Complexity:** M
-- **Status:** DONE
+- **Status:** IN_PROGRESS
+- **Reopened (2026-11-08, Windows manifest digest):** `parse_manifest` converts CRLF to LF before computing the batch SHA-256. Staging a verified CRLF manifest by its original byte digest fails because PostgreSQL stores the normalized digest. The NI-028 import-to-staging check exposed this on disposable PostgreSQL 18.6.
+- **Repair claim:** Codex / BkycnocTbI / role B / session 01a1a2c9-f42d-7422-8e3e-755c9e33551b. Started 2026-11-08T04:03:03+03:00 on `fix/ni-027-manifest-byte-hash` from `83b334d`. PR #47 records acceptance of the previous implementation and releases its claim. NI-003 and NI-026 are DONE. This repair covers the exact manifest digest and the affected NI-028 integration check.
 - **Claimed by:** Claude agent for role B (operator-authorized subagent), session dispatch #5
 - **Execution role:** B
 - **Started at:** 2026-11-06T22:40:00+03:00
