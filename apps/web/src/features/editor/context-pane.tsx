@@ -258,7 +258,7 @@ export function TableProperties({
 
 const LATER_TASKS_NOTE: Record<string, string> = {
   liveChart:
-    "Interactive chart rendering and the chart library flow arrive with NI-041/NI-042; the block's context pins and structural operations are active now.",
+    "Use the chart controls in the paper to inspect sources, apply a range or filter, and explicitly refresh its observed dataset. These changes are document edits.",
   insight:
     "Structured insight authoring arrives with NI-047; the block and its structural operations are active now.",
   hypothesis:

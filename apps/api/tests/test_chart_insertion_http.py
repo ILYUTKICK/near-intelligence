@@ -1,11 +1,14 @@
-"""NI-041 true gateway/JWT/DB insertion, pinned evidence and reopen/save E2E."""
+"""NI-041/042 real gateway/JWT/DB insertion, interactive edits and frozen pins."""
 import copy
 import datetime as dt
+import json
+from unittest.mock import patch
 from uuid import uuid4
 
 import test_saved_charts_http as gateway_fixture
 import test_delivery_apis as data_fixture
 from near_api.datasets import delivery
+from near_api.schemas.delivery import ChartViewResponse
 
 
 class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
@@ -53,7 +56,105 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         self.assertEqual(again["resolved_contexts"][block["attrs"]["block_id"]], context)
         self.assertEqual(again["revision"], 3)
         self.assertEqual(client.get("/workspace/research/" + document["id"]).status_code, 200)
+        # NI-042 resolves the stored immutable UUID through the private fixed
+        # gateway route. No request defaults to latest during reopen.
+        query = {"chart_definition_version_id": payload["chart_definition_version_id"],
+                 "start": payload["selection"]["start"],
+                 "end": payload["selection"]["end"],
+                 "dataset_version": payload["dataset_version_id"],
+                 "filters": json.dumps(payload["selection"]["filters"])}
+        chart_path = path + "/chart-view"
+        pinned_response = client.get(chart_path, params=query)
+        self.assertEqual(pinned_response.status_code, 200, pinned_response.text)
+        self.assertEqual(pinned_response.headers["cache-control"], "no-store")
+        pinned = ChartViewResponse.model_validate(pinned_response.json())
+        self.assertEqual(str(pinned.definition.id), payload["chart_definition_version_id"])
+        self.assertEqual(str(pinned.dataset.id), payload["dataset_version_id"])
+        self.assertEqual(pinned.context_hash, context["context_hash"])
+        exact_values = [point.value for series in pinned.series for point in series.points
+                        if point.value is not None]
+        self.assertEqual(exact_values, ["12.123456789012345678901234"])
+
+        # Range + filter change is inspected first, then one explicit saved
+        # document edit. A source was published after the old inspection, but
+        # this request retains v1 until Refresh explicitly sends latest.
+        changed_query = {**query, "end": "2026-01-03", "filters": "{}"}
+        changed_response = client.get(chart_path, params=changed_query)
+        self.assertEqual(changed_response.status_code, 200, changed_response.text)
+        inspected = changed_response.json()
+        changed_content = copy.deepcopy(again["content"])
+        attrs = changed_content["content"][0]["attrs"]
+        attrs["selection"] = inspected["selection"]
+        attrs["observed_dataset_version_id"] = inspected["dataset"]["id"]
+        headers.update({"If-Match": '"3"', "Idempotency-Key": str(uuid4())})
+        edit_body = {"schema_version": 1, "content": changed_content, "observed_contexts": []}
+        edited = client.post(path + "/versions", json=edit_body, headers=headers)
+        self.assertEqual(edited.status_code, 201, edited.text)
+        self.assertEqual(client.post(path + "/versions", json=edit_body,
+                                     headers=headers).json(), edited.json())
+        reopened = client.get(path).json()
+        self.assertEqual(reopened["revision"], 4)
+        self.assertEqual(reopened["content"]["content"][0]["attrs"]["selection"],
+                         inspected["selection"])
+        saved_context = reopened["resolved_contexts"][block["attrs"]["block_id"]]
+        self.assertEqual(saved_context["context_hash"], inspected["context_hash"])
+        self.assertEqual(saved_context["dataset_version_id"], payload["dataset_version_id"])
+        revision_two_id = next(item["id"] for item in client.get(path + "/versions").json()["items"]
+                               if item["revision"] == 2)
+        old = client.get(path + "/versions/" + revision_two_id).json()
+        self.assertEqual(old["resolved_contexts"][block["attrs"]["block_id"]], context)
+
+        # Preview latest is read-only. Only adopting its returned UUID into
+        # the canonical node and saving makes a new pin.
+        fresh_response = client.get(chart_path,
+                                    params={**changed_query, "dataset_version": "latest"})
+        self.assertEqual(fresh_response.status_code, 200, fresh_response.text)
+        fresh = fresh_response.json()
+        self.assertNotEqual(fresh["dataset"]["id"], payload["dataset_version_id"])
+        self.assertEqual(client.get(path).json()["revision"], 4)
+        refreshed_content = copy.deepcopy(reopened["content"])
+        refreshed_attrs = refreshed_content["content"][0]["attrs"]
+        refreshed_attrs["observed_dataset_version_id"] = fresh["dataset"]["id"]
+        refreshed_attrs["selection"] = fresh["selection"]
+        headers.update({"If-Match": '"4"', "Idempotency-Key": str(uuid4())})
+        refreshed = client.post(path + "/versions",
+            json={"schema_version": 1, "content": refreshed_content,
+                  "observed_contexts": []}, headers=headers)
+        self.assertEqual(refreshed.status_code, 201, refreshed.text)
+        current = client.get(path).json()
+        refreshed_context = current["resolved_contexts"][block["attrs"]["block_id"]]
+        self.assertEqual(refreshed_context["context_hash"], fresh["context_hash"])
+        self.assertEqual(refreshed_context["dataset_version_id"], fresh["dataset"]["id"])
+        stale = client.post(path + "/versions", json=edit_body,
+                            headers={**headers, "Idempotency-Key": str(uuid4())})
+        self.assertEqual(stale.status_code, 409, stale.text)
+
+        # A localized chart-source/delivery outage cannot disable prose saves.
+        # This failure affects the real API route while document validation
+        # retains already-verified immutable attrs, without a latest query.
+        with patch.object(delivery, "build_chart_view",
+                          side_effect=delivery.DeliveryDataNotReady("Synthetic chart delivery outage")):
+            outage = client.get(chart_path, params=changed_query)
+            self.assertEqual(outage.status_code, 503, outage.text)
+            self.assertEqual(outage.headers["cache-control"], "no-store")
+            outage_content = copy.deepcopy(current["content"])
+            outage_content["content"].append({
+                "type": "paragraph", "attrs": {"block_id": str(uuid4())},
+                "content": [{"type": "text", "text": "Synthetic prose during source outage"}]})
+            headers.update({"If-Match": '"5"', "Idempotency-Key": str(uuid4())})
+            prose = client.post(path + "/versions", json={"schema_version": 1,
+                                "content": outage_content, "observed_contexts": []}, headers=headers)
+            self.assertEqual(prose.status_code, 201, prose.text)
+        final = client.get(path).json()
+        self.assertEqual(final["revision"], 6)
+        self.assertEqual(final["resolved_contexts"][block["attrs"]["block_id"]], refreshed_context)
+        self.assertEqual(client.get(path + "/versions/" + revision_two_id).json()["resolved_contexts"][block["attrs"]["block_id"]], context)
+        self.assertEqual(client.get("/workspace/research/" + document["id"]).status_code, 200)
         client.cookies.set("ni_session", session_cookie("bob"))
         self.assertEqual(client.get(path).status_code, 404)
         self.assertEqual(client.post(path + "/chart-blocks", json=payload, headers=headers).status_code, 404)
-        print("NI-041 gateway E2E: one insertion/retry, inspected pin survives newer source + prose save; Bob denied", flush=True)
+        self.assertEqual(client.get(chart_path, params=query).status_code, 404)
+        denied_save = client.post(path + "/versions", json=edit_body, headers=headers)
+        self.assertEqual(denied_save.status_code, 404, denied_save.text)
+        print("NI-041/042 gateway E2E: insert/retry, pinned renderer context, range/filter save/reopen, "
+              "explicit refresh, old context unchanged, chart outage + prose save, Bob denied", flush=True)

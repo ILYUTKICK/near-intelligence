@@ -4878,6 +4878,186 @@
         ]
       }
     },
+    "/api/documents/{document_id}/chart-view": {
+      "get": {
+        "description": "Resolve an editor inspection through the canonical public chart adapter.\n\nThe dataset choice is REQUIRED: normal reopen/range/filter requests send\nthe observed immutable UUID; only an explicit Refresh sends ``latest``.\nResolution does not mutate the document. A successful explicit editor\naction adopts the returned selection + dataset UUID in one undoable edit,\nand the ordinary CAS revision save validates and freezes those attrs.\nNew/duplicated unsaved blocks can be inspected too, without requiring a\npersisted block id or accepting arbitrary routes/URLs. Historical readers\nmust use their revision pin (NI-043), never this working-view refresh.",
+        "operationId": "getDocumentChartView",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "chart_definition_version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chart Definition Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dataset_version",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "title": "Dataset Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filters",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Filters"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartViewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Revision conflict (document moved) or Idempotency-Key reused with a different request"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Document exceeds a hard size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "If-Match precondition is required"
+          },
+          "503": {
+            "description": "Approved chart data is unavailable"
+          }
+        },
+        "summary": "Inspect one canonical chart context for an owned working document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/api/documents/{document_id}/versions": {
       "get": {
         "description": "Page the owned document's revisions over the stable revision DESC order.",

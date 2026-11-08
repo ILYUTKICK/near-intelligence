@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { canonicalToTiptapDoc } from "./serialize";
+import { ChartEditorProvider } from "./blocks/chart-context";
 import { EDITOR_EXTENSIONS } from "./extensions";
 import { deriveOutline, type OutlineEntry } from "./outline";
 import {
@@ -152,6 +153,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   }, [editor]);
 
   const [outline, setOutline] = useState<OutlineEntry[]>([]);
+  const [hasCharts, setHasCharts] = useState(content.content.some(block => block.type === "liveChart"));
   const [blockCount, setBlockCount] = useState(content.content.length);
   const [currentBlock, setCurrentBlock] = useState<CurrentBlock | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -340,7 +342,9 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
       return;
     }
     const refreshDoc = (contentChanged: boolean) => {
-      setOutline(deriveOutline(editor.getJSON()));
+      const currentDocument = editor.getJSON();
+      setOutline(deriveOutline(currentDocument));
+      setHasCharts(currentDocument.content?.some(block => block.type === "liveChart") ?? false);
       setBlockCount(editor.state.doc.childCount);
       setCurrentBlock(currentTopLevelBlock(editor));
       if (contentChanged) {
@@ -679,7 +683,9 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
         <section data-pane="paper" className="min-w-0">
           <div ref={paperRef} className="relative rounded-surface border border-border bg-surface p-6">
             {editor ? (
-              <EditorContent editor={editor} />
+              <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasCharts} saved={controller.status.kind === "clean"}>
+                <EditorContent editor={editor} />
+              </ChartEditorProvider>
             ) : (
               <div className="flex flex-col gap-3" role="status" aria-label="Loading editor">
                 <Skeleton className="h-8 w-2/3" />
