@@ -36,20 +36,24 @@ export default async function DataChartDetailPage({
     notFound();
   }
 
-  return (
-    <ChartDetailScreen
-      chartId={chartId}
-      values={values}
-      links={{
-        basePath: `/data/${explorer.slug}`,
-        categoryHref: `/data/${explorer.slug}`,
-        categoryLabel: explorer.label,
-        breadcrumbRoots: [
-          { label: "Data", href: "/data" },
-          { label: explorer.label, href: `/data/${explorer.slug}` },
-        ],
-        expectedRegistryCategories: explorer.registryCategories,
-      }}
-    />
-  );
+  // The shared screen is invoked as a function and its promise returned, so
+  // the whole resolution (definition load, selection gate, view fetch) runs
+  // while this page function is awaited. Rendering <ChartDetailScreen /> as
+  // an element would suspend in plain React (and the page-function tests)
+  // instead of resolving during the await; the chained promise is exactly
+  // equivalent for the server renderer.
+  return ChartDetailScreen({
+    chartId,
+    values,
+    links: {
+      basePath: `/data/${explorer.slug}`,
+      categoryHref: `/data/${explorer.slug}`,
+      categoryLabel: explorer.label,
+      breadcrumbRoots: [
+        { label: "Data", href: "/data" },
+        { label: explorer.label, href: `/data/${explorer.slug}` },
+      ],
+      expectedRegistryCategories: explorer.registryCategories,
+    },
+  });
 }

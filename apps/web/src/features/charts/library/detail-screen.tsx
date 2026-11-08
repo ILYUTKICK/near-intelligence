@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { ChartView } from "@/features/charts/renderer/ChartView";
-import type { ChartDefinitionResponse } from "@/features/charts/renderer/view-types";
 import { ChartDetailClient } from "@/features/charts/library/ChartDetailClient";
 import { DefinitionQualityPanel } from "@/features/charts/library/DefinitionQualityPanel";
 import {
@@ -19,10 +18,8 @@ import {
   todayUtc,
 } from "@/features/charts/library/selection-url";
 import type { DroppedParam, SerializedSelection } from "@/features/charts/library/selection-url";
-import { detailHrefFor } from "@/features/charts/library/selection-url";
 import { firstValue, toPairs } from "@/features/charts/library/search-values";
 import type { SearchValues } from "@/features/charts/library/search-values";
-import { categoryWordings } from "@/features/charts/library/wording";
 
 /**
  * Shared chart-detail screen (NI-015 extraction of the NI-034 detail flow).
@@ -54,11 +51,11 @@ export interface ChartDetailLinks {
   /** Breadcrumb entries before the chart title crumb. */
   breadcrumbRoots: Array<{ label: string; href?: string }>;
   /**
-   * When set, a definition whose registry category differs is answered with
-   * the 404 boundary (the data explorer only serves charts that belong to
-   * the mapped explorer category).
+   * When set, a definition whose registry category is not listed is answered
+   * with the 404 boundary (the data explorer only serves charts that belong
+   * to the mapped explorer category's registry categories).
    */
-  expectedRegistryCategory?: string;
+  expectedRegistryCategories?: readonly string[];
 }
 
 const VERSION_PATTERN = /^[0-9]+$/;
@@ -107,8 +104,8 @@ export async function ChartDetailScreen({
   const definition = definitionResult.data;
 
   if (
-    links.expectedRegistryCategory !== undefined
-    && definition.category !== links.expectedRegistryCategory
+    links.expectedRegistryCategories !== undefined
+    && !links.expectedRegistryCategories.includes(definition.category)
   ) {
     notFound();
   }
@@ -178,9 +175,6 @@ export async function ChartDetailScreen({
 
   const view = viewResult !== null && viewResult.ok ? viewResult.data : null;
 
-  /** The detail URL for a selection (replace-state, continuation payload). */
-  const detailHref = (sel: SerializedSelection): string =>
-    detailHrefFor(links.basePath, chartId, sel);
   /** The retry/reset URL: only the definition version re-pinned. */
   const resetHref = `${links.basePath}/${encodeURIComponent(chartId)}?version=${definition.version}`;
 
@@ -214,7 +208,7 @@ export async function ChartDetailScreen({
       ) : null}
 
       {viewResult !== null && !viewResult.ok ? (
-        <ViewFailurePanel definition={definition} failure={viewResult} resetHref={resetHref} />
+        <ViewFailurePanel failure={viewResult} resetHref={resetHref} />
       ) : null}
 
       {definition.data_status === "unavailable" ? (
@@ -289,11 +283,9 @@ function DroppedNotice({ dropped }: { dropped: DroppedParam[] }) {
 }
 
 function ViewFailurePanel({
-  definition,
   failure,
   resetHref,
 }: {
-  definition: ChartDefinitionResponse;
   failure: ApiFailure;
   resetHref: string;
 }) {
