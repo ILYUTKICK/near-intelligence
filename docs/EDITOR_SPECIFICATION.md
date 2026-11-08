@@ -50,3 +50,40 @@ After insertion focus first editable field; atomic chart node selected with keyb
 P0 start empty. P1 template headings: Executive Summary, Investment Hypothesis, Adoption Evidence, Revenue Analysis, Token Economics, Econometric Results, Risks, Conclusion. No fabricated paragraphs or numerical placeholder claims. Public duplication clones a specified public release into new private IDs and retains attribution/data/model pins. Public subsequent edits do not mutate copies.
 
 P0 export uses the exact acknowledged document revision; renders all block types to Markdown with static chart files, CSV and evidence/model citations. Unknown/unrenderable nodes fail explicitly. P1 PDF uses the same frozen intermediate representation; no screenshot of the live editor. [Export tasks](TASKS.md) define verification, and [chart system](CHART_SYSTEM.md) defines static rendering.
+
+## Implemented editor state (NI-039, 2026-11-08)
+
+The three-pane research editor lives at `apps/web/src/features/editor/` and serves
+`/workspace/research/[documentId]`. State of this step, without changing the contracts above:
+
+- **Layout.** ≥1280px shows outline / paper / context tools (collapsible); 768–1279px uses a
+  collapsible inline outline and the tools drawer; below 768px the paper is the only pane and
+  outline/tools open as drawers, one at a time. Block toolbar (move up/down, duplicate, delete)
+  covers every structural operation with keyboard shortcuts (`Mod+Alt+↑/↓`, `Mod+Shift+D`,
+  `Mod+Shift+Backspace`); reorder results are announced through a polite live region.
+- **Insert set.** paragraph, heading 1–3, bullet/ordered list, dataTable, risk, divider — via
+  the toolbar menu or the "/" slash menu (typing "/" in an empty top-level text block; choosing
+  an item replaces that block). `liveChart`/`insight`/`hypothesis`/`evidence` authoring flows
+  arrive with NI-041/NI-047/NI-048/NI-049; all four families already load, render, serialize and
+  take part in every structural operation.
+- **Stable IDs.** every top-level node carries an immutable `block_id`; a ProseMirror plugin
+  allocates ids for Tiptap-normalized nodes (empty document, Enter split — which copies attrs and
+  would duplicate the id) and never remaps them. Duplicates allocate NEW block and entity ids;
+  references pointing outside the copied set are preserved (a duplicated single evidence block
+  still links to its existing hypothesis/chart target).
+- **Delete with links.** deleting a hypothesis/insight/liveChart that other blocks link to opens
+  an explicit confirmation naming the dependent evidence/insight/risk blocks; confirming removes
+  target and dependents together so a revision can never contain a dangling reference. Unlinked
+  blocks delete directly and are undoable.
+- **Serialization.** the Tiptap JSON ↔ canonical transform (list-name mapping, empty inline
+  content, optional-null attr omission, ordered-list `start`/`type` stripping) is validated by a
+  client mirror of the NI-036 validator whose issue paths/reasons are cross-verified to agree
+  with `apps/api` `parse_document`; invalid or unsupported stored content opens a read-only
+  recovery view with the raw content for download, never a partial render.
+- **Editing depth.** dataTable cells (strings only — decimal precision stays exact, bounds
+  mirrored) and risk titles are editable; rich-text bodies of annotation cards render read-only
+  until the NI-047/NI-048/NI-049 forms. Saving is deliberately NOT implemented here: autosave,
+  manual save and conflict recovery are NI-040, and the editor shows an explicit "saving arrives
+  with NI-040" note instead of any save state or control.
+- **Known manual steps.** IME/paste/selection behavior needs operator browser checks (jsdom
+  cannot emulate composition), carried over from the NI-038 record.
