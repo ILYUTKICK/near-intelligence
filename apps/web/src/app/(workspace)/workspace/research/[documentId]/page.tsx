@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { DocumentStubView } from "@/features/documents/list/DocumentStubView";
+import { ResearchDocumentEditor } from "@/features/editor/workbench";
 
 export const metadata: Metadata = { title: "Document — NEAR Intelligence" };
 
 /**
- * Persisted document route (INFORMATION_ARCHITECTURE:
- * /workspace/research/[documentId]). This is the canonical destination of a
- * created document and of every list link. The editor surface itself is
- * NI-039/NI-040; until then the route shows the persisted, owner-checked
- * document metadata and says so honestly.
+ * Research editor route (INFORMATION_ARCHITECTURE:
+ * /workspace/research/[documentId]; NI-039). The persisted, owner-checked
+ * document (NI-023 client) is loaded into the three-pane editor — outline,
+ * paper and context tools — with the P0 block operations. Saving itself
+ * arrives with NI-040 and the editor says so honestly; invalid or
+ * unsupported stored content opens the read-only recovery view instead of
+ * being reinterpreted.
  */
 export default async function ResearchDocumentPage({
   params,
@@ -19,7 +21,7 @@ export default async function ResearchDocumentPage({
 }) {
   const { documentId } = await params;
   return (
-    <div className="max-w-(--width-prose)">
+    <div className="w-full min-w-0">
       <Breadcrumbs
         items={[
           { label: "Workspace", href: "/workspace" },
@@ -27,7 +29,7 @@ export default async function ResearchDocumentPage({
           { label: "Document" },
         ]}
       />
-      <DocumentStubView key={documentId} documentId={documentId} />
+      <ResearchDocumentEditor key={documentId} documentId={documentId} />
     </div>
   );
 }
