@@ -137,3 +137,18 @@ uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postg
 ```
 
 The isolated suite exercises the chart-block race/retry/ownership cases, then the actual web gateway and ES256 principal/RLS path. A newer dataset is published between inspection and insertion; the original pin survives insertion, replay, prose save and reopen. Bob cannot read or append to Alice's document. No external provider/account or research archive is used.
+
+NI-024 Home continuation integration (after the production web build):
+
+```sh
+uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --workspace-home-http
+```
+
+This runs the Home aggregation checks and production cookie/CSRF gateway against
+isolated PostgreSQL with synthetic auth/data only. It verifies an empty first-use
+workspace, persisted creation/current-revision continuation, owned saved charts
+and notes, and an indicator SQL outage that leaves documents available. Home's
+Create action saves an empty document immediately; Continue opens the newest
+owned document. The checklist counts work in that document, without assessing
+the truth of its claims. Indicators reuse one day from each latest approved
+dataset and preserve dates, exact decimals, quality and provenance.

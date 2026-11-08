@@ -39,6 +39,15 @@ checks the consumed archive hashes before/after; missing inputs fail the run
 instead of substituting fixtures. This is HTTP/SSR integration evidence;
 keyboard, responsive and screen-reader release checks remain separate.
 
+NI-024 Home integration runs with `scripts/run-db-tests.py --workspace-home-http`
+after the production web build. It uses the real Next.js private gateway,
+ES256 verification, RLS and disposable PostgreSQL to check first-use empty
+sections, document create/save/reopen, current-version workflow projections,
+Alice/Bob lists and an actual SQL error isolated to one contextual indicator.
+The optional `NI_BROWSER_HANDOFF=1` retains that synthetic-only stack briefly
+for native browser first-use/returning-user, keyboard and viewport checks.
+Desktop responsive emulation is not physical-phone validation.
+
 Every P0 user journey has one successful real persistence E2E and relevant failure branch. Every private route family has Alice/Bob tests including search, nested IDs and download. Every released metric has unit/definition/provenance/quality tests. Every model has input manifest, deterministic command and clean offline reproduction. Every chart has accessible data and missing/stale state. Markdown export is unpacked and validated against its revision, not just checked for HTTP200.
 
 Performance budgets from PRD run on a documented staging machine/data/concurrency, not inferred from local dev. Limit 200-block documents, 20 chart references with lazy mounting, 366-day series; if budgets fail, optimize or lower documented limits rather than hiding failures.

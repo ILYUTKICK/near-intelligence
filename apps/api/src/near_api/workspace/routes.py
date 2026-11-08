@@ -46,9 +46,8 @@ def workspace_home(principal: PrincipalDependency, engine: RuntimeEngineDependen
                    response: Response) -> HomeResponse:
     """Return the verified principal's recent documents and scoped totals.
 
-    The pending sections (recent_charts, recent_insights, indicators) are
-    honest empty arrays until NI-035 / NI-046-047 / NI-031-032 implement
-    their data pipelines; see schemas/home.py.
+    Private lists use current owner-scoped projections. Each approved public
+    indicator resolves independently; source failures do not hide research.
     """
     with principal_transaction(engine, principal) as connection:
         overview = home_overview(connection, principal)
