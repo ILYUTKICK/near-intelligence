@@ -411,7 +411,12 @@ Specification: [UI_SCREEN_SPECIFICATIONS.md](UI_SCREEN_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-033, NI-034, NI-011
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role A (ILYUTKICK), session dispatch #29
+- **Execution role:** A
+- **Started at:** 2026-11-08T04:45:49+03:00
+- **Branch/worktree:** feat/ni-015-analytics-explorer; /Users/ilyutkinn/Desktop/near-intelligence-a12 (base 29ae757)
+- **Dependency basis:** NI-033 DONE (renderer verified), NI-034 DONE (merged #60), NI-011 DONE — verified on base 29ae757 before claiming.
 
 **Description:** Allow anonymous exploration using exactly the shared chart/query implementation.
 
