@@ -952,7 +952,11 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-033
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role A (ILYUTKICK), session dispatch #26
+- **Execution role:** A
+- **Started at:** 2026-11-08T03:22:15+03:00
+- **Branch/worktree:** feat/ni-034-chart-library; /Users/ilyutkinn/Desktop/near-intelligence-a9 (from origin/main b9ec7cc)
 
 **Description:** Provide discoverable analytical charts with validated selection URLs.
 
