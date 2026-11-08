@@ -10,14 +10,15 @@ import type { ChartDefinitionResponse, ChartViewResponse } from "@/features/char
 
 import { ChartAuthActions } from "./ChartAuthActions";
 import {
-  chartDetailHref,
+  detailHrefFor,
   isIsoCalendarDate,
   windowDays,
 } from "./selection-url";
 import type { DroppedParam, SerializedSelection } from "./selection-url";
 
 /**
- * Chart detail selection island (NI-034).
+ * Chart detail selection island (NI-034; reused by the public data explorer
+ * NI-015 through the `basePath` prop).
  *
  * The URL is the selection's persistence: range, dataset version and filter
  * changes are written back with replace-state (INFORMATION_ARCHITECTURE.md
@@ -26,6 +27,11 @@ import type { DroppedParam, SerializedSelection } from "./selection-url";
  * The page re-resolves the view from the new URL; this component never
  * fetches on its own and never adds a URL field beyond the approved
  * selection parameters serialized by selection-url.ts.
+ *
+ * `basePath` decides where the chart detail is mounted (default "/charts",
+ * the NI-034 chart library detail). Both the replace-state URLs and the
+ * sign-in continuation payload are derived from it, so they can never
+ * disagree, and the serialized selection is identical for every base.
  *
  * The custom date-range control lives here (CHART_SYSTEM.md assigns the
  * custom picker to the chart detail page): native date inputs, validated
@@ -38,14 +44,19 @@ export function ChartDetailClient({
   view,
   selection,
   dropped,
+  basePath = "/charts",
 }: {
   chartId: string;
   definition: ChartDefinitionResponse;
   view: ChartViewResponse | null;
   selection: SerializedSelection;
   dropped: DroppedParam[];
+  /** Route base this detail page is mounted at (e.g. "/charts", "/data/intents"). */
+  basePath?: string;
 }) {
   const router = useRouter();
+  /** The one href builder for this mounted detail route. */
+  const detailHref = (sel: SerializedSelection): string => detailHrefFor(basePath, chartId, sel);
   // The custom-range inputs hold a local draft while being edited; without a
   // draft they mirror the URL selection (the single source of truth). The
   // draft resets when a selection is applied or a preset is used — no
@@ -59,7 +70,7 @@ export function ChartDetailClient({
   function applySelection(next: Partial<Pick<SerializedSelection, "start" | "end" | "filters">>): void {
     setDraft(null);
     setRangeError(null);
-    router.replace(chartDetailHref(chartId, { ...selection, ...next }), { scroll: false });
+    router.replace(detailHref({ ...selection, ...next }), { scroll: false });
   }
 
   function handleSelectionChange(next: { start: string; end: string }): void {
@@ -161,7 +172,11 @@ export function ChartDetailClient({
                 Refresh to latest
               </Button>
             ) : null}
-            <ChartAuthActions nextPath={chartDetailHref(chartId, selection)} chartTitle={definition.title} />
+            <ChartAuthActions
+              nextPath={detailHref(selection)}
+              chartTitle={definition.title}
+              basePath={`${basePath}/`}
+            />
           </div>
         }
       />

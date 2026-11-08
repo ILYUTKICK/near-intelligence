@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
- * Public-to-private action continuation (NI-034).
+ * Public-to-private action continuation (NI-034; reused by the public data
+ * explorer NI-015 through the `basePath` prop).
  *
  * For anonymous visitors the private actions (Save chart / Add to Research)
  * are offered as safe auth continuations: clicking starts the sign-in flow
@@ -17,16 +18,26 @@ import { Button } from "@/components/ui/button";
  * ID/version/range/filter context, never serialized private document
  * content or arbitrary redirect URLs."
  *
- * The payload is built only from `chartDetailHref` output and re-verified to
- * be an internal /charts path before navigation (no open-redirect
- * injection; the login gateway validates it again server-side through
- * safeInternalReturnTo). Pending UI announces the continuation honestly.
+ * The payload is built only from the mounted detail route's own href output
+ * and re-verified to be an internal path under `basePath` before navigation
+ * (no open-redirect injection; the login gateway validates it again
+ * server-side through safeInternalReturnTo). Pending UI announces the
+ * continuation honestly.
  *
  * The persistence half of the flow (destination picker, actual save) is the
  * saved-charts/research-insertion scope (NI-035/NI-041): a signed-in visitor
  * sees an honest pending note instead of a dead button.
  */
-export function ChartAuthActions({ nextPath, chartTitle }: { nextPath: string; chartTitle: string }) {
+export function ChartAuthActions({
+  nextPath,
+  chartTitle,
+  basePath = "/charts/",
+}: {
+  nextPath: string;
+  chartTitle: string;
+  /** Internal-path base the continuation may target (with trailing slash). */
+  basePath?: string;
+}) {
   const router = useRouter();
   const [session, setSession] = useState<"checking" | "anonymous" | "authenticated" | "unknown">("checking");
   const [pending, setPending] = useState(false);
@@ -49,8 +60,9 @@ export function ChartAuthActions({ nextPath, chartTitle }: { nextPath: string; c
 
   function continueToSignIn(): void {
     // Defense in depth: the payload is constructed internally, but never
-    // navigate unless it is an internal /charts path (no arbitrary URLs).
-    if (!isInternalChartPath(nextPath)) {
+    // navigate unless it is an internal path under this route's base (no
+    // arbitrary URLs).
+    if (!isInternalPath(nextPath, basePath)) {
       setPending(false);
       return;
     }
@@ -105,7 +117,12 @@ export function ChartAuthActions({ nextPath, chartTitle }: { nextPath: string; c
   );
 }
 
+/** Only an internal path under `base` (never "//", never absolute URLs) qualifies. */
+export function isInternalPath(value: string, base: string): boolean {
+  return value.startsWith(base) && !value.startsWith("//") && !value.includes("\\");
+}
+
 /** Only an internal /charts path (never "//", never absolute URLs) qualifies. */
 export function isInternalChartPath(value: string): boolean {
-  return value.startsWith("/charts/") && !value.startsWith("//") && !value.includes("\\");
+  return isInternalPath(value, "/charts/");
 }

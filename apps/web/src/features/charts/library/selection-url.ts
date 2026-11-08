@@ -378,7 +378,18 @@ export function serializeSelectionQuery(selection: SerializedSelection): string 
   return params.toString();
 }
 
-/** The internal detail URL for a resolved selection (continuation payload). */
+/**
+ * The internal detail URL for a resolved selection under any detail route
+ * base (`"/charts"`, `"/data/<category>"`, …). The base only decides where
+ * the chart detail is mounted; the serialized selection is identical, so the
+ * same selection always produces the same request regardless of route
+ * (NI-015 reuses this for the public data explorer).
+ */
+export function detailHrefFor(base: string, chartId: string, selection: SerializedSelection): string {
+  return `${base}/${encodeURIComponent(chartId)}?${serializeSelectionQuery(selection)}`;
+}
+
+/** The internal /charts detail URL for a resolved selection (continuation payload). */
 export function chartDetailHref(chartId: string, selection: SerializedSelection): string {
-  return `/charts/${encodeURIComponent(chartId)}?${serializeSelectionQuery(selection)}`;
+  return detailHrefFor("/charts", chartId, selection);
 }

@@ -64,9 +64,14 @@ function failure(status: number, body: unknown): ApiFailure {
   return { ok: false, status, code: null, message: null, retryable: status === 503 };
 }
 
-/** GET /api/charts — the public catalog (search q, category, opaque cursor). */
+/**
+ * GET /api/charts — the public catalog (search q, category, opaque cursor).
+ * `limit` (API maximum 100) is optional and only used by callers that need a
+ * wider page (the NI-015 explorer overview); the chart library keeps the
+ * API's default page size.
+ */
 export async function fetchChartCatalog(
-  params: { q?: string; category?: string; cursor?: string },
+  params: { q?: string; category?: string; cursor?: string; limit?: number },
 ): Promise<ApiResult<Schemas["ChartListResponse"]>> {
   const { GET } = apiClient();
   const result = await GET("/api/charts", {
@@ -75,6 +80,7 @@ export async function fetchChartCatalog(
         ...(params.q !== undefined ? { q: params.q } : {}),
         ...(params.category !== undefined ? { category: params.category } : {}),
         ...(params.cursor !== undefined ? { cursor: params.cursor } : {}),
+        ...(params.limit !== undefined ? { limit: params.limit } : {}),
       },
     },
   });
