@@ -988,7 +988,7 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-019, NI-034
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #31
 - **Execution role:** B
 - **Started at:** 2026-11-08T05:27:41+03:00
@@ -1016,7 +1016,15 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 - **A contribution:** implemented real same-origin saved-chart gateway (signed cookie -> bearer; Origin/CSRF; bounded body; no-store), Save Chart on resolved public details, private list/search/rename/confirmed-removal and shared-renderer detail routes. Account-change/logout/visibility/focus invalidation clears private state before revalidation and discards old in-flight responses. Fixed the chart's workspace flex overflow with `min-w-0`.
 - **Verification:** frozen existing dependencies, no new package. Full disposable PostgreSQL 18 suite: 369 tests passed, no skips/failures, Alembic model drift clean. Frontend: 32 files / 373 tests passed with `vitest run --maxWorkers=2`, including retry-key reuse, CRUD/confirmation, axe, account-change race and gateway cookie/CSRF/body-size cases. Typecheck, lint, production build, API contract tests and generated-contract drift passed; documentation links checked. New saved-chart HTTP suite (`scripts/run-db-tests.py --pg-bin /opt/homebrew/opt/postgresql@18/bin --saved-charts-http`) passed through production Next.js, real ES256 JWT verification, bootstrap, CSRF and RLS, with only the JWKS transport replaced by an ephemeral synthetic key: save/retry/reopen and Bob GET/PATCH/DELETE denial.
 - **Browser evidence:** actual isolated IAB save -> Open saved chart -> reload -> list -> rename -> reopen passed; exact `12.123456789012345678901234` and source/range remained intact. Switching to Bob and opening Alice's URL showed the generic unavailable state. At 387px the corrected document width is 387px; [synthetic screenshot](qa/ni035-saved-chart-mobile.jpg). This is browser viewport verification; physical-phone release testing belongs to NI-064. The temporary servers/database were stopped and removed; original b9 files and stopped collectors were not modified.
-- **Reviewer:** pending independent role-A review of this continuation; status remains IN_PROGRESS until review. Implementation/verification is complete and ready for that handoff before proceeding to the user-assigned NI-041.
+- **Reviewer:** independent acceptance explicitly waived by the user on 8 November 2026; no independent approval is claimed.
+- **Review fixes claimed:** Codex / chat 01a1ba7d-239f-7483-b2d6-fc651744fe9b, roles A/B, 2026-11-08T13:59:40+03:00, feat/ni-035-continuation @ /Users/ilyutkinn/Desktop/Near. Fix same-account focus retry-key loss and parallel-mutation CSRF rotation; IN_PROGRESS until verification. NI-041 destination replay fix follows separately.
+
+**Review correction result — 8 November 2026:**
+- Preserved save attempt/result through same-subject focus checks (hidden while checking); explicit auth changes, logout and verified different subjects reset it. Added lost-response/focus and two identity-change regressions.
+- Reused verified CSRF cookies; concurrent first-token requests for one signed session produce the same opaque HMAC-based nonce. Tampered cookies still fail verification and are replaced; Origin/header-cookie validation is unchanged. Added four CSRF regressions and parallel token acquisition to the real gateway HTTP test.
+- **Verification:** focused 6-file run: 78 tests passed; full frontend: 33 files / 380 tests passed; lint, typecheck, production build, generated contract check and 600 documentation links passed. Saved-chart PostgreSQL/API regressions 6/6 plus production gateway HTTP E2E 1/1 passed, including real concurrent CSRF acquisition, signed JWT/bootstrap/RLS and Bob denial. Existing complete DB baseline remains 369 passed; no domain/schema migration changed in this correction.
+- **Acceptance:** all original task checks implemented and verified; independent acceptance waived by explicit user instruction, not presented as a second-participant approval. PR #67 remains for the operator to merge.
+- **Completed at:** 2026-11-08T14:05:37+03:00.
 
 ### NI-071 — Add advanced supported analytical filters
 

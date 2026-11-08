@@ -61,3 +61,5 @@ Back up DB and artifacts together; restore/reconcile manifests before traffic. P
 ## Required security tests
 
 Alice/Bob matrix for every private endpoint family; IDOR by nested version/snapshot/export/reference; pooled RLS identity reset; forged/expired/wrong issuer/audience/algorithm tokens; revoked refresh and disabled users; CSRF/open redirects; private cache bleed; XSS in text/link/tooltip/export; path traversal and oversized document/query/export. A release with any unauthorized read/write is blocked. See NI-062 and [testing](TESTING_STRATEGY.md).
+
+NI-035 parallel-write correction: `GET /api/auth/csrf` reuses a valid signed double-submit cookie and returns `no-store`. If an authenticated session lacks that cookie, concurrent requests derive the same opaque signed nonce from a domain-separated HMAC of the bearer; no bearer or session payload is returned. Anonymous first minting stays random. Invalid cookies are replaced, mutation cookie/header matching and Origin checks remain mandatory, and logout clears both session and CSRF cookies.

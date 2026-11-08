@@ -5,6 +5,7 @@ JWT signature/issuer/audience verification, principal bootstrap and RLS run.
 Use run-db-tests.py --saved-charts-http after pnpm build. No external auth service.
 """
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
 import hashlib
 import hmac
@@ -126,7 +127,13 @@ class SavedChartsHTTPE2E(unittest.TestCase):
             time.sleep(0.1)
         self.assertIsNone(process.poll())
         client.cookies.set("ni_session", session_cookie("alice"))
-        token = client.get("/api/auth/csrf").json()["token"]
+        # Two tabs can request their first token before either response arrives.
+        # They share a session, so both tokens must work with the final cookie.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            tokens = list(pool.map(lambda _: client.get("/api/auth/csrf").json()["token"], range(2)))
+        self.assertEqual(tokens[0], tokens[1])
+        token = tokens[0]
+        self.assertEqual(client.get("/api/auth/csrf").json()["token"], token)
         headers = {"Origin": web_url, "x-csrf-token": token, "Idempotency-Key": str(uuid4())}
         body = {"chart_definition_version_id": str(chart_by_chart_id("intents-volume").id),
                 "dataset_version_id": str(dataset.dataset_version_id), "mode": "live", "label": "Synthetic HTTP E2E",

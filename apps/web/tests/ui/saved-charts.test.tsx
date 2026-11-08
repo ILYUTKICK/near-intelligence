@@ -2,12 +2,14 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "jest-axe";
+import { ChartAuthActions } from "@/features/charts/library/ChartAuthActions";
 import { SaveChartButton } from "@/features/charts/saved/SaveChartButton";
 import { SavedCharts } from "@/features/charts/saved/SavedCharts";
 import { SavedChartDetail } from "@/features/charts/saved/SavedChartDetail";
 import { AUTH_CHANGE } from "@/lib/auth/change";
 import { definition, view } from "./renderer/fixtures";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/features/charts/renderer/ChartView", () => ({ ChartView: () => <div>Shared chart renderer</div> }));
 const id = "22222222-2222-4222-8222-222222222222";
 const selection = { start: "2026-11-01", end: "2026-11-06", frequency: "day" as const, filters: { source: "SRC-LLAMA" } };
@@ -19,6 +21,56 @@ function json(body: unknown, status = 200) { return new Response(status === 204 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Saved chart workflow", () => {
+  it("retains a lost-response retry through same-account focus revalidation", async () => {
+    const keys: string[] = [];
+    let sessionChecks = 0;
+    let releaseSession!: (value: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {
+      if (url === "/api/auth/session") {
+        if (++sessionChecks === 2) return new Promise<Response>((resolve) => { releaseSession = resolve; });
+        return json({ subject: "synthetic-alice" });
+      }
+      if (url === "/api/auth/csrf") return json({ token: "synthetic-csrf" });
+      keys.push(new Headers(options.headers).get("idempotency-key")!);
+      if (keys.length === 1) throw new Error("Response lost after commit");
+      return json(saved, 201);
+    }));
+    const user = userEvent.setup();
+    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    await user.click(await screen.findByRole("button", { name: "Save chart" }));
+    await screen.findByRole("alert");
+    fireEvent(window, new Event("focus"));
+    expect(screen.queryByRole("button", { name: "Save chart" })).toBeNull();
+    releaseSession(json({ subject: "synthetic-alice" }));
+    await user.click(await screen.findByRole("button", { name: "Save chart" }));
+    await screen.findByRole("link", { name: "Open saved chart" });
+    expect(keys).toHaveLength(2); expect(keys[1]).toBe(keys[0]);
+    fireEvent(window, new Event("focus"));
+    expect(await screen.findByRole("link", { name: "Open saved chart" })).toHaveAttribute("href", `/workspace/saved-charts/${id}`);
+    expect(keys).toHaveLength(2);
+  });
+
+  it.each(["focus", AUTH_CHANGE])("discards the old account's save state on %s", async (event) => {
+    let subject = "synthetic-alice";
+    const keys: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {
+      if (url === "/api/auth/session") return json({ subject });
+      if (url === "/api/auth/csrf") return json({ token: "synthetic-csrf" });
+      keys.push(new Headers(options.headers).get("idempotency-key")!);
+      return json(saved, 201);
+    }));
+    const user = userEvent.setup();
+    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    await user.click(await screen.findByRole("button", { name: "Save chart" }));
+    await screen.findByRole("link", { name: "Open saved chart" });
+    subject = "synthetic-bob";
+    fireEvent(window, new Event(event));
+    expect(screen.queryByRole("link", { name: "Open saved chart" })).toBeNull();
+    await user.click(await screen.findByRole("button", { name: "Save chart" }));
+    await screen.findByRole("link", { name: "Open saved chart" });
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+
   it("reuses the idempotency key after a lost response and preserves the inspected selection", async () => {
     const bodies: string[] = [], keys: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {

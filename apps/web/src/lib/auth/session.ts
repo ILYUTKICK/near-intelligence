@@ -91,6 +91,17 @@ export function mintCsrfToken(): string {
   return encodeSignedPayload({ nonce: randomBytes(24).toString("base64url"), mintedAt: Date.now() });
 }
 
+/** Concurrent first requests for one signed session must mint the same token.
+ * The session bearer is never exposed: only a domain-separated keyed digest
+ * is included in the signed double-submit payload. Existing valid CSRF
+ * cookies are reused even when an access token is refreshed.
+ */
+export function mintSessionCsrfToken(session: AuthSession): string {
+  const nonce = createHmac("sha256", signingSecret())
+    .update(`csrf-session:${session.accessToken}`).digest("base64url");
+  return encodeSignedPayload({ nonce });
+}
+
 export function verifyCsrfPair(cookieValue: string | undefined, headerValue: string | null): boolean {
   if (!cookieValue || !headerValue) {
     return false;
