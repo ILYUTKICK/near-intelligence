@@ -307,7 +307,10 @@ export function insertBlock(
   if (ATOMIC_INSERT_TYPES.has(type)) {
     return editor.chain().focus().setNodeSelection(insertPos).run();
   }
-  return editor.chain().focus().setTextSelection(insertPos + 1).run();
+  // Inside a list the first editable position sits in the first item's
+  // paragraph (list open + item open + paragraph open).
+  const cursorPos = type === "bullet_list" || type === "ordered_list" ? insertPos + 3 : insertPos + 1;
+  return editor.chain().focus().setTextSelection(cursorPos).run();
 }
 
 /**

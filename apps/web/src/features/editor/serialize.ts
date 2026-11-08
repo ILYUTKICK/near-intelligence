@@ -173,26 +173,100 @@ function listItemToCanonical(item: JSONContent): CanonicalListItem {
 }
 
 /**
- * Tiptap resolves missing attrs to their defaults (`null`), and `getJSON`
- * emits the full resolved set. The server's canonical form omits the optional
- * null keys of these block families — the serializer matches that exactly so
- * a loaded document re-serializes to its stored canonical shape unchanged
- * (required for honest dirty detection in NI-040). `liveChart.snapshot_id`
- * is the exception: the server keeps it explicitly null for live charts.
+ * Canonical attrs are constructed per block family, mirroring the server's
+ * canonicalization exactly: Tiptap resolves missing attrs to defaults and
+ * `getJSON` emits the FULL resolved set whenever any attr differs from the
+ * defaults (so an ordered list leaks `start`/`type`, and a nested paragraph
+ * can leak `block_id: null`). The canonical grammar only knows the keys
+ * below; optional null keys (hypothesis_id, related_hypothesis_id, rows,
+ * dataset_version_id) are omitted like the server omits them, while
+ * `liveChart.snapshot_id` is kept explicitly null for live charts.
  */
-const NULL_KEYS_OMITTED: Record<string, readonly string[]> = {
-  insight: ["hypothesis_id"],
-  risk: ["related_hypothesis_id"],
-  dataTable: ["dataset_version_id", "rows"],
-};
+function canonicalAttrs(nodeType: string, source: Record<string, unknown>): Record<string, unknown> {
+  const pick = (key: string): unknown => source[key];
+  switch (nodeType) {
+    case "paragraph":
+    case "divider":
+      return { block_id: pick("block_id") };
+    case "heading":
+      return { block_id: pick("block_id"), level: pick("level") };
+    case "bulletList":
+    case "orderedList":
+      return { block_id: pick("block_id") };
+    case "liveChart":
+      return {
+        block_id: pick("block_id"),
+        chart_definition_version_id: pick("chart_definition_version_id"),
+        mode: pick("mode"),
+        selection: pick("selection"),
+        observed_dataset_version_id: pick("observed_dataset_version_id"),
+        snapshot_id: pick("snapshot_id") ?? null,
+      };
+    case "dataTable": {
+      const attrs: Record<string, unknown> = {
+        block_id: pick("block_id"),
+        columns: pick("columns"),
+      };
+      if (pick("rows") != null) {
+        attrs.rows = pick("rows");
+      }
+      if (pick("dataset_version_id") != null) {
+        attrs.dataset_version_id = pick("dataset_version_id");
+      }
+      return attrs;
+    }
+    case "insight": {
+      const attrs: Record<string, unknown> = {
+        block_id: pick("block_id"),
+        insight_id: pick("insight_id"),
+        type: pick("type"),
+        classification: pick("classification"),
+        body: pick("body"),
+        context: pick("context"),
+        authored_at: pick("authored_at"),
+        modified_at: pick("modified_at"),
+      };
+      if (pick("hypothesis_id") != null) {
+        attrs.hypothesis_id = pick("hypothesis_id");
+      }
+      return attrs;
+    }
+    case "hypothesis":
+      return {
+        block_id: pick("block_id"),
+        hypothesis_id: pick("hypothesis_id"),
+        statement: pick("statement"),
+        assessment: pick("assessment"),
+        authored_at: pick("authored_at"),
+        modified_at: pick("modified_at"),
+      };
+    case "evidence":
+      return {
+        block_id: pick("block_id"),
+        evidence_id: pick("evidence_id"),
+        hypothesis_id: pick("hypothesis_id"),
+        classification: pick("classification"),
+        target_kind: pick("target_kind"),
+        target_id: pick("target_id"),
+        explanation: pick("explanation"),
+      };
+    case "risk": {
+      const attrs: Record<string, unknown> = {
+        block_id: pick("block_id"),
+        title: pick("title"),
+        body: pick("body"),
+      };
+      if (pick("related_hypothesis_id") != null) {
+        attrs.related_hypothesis_id = pick("related_hypothesis_id");
+      }
+      return attrs;
+    }
+    default:
+      return { ...source };
+  }
+}
 
 function nodeToCanonicalBlock(node: JSONContent): unknown {
-  const attrs = { ...((node.attrs ?? {}) as Record<string, unknown>) };
-  for (const key of NULL_KEYS_OMITTED[node.type ?? ""] ?? []) {
-    if (attrs[key] == null) {
-      delete attrs[key];
-    }
-  }
   switch (node.type) {
     case "paragraph":
     case "heading":
@@ -200,14 +274,14 @@ function nodeToCanonicalBlock(node: JSONContent): unknown {
       // key present (possibly an empty array).
       return {
         type: node.type,
-        attrs,
+        attrs: canonicalAttrs(node.type, (node.attrs ?? {}) as Record<string, unknown>),
         content: textRunsToCanonical(node.content),
       };
     case "bulletList":
     case "orderedList":
       return {
         type: node.type === "orderedList" ? "ordered_list" : "bullet_list",
-        attrs,
+        attrs: canonicalAttrs(node.type, (node.attrs ?? {}) as Record<string, unknown>),
         content: (node.content ?? []).map(listItemToCanonical),
       };
     case "divider":
@@ -217,7 +291,7 @@ function nodeToCanonicalBlock(node: JSONContent): unknown {
     case "hypothesis":
     case "evidence":
     case "risk":
-      return { type: node.type, attrs };
+      return { type: node.type, attrs: canonicalAttrs(node.type, (node.attrs ?? {}) as Record<string, unknown>) };
     default:
       // Unknown top-level node: validated verbatim so it is rejected with an
       // exact path, never silently dropped.

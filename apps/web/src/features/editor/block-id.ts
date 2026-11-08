@@ -36,6 +36,30 @@ export function newBlockId(): string {
 export const StableBlockIds = Extension.create({
   name: "stableBlockIds",
 
+  onCreate() {
+    // The initial document never passes through appendTransaction (Tiptap
+    // normalizes its content — e.g. an empty document to one empty
+    // paragraph — at construction), so the same fill/repair runs once here.
+    const { doc } = this.editor.state;
+    const transaction = this.editor.state.tr;
+    let modified = false;
+    const seen = new Set<string>();
+    doc.forEach((node, offset) => {
+      const blockId = node.attrs.block_id as string | null | undefined;
+      if (blockId == null || seen.has(blockId)) {
+        const fresh = newBlockId();
+        transaction.setNodeMarkup(offset, undefined, { ...node.attrs, block_id: fresh });
+        seen.add(fresh);
+        modified = true;
+      } else {
+        seen.add(blockId);
+      }
+    });
+    if (modified) {
+      this.editor.view.dispatch(transaction);
+    }
+  },
+
   addProseMirrorPlugins() {
     return [
       new Plugin({
@@ -46,13 +70,24 @@ export const StableBlockIds = Extension.create({
           }
           const transaction = newState.tr;
           let modified = false;
+          const seen = new Set<string>();
+          // Fill missing ids AND repair duplicates: ProseMirror's splitBlock
+          // copies attrs, so pressing Enter inside a block yields two nodes
+          // with the same id. The first occurrence keeps the original id
+          // (ids are allocated once, never remapped); the split-off copy is
+          // a NEW block and gets a fresh id.
           newState.doc.forEach((node, offset) => {
-            if (node.attrs.block_id == null) {
+            const blockId = node.attrs.block_id as string | null | undefined;
+            if (blockId == null || seen.has(blockId)) {
+              const fresh = newBlockId();
               transaction.setNodeMarkup(offset, undefined, {
                 ...node.attrs,
-                block_id: newBlockId(),
+                block_id: fresh,
               });
+              seen.add(fresh);
               modified = true;
+            } else {
+              seen.add(blockId);
             }
           });
           return modified ? transaction : null;
