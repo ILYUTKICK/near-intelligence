@@ -212,7 +212,14 @@ export class SaveCoordinator {
       return;
     }
     const kind = this.status.kind;
-    if (kind === "dirty" || kind === "clean") {
+    const editable =
+      kind === "dirty" ||
+      kind === "clean" ||
+      // A validation/size failure can be fixed by editing — the fixed
+      // content deserves a normal autosave schedule again. Auth (401) and
+      // deleted-document (404) states need an explicit user action first.
+      (kind === "error" && this.status.httpStatus !== 401 && this.status.httpStatus !== 404);
+    if (editable) {
       if (this.dirtyAnchor === null) {
         this.dirtyAnchor = this.timers.now();
         this.maxHandle = this.timers.set(this.maxDelayMs, () => this.fireAutosave());
@@ -227,8 +234,8 @@ export class SaveCoordinator {
       this.maybeCaptureForDraft();
       return;
     }
-    // queued/conflict/error: autosave stays stopped, but the user is still
-    // producing real content — keep the recovery draft current.
+    // queued/conflict/auth-error: autosave stays stopped, but the user is
+    // still producing real content — keep the recovery draft current.
     this.maybeCaptureForDraft();
   }
 

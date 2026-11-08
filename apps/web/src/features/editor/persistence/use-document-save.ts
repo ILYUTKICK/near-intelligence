@@ -125,11 +125,6 @@ export function useDocumentSave(options: UseDocumentSaveOptions): DocumentSaveCo
   });
 
   useEffect(() => {
-    if (coordinator.isStopped()) {
-      // Strict Mode re-setup after the cleanup below stopped the instance.
-      setCoordinator(createCoordinator());
-      return;
-    }
     let previousKind: SaveStatus["kind"] = coordinator.getStatus().kind;
     const unsubscribe = coordinator.onStatus((next) => {
       setStatus(next);

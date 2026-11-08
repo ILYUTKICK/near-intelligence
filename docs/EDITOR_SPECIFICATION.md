@@ -82,8 +82,51 @@ The three-pane research editor lives at `apps/web/src/features/editor/` and serv
   recovery view with the raw content for download, never a partial render.
 - **Editing depth.** dataTable cells (strings only — decimal precision stays exact, bounds
   mirrored) and risk titles are editable; rich-text bodies of annotation cards render read-only
-  until the NI-047/NI-048/NI-049 forms. Saving is deliberately NOT implemented here: autosave,
-  manual save and conflict recovery are NI-040, and the editor shows an explicit "saving arrives
-  with NI-040" note instead of any save state or control.
+  until the NI-047/NI-048/NI-049 forms. Saving was deliberately NOT implemented in that step:
+  autosave, manual save and conflict recovery are NI-040 and are now implemented (see the
+  "Implemented save service" section below); the NI-039 "saving arrives with NI-040" note is
+  gone from the header, replaced by the truthful save-status line.
 - **Known manual steps.** IME/paste/selection behavior needs operator browser checks (jsdom
   cannot emulate composition), carried over from the NI-038 record.
+
+## Implemented save service (NI-040, 2026-11-08)
+
+The persistence paragraph above is implemented in `apps/web/src/features/editor/persistence/`
+and wired into the NI-039 workbench; contracts are unchanged:
+
+- **Scheduling.** Autosave fires after a 1s idle window and at a hard 5s ceiling while typing
+  continues; manual Save (toolbar button or Mod+S) is immediate and cancels the pending
+  timers. Content is captured when a save fires, not per keystroke; the loaded (already
+  validated) content is adopted as the acknowledged baseline, so the editor's own
+  normalization of an empty document never produces a phantom revision and content equal to
+  the baseline never saves.
+- **One request in flight; coalescing.** A change during a pending request is coalesced;
+  the acknowledgement re-evaluates the captured state and only an exact match with the
+  acknowledged payload marks the revision clean — changes typed while the request ran stay
+  dirty and are scheduled (immediately after a manual save, else after the idle window).
+- **CAS/idempotency.** Every attempt sends `If-Match: "<revision>"` and a client-generated
+  UUID `Idempotency-Key`. A retry after an unknown-outcome (transport) failure reuses the
+  SAME attempt (and key), so a committed save replays the original 201 instead of
+  duplicating a revision; an explicit new decision (conflict overwrite) starts a fresh key.
+- **Truthful status.** The header shows one honest state: all changes saved (with the UTC
+  saved-at time and revision), unsaved with the autosave schedule, saving, offline queue
+  ("changes are held in this tab…"), saving paused after a conflict, or a typed error with
+  the content retained. The unload warning covers every unacknowledged state.
+- **Conflict recovery.** A 409 REVISION_CONFLICT stops autosaving and opens an explicit
+  dialog naming the server's current revision (from the typed `current_revision` detail)
+  against the editor's held revision. Options: overwrite the server version (CAS against
+  the reported revision, only through the dialog button), load the server version
+  (discards local edits, explicitly labeled), download the local copy (JSON, no API
+  needed), save a copy as a new document (POST /documents + first revision, then
+  navigation), or keep editing (autosave stays paused, status bar keeps the review entry).
+  A raced overwrite that 409s again re-surfaces the dialog with the fresh revision.
+- **Offline queue and errors.** A transport failure retains the attempt with its
+  idempotency key, reports the held state honestly, and retries on the browser `online`
+  event or the explicit Retry button; newer edits coalesce behind the retained attempt.
+  401/404/413/422 are typed errors that keep the content; editing resumes scheduling only
+  where editing can fix the failure (validation/size), not auth or deletion.
+- **Recovery draft.** While content is unacknowledged, the latest captured state is written
+  to `sessionStorage` (throttled to the idle window, also on unload) under a per-document
+  key and cleared once the server acknowledges. On load, a differing draft is offered with
+  an explicit Restore/Discard choice; a draft failing the canonical validation says why and
+  offers discard only. Storage failures degrade honestly (no draft, autosave still active).

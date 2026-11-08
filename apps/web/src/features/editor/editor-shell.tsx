@@ -101,7 +101,10 @@ interface DeleteRequest {
 
 export function EditorShell({ documentId, title, revision, updatedAt, content }: EditorShellProps) {
   const router = useRouter();
-  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  // The conflict dialog opens declaratively whenever a 409 state exists and
+  // has not been dismissed for THIS conflict (each conflict carries a fresh
+  // timestamp, so a later conflict re-opens it). No effect/setState cascade.
+  const [conflictDismissedAt, setConflictDismissedAt] = useState<string | null>(null);
   const [conflictBusy, setConflictBusy] = useState(false);
   const [conflictActionError, setConflictActionError] = useState<string | null>(null);
   const editorRef = useRef<Editor | null>(null);
@@ -181,11 +184,14 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
     markChanged();
   }, [markChanged]);
 
+  const conflictAt = controller.status.kind === "conflict" ? controller.status.at : null;
+  const conflictDialogOpen = conflictAt !== null && conflictDismissedAt !== conflictAt;
+
   // Manual save (button and Mod+S): during a conflict the button reopens the
   // explicit resolution dialog instead of racing another 409.
   const handleSaveNow = useCallback(() => {
     if (controller.status.kind === "conflict") {
-      setConflictDialogOpen(true);
+      setConflictDismissedAt(null);
       return;
     }
     controller.saveNow();
@@ -212,14 +218,14 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   }, [controller]);
 
   const handleConflictOpen = useCallback(() => {
-    setConflictDialogOpen(true);
+    setConflictDismissedAt(null);
     setConflictActionError(null);
   }, []);
 
   const handleConflictDismiss = useCallback(() => {
-    setConflictDialogOpen(false);
+    setConflictDismissedAt(conflictAt);
     setConflictActionError(null);
-  }, []);
+  }, [conflictAt]);
 
   const handleConflictOverwrite = useCallback(() => {
     const status = controller.status;
@@ -236,7 +242,6 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
       // The explicit dialog confirmation is the only path here: CAS against
       // the revision the 409 reported, with the LATEST local content.
       controller.overwriteConflict(status.serverRevision);
-      setConflictDialogOpen(false);
       setConflictActionError(null);
     } catch {
       setConflictActionError(
@@ -260,7 +265,6 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
       }
       editorRef.current.commands.setContent(canonicalToTiptapDoc(validated));
       controller.adoptServerState(document.revision);
-      setConflictDialogOpen(false);
       announce("Loaded the server version. Your local edits were discarded as you confirmed.");
     } catch (error) {
       setConflictActionError(describeRecoveryActionError(error, "The server version could not be loaded."));
@@ -761,7 +765,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
       />
 
       <ConflictRecoveryDialog
-        open={conflictDialogOpen && controller.status.kind === "conflict"}
+        open={conflictDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
             handleConflictDismiss();
