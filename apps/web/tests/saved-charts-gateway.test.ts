@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, POST } from "@/app/api/saved-charts/[[...segments]]/route";
+import { GET as getDocument, POST as postDocument } from "@/app/api/documents/[[...segments]]/route";
 import { CSRF_COOKIE, SESSION_COOKIE, encodeSessionCookie, mintCsrfToken } from "@/lib/auth/session";
 
 const environment = {
@@ -56,5 +57,24 @@ describe("Saved charts same-origin gateway", () => {
       body: "x".repeat(2_000_001) });
     expect((await POST(large, context)).status).toBe(413);
     expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("limits document forwarding to registered paths and preserves CAS/ETag", async () => {
+    const id = "44444444-4444-4444-8444-444444444444";
+    const fetcher = vi.fn(async () => new Response("{}", { status: 201, headers: { etag: '"4"' } }));
+    vi.stubGlobal("fetch", fetcher);
+    const valid = request("POST", true);
+    valid.headers.set("if-match", '"3"');
+    valid.headers.set("idempotency-key", id);
+    const incoming = new NextRequest(`http://localhost:3000/api/documents/${id}/chart-blocks`, {
+      method: "POST", headers: valid.headers, body: "{}",
+    });
+    const response = await postDocument(incoming, { params: Promise.resolve({ segments: [id, "chart-blocks"] }) });
+    expect(response.status).toBe(201); expect(response.headers.get("etag")).toBe('"4"');
+    const [url, options] = fetcher.mock.calls[0] as unknown as [URL, RequestInit];
+    expect(url.pathname).toBe(`/api/documents/${id}/chart-blocks`);
+    expect(new Headers(options.headers).get("if-match")).toBe('"3"');
+    expect(new Headers(options.headers).get("idempotency-key")).toBe(id);
+    expect((await getDocument(request(), { params: Promise.resolve({ segments: [id, "arbitrary-path"] }) })).status).toBe(404);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });

@@ -422,13 +422,14 @@ class DocumentRouteContractTests(unittest.TestCase):
     def test_01_document_routes_are_documented_in_openapi(self):
         schema = self.client.get("/openapi.json").json()
         # The contract grows with implemented routes (NI-032 public delivery,
-        # NI-054 public model routes).
+        # NI-054 public model routes, NI-041 chart-block insertion).
         self.assertEqual(set(schema["paths"]), {
             "/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
             "/api/documents", "/api/documents/{document_id}",
             "/api/documents/{document_id}/versions",
             "/api/documents/{document_id}/versions/{version_id}",
+            "/api/documents/{document_id}/chart-blocks",
             "/api/metrics", "/api/metrics/{metric_id}",
             "/api/metrics/{metric_id}/series",
             "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",
@@ -452,8 +453,22 @@ class DocumentRouteContractTests(unittest.TestCase):
         self.assertEqual(
             schema["paths"]["/api/documents/{document_id}/versions/{version_id}"]["get"]
             ["operationId"], "getDocumentVersion")
+        # NI-041 insertion row: MutationResult<{block_id}> contract.
+        chart_blocks_path = schema["paths"]["/api/documents/{document_id}/chart-blocks"]
+        self.assertEqual(set(chart_blocks_path), {"post"})
+        self.assertEqual(chart_blocks_path["post"]["operationId"], "addChartBlock")
+        self.assertEqual(
+            chart_blocks_path["post"]["requestBody"]["content"]["application/json"]
+            ["schema"],
+            {"$ref": "#/components/schemas/ChartBlockInsertRequest"})
+        self.assertEqual(
+            chart_blocks_path["post"]["responses"]["201"]["content"]["application/json"]
+            ["schema"],
+            {"$ref": "#/components/schemas/ChartBlockMutationResponse"})
         for component in ("DocumentRenameRequest", "VersionListResponse",
-                          "VersionDetailResponse", "VersionSummaryResponse"):
+                          "VersionDetailResponse", "VersionSummaryResponse",
+                          "ChartBlockInsertRequest", "ChartBlockMutationResponse",
+                          "ChartBlockValue"):
             self.assertIn(component, schema["components"]["schemas"])
         self.assertIn("DocumentResponse", schema["components"]["schemas"])
         self.assertIn("DocumentSaveResponse", schema["components"]["schemas"])
@@ -469,6 +484,11 @@ class DocumentRouteContractTests(unittest.TestCase):
             ("get", f"/api/documents/{uuid4()}/versions/{uuid4()}", None),
             ("post", f"/api/documents/{uuid4()}/versions",
              {"schema_version": 1, "content": empty_document()}),
+            ("post", f"/api/documents/{uuid4()}/chart-blocks",
+             {"chart_definition_version_id": str(uuid4()),
+              "selection": {"start": "2025-01-01", "end": "2025-01-08",
+                            "frequency": "day", "filters": {}},
+              "mode": "live", "dataset_version_id": str(uuid4())}),
         ):
             with self.subTest(method=method):
                 response = self.client.request(method, path, json=payload) \
@@ -1404,6 +1424,28 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         counts = self.table_counts(document_id)
         self.assertEqual(counts, {"document_versions": 3, "document_blocks": 9,
                                   "insights": 1, "hypotheses": 1, "evidence_links": 1})
+
+    def test_version_replay_is_scoped_to_the_concrete_document(self):
+        first = service.create_document(self.engine, self.alice, title="Synthetic first")
+        second = service.create_document(self.engine, self.alice, title="Synthetic second")
+        foreign = service.create_document(self.engine, self.bob, title="Synthetic Bob")
+        payload = {"schema_version": SCHEMA_VERSION, "content": empty_document()}
+        headers = {"Authorization": "Bearer t.alice", "If-Match": '\"1\"',
+                   "Idempotency-Key": str(uuid4())}
+        with self.as_session(self.alice_id):
+            a = self.client.post(f"/api/documents/{first.document.id}/versions", json=payload, headers=headers)
+            self.assertEqual(a.status_code, 201, a.text)
+            denied = self.client.post(f"/api/documents/{foreign.document.id}/versions", json=payload, headers=headers)
+            self.assertEqual(denied.status_code, 404, denied.text)
+            b = self.client.post(f"/api/documents/{second.document.id}/versions", json=payload, headers=headers)
+            self.assertEqual(b.status_code, 201, b.text)
+            self.assertEqual(b.json()["document"]["id"], str(second.document.id))
+            self.assertNotEqual(a.json()["version"]["id"], b.json()["version"]["id"])
+            for document, result in ((first, a), (second, b)):
+                replay = self.client.post(f"/api/documents/{document.document.id}/versions", json=payload,
+                                          headers={**headers, "If-Match": '\"2\"'})
+                self.assertEqual(replay.json(), result.json())
+                self.assertEqual(self.table_counts(document.document.id)["document_versions"], 2)
 
     def test_17_idempotent_create_concurrent_same_key_single_document(self):
         key = uuid4()

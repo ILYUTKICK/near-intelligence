@@ -19,6 +19,7 @@ from sqlalchemy.engine import URL
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--chart-insertion-http", action="store_true")
     parser.add_argument("--saved-charts-http", action="store_true",
                         help="run saved-chart DB and production gateway HTTP checks only")
     parser.add_argument("--pg-bin", type=Path, required=True)
@@ -104,13 +105,15 @@ def main() -> int:
         # use), the NI-052 deterministic estimator (also offline research
         # code), the NI-053 diagnostics battery (same), the NI-054
         # publication gate + public model APIs (publish flow, migration 0010,
-        # RLS matrix) and the NI-036 document revision suites.
+        # RLS matrix), the NI-036 document revision suites and the NI-041
+        # chart-block insertion suites.
         patterns = ["test_database.py", "test_auth_bootstrap.py", "test_ownership_rls.py",
                     "test_home_aggregation.py", "test_archive_import.py",
                     "test_dataset_staging.py", "test_metrics.py",
                     "test_refresh_adapter.py", "test_chart_registry.py",
                     "test_delivery_apis.py", "test_saved_charts.py",
-                    "test_profile.py", "test_documents.py", "test_models_readiness.py",
+                    "test_profile.py", "test_documents.py", "test_chart_blocks.py",
+                    "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py"]
         if args.suite == "landing":
@@ -124,6 +127,8 @@ def main() -> int:
             patterns.append("test_refresh_live_smoke.py")
         if args.saved_charts_http:
             patterns = ["test_saved_charts.py", "test_saved_charts_http.py"]
+        if args.chart_insertion_http:
+            patterns = ["test_chart_blocks.py", "test_chart_insertion_http.py"]
         returncode = 0
         with test_log.open("wb") as log:
             for pattern in patterns:

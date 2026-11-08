@@ -24,7 +24,9 @@ Mechanics: :func:`execute_idempotent` opens ONE principal transaction that
    ("timeout-after-commit" guarantee by construction).
 
 Request identity: the fingerprint covers route, verified owner and the
-canonical request BODY only — API_SPECIFICATION defines idempotency over
+canonical request BODY only. For a document-scoped mutation the route key
+contains the concrete document UUID (never the path template), so one
+destination cannot replay another destination's result. API_SPECIFICATION defines idempotency over
 owner/route/body, not headers. A retried save therefore replays the stored
 revision result even if the retry carries a refreshed If-Match (the stored
 result is exactly the state that payload's save produced); a genuinely
@@ -55,6 +57,7 @@ from near_api.documents.schema import DocumentSchemaError
 
 ROUTE_CREATE_DOCUMENT = "POST /api/documents"
 ROUTE_SAVE_DOCUMENT_VERSION = "POST /api/documents/{document_id}/versions"
+ROUTE_ADD_CHART_BLOCK = "POST /api/documents/{document_id}/chart-blocks"
 
 # API_SPECIFICATION: repeated identical owner/route/body requests return the
 # original result for 24h. Evaluated server-side against now() at read time.

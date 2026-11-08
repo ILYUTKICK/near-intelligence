@@ -117,11 +117,11 @@ function ObservationCard({ state }: { readonly state: Extract<LandingMetricState
       <p className="text-ui leading-ui text-text-secondary mt-3">
         Latest approved observation in {landingSelectionWindow.scope}:
       </p>
-      <p className="text-title leading-title text-text mt-1">
+      <p className="text-title leading-title text-text mt-1 [overflow-wrap:anywhere]">
         {state.latest.value} <span className="text-body leading-body">{state.latest.unit}</span>
       </p>
 
-      <dl className="text-ui leading-ui text-text-secondary mt-3 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
+      <dl className="text-ui leading-ui text-text-secondary mt-3 grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-[max-content_minmax(0,1fr)]">
         <div className="contents">
           <dt className={metaLabelClasses}>Observation period</dt>
           <dd>

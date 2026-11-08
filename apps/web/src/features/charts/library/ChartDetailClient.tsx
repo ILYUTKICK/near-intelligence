@@ -173,7 +173,7 @@ export function ChartDetailClient({
               </Button>
             ) : null}
             <ChartAuthActions
-              nextPath={detailHref(selection)}
+              nextPath={detailHref({ ...selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
               chartTitle={definition.title}
               saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
                 selection: { ...view.selection, filters: selection.filters }, dataset_version_id: view.dataset.id, mode: "live" } : undefined}

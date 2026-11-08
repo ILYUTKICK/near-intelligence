@@ -1,3 +1,4 @@
+import { privateFetch } from "@/lib/auth/private-fetch";
 import { z } from "zod";
 
 import { DocumentApiError } from "@/features/documents/list/documents-api";
@@ -14,8 +15,7 @@ import {
  * `current_revision:<n>` for the owned document), an `Idempotency-Key: UUID`
  * (a retried identical request replays the original 201 instead of creating
  * a second revision — the timeout-after-commit guarantee), and the canonical
- * document as `{schema_version, content, observed_contexts}` (empty until the
- * chart system resolves pins server-side).
+ * document as `{schema_version, content, observed_contexts}` (empty; the server carries unchanged inserted chart pins forward).
  *
  * The client follows the NI-023 render-boundary pattern: responses are
  * validated against zod mirrors of the generated contracts before use, and
@@ -30,7 +30,7 @@ export interface SaveRequestBody {
   schema_version: number;
   /** The full canonical EditorDocument (`{schema_version, type, content}`). */
   content: Record<string, unknown>;
-  /** ResolvedContext pins; must be empty until NI-041/NI-043 (API contract). */
+  /** ResolvedContext pins; stay empty until NI-043; NI-041 carries unchanged stored pins server-side. */
   observed_contexts: Record<string, unknown>[];
 }
 
@@ -91,7 +91,7 @@ function parseSaveErrorResponse(response: Response, body: unknown): DocumentApiE
  * 428/401/…) and anything else for transport failures.
  */
 export async function saveRevision(attempt: SaveAttempt): Promise<SaveAck> {
-  const response = await fetch(`/api/documents/${attempt.documentId}/versions`, {
+  const response = await privateFetch(`/api/documents/${attempt.documentId}/versions`, {
     method: "POST",
     credentials: "same-origin",
     headers: {

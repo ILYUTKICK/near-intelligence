@@ -472,9 +472,12 @@ def _parse_selection(value, path: str) -> dict:
     if _require_enum(selection.get("frequency"), f"{path}.frequency", ("day",)) != "day":
         _fail(f"{path}.frequency", "unsupported_value")
     filters = _require_object(selection.get("filters"), f"{path}.filters")
-    if filters:
-        _fail(f"{path}.filters", "no_filters_approved")
-    return {"start": start, "end": end, "frequency": "day", "filters": {}}
+    from pydantic import ValidationError
+    from near_api.schemas.chart_selection import ChartSelection
+    try:
+        return ChartSelection.model_validate(selection).model_dump(mode="json")
+    except ValidationError:
+        _fail(path, "invalid_selection")
 
 
 def _require_sha256(value, path: str) -> str:
@@ -534,6 +537,21 @@ def _parse_context(value, path: str) -> dict:
                                             f"{path}.context_hash"),
         }
     _fail(path, "unsupported_context_shape")
+
+
+def canonical_context_json(value: object, *, path: str = "context") -> dict:
+    """Validate one frozen inspection record; return its canonical JSON.
+
+    NI-041 reuse point for the chart-block insertion service
+    (:mod:`near_api.documents.chart_blocks`): the ``ResolvedContext`` /
+    ``ModelContext`` field sets, UUID/timestamp/hash spellings and the
+    selection structure stay defined HERE once — a context-producing module
+    validates through this wrapper instead of re-implementing any rule, so a
+    stored context always matches the shape the canonical editor grammar and
+    the per-revision map expect. Raises :class:`DocumentSchemaError` on every
+    violation.
+    """
+    return _parse_context(value, path)
 
 
 # --------------------------------------------------------------------------- #

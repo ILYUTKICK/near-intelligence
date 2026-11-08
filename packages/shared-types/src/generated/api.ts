@@ -198,6 +198,31 @@ export interface paths {
         patch: operations["renameDocument"];
         trace?: never;
     };
+    "/api/documents/{document_id}/chart-blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Append one inspected chart block to an owned document (compare-and-set via If-Match)
+         * @description Append one valid liveChart block with its frozen inspection context.
+         *
+         *     With an ``Idempotency-Key`` the response snapshot is stored in the write
+         *     transaction (NI-037 store), so a repeated identical owner/route/body
+         *     request replays the original 201 (same revision, no second block)
+         *     instead of a spurious 409 against the advanced document.
+         */
+        post: operations["addChartBlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{document_id}/versions": {
         parameters: {
             query?: never;
@@ -583,6 +608,64 @@ export interface components {
             presets_days: number[];
         };
         /**
+         * ChartBlockInsertRequest
+         * @description POST /documents/{id}/chart-blocks body (If-Match carries the CAS).
+         *
+         *     ``dataset_version_id`` is the INSPECTED dataset version from the
+         *     explorer/library/detail view: the server pins exactly that version and
+         *     rejects the request when it is not an approved public dataset — it never
+         *     substitutes latest (API_SPECIFICATION: "Server accepts the inspected
+         *     dataset version to prevent data changing between preview and insertion").
+         *     ``after_block_id`` positions the new block after an existing top-level
+         *     block of the document; without it the block is appended last.
+         */
+        ChartBlockInsertRequest: {
+            /** After Block Id */
+            after_block_id?: string | null;
+            /**
+             * Chart Definition Version Id
+             * Format: uuid
+             */
+            chart_definition_version_id: string;
+            /**
+             * Dataset Version Id
+             * Format: uuid
+             */
+            dataset_version_id: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "live" | "snapshot";
+            selection: components["schemas"]["ChartSelection"];
+            /** Snapshot Id */
+            snapshot_id?: string | null;
+        };
+        /**
+         * ChartBlockMutationResponse
+         * @description ``MutationResult<{block_id}>``: the new revision summary plus the block.
+         *
+         *     The new revision's content and resolved contexts (including the frozen
+         *     context of the inserted block, keyed by ``block_id``) are fetchable
+         *     through ``GET /documents/{id}`` — the response never makes the client
+         *     guess the new revision (the ETag carries it).
+         */
+        ChartBlockMutationResponse: {
+            document: components["schemas"]["DocumentSummary"];
+            value: components["schemas"]["ChartBlockValue"];
+        };
+        /**
+         * ChartBlockValue
+         * @description The inserted block identity (API_SPECIFICATION ``MutationResult`` value).
+         */
+        ChartBlockValue: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+        };
+        /**
          * ChartDefinitionResponse
          * @description One immutable chart definition version (API_SPECIFICATION ``ChartDefinition``).
          *
@@ -650,6 +733,28 @@ export interface components {
             items: components["schemas"]["ChartDefinitionResponse"][];
             /** Next Cursor */
             next_cursor: string | null;
+        };
+        /** ChartSelection */
+        ChartSelection: {
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Filters */
+            filters: {
+                [key: string]: string;
+            };
+            /**
+             * Frequency
+             * @constant
+             */
+            frequency: "day";
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
         };
         /**
          * ChartViewResponse
@@ -1625,8 +1730,8 @@ export interface components {
          *
          *     Contains the selected range (``selection.start``/``selection.end`` with the
          *     half-open UTC window rules of :class:`near_api.schemas.common.Selection`),
-         *     the filters as passed (the approved filter domain is empty until a filter
-         *     schema is registered), the immutable pinned dataset version and the stable
+         *     the bounded registered filter dimensions as passed (the referenced chart
+         *     definition controls the exact allowed values), the immutable pinned dataset version and the stable
          *     version identifiers whose ``context_hash`` binds them together. Server
          *     resolution/verification of every id happens where the context is created;
          *     this contract keeps a stored context from drifting afterwards.
@@ -1653,7 +1758,7 @@ export interface components {
              * Format: date-time
              */
             resolved_at: string;
-            selection: components["schemas"]["Selection"];
+            selection: components["schemas"]["ChartSelection"];
         };
         /**
          * ResolvedSelection
@@ -2740,6 +2845,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentSummary"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    addChartBlock: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChartBlockInsertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChartBlockMutationResponse"];
                 };
             };
             /** @description Missing or invalid session */
