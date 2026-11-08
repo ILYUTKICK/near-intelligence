@@ -186,15 +186,16 @@ def _reject_unsafe_path(relative_path: str) -> None:
 
 
 def parse_manifest(manifest_path: Path) -> tuple[str, tuple[ManifestEntry, ...]]:
-    """Parse a strict ``shasum -a 256`` text listing (hash, two spaces, path)."""
+    """Parse a strict ``shasum -a 256`` listing and hash its original bytes."""
     try:
-        raw = manifest_path.read_text(encoding="utf-8")
-    except OSError as error:
+        manifest_bytes = manifest_path.read_bytes()
+        listing = manifest_bytes.decode("utf-8")
+    except (OSError, UnicodeDecodeError) as error:
         raise ManifestFormatError(f"Manifest is unreadable: {error}") from None
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(manifest_bytes).hexdigest()
     entries: list[ManifestEntry] = []
     seen: set[str] = set()
-    for number, line in enumerate(raw.splitlines(), start=1):
+    for number, line in enumerate(listing.splitlines(), start=1):
         if not line.strip():
             raise ManifestFormatError(f"Manifest line {number} is empty")
         match = MANIFEST_LINE.fullmatch(line)

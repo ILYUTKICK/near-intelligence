@@ -38,16 +38,19 @@ from near_api.ingestion.archive import (
 
 class ManifestParsingTests(unittest.TestCase):
     def test_strict_shasum_text_listing(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "m.sha256"
-            path.write_text(
-                "a" * 64 + "  research/alpha/FINDINGS.md\n"
-                + "b" * 64 + "  research/alpha/data/x.json\n",
-                encoding="utf-8")
-            digest, entries = parse_manifest(path)
-            self.assertEqual(len(entries), 2)
-            self.assertEqual(entries[0].relative_path, "research/alpha/FINDINGS.md")
-            self.assertEqual(digest, hashlib.sha256(path.read_bytes()).hexdigest())
+        for line_ending in (b"\n", b"\r\n"):
+            with self.subTest(line_ending=line_ending), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "m.sha256"
+                contents = line_ending.join((
+                    b"a" * 64 + b"  research/alpha/FINDINGS.md",
+                    b"b" * 64 + b"  research/alpha/data/x.json",
+                    b"",
+                ))
+                path.write_bytes(contents)
+                digest, entries = parse_manifest(path)
+                self.assertEqual(len(entries), 2)
+                self.assertEqual(entries[0].relative_path, "research/alpha/FINDINGS.md")
+                self.assertEqual(digest, hashlib.sha256(contents).hexdigest())
 
     def test_format_contract_failures(self):
         cases = {

@@ -732,7 +732,8 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
         lines = [f"{hashlib.sha256(data).hexdigest()}  {relative}"
                  for relative, data in sorted(files.items())]
         manifest_path = root.parent / "observations-manifest.sha256"
-        manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        # Exercise the raw-byte batch digest with CRLF on every platform.
+        manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\r\n")
         return manifest_path
 
     def test_09_query_api_surfaces_history_hashes_and_pages(self):
