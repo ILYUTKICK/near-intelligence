@@ -124,8 +124,8 @@ def upgrade():
         );
 
         CREATE INDEX ix_model_runs_spec_published
-            ON app.model_runs (spec_id, published_at DESC);
-        CREATE INDEX ix_model_runs_published_at ON app.model_runs (published_at DESC);
+            ON app.model_runs (spec_id, published_at);
+        CREATE INDEX ix_model_runs_published_at ON app.model_runs (published_at);
 
         -- Public scientific results: FORCE RLS keeps every role without a
         -- policy locked out (including the table owner and grant-less

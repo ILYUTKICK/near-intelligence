@@ -70,12 +70,13 @@ def publish_run(database_url: str, bundle: dict, run_id: UUID) -> PublishedRun:
             _assert_operator(connection)
             inserted = connection.execute(text("""
                 INSERT INTO app.model_runs (run_id, spec_id, spec_version, gate_verdict,
-                                            manifests, artifacts, publication_approval,
-                                            code_commit, dependency_lock_sha256,
+                                            status, manifests, artifacts,
+                                            publication_approval, code_commit,
+                                            dependency_lock_sha256,
                                             coefficient_rtol, coefficient_atol,
                                             sample_start, sample_end_exclusive, nobs,
                                             published_by)
-                VALUES (:run_id, :spec_id, :spec_version, :gate_verdict,
+                VALUES (:run_id, :spec_id, :spec_version, :gate_verdict, 'published',
                         CAST(:manifests AS jsonb), CAST(:artifacts AS jsonb),
                         CAST(:approval AS jsonb),
                         :code_commit, :dependency_lock_sha256,

@@ -115,17 +115,28 @@ def _summary_response(row) -> ModelRunSummaryResponse:
 def list_published_runs(connection: Connection, *, limit: int, offset: int,
                         model_id: str | None = None) -> tuple[list[dict], int]:
     """Published run rows newest-first (stable order: published_at, run_id)."""
-    total = connection.execute(text("""
-        SELECT count(*) FROM app.model_runs
-        WHERE (:spec_id::varchar IS NULL OR spec_id = :spec_id)
-    """), {"spec_id": model_id}).scalar_one()
-    rows = connection.execute(text("""
-        SELECT run_id, spec_id, published_at, published_by, manifests
-        FROM app.model_runs
-        WHERE (:spec_id::varchar IS NULL OR spec_id = :spec_id)
-        ORDER BY published_at DESC, run_id
-        LIMIT :limit OFFSET :offset
-    """), {"spec_id": model_id, "limit": limit, "offset": offset}).mappings().all()
+    # The optional filter is composed server-side as two closed statements
+    # (a bind-in-Cast would be the only way to make one optional predicate;
+    # both statements are parameterless beyond the bounded page values).
+    if model_id is None:
+        total = connection.execute(
+            text("SELECT count(*) FROM app.model_runs")).scalar_one()
+        rows = connection.execute(text("""
+            SELECT run_id, spec_id, published_at, published_by, manifests
+            FROM app.model_runs
+            ORDER BY published_at DESC, run_id
+            LIMIT :limit OFFSET :offset
+        """), {"limit": limit, "offset": offset}).mappings().all()
+    else:
+        total = connection.execute(text("SELECT count(*) FROM app.model_runs "
+                                        "WHERE spec_id = :spec_id"),
+                                   {"spec_id": model_id}).scalar_one()
+        rows = connection.execute(text("""
+            SELECT run_id, spec_id, published_at, published_by, manifests
+            FROM app.model_runs WHERE spec_id = :spec_id
+            ORDER BY published_at DESC, run_id
+            LIMIT :limit OFFSET :offset
+        """), {"spec_id": model_id, "limit": limit, "offset": offset}).mappings().all()
     return list(rows), int(total)
 
 
