@@ -1,3 +1,4 @@
+import { privateFetch } from "@/lib/auth/private-fetch";
 import {
   apiErrorResponseSchema,
   documentListResponseSchema,
@@ -84,7 +85,7 @@ export async function listDocuments(
     params.set("limit", String(limit));
   }
   const search = params.toString();
-  const response = await fetch(`/api/documents${search ? `?${search}` : ""}`, {
+  const response = await privateFetch(`/api/documents${search ? `?${search}` : ""}`, {
     credentials: "same-origin",
     headers: { accept: "application/json" },
     signal: options.signal,
@@ -107,7 +108,7 @@ export async function createDocument(input: {
   title: string;
   idempotencyKey: string;
 }): Promise<DocumentResponse> {
-  const response = await fetch("/api/documents", {
+  const response = await privateFetch("/api/documents", {
     method: "POST",
     credentials: "same-origin",
     headers: {
@@ -135,7 +136,7 @@ export async function renameDocument(input: {
   title: string;
   revision: number;
 }): Promise<DocumentSummary> {
-  const response = await fetch(`/api/documents/${input.documentId}`, {
+  const response = await privateFetch(`/api/documents/${input.documentId}`, {
     method: "PATCH",
     credentials: "same-origin",
     headers: {
@@ -159,7 +160,7 @@ export async function deleteDocument(input: {
   documentId: string;
   revision: number;
 }): Promise<void> {
-  const response = await fetch(`/api/documents/${input.documentId}`, {
+  const response = await privateFetch(`/api/documents/${input.documentId}`, {
     method: "DELETE",
     credentials: "same-origin",
     headers: { "if-match": `"${input.revision}"` },
@@ -178,7 +179,7 @@ export async function deleteDocument(input: {
 
 /** GET /api/documents/{id} — the current document (persisted-editor stub view). */
 export async function getDocument(documentId: string, signal?: AbortSignal): Promise<DocumentResponse> {
-  const response = await fetch(`/api/documents/${documentId}`, {
+  const response = await privateFetch(`/api/documents/${documentId}`, {
     credentials: "same-origin",
     headers: { accept: "application/json" },
     signal,

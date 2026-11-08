@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { SaveChartButton } from "../saved/SaveChartButton";
+import { AddChartToResearch } from "../add-to-research/AddChartToResearch";
 import type { SaveInput } from "../saved/api";
 import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
 
@@ -27,9 +28,9 @@ import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
  * server-side through safeInternalReturnTo). Pending UI announces the
  * continuation honestly.
  *
- * The persistence half of the flow (destination picker, actual save) is the
- * saved-charts/research-insertion scope (NI-035/NI-041): a signed-in visitor
- * sees an honest pending note instead of a dead button.
+ * NI-035/NI-041 connect resolved, signed-in actions to owned persistence.
+ * Their payload comes from the mounted view, including its inspected dataset;
+ * account changes unmount action state before another identity can use it.
  */
 export function ChartAuthActions({
   nextPath,
@@ -98,8 +99,9 @@ export function ChartAuthActions({
   // Retain the mounted attempt for a known subject while hiding all its UI.
   // A verified different subject (or an explicit auth-change signal) resets it.
   if (session.subject && saveInput) {
-    return <div key={`${session.subject}:${JSON.stringify(saveInput)}`}>
+    return <div key={`${session.subject}:${JSON.stringify(saveInput)}`} className="flex flex-wrap gap-2">
       <SaveChartButton input={saveInput} suspended={session.status !== "authenticated"} />
+      <AddChartToResearch input={saveInput} suspended={session.status !== "authenticated"} />
       {session.status === "unknown" ? <p role="status">The sign-in state could not be checked. Try returning to this window again.</p> : null}
     </div>;
   }

@@ -407,12 +407,13 @@ def save_document_version(request: Request, principal: PrincipalDependency,
         return 201, body.model_dump(mode="json")
 
     if key is not None:
+        route_key = idempotency.ROUTE_SAVE_DOCUMENT_VERSION.format(document_id=document_id)
         try:
             outcome = idempotency.execute_idempotent(
-                engine, principal, route_key=idempotency.ROUTE_SAVE_DOCUMENT_VERSION,
+                engine, principal, route_key=route_key,
                 idempotency_key=key,
                 request_hash=idempotency.request_fingerprint(
-                    idempotency.ROUTE_SAVE_DOCUMENT_VERSION, principal.id,
+                    route_key, principal.id,
                     payload.model_dump(mode="json")),
                 operation=execute)
         except idempotency.IdempotencyConflict:

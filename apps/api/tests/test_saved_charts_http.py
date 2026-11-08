@@ -54,6 +54,9 @@ class SavedChartsHTTPE2E(unittest.TestCase):
     def setUp(self):
         fixtures.DeliveryDatabaseTests.setUp(self)
 
+    def after_gateway_checks(self, client, session_cookie, body):
+        """Extension point for NI-041 using the same real auth/gateway setup."""
+
     def test_cookie_gateway_save_reopen_and_two_users(self):
         web = self.repo / "apps/web"
         self.assertTrue((web / ".next/BUILD_ID").exists(), "Build the frozen web app first")
@@ -152,12 +155,13 @@ class SavedChartsHTTPE2E(unittest.TestCase):
         self.assertEqual(client.get(path).status_code, 404)
         self.assertEqual(client.patch(path, json={"label": "Stolen"}, headers=headers).status_code, 404)
         self.assertEqual(client.delete(path, headers=headers).status_code, 404)
+        self.after_gateway_checks(client, session_cookie, body)
         if os.environ.get("NI_BROWSER_HANDOFF") == "1":
             info = self.repo / ".local/ni035-browser.json"
             marker = self.repo / ".local/ni035-browser.done"
             marker.unlink(missing_ok=True)
             info.write_text(json.dumps({"web": web_url, "alice": api_url + "/__ni035_synthetic_session/alice",
-                                        "bob": api_url + "/__ni035_synthetic_session/bob", "saved_id": saved["id"]}))
+                                        "bob": api_url + "/__ni035_synthetic_session/bob", "saved_id": saved["id"], "document_id": getattr(self, "http_document_id", None)}))
             deadline = time.monotonic() + 240
             while not marker.exists() and time.monotonic() < deadline: time.sleep(0.2)
             self.assertTrue(marker.exists(), "Browser handoff did not complete")

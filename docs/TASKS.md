@@ -1191,7 +1191,17 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-040, NI-033
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #30
+- **Execution role:** B
+- **Started at:** 2026-11-08T05:11:00+03:00
+- **Branch/worktree:** feat/ni-041-chart-research @ /Users/ilyutkinn/Desktop/near-intelligence-b8 (stacked on origin/feat/ni-040-autosave — PR #64, role-B review approved, awaiting operator merge; NI-040 implemented on the base and NI-033 DONE on main)
+
+- **Resumed by:** Codex / chat 01a1ba7d-239f-7483-b2d6-fc651744fe9b
+- **Continuation execution role:** B, with required A/UI contribution under the user’s explicit authorization of both roles
+- **Resumed at:** 2026-11-08T13:12:16+03:00
+- **Continuation branch/worktree:** feat/ni-041-continuation @ /Users/ilyutkinn/Desktop/Near; stacked on feat/ni-035-continuation (PR #67) to reuse private gateway/actions
+- **User-authorized handoff:** The user explicitly transferred NI-035/NI-041 on 8 November and supplied the prior chat history. NI-035 is verified DONE in #67; independent acceptance of NI-035/NI-041 was explicitly waived by the user on 8 November. NI-040 and NI-033 are DONE on main. Original b8 HEAD fb5fe6d and five dirty files/patch/hashes were preserved under ignored .local/handoffs/NI-041; continue both existing commits and the supplied test fixes without editing original b8.
 
 **Description:** Connect explorer/library selection to persisted document blocks.
 
@@ -1202,6 +1212,22 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 **Acceptance criteria:** One confirmation appends one valid block; owner validated; source change does not silently alter inspected evidence; duplicate retry idempotent.
 
 **Testing requirements:** Public→login→destination flow; Bob/private snapshot probe; double submit/concurrent revision cases; reopen inserted chart.
+
+**Continuation result (Codex, 8 November 2026):**
+- **Result:** preserved b8's two implementation/test commits as 573a4f9/84bfcb2, preserved all five dirty handoff files, carried forward their test/claim fixes, regenerated contracts and finished the API/UI integration on top of NI-035 (#67). Insertion is one owner-checked CAS transaction/revision with a server-allocated block ID, registry/dataset/filter validation, immutable inspected pins and shared ChartView context hashing. Same-key retries replay the original result; failures/conflicts store no extra revision. Corrected the inherited cumulative projection assertion (rev 2 has one block, rev 3 has two: three stored rows across immutable versions).
+- **Contracts/UI:** introduced the shared bounded ChartSelection for saved/inserted/editor contexts (registered dimensions, exact option checks per immutable definition), generated TS and a preserved-filter editor round-trip. Implemented an owned destination picker with search/pagination/Create New, explicit confirmation and stable separate creation/insertion retry keys. Private document CRUD/versions/chart-block paths now use a fixed-path cookie/CSRF/Origin gateway; existing CRUD/autosave clients supply CSRF. Public action continuations pin the inspected dataset UUID, and password/demo sign-in carry the sanitized internal return target. The reopened node displays filters and observed dataset; interactive rendering/controls stay NI-042, and changed/submitted context re-resolution stays NI-043.
+- **Verification:** full disposable PostgreSQL 18 suite: 384 tests passed, no failures/skips; migration/model drift clean. Frontend: 33 files / 380 tests passed with `vitest run --maxWorkers=2`; lint/typecheck/production build and API contract/client generation checks passed. The focused 4-file regression pass also passed (33 tests), including actual gateway path/CAS forwarding, immutable continuation, picker retry/focus/axe, filter round-trip and external redirect denial. No new dependency.
+- **HTTP E2E:** `scripts/run-db-tests.py --pg-bin /opt/homebrew/opt/postgresql@18/bin --chart-insertion-http` passed 15 chart-block regressions plus the real production Next -> cookie/CSRF -> ES256 JWT verification/bootstrap -> FastAPI/RLS -> PostgreSQL scenario. A newer approved dataset was published after inspection but before insertion; the original dataset/filter pin survived insertion, replay, later prose save and reopen. Bob GET/append to Alice's document returned 404. Only provider JWKS transport is synthetic; signature, principal and ownership checks execute normally.
+- **Browser evidence:** public chart -> login link with exact dataset UUID/range/filter -> controlled synthetic session -> owned destination picker/Create New -> one chart block (revision 2) -> inserted paragraph/typed note -> Save (revision 4) -> reload passed at 387px. Stored source SRC-LLAMA, range and observed dataset stayed visible and unchanged. [Synthetic browser evidence](qa/ni041-chart-insertion-mobile.jpg). No provider account was created/contacted; physical-phone release QA is not claimed. Temporary servers/databases were stopped/removed and original b8 is unchanged.
+- **Reviewer:** independent acceptance explicitly waived by the user on 8 November 2026; no independent approval is claimed.
+- **Review fixes claimed:** Codex / chat 01a1ba7d-239f-7483-b2d6-fc651744fe9b, roles A/B, 2026-11-08T14:06:00+03:00, feat/ni-041-continuation @ /Users/ilyutkinn/Desktop/Near. Integrate the verified NI-035 fixes, preserve insertion attempts across same-account revalidation and bind replay to the concrete destination. The same route-template issue also affects the whole-document version path used to save inserted charts; fix it with the same bounded rule and regression. IN_PROGRESS until verification.
+
+**Review correction result — 8 November 2026:**
+- Integrated the verified NI-035 correction (75c9e42, PR #67 CI 42474253460 green). The insertion component now keeps draft/destination, stable creation/insertion keys and acknowledged results above the modal subtree. Same-subject revalidation hides it without losing state; a different verified subject discards it. Closing/reopening an uncertain insertion retains keys. A new confirmation after acknowledged success starts a fresh intent.
+- Chart insertion and whole-document version saves now use concrete document URLs as their replay/lock identity. Same-key/same-body writes to two owned documents each target the correct document; a foreign target remains 404; same-destination replay with refreshed If-Match remains idempotent. Added real DB regressions for both paths.
+- **Verification:** full disposable PostgreSQL 18 suite: 386 tests passed, no failures/skips, model/migration drift clean. Full frontend: 34 files / 391 tests passed; lint, typecheck and production build passed. Focused retry/account/CSRF regressions: 19 passed. API contract unit tests 6/6; OpenAPI/TS drift check and 604 documentation links passed. Production gateway HTTP suite: 16 chart-block regressions plus 1 actual Next -> CSRF -> ES256 JWT/bootstrap -> API/RLS -> PostgreSQL E2E passed, preserving inspected data across insertion/replay/prose save and denying Bob; it also checks concurrent first CSRF acquisition. No external provider/account, collector, real data import or new dependency.
+- **Acceptance:** all original NI-041 acceptance checks and the three review findings are addressed and verified. Independent acceptance explicitly waived by the user; no second-participant approval is claimed. PR #68 remains stacked on #67, with merge reserved for the operator. NI-042 work is not started in this correction.
+- **Completed at:** 2026-11-08T17:35:14+03:00.
 
 ### NI-042 — Complete interactive chart node behavior
 

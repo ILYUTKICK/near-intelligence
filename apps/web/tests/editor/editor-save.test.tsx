@@ -139,6 +139,7 @@ function saveSuccess(revision: number): Response {
 function mockApi(handlers: Handler[]): CapturedRequest[] {
   const requests: CapturedRequest[] = [];
   const fetchMock = vi.fn((input: RequestInfo | URL, init: RequestInit = {}) => {
+    if (String(input) === "/api/auth/csrf") return Promise.resolve(new Response(JSON.stringify({ token: "synthetic-csrf" }), { headers: { "content-type": "application/json" } }));
     const headers = (init.headers ?? {}) as Record<string, string>;
     let body: unknown = null;
     if (typeof init.body === "string") {
