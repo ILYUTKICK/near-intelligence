@@ -1116,7 +1116,11 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-039
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude agent for role A (ILYUTKICK), session dispatch #27
+- **Execution role:** A
+- **Started at:** 2026-11-08T03:52:00+03:00
+- **Branch/worktree:** feat/ni-040-autosave @ /Users/ilyutkinn/Desktop/near-intelligence-a10 (from origin/main 97927ce, PR #58 merge — NI-039 editor code available as the integration point)
 
 **Description:** Prevent data loss during network failures, concurrent tabs and session expiry.
 

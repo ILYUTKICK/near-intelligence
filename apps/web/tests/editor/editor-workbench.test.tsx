@@ -14,6 +14,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ResearchDocumentEditor } from "@/features/editor/workbench";
 import type { CanonicalDocument } from "@/features/editor/canonical";
 
+// The editor shell navigates on conflict recovery (new-document copy);
+// tests stub the app router like the NI-023 list tests do.
+const routerPush = vi.hoisted(() => vi.fn());
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
+
 const DOC_ID = "22222222-2222-4222-8222-222222222222";
 
 const HEADING_ID = "11111111-1111-4111-8111-111111111111";
@@ -128,6 +136,9 @@ function mockApi(handlers: Array<(url: string) => Response | undefined>) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // The recovery draft lives in sessionStorage; tests must not leak one into
+  // the next render.
+  sessionStorage.clear();
 });
 
 async function renderReady(content: CanonicalDocument = PLAIN_DOC) {
@@ -147,8 +158,10 @@ describe("honest load states", () => {
     // The client sends no user identifier — ownership rides the session.
     expect(Object.keys(requests[0].init.headers as Record<string, string>)).not.toContain("authorization");
     expect(screen.getByRole("heading", { name: "Editor workbench fixture" })).toBeInTheDocument();
-    expect(screen.getByTestId("persistence-note")).toHaveTextContent(/NI-040/);
-    expect(screen.getByText(/Revision 7/)).toBeInTheDocument();
+    // NI-040: the loaded content is the acknowledged baseline — a truthful
+    // clean status, not a fake "saving" promise.
+    expect(screen.getByTestId("save-status")).toHaveTextContent(/No unsaved changes · Revision 7/);
+    expect(screen.getByText(/· Revision 7 · Schema version 1/)).toBeInTheDocument();
   });
 
   it("shows a loading skeleton shaped like the paper first", async () => {
@@ -238,10 +251,11 @@ describe("three-pane layout contract", () => {
     expect(outline.length).toBeGreaterThan(0);
     // The properties pane exists.
     expect(screen.getAllByLabelText("Block properties").length).toBeGreaterThan(0);
-    // Drawer triggers exist for small screens; no fake save control.
+    // Drawer triggers exist for small screens; the NI-040 save control is real.
     expect(screen.getByRole("button", { name: "Open outline drawer" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open tools drawer" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Save$/i })).toBeNull();
+    const saveButton = screen.getByRole("button", { name: "Save now" });
+    expect(saveButton).toBeDisabled(); // nothing unsaved yet
     expect(await axe(document.body, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });
 

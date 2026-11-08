@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/data-state/Skeleton";
 
 import { DocumentApiError, getDocument } from "@/features/documents/list/documents-api";
 import { CanonicalDocumentError, validateCanonicalDocument, CANONICAL_SCHEMA_VERSION } from "./canonical";
+import { downloadJson } from "./persistence/download";
 import { EditorShell } from "./editor-shell";
 
 /**
@@ -30,16 +31,6 @@ type LoadState =
   | { kind: "unauthorized" }
   | { kind: "error"; message: string }
   | { kind: "recovery"; title: string; reason: string; path: string; rawContent: unknown };
-
-function rawJsonDownload(rawContent: unknown, documentId: string): void {
-  const blob = new Blob([JSON.stringify(rawContent, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `document-content-${documentId}.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
 
 export function RecoveryView({
   documentId,
@@ -67,7 +58,7 @@ export function RecoveryView({
       <button
         type="button"
         data-testid="download-content"
-        onClick={() => rawJsonDownload(rawContent, documentId)}
+        onClick={() => downloadJson(rawContent, `document-content-${documentId}.json`)}
         className="mt-3 inline-flex min-h-11 items-center rounded-control border border-control-border bg-surface px-4 text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         Download stored content

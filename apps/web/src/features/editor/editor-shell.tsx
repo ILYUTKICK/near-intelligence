@@ -4,8 +4,11 @@ import type { Editor } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useRouter } from "next/navigation";
+
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/data-state/Skeleton";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { canonicalToTiptapDoc } from "./serialize";
@@ -24,7 +27,13 @@ import {
   type CurrentBlock,
   type DependentBlock,
 } from "./commands";
-import type { CanonicalDocument, CanonicalCell, CanonicalTableColumn } from "./canonical";
+import {
+  CANONICAL_SCHEMA_VERSION,
+  validateCanonicalDocument,
+  type CanonicalDocument,
+  type CanonicalCell,
+  type CanonicalTableColumn,
+} from "./canonical";
 import { InsertMenuButton, SlashMenu, type InsertItemChoice } from "./insert-menu";
 import { BlockToolbar } from "./block-toolbar";
 import { OutlinePane } from "./outline-pane";
@@ -36,6 +45,17 @@ import {
   EDITOR_SLASH_TRIGGER,
   detailOf,
 } from "./ui-bridge";
+import { ConflictRecoveryDialog } from "./persistence/conflict-dialog";
+import { SaveStatusBar, formatSavedAt } from "./persistence/save-status";
+import { useDocumentSave } from "./persistence/use-document-save";
+import { downloadJson } from "./persistence/download";
+import { newIdempotencyKey, saveRevision, type SaveRequestBody } from "./persistence/save-transport";
+import {
+  createDocument,
+  DocumentApiError,
+  getDocument,
+} from "@/features/documents/list/documents-api";
+import { DOCUMENT_TITLE_MAX_LENGTH } from "@/features/documents/list/documents-schema";
 
 /**
  * The three-pane research editor workbench (NI-039):
@@ -51,9 +71,12 @@ import {
  * tools drawer; below 768px the paper is the only pane and outline/tools
  * open as drawers — one at a time, focus handled by the drawer primitive.
  *
- * Persistence is deliberately NOT implemented here: saving (autosave, manual
- * save, conflict recovery) arrives with NI-040, and the header says so
- * honestly instead of showing a fake save state.
+ * Persistence (NI-040): autosave after 1s idle with a hard 5s ceiling, an
+ * immediate manual save (button or Mod+S), one request in flight with later
+ * content coalesced, If-Match compare-and-set with a per-attempt
+ * Idempotency-Key, a truthful status line, honest offline queueing, session
+ * draft recovery, and an explicit 409 conflict dialog (reload / overwrite /
+ * download / new copy — never a silent overwrite).
  */
 
 export interface EditorShellProps {
@@ -76,7 +99,36 @@ interface DeleteRequest {
   dependents: readonly DependentBlock[];
 }
 
-export function EditorShell({ title, revision, updatedAt, content }: EditorShellProps) {
+export function EditorShell({ documentId, title, revision, updatedAt, content }: EditorShellProps) {
+  const router = useRouter();
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [conflictBusy, setConflictBusy] = useState(false);
+  const [conflictActionError, setConflictActionError] = useState<string | null>(null);
+  const editorRef = useRef<Editor | null>(null);
+  const paperRef = useRef<HTMLDivElement>(null);
+
+  /** Captures the editor state as a save request body (canonical, validated). */
+  const capture = useCallback((): SaveRequestBody => {
+    const current = editorRef.current;
+    if (!current) {
+      throw new Error("The editor is not ready");
+    }
+    const snapshot = canonicalSnapshot(current);
+    return {
+      schema_version: CANONICAL_SCHEMA_VERSION,
+      content: snapshot as unknown as Record<string, unknown>,
+      observed_contexts: [],
+    };
+  }, []);
+
+  const controller = useDocumentSave({ documentId, initialRevision: revision, capture });
+  // The controller's members are stable callbacks (they close over the
+  // coordinator); depending on THEM — not the per-status object — keeps the
+  // effects below from re-running on every save-status transition. This is
+  // also what keeps the baseline adoption a one-time event: re-running it on
+  // edits would swallow unsaved content into the "acknowledged" baseline.
+  const { adoptBaseline, markChanged } = controller;
+
   const editor = useEditor({
     extensions: EDITOR_EXTENSIONS,
     content: canonicalToTiptapDoc(content),
@@ -90,6 +142,11 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
       },
     },
   });
+  // Refs sync in effects (never during render); event-time readers always
+  // see the current values.
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   const [outline, setOutline] = useState<OutlineEntry[]>([]);
   const [blockCount, setBlockCount] = useState(content.content.length);
@@ -101,11 +158,176 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
   const [tabletOutlineOpen, setTabletOutlineOpen] = useState(false);
-  const paperRef = useRef<HTMLDivElement>(null);
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
   }, []);
+
+  // -- persistence (NI-040) -------------------------------------------------- //
+
+  // The loaded (already validated) content is the acknowledged baseline: the
+  // editor may normalize it (e.g. an empty document to one paragraph), so the
+  // baseline is captured from the editor itself — never a phantom revision.
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+    adoptBaseline(revision);
+  }, [editor, adoptBaseline, revision]);
+
+  // Every editor update marks the coordinator; content is captured only when
+  // a save actually fires (cheap per-keystroke path).
+  const onEditorChanged = useCallback(() => {
+    markChanged();
+  }, [markChanged]);
+
+  // Manual save (button and Mod+S): during a conflict the button reopens the
+  // explicit resolution dialog instead of racing another 409.
+  const handleSaveNow = useCallback(() => {
+    if (controller.status.kind === "conflict") {
+      setConflictDialogOpen(true);
+      return;
+    }
+    controller.saveNow();
+  }, [controller]);
+
+  // Mod+S inside the research editor claims the browser save shortcut for
+  // the document save (standard editor behavior; the listener lives on the
+  // window so the handler identity always matches the current controller).
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        handleSaveNow();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [handleSaveNow]);
+
+  const handleStatusRetry = useCallback(() => {
+    controller.retry();
+  }, [controller]);
+
+  const handleConflictOpen = useCallback(() => {
+    setConflictDialogOpen(true);
+    setConflictActionError(null);
+  }, []);
+
+  const handleConflictDismiss = useCallback(() => {
+    setConflictDialogOpen(false);
+    setConflictActionError(null);
+  }, []);
+
+  const handleConflictOverwrite = useCallback(() => {
+    const status = controller.status;
+    if (status.kind !== "conflict") {
+      return;
+    }
+    if (status.serverRevision === null) {
+      setConflictActionError(
+        "The server did not report its current revision — load the server version or download a local copy instead.",
+      );
+      return;
+    }
+    try {
+      // The explicit dialog confirmation is the only path here: CAS against
+      // the revision the 409 reported, with the LATEST local content.
+      controller.overwriteConflict(status.serverRevision);
+      setConflictDialogOpen(false);
+      setConflictActionError(null);
+    } catch {
+      setConflictActionError(
+        "The current content could not be serialized for saving — nothing was sent.",
+      );
+    }
+  }, [controller]);
+
+  const handleConflictReload = useCallback(async () => {
+    setConflictBusy(true);
+    setConflictActionError(null);
+    try {
+      const document = await getDocument(documentId);
+      const rawContent = document.content;
+      if (rawContent.schema_version !== CANONICAL_SCHEMA_VERSION) {
+        throw new Error("the server content uses an unsupported schema version");
+      }
+      const validated = validateCanonicalDocument(rawContent);
+      if (!editorRef.current) {
+        throw new Error("the editor is not ready");
+      }
+      editorRef.current.commands.setContent(canonicalToTiptapDoc(validated));
+      controller.adoptServerState(document.revision);
+      setConflictDialogOpen(false);
+      announce("Loaded the server version. Your local edits were discarded as you confirmed.");
+    } catch (error) {
+      setConflictActionError(describeRecoveryActionError(error, "The server version could not be loaded."));
+    } finally {
+      setConflictBusy(false);
+    }
+  }, [controller, documentId, announce]);
+
+  const handleDownloadLocalCopy = useCallback(() => {
+    try {
+      const body = controller.captureLocal();
+      downloadJson(body.content, `document-local-copy-${documentId}.json`);
+      announce("Downloaded a local copy of the current content.");
+    } catch {
+      setConflictActionError("The current content could not be serialized for download.");
+    }
+  }, [controller, documentId, announce]);
+
+  const handleConflictNewCopy = useCallback(async () => {
+    setConflictBusy(true);
+    setConflictActionError(null);
+    try {
+      const body = controller.captureLocal();
+      // POST /documents (owner-checked, client Idempotency-Key) then the
+      // first content save against the created revision 1 — the copy holds
+      // exactly the local content, the original stays untouched.
+      const created = await createDocument({
+        title: recoveredCopyTitle(title),
+        idempotencyKey: newIdempotencyKey(),
+      });
+      await saveRevision({
+        documentId: created.id,
+        revision: created.revision,
+        idempotencyKey: newIdempotencyKey(),
+        body,
+      });
+      router.push(`/workspace/research/${created.id}`);
+    } catch (error) {
+      setConflictActionError(
+        describeRecoveryActionError(error, "The copy could not be saved as a new document."),
+      );
+      setConflictBusy(false);
+      return;
+    }
+    setConflictBusy(false);
+  }, [controller, title, router]);
+
+  const handleDraftRestore = useCallback(() => {
+    const offer = controller.draft;
+    if (!offer || offer.invalidReason !== null || !editorRef.current) {
+      return;
+    }
+    try {
+      const validated = validateCanonicalDocument(offer.body.content);
+      editorRef.current.commands.setContent(canonicalToTiptapDoc(validated));
+      controller.restoreDraft();
+      announce("Restored the draft with unsaved changes. Autosave will save it shortly.");
+    } catch {
+      controller.discardDraft();
+    }
+  }, [controller, announce]);
+
+  const handleDraftDiscard = useCallback(() => {
+    controller.discardDraft();
+    announce("Discarded the recovered draft.");
+  }, [controller, announce]);
+
 
   // -- editor state derivation (doc + selection driven) --------------------- //
 
@@ -113,10 +335,13 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
     if (!editor) {
       return;
     }
-    const refreshDoc = () => {
+    const refreshDoc = (contentChanged: boolean) => {
       setOutline(deriveOutline(editor.getJSON()));
       setBlockCount(editor.state.doc.childCount);
       setCurrentBlock(currentTopLevelBlock(editor));
+      if (contentChanged) {
+        onEditorChanged();
+      }
     };
     const refreshSelection = () => {
       setCurrentBlock(currentTopLevelBlock(editor));
@@ -124,14 +349,18 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
       // is a clearer intent than a stale menu).
       setSlashMenu(null);
     };
-    refreshDoc();
-    editor.on("update", refreshDoc);
+    // The initial derivation is NOT a content change: the editor holds the
+    // loaded baseline (adoptBaseline adopts it), and marking it dirty would
+    // schedule a phantom save.
+    refreshDoc(false);
+    const onUpdate = () => refreshDoc(true);
+    editor.on("update", onUpdate);
     editor.on("selectionUpdate", refreshSelection);
     return () => {
-      editor.off("update", refreshDoc);
+      editor.off("update", onUpdate);
       editor.off("selectionUpdate", refreshSelection);
     };
-  }, [editor]);
+  }, [editor, onEditorChanged]);
 
   // -- bridges (node views / keyboard -> shell, via bubbling DOM events) ---- //
 
@@ -295,6 +524,9 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
     [editor, announce],
   );
 
+  const savedAt = controller.status.kind === "clean" ? controller.status.savedAt : null;
+  const displayedUpdatedAt = savedAt ?? updatedAt;
+
   return (
     <div className="flex flex-col gap-4" data-testid="editor-workbench">
       <p aria-live="polite" role="status" data-testid="editor-announcement" className="sr-only">
@@ -304,17 +536,54 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
       <header>
         <h1 className="font-serif text-title leading-title">{title}</h1>
         <p className="text-metadata leading-metadata text-text-secondary mt-1">
-          Updated <time dateTime={updatedAt}>{updatedAt}</time> · Revision {revision} · Schema
-          version 1
+          Updated <time dateTime={displayedUpdatedAt}>{displayedUpdatedAt}</time> · Revision{" "}
+          {controller.revision} · Schema version 1
         </p>
-        <p
-          data-testid="persistence-note"
-          className="mt-2 text-ui leading-ui text-warning font-medium"
-        >
-          Editing is local to this session — saving to the server arrives with NI-040 (autosave,
-          manual save and conflict recovery). Your changes are not persisted yet.
-        </p>
+        <div className="mt-2">
+          <SaveStatusBar
+            status={controller.status}
+            onSave={handleSaveNow}
+            onRetry={handleStatusRetry}
+            onOpenConflict={handleConflictOpen}
+            onDownloadCopy={handleDownloadLocalCopy}
+          />
+        </div>
       </header>
+
+      {controller.draft ? (
+        <div
+          role="alert"
+          data-testid="draft-recovery"
+          className="rounded-surface border border-border bg-surface p-4"
+        >
+          <p className="text-ui leading-ui font-medium text-text">
+            A draft with unsaved changes from this session was found (saved at{" "}
+            {formatSavedAt(controller.draft.capturedAt)}, based on revision{" "}
+            {controller.draft.baseRevision}).
+          </p>
+          {controller.draft.invalidReason ? (
+            <p className="text-ui leading-ui text-warning mt-1">
+              The draft cannot be restored: {controller.draft.invalidReason}. Discard it or keep
+              editing without it.
+            </p>
+          ) : (
+            <p className="text-body leading-body text-text-secondary mt-1">
+              Restoring replaces the paper with the draft&apos;s content; it is saved to the
+              server by the next autosave. The server version stays in the document history.
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {controller.draft.invalidReason === null ? (
+              <Button variant="secondary" onClick={handleDraftRestore} data-testid="draft-restore">
+                Restore draft
+              </Button>
+            ) : null}
+            <Button variant="quiet" onClick={handleDraftDiscard} data-testid="draft-discard">
+              Discard draft
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-start gap-2">
         <InsertMenuButton onInsert={handleInsert} disabled={!editor} />
@@ -490,6 +759,23 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
           }
         }}
       />
+
+      <ConflictRecoveryDialog
+        open={conflictDialogOpen && controller.status.kind === "conflict"}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleConflictDismiss();
+          }
+        }}
+        localRevision={controller.status.kind === "conflict" ? controller.status.revision : controller.revision}
+        serverRevision={controller.status.kind === "conflict" ? controller.status.serverRevision : null}
+        busy={conflictBusy}
+        actionError={conflictActionError}
+        onOverwrite={handleConflictOverwrite}
+        onReloadServerVersion={() => void handleConflictReload()}
+        onDownloadLocalCopy={handleDownloadLocalCopy}
+        onSaveAsNewCopy={() => void handleConflictNewCopy()}
+      />
     </div>
   );
 }
@@ -497,6 +783,27 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
 // --------------------------------------------------------------------------- //
 // Helpers
 // --------------------------------------------------------------------------- */
+
+/** Title of the "save as new document" conflict-recovery copy. */
+function recoveredCopyTitle(original: string): string {
+  const suffix = " (recovered copy)";
+  const room = DOCUMENT_TITLE_MAX_LENGTH - suffix.length;
+  const base = original.length > room ? `${original.slice(0, room - 1)}…` : original;
+  return `${base}${suffix}`;
+}
+
+function describeRecoveryActionError(error: unknown, fallback: string): string {
+  if (error instanceof DocumentApiError) {
+    if (error.status === 401) {
+      return "Your session has expired. Sign in again and retry — your local content is kept.";
+    }
+    if (error.status === 404) {
+      return "The document no longer exists on the server. Download a local copy to preserve your edits.";
+    }
+    return error.message || fallback;
+  }
+  return fallback;
+}
 
 function buildDeleteRequest(editor: Editor, index: number): DeleteRequest | null {
   const snapshot = canonicalSnapshot(editor);
