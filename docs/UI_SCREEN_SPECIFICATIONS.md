@@ -34,6 +34,20 @@ Shared shell: persistent group sidebar on desktop; top breadcrumb/title/account;
 | Profile `/workspace/profile` | Display name, provider-managed identity info and timezone preference | Save/error; ID/email ownership not editable through profile. Account email/password changes through provider flows |
 | Settings `/workspace/settings` | Display timezone, local draft controls, session/logout, data/privacy description, operator-assisted deletion process | Clear local drafts with confirmation; no unimplemented subscription/team/billing controls |
 
+Implemented Home (NI-024): Create document immediately persists “Untitled
+research” and opens its owned editor after acknowledgement; an uncertain retry
+retains its idempotency key. Continue opens the most recently updated owned
+document. The four workflow steps refer only to that document's current revision
+(creation, heading, chart, insight); the checklist never rates a claim. Recent
+notes are existing canonical saved insight projections, not a new insight
+authoring flow. A focus/auth check hides private state until the account can be
+checked again, and a different account discards pending continuation state.
+Each of at most three data-context cards preserves a canonical single-day
+observation, exact decimal string, metric/chart/dataset versions, sources,
+timestamps, quality and limitations. Source failures remain local to their card;
+missing values never become zero. Context links pin the displayed selection in
+the chart library; the general Explore data action opens the explorer.
+
 ## Research editor `/workspace/research/[documentId]`
 
 Header: editable title, saved/dirty/saving/error state, last saved time, manual Save, Export. Left outline from headings; central paper contains typed blocks; right contextual panel switches Add Block/Chart Library/Properties/Sources/Insight/Model. Tool panels collapse. Desktop three-pane appears only when minimum paper width fits; tablet tools as drawer; phone full paper with one drawer at a time.

@@ -283,9 +283,8 @@ export interface paths {
          * Owner-scoped workspace home aggregation
          * @description Return the verified principal's recent documents and scoped totals.
          *
-         *     The pending sections (recent_charts, recent_insights, indicators) are
-         *     honest empty arrays until NI-035 / NI-046-047 / NI-031-032 implement
-         *     their data pipelines; see schemas/home.py.
+         *     Private lists use current owner-scoped projections. Each approved public
+         *     indicator resolves independently; source failures do not hide research.
          */
         get: operations["getWorkspaceHome"];
         put?: never;
@@ -944,9 +943,8 @@ export interface components {
          *
          *     Block projection regeneration is owned by the document revision service
          *     (NI-036) and the chart/insight block taxonomy by NI-041/NI-046/NI-047.
-         *     Until that canonical taxonomy and projection exist, these counters are
-         *     the documented zero; they are never guessed from a non-canonical block
-         *     type naming. The counter semantics measure work completion only.
+         *     Home counts the canonical current-version heading/liveChart/insight
+         *     projection types. The counter semantics measure work completion only.
          */
         DocumentProgress: {
             /** Charts */
@@ -1199,15 +1197,76 @@ export interface components {
         };
         /**
          * HomeCounts
-         * @description Owner-scoped workflow totals the workspace shell renders.
-         *
-         *     Only the documents total exists today (it is the scoped count of the same
-         *     statement that pages recent_documents). Sections that arrive with
-         *     NI-035/NI-046/NI-047 extend this object instead of reshaping the response.
+         * @description Owner-scoped document total; no financial or confidence meaning.
          */
         HomeCounts: {
             /** Documents */
             documents: number;
+        };
+        /**
+         * HomeIndicator
+         * @description One canonical single-day series or an independently unavailable context.
+         *
+         *     The series preserves metric/dataset versions, decimal strings, quality,
+         *     source provenance and the exact UTC selection. No home-specific arithmetic.
+         */
+        HomeIndicator: {
+            /** Chart Id */
+            chart_id: string;
+            /** Chart Version */
+            chart_version: number | null;
+            /** Reason */
+            reason: string | null;
+            series: components["schemas"]["SeriesResponse"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "available" | "unavailable";
+            /** Title */
+            title: string;
+        };
+        /**
+         * HomeInsightSummary
+         * @description An existing canonical insight in an owned document's current revision.
+         *
+         *     This read projection provides navigation only; NI-047 owns insight authoring.
+         */
+        HomeInsightSummary: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "supporting" | "contradicting" | "uncertain";
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Title */
+            document_title: string;
+            /** Excerpt */
+            excerpt: string;
+            /**
+             * Insight Id
+             * Format: uuid
+             */
+            insight_id: string;
+            /**
+             * Modified At
+             * Format: date-time
+             */
+            modified_at: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "observation" | "hypothesis" | "risk" | "conclusion";
         };
         /**
          * HomeResponse
@@ -1220,13 +1279,13 @@ export interface components {
         HomeResponse: {
             counts: components["schemas"]["HomeCounts"];
             /** Indicators */
-            indicators: components["schemas"]["PendingHomeSection"][];
+            indicators: components["schemas"]["HomeIndicator"][];
             /** Recent Charts */
-            recent_charts: components["schemas"]["PendingHomeSection"][];
+            recent_charts: components["schemas"]["SavedChartResponse"][];
             /** Recent Documents */
             recent_documents: components["schemas"]["DocumentSummary"][];
             /** Recent Insights */
-            recent_insights: components["schemas"]["PendingHomeSection"][];
+            recent_insights: components["schemas"]["HomeInsightSummary"][];
         };
         /**
          * Hypothesis
@@ -1671,26 +1730,6 @@ export interface components {
              */
             start: string;
             value: components["schemas"]["DecimalString"] | null;
-        };
-        /**
-         * PendingHomeSection
-         * @description Typed marker element for a home section whose data model arrives later.
-         *
-         *     recent_charts arrives with NI-035 (persisted saved charts), recent_insights
-         *     with NI-046/NI-047 (insight contracts and persistence) and indicators with
-         *     NI-031/NI-032 (versioned chart/metric registries and public series APIs).
-         *     The owning tasks replace this element type with SavedChart / Insight /
-         *     Series per API_SPECIFICATION.md. The response schema forbids items
-         *     (`maxItems: 0`) until then: an empty array is the honest answer and
-         *     fabricated placeholder data can never validate.
-         */
-        PendingHomeSection: {
-            /**
-             * Status
-             * @default pending
-             * @constant
-             */
-            status: "pending";
         };
         /** ProfileResponse */
         ProfileResponse: {

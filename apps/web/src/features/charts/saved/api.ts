@@ -7,7 +7,7 @@ export type SavedChart = Schemas["SavedChartResponse"];
 export type SavedDetail = Schemas["SavedChartDetailResponse"];
 export type SaveInput = Schemas["SavedChartCreateRequest"];
 const selectionSchema = z.object({ start: z.string(), end: z.string(), frequency: z.literal("day"), filters: z.record(z.string(), z.string()) });
-const savedSchema: z.ZodType<SavedChart> = z.object({
+export const savedSchema: z.ZodType<SavedChart> = z.object({
   id: z.uuid(), label: z.string().nullable(), mode: z.enum(["live", "snapshot"]),
   chart_definition_version_id: z.uuid(), selection: selectionSchema,
   snapshot_id: z.uuid().nullable(), last_resolved_dataset_version_id: z.uuid().nullable(),

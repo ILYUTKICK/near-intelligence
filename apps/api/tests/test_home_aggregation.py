@@ -4,7 +4,7 @@ Use scripts/run-db-tests.py for the cluster-dependent cases; direct discovery
 skips them without its explicit isolated-cluster environment. A skip is never
 successful integration evidence. The offline cases cover the HTTP failure
 matrix (401 without/with an invalid session), the standardized 404 mapping
-and the response contract shape including the honest pending sections.
+and the bounded response contracts.
 
 All identities, titles and document contents are synthetic test fixtures,
 never research data.
@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.pool import NullPool
+from sqlalchemy.engine import make_url
 
 from near_api.auth import principal as principal_module
 from near_api.auth.principal import Principal, bootstrap_principal
@@ -37,8 +38,15 @@ from near_api.db.session import create_runtime_engine, user_transaction
 from near_api.main import app
 from near_api.repositories import documents as documents_repo
 from near_api.schemas.common import ErrorResponse
-from near_api.schemas.home import DocumentSummary, HomeResponse, PendingHomeSection
+from near_api.schemas.home import DocumentSummary, HomeResponse, HomeIndicator
 from near_api.workspace.aggregation import HomeOverview, home_overview
+from near_api.documents import service as document_service
+import test_documents as document_fixtures
+import test_delivery_apis as delivery_fixtures
+from near_api.charts import saved
+from near_api.charts.registry import chart_by_chart_id
+from near_api.schemas.saved_charts import SavedChartCreateRequest
+from near_api.datasets import delivery
 
 DOCUMENT_CONTENT = {"type": "doc", "content": [{"type": "paragraph"}]}
 HOME_FIELDS = {"recent_documents", "recent_charts", "recent_insights", "indicators", "counts"}
@@ -82,7 +90,7 @@ class HomeContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls.client = TestClient(app, raise_server_exceptions=False)
 
-    def test_01_home_is_documented_in_openapi_with_required_pending_sections(self):
+    def test_01_home_is_documented_in_openapi_with_bounded_typed_sections(self):
         schema = self.client.get("/openapi.json").json()
         # The contract grows with implemented routes: NI-025 added /api/me,
         # NI-036 added the document revision routes, NI-037 added the version
@@ -117,23 +125,28 @@ class HomeContractTests(unittest.TestCase):
         # Every documented field is always present: empty arrays stay explicit
         # instead of turning into optional fields later (NI-024 consumption).
         self.assertEqual(set(response_schema["required"]), HOME_FIELDS)
-        for section in ("recent_charts", "recent_insights", "indicators"):
-            self.assertEqual(response_schema["properties"][section]["maxItems"], 0,
-                             "pending sections must forbid items until their owning task lands")
+        for section, cap in (("recent_charts", 5), ("recent_insights", 5), ("indicators", 3)):
+            self.assertEqual(response_schema["properties"][section]["maxItems"], cap)
         self.assertEqual(response_schema["properties"]["recent_documents"]["maxItems"], 5)
-        for name in ("DocumentSummary", "DocumentProgress", "PendingHomeSection", "HomeCounts"):
+        for name in ("DocumentSummary", "DocumentProgress", "HomeInsightSummary", "HomeIndicator", "HomeCounts"):
             self.assertIn(name, schema["components"]["schemas"])
 
     def test_02_response_contract_rejects_fabricated_or_wrong_data(self):
         with self.assertRaises(ValidationError):
-            # A pending section can never carry a placeholder item.
-            HomeResponse(recent_documents=(), recent_charts=(PendingHomeSection(),),
+            # A placeholder cannot validate as a persisted saved chart.
+            HomeResponse(recent_documents=(), recent_charts=({"status": "pending"},),
                          recent_insights=(), indicators=(), counts={"documents": 0})
         with self.assertRaises(ValidationError):
             # The recent list is capped by the schema at 5.
             HomeResponse(recent_documents=tuple(summary() for _ in range(6)),
                          recent_charts=(), recent_insights=(), indicators=(),
                          counts={"documents": 6})
+        with self.assertRaises(ValidationError):
+            HomeIndicator(chart_id="gross-fees", title="Synthetic", chart_version=1,
+                          status="available", series=None, reason=None)
+        with self.assertRaises(ValidationError):
+            HomeIndicator(chart_id="gross-fees", title="Synthetic", chart_version=None,
+                          status="unavailable", series=None, reason=None)
         with self.assertRaises(ValidationError):
             DocumentSummary.model_validate(summary(revision=0))
         with self.assertRaises(ValidationError):
@@ -325,7 +338,8 @@ class HomeAggregationTests(unittest.TestCase):
                             for item in payload["recent_documents"]))
         self.assertEqual(payload["recent_charts"], [])
         self.assertEqual(payload["recent_insights"], [])
-        self.assertEqual(payload["indicators"], [])
+        self.assertEqual(len(payload["indicators"]), 3)
+        self.assertTrue(all(item["status"] == "unavailable" for item in payload["indicators"]))
 
     def test_02_deleted_document_leaves_recent_without_error(self):
         alice = self.alice()
@@ -357,7 +371,8 @@ class HomeAggregationTests(unittest.TestCase):
         self.assertEqual(payload["recent_documents"], [])
         self.assertEqual(payload["recent_charts"], [])
         self.assertEqual(payload["recent_insights"], [])
-        self.assertEqual(payload["indicators"], [])
+        self.assertEqual(len(payload["indicators"]), 3)
+        self.assertTrue(all(item["status"] == "unavailable" for item in payload["indicators"]))
         self.assertEqual(payload["counts"], {"documents": 0})
         HomeResponse.model_validate(payload)
 
@@ -404,7 +419,169 @@ class HomeAggregationTests(unittest.TestCase):
         # Identical statement count for 25 rows and 1 row proves there is no
         # per-row follow-up query (no N+1); the absolute bound stays small.
         self.assertEqual(alice_statements, bob_statements)
-        self.assertLessEqual(alice_statements, 6)
+        self.assertLessEqual(alice_statements, 20)
+        # 6 private queries + identity setup + <=3 savepoint/catalog attempts.
+
+
+@unittest.skipUnless(os.environ.get("NI_ISOLATED_PG_TEST") == "1", "Use scripts/run-db-tests.py")
+class HomeContextDatabaseTests(unittest.TestCase):
+    """Actual canonical saves, saved instances and approved indicator data."""
+
+    @classmethod
+    def setUpClass(cls):
+        # Delivery's catalog fixture inserts/updates shared scientific rows.
+        # Give this class a copy of the existing isolated database so neither
+        # those writes nor approved immutable datasets can leak to later suites.
+        # The original DB is never changed; this also preserves preexisting data.
+        original = make_url(os.environ["NI_TEST_ADMIN_URL"])
+        database_name = f"ni024_home_{uuid4().hex}"
+        cls.bootstrap = create_engine(original.set(database="postgres"), poolclass=NullPool,
+                                      hide_parameters=True, isolation_level="AUTOCOMMIT")
+        quote = cls.bootstrap.dialect.identifier_preparer.quote
+        database_sql = quote(database_name)
+        with cls.bootstrap.connect() as connection:
+            connection.execute(text(f"CREATE DATABASE {database_sql} OWNER near_migrator "
+                                    f"TEMPLATE {quote(original.database)}"))
+            connection.execute(text(f"REVOKE ALL ON DATABASE {database_sql} FROM PUBLIC"))
+            connection.execute(text(f"GRANT CONNECT ON DATABASE {database_sql} "
+                                    "TO near_app, near_operator, near_migrator, near_public"))
+            for role in ("near_app", "near_operator"):
+                connection.execute(text(f"ALTER ROLE {role} IN DATABASE {database_sql} "
+                                        "SET search_path = pg_catalog, app"))
+            connection.execute(text(f"ALTER ROLE near_public IN DATABASE {database_sql} "
+                                    "SET search_path = pg_catalog"))
+
+        def drop_class_database():
+            try:
+                with cls.bootstrap.connect() as connection:
+                    connection.execute(text(f"DROP DATABASE {database_sql} WITH (FORCE)"))
+            finally:
+                cls.bootstrap.dispose()
+
+        cls.addClassCleanup(drop_class_database)
+        environment = {}
+        for key in ("NI_TEST_ADMIN_URL", "NI_TEST_RUNTIME_URL", "NI_TEST_OPERATOR_URL",
+                    "NI_TEST_PUBLIC_URL", "MIGRATION_DATABASE_URL"):
+            environment[key] = make_url(os.environ[key]).set(database=database_name).render_as_string(
+                hide_password=False)
+        cls.environment = patch.dict(os.environ, environment)
+        cls.environment.start()
+        cls.addClassCleanup(cls.environment.stop)
+        delivery_fixtures.DeliveryDatabaseTests.setUpClass.__func__(cls)
+        cls.addClassCleanup(delivery_fixtures.DeliveryDatabaseTests.tearDownClass.__func__, cls)
+        cls.addClassCleanup(delivery.reset_delivery_caches)
+        cls.engine = cls.runtime
+
+    def setUp(self):
+        delivery_fixtures.DeliveryDatabaseTests.setUp(self)
+        self.alice = Principal(uuid4(), "Synthetic Alice", "UTC")
+        self.bob = Principal(uuid4(), "Synthetic Bob", "UTC")
+        with self.admin.begin() as connection:
+            connection.execute(text("DELETE FROM app.users"))
+            for actor in (self.alice, self.bob):
+                connection.execute(text("INSERT INTO app.users(id) VALUES (:id)"), {"id": actor.id})
+
+    def overview(self, actor):
+        with principal_transaction(self.runtime, actor) as connection:
+            return home_overview(connection, actor).to_home_response()
+
+    def test_current_canonical_notes_and_progress_exclude_history_and_other_owner(self):
+        document = document_service.create_document(self.runtime, self.alice, title="Synthetic Alice current")
+        old_note = document_fixtures.insight_attrs()
+        heading = document_fixtures.block("heading", level=1)
+        heading["content"] = [{"type": "text", "text": "Synthetic heading"}]
+        document_service.save_revision(self.runtime, self.alice, document.document.id,
+            expected_revision=1, document_payload={"type": "doc", "schema_version": 1,
+                                                 "content": [heading, old_note]})
+        # Same immutable note ID across revisions must appear exactly once;
+        # the removed old heading must not inflate workflow completion.
+        notes = [old_note] + [document_fixtures.insight_attrs() for _ in range(6)]
+        document_service.save_revision(self.runtime, self.alice, document.document.id,
+            expected_revision=2, document_payload={"type": "doc", "schema_version": 1, "content": notes})
+        bob_doc = document_service.create_document(self.runtime, self.bob, title="Synthetic Bob private")
+        document_service.save_revision(self.runtime, self.bob, bob_doc.document.id,
+            expected_revision=1, document_payload={"type": "doc", "schema_version": 1,
+                                                 "content": [heading, document_fixtures.insight_attrs()]})
+        home = self.overview(self.alice)
+        self.assertEqual(home.counts.documents, 1)
+        self.assertEqual(home.recent_documents[0].progress.model_dump(),
+                         {"headings": 0, "charts": 0, "insights": 7})
+        self.assertEqual(len(home.recent_insights), 5)
+        self.assertTrue(all(item.document_id == document.document.id for item in home.recent_insights))
+        self.assertEqual(len({item.insight_id for item in home.recent_insights}), 5)
+        self.assertTrue(all(item.excerpt == "Observation body" for item in home.recent_insights))
+        bob_home = self.overview(self.bob)
+        self.assertEqual(bob_home.recent_documents[0].progress.headings, 1)
+        self.assertEqual(len(bob_home.recent_insights), 1)
+        with principal_transaction(self.runtime, self.alice) as connection:
+            documents_repo.delete_document(connection, self.alice, document.document.id)
+        self.assertEqual(self.overview(self.alice).recent_insights, ())
+
+    def test_owned_saved_chart_cap_exact_indicator_and_isolated_sql_source_failure(self):
+        day = datetime(2026, 1, 1).date()
+        exact = "123456789.123456789012345678901234"
+        dataset = delivery_fixtures.DeliveryDatabaseTests.stage_fixture(self, f"ni024.{uuid4().hex[:16]}",
+            [delivery_fixtures.observation(delivery_fixtures.METRIC_VOLUME, day, value=exact),
+             delivery_fixtures.observation(delivery_fixtures.METRIC_FEES, day, value="1.5")],
+            [delivery_fixtures.METRIC_VOLUME, delivery_fixtures.METRIC_FEES],
+            window=("2026-01-01", "2026-01-02"))
+        body = SavedChartCreateRequest.model_validate({
+            "chart_definition_version_id": str(chart_by_chart_id("intents-volume").id),
+            "label": "Synthetic saved context", "mode": "live",
+            "dataset_version_id": str(dataset.dataset_version_id),
+            "selection": {"start": "2026-01-01", "end": "2026-01-02", "frequency": "day", "filters": {}}})
+        saved_ids = []
+        with principal_transaction(self.runtime, self.alice) as connection:
+            for _ in range(7):
+                saved_ids.append(saved.create(connection, self.alice.id, body).id)
+        with principal_transaction(self.runtime, self.bob) as connection:
+            bob_saved = saved.create(connection, self.bob.id, body)
+        document = document_service.create_document(self.runtime, self.alice, title="Synthetic persists through outage")
+        home = self.overview(self.alice)
+        self.assertEqual(len(home.recent_charts), 5)
+        self.assertTrue(all(item.id in saved_ids for item in home.recent_charts))
+        self.assertNotIn(bob_saved.id, {item.id for item in home.recent_charts})
+        self.assertEqual(home.indicators[0].series.points[0].value, exact)
+        self.assertEqual(home.indicators[0].series.dataset.id, dataset.dataset_version_id)
+        self.assertEqual(home.indicators[0].chart_version, 1)
+        self.assertEqual(home.indicators[0].series.selection.start.isoformat(), "2026-01-01")
+        self.assertEqual(home.indicators[0].series.selection.end.isoformat(), "2026-01-02")
+        original = delivery.load_chart_definition
+
+        def fail_one_source(connection, chart_id, version):
+            if chart_id == "intents-volume":
+                connection.execute(text("SELECT * FROM app.synthetic_missing_source_table"))
+            return original(connection, chart_id, version)
+
+        with patch.object(delivery, "load_chart_definition", side_effect=fail_one_source):
+            failed = self.overview(self.alice)
+        self.assertEqual(failed.recent_documents[0].id, document.document.id)
+        self.assertEqual(len(failed.recent_charts), 5)
+        self.assertEqual(failed.indicators[0].status, "unavailable")
+        self.assertIsNone(failed.indicators[0].series)
+        self.assertNotIn("synthetic_missing_source_table", failed.model_dump_json())
+        self.assertEqual(failed.indicators[1].status, "available")
+        self.assertEqual(failed.indicators[1].series.points[0].value, "1.5")
+        self.assertEqual(len(self.overview(self.bob).recent_charts), 1)
+        # Cold canonical delivery has a fixed bound too: more private rows do
+        # not multiply queries or trigger one lookup per recent item.
+        statements = []
+
+        def count_statement(connection, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        event.listen(self.runtime, "before_cursor_execute", count_statement)
+        try:
+            counts = []
+            for actor in (self.alice, self.bob):
+                delivery.reset_delivery_caches()
+                statements.clear()
+                self.overview(actor)
+                counts.append(len(statements))
+        finally:
+            event.remove(self.runtime, "before_cursor_execute", count_statement)
+        self.assertEqual(counts[0], counts[1])
+        self.assertLessEqual(counts[0], 64)
 
 
 if __name__ == "__main__":

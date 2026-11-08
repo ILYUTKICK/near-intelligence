@@ -92,13 +92,15 @@ describe("Workspace gate", () => {
 });
 
 describe("Workspace entry page", () => {
-  it("has no dead links to unimplemented routes", async () => {
+  it("mounts the real Home behind a session check", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
     const tree = await WorkspaceHomePage();
     const { container } = render(tree);
-    // NI-023/NI-035 pages do not exist yet — no anchors may point at them.
+    // No private content/actions appear before identity can be checked.
     expect(container.querySelector('a[href="/workspace/research"]')).toBeNull();
     expect(container.querySelector('a[href="/workspace/saved-charts"]')).toBeNull();
-    expect(container.textContent).toMatch(/NI-024/);
+    expect(screen.getByRole("status", { name: "Checking your workspace session" })).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/NI-024/);
   });
 });
 

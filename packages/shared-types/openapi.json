@@ -919,7 +919,7 @@
       },
       "DocumentProgress": {
         "additionalProperties": false,
-        "description": "Per-document work-completion counters (`{headings,charts,insights}`).\n\nBlock projection regeneration is owned by the document revision service\n(NI-036) and the chart/insight block taxonomy by NI-041/NI-046/NI-047.\nUntil that canonical taxonomy and projection exist, these counters are\nthe documented zero; they are never guessed from a non-canonical block\ntype naming. The counter semantics measure work completion only.",
+        "description": "Per-document work-completion counters (`{headings,charts,insights}`).\n\nBlock projection regeneration is owned by the document revision service\n(NI-036) and the chart/insight block taxonomy by NI-041/NI-046/NI-047.\nHome counts the canonical current-version heading/liveChart/insight\nprojection types. The counter semantics measure work completion only.",
         "properties": {
           "charts": {
             "minimum": 0.0,
@@ -1372,7 +1372,7 @@
       },
       "HomeCounts": {
         "additionalProperties": false,
-        "description": "Owner-scoped workflow totals the workspace shell renders.\n\nOnly the documents total exists today (it is the scoped count of the same\nstatement that pages recent_documents). Sections that arrive with\nNI-035/NI-046/NI-047 extend this object instead of reshaping the response.",
+        "description": "Owner-scoped document total; no financial or confidence meaning.",
         "properties": {
           "documents": {
             "minimum": 0.0,
@@ -1386,6 +1386,143 @@
         "title": "HomeCounts",
         "type": "object"
       },
+      "HomeIndicator": {
+        "additionalProperties": false,
+        "description": "One canonical single-day series or an independently unavailable context.\n\nThe series preserves metric/dataset versions, decimal strings, quality,\nsource provenance and the exact UTC selection. No home-specific arithmetic.",
+        "properties": {
+          "chart_id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Chart Id",
+            "type": "string"
+          },
+          "chart_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart Version"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeriesResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "available",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chart_id",
+          "title",
+          "chart_version",
+          "status",
+          "series",
+          "reason"
+        ],
+        "title": "HomeIndicator",
+        "type": "object"
+      },
+      "HomeInsightSummary": {
+        "additionalProperties": false,
+        "description": "An existing canonical insight in an owned document's current revision.\n\nThis read projection provides navigation only; NI-047 owns insight authoring.",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "supporting",
+              "contradicting",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Document Title",
+            "type": "string"
+          },
+          "excerpt": {
+            "maxLength": 280,
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "insight_id": {
+            "format": "uuid",
+            "title": "Insight Id",
+            "type": "string"
+          },
+          "modified_at": {
+            "format": "date-time",
+            "title": "Modified At",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "observation",
+              "hypothesis",
+              "risk",
+              "conclusion"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "insight_id",
+          "document_id",
+          "document_title",
+          "block_id",
+          "type",
+          "classification",
+          "modified_at",
+          "excerpt"
+        ],
+        "title": "HomeInsightSummary",
+        "type": "object"
+      },
       "HomeResponse": {
         "additionalProperties": false,
         "description": "`GET /api/home` payload for the verified principal.\n\nOperator-directed addition to the specification row: `counts` exposes the\nowner-scoped totals (NI-022 \"include workflow counts\"). Every list is\ncapped at RECENT_LIST_CAP by the query, not by slicing.",
@@ -1395,17 +1532,17 @@
           },
           "indicators": {
             "items": {
-              "$ref": "#/components/schemas/PendingHomeSection"
+              "$ref": "#/components/schemas/HomeIndicator"
             },
-            "maxItems": 0,
+            "maxItems": 3,
             "title": "Indicators",
             "type": "array"
           },
           "recent_charts": {
             "items": {
-              "$ref": "#/components/schemas/PendingHomeSection"
+              "$ref": "#/components/schemas/SavedChartResponse"
             },
-            "maxItems": 0,
+            "maxItems": 5,
             "title": "Recent Charts",
             "type": "array"
           },
@@ -1419,9 +1556,9 @@
           },
           "recent_insights": {
             "items": {
-              "$ref": "#/components/schemas/PendingHomeSection"
+              "$ref": "#/components/schemas/HomeInsightSummary"
             },
-            "maxItems": 0,
+            "maxItems": 5,
             "title": "Recent Insights",
             "type": "array"
           }
@@ -2356,20 +2493,6 @@
           "quality"
         ],
         "title": "Observation",
-        "type": "object"
-      },
-      "PendingHomeSection": {
-        "additionalProperties": false,
-        "description": "Typed marker element for a home section whose data model arrives later.\n\nrecent_charts arrives with NI-035 (persisted saved charts), recent_insights\nwith NI-046/NI-047 (insight contracts and persistence) and indicators with\nNI-031/NI-032 (versioned chart/metric registries and public series APIs).\nThe owning tasks replace this element type with SavedChart / Insight /\nSeries per API_SPECIFICATION.md. The response schema forbids items\n(`maxItems: 0`) until then: an empty array is the honest answer and\nfabricated placeholder data can never validate.",
-        "properties": {
-          "status": {
-            "const": "pending",
-            "default": "pending",
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "title": "PendingHomeSection",
         "type": "object"
       },
       "ProfileResponse": {
@@ -5202,7 +5325,7 @@
     },
     "/api/home": {
       "get": {
-        "description": "Return the verified principal's recent documents and scoped totals.\n\nThe pending sections (recent_charts, recent_insights, indicators) are\nhonest empty arrays until NI-035 / NI-046-047 / NI-031-032 implement\ntheir data pipelines; see schemas/home.py.",
+        "description": "Return the verified principal's recent documents and scoped totals.\n\nPrivate lists use current owner-scoped projections. Each approved public\nindicator resolves independently; source failures do not hide research.",
         "operationId": "getWorkspaceHome",
         "parameters": [
           {

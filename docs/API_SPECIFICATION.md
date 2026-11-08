@@ -66,19 +66,34 @@ SDK refresh occurs server-side through gateway/session handlers with cookie rota
 | PATCH `/me` | `{display_name?,display_timezone?}` → Principal | Owner; forbid id/email/owner edits | 422 |
 | GET `/workspace/home` | none → `{recent_documents:DocumentSummary[],recent_charts:SavedChart[],recent_insights:Insight[],indicators:Series[]}` | Owner lists; public indicators reused | 401; individual unavailable indicator typed, not whole-page failure |
 
-**Implemented (NI-022):** `apps/api/src/near_api/workspace/` serves this contract at
-`GET /api/home` with authorization solely through the `get_principal` dependency: 401 for a
-missing/invalid session, 403 fail closed for a disabled account, and the one generic
-`ResourceNotFound` 404 shape for absent/not-owned targets. The response adds an operator-directed
-`counts:{documents:int}` object with the owner-scoped total (scoped_page applies the owner
-predicate before LIMIT/OFFSET and counts the same scoped statement; two SQL statements total — no
-N+1) and caps `recent_documents` at 5 by the query with the stable `(updated_at DESC, id)` order.
-`recent_charts`/`recent_insights`/`indicators` are honest empty arrays with schema-level
-`maxItems: 0` until their owning tasks land (saved charts NI-035, insights NI-046/NI-047,
-public series NI-031/NI-032); individual unavailable indicators will be typed by those tasks, not
-this one. `DocumentSummary.progress` counters are documented zeros until the NI-036 revision
-service and the NI-041/NI-046 block taxonomy define canonical projection counters. Every response
-is `Cache-Control: no-store`.
+**Implemented (NI-022 / NI-024):** `GET /api/home` uses only the verified
+`get_principal` identity and transaction-local RLS. Every response is
+`Cache-Control: no-store` (401 invalid/missing session; 403 disabled account;
+absent/not-owned references share generic 404). `counts:{documents:int}` is an
+owner-scoped total; `recent_documents`, `recent_charts` and `recent_insights`
+are each query-capped at 5. Documents and saved charts use stable
+`(updated_at DESC,id)` ordering. Document progress counts canonical
+`heading`/`liveChart`/`insight` blocks only in each current revision; historical
+versions never inflate completion. These are workflow counts, never confidence.
+Saved charts reuse `SavedChartResponse`; no home read changes recency or pins.
+`HomeInsightSummary` is a read projection of existing canonical current-revision
+insights (`insight_id,document_id,document_title,block_id,type,classification,
+modified_at,excerpt`); excerpt is at most 280 plain-text characters. It exposes
+no independent insight authoring capability ahead of NI-047.
+
+At most 3 `HomeIndicator` entries use the registered `intents-volume`,
+`gross-fees` and `observed-conversions` definitions. Each carries
+`chart_id,title,chart_version:int|null,status,series:Series|null,reason:string|null`. An available
+entry reuses the first role-ordered canonical ChartView series for the last day
+of its latest approved dataset (`[end-1 day,end)`), retaining exact decimal
+strings, metric/dataset versions, quality, limits, sources and timestamps.
+Filters remain the canonical empty selection: ambiguous dimensions return
+explicit unavailable observations rather than a guessed source. Missing
+observations stay null. Catalog/delivery errors or source SQL failures produce
+only that indicator's unavailable state using a savepoint; private documents,
+saved contexts and other indicators remain usable. No providers or collectors
+are contacted. Private query count is constant (6 statements), plus at most
+three bounded canonical indicator resolutions; there is no per-document query.
 
 ## Research documents and versions
 
