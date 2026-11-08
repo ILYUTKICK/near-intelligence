@@ -192,8 +192,24 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
     if (!editor || !currentBlock) {
       return;
     }
-    setDeleteRequest(buildDeleteRequest(editor, currentBlock.index));
-  }, [editor, currentBlock]);
+    const snapshot = canonicalSnapshot(editor);
+    const block = snapshot.content[currentBlock.index];
+    if (!block) {
+      return;
+    }
+    const dependents = findDependentBlocks(snapshot.content, block.attrs.block_id);
+    if (dependents.length > 0) {
+      // Explicit preview of the affected links before anything is removed.
+      setDeleteRequest({
+        targetIndex: currentBlock.index,
+        targetLabel: blockLabel(block.type),
+        dependents,
+      });
+      return;
+    }
+    const ok = removeTopLevelBlocks(editor, [currentBlock.index]);
+    announce(ok ? "Block deleted. You can undo this." : "The block could not be deleted.");
+  }, [editor, currentBlock, announce]);
 
   const confirmDelete = useCallback(() => {
     if (!editor || !deleteRequest) {

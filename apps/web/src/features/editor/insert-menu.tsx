@@ -70,7 +70,9 @@ export function InsertMenuButton({
           <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </DropdownMenuTrigger>
-      <DropdownMenuContent aria-label="Insert block menu">
+      {/* The menu takes its accessible name from the trigger via Radix's
+          aria-labelledby — one name, no duplicate labelling. */}
+      <DropdownMenuContent>
         <p className="px-3 py-1.5 text-metadata leading-metadata text-text-secondary">
           Insert after the current block · type <kbd className="rounded-control border border-control-border px-1">/</kbd> in an empty line
         </p>
