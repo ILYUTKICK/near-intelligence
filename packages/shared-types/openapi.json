@@ -49,6 +49,58 @@
         "title": "ApiError",
         "type": "object"
       },
+      "ApprovalResponse": {
+        "additionalProperties": false,
+        "description": "The recorded operator review provenance of a published run.",
+        "properties": {
+          "decision": {
+            "const": "approve",
+            "title": "Decision",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "review_reference": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Review Reference",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewer": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reviewer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "reviewer",
+          "review_reference"
+        ],
+        "title": "ApprovalResponse",
+        "type": "object"
+      },
       "AvailableRanges": {
         "additionalProperties": false,
         "description": "Bounded query ranges of a chart definition (registry ``allowed_ranges``).",
@@ -288,6 +340,47 @@
           "quality"
         ],
         "title": "ChartViewResponse",
+        "type": "object"
+      },
+      "CoefficientResponse": {
+        "additionalProperties": false,
+        "description": "One recorded coefficient of a published fit (API_SPECIFICATION ``ModelRun``\n``coefficients`` row: term/estimate/standard_error/ci bounds/p_value).\n\nValues are the fit manifest's finite float64 records verbatim; the\npublication gate refuses NaN/Infinity, so a published coefficient is\nalways finite. ``p_value`` is recorded evidence, never a selection input.",
+        "properties": {
+          "ci95_high": {
+            "title": "Ci95 High",
+            "type": "number"
+          },
+          "ci95_low": {
+            "title": "Ci95 Low",
+            "type": "number"
+          },
+          "estimate": {
+            "title": "Estimate",
+            "type": "number"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "p_value": {
+            "title": "P Value",
+            "type": "number"
+          },
+          "std_error": {
+            "title": "Std Error",
+            "type": "number"
+          },
+          "t_stat": {
+            "title": "T Stat",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CoefficientResponse",
         "type": "object"
       },
       "Coverage": {
@@ -1496,6 +1589,42 @@
         "title": "InsightInput",
         "type": "object"
       },
+      "LimitationsResponse": {
+        "additionalProperties": false,
+        "description": "Limitations attached verbatim to the published run.",
+        "properties": {
+          "gate_limit_codes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Gate Limit Codes",
+            "type": "array"
+          },
+          "prohibited_labels": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Prohibited Labels",
+            "type": "array"
+          },
+          "spec_limitation_notes": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Spec Limitation Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "prohibited_labels",
+          "spec_limitation_notes"
+        ],
+        "title": "LimitationsResponse",
+        "type": "object"
+      },
       "MetricListResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1666,6 +1795,398 @@
         "title": "ModelContext",
         "type": "object"
       },
+      "ModelDefinitionListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelDefinitionResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ModelDefinitionListResponse",
+        "type": "object"
+      },
+      "ModelDefinitionResponse": {
+        "additionalProperties": false,
+        "description": "One public model definition (API_SPECIFICATION ``ModelDefinition`` row).\n\nServed from the latest published run of the specification: an unpublished\nor rejected specification has no public definition. ``question`` is\nmechanically composed from the specification's declared fields (see the\nmodule docstring) \u2014 never an authored claim.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "latest_published_run_id": {
+            "format": "uuid",
+            "title": "Latest Published Run Id",
+            "type": "string"
+          },
+          "limitations": {
+            "$ref": "#/components/schemas/LimitationsResponse"
+          },
+          "model_id": {
+            "pattern": "^[a-z][a-z0-9_]{2,79}$",
+            "title": "Model Id",
+            "type": "string"
+          },
+          "question": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "readiness_rules": {
+            "additionalProperties": true,
+            "title": "Readiness Rules",
+            "type": "object"
+          },
+          "required_metric_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Required Metric Ids",
+            "type": "array"
+          },
+          "specification": {
+            "additionalProperties": true,
+            "title": "Specification",
+            "type": "object"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "model_id",
+          "version",
+          "question",
+          "specification",
+          "required_metric_ids",
+          "readiness_rules",
+          "limitations",
+          "latest_published_run_id"
+        ],
+        "title": "ModelDefinitionResponse",
+        "type": "object"
+      },
+      "ModelReadinessResponse": {
+        "additionalProperties": false,
+        "description": "The NI-051 gate verdict for one specification (public readiness record).\n\n``ready`` is true only for the admitted verdicts; every reason code the\ngate recorded travels verbatim, and ``recorded_in_run_id`` names the\npublished run whose readiness report carries the verdict. A specification\nnever evaluated by a published readiness report is 404 \u2014 an unpublished\ngate report never looks like a verdict.",
+        "properties": {
+          "model_id": {
+            "pattern": "^[a-z][a-z0-9_]{2,79}$",
+            "title": "Model Id",
+            "type": "string"
+          },
+          "overall_verdict": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Overall Verdict",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reasons": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReasonCodeResponse"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "recorded_in_run_id": {
+            "format": "uuid",
+            "title": "Recorded In Run Id",
+            "type": "string"
+          },
+          "selected_specification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Specification"
+          },
+          "verdict": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id",
+          "ready",
+          "verdict",
+          "overall_verdict",
+          "recorded_in_run_id"
+        ],
+        "title": "ModelReadinessResponse",
+        "type": "object"
+      },
+      "ModelRunDetailResponse": {
+        "additionalProperties": false,
+        "description": "One published run with its recorded results.\n\nEvery block is a projection of the verified manifests stored on the row:\nthe specification and design verbatim, the coefficient table, the\nestimation summary, the NI-053 diagnostics battery, the template-rendered\ninterpretation, the limitations verbatim, the recorded environment and\nreproduction contract, and the review approval. The full manifest set is\ndownloadable at ``manifest_url``.",
+        "properties": {
+          "admission_reasons": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReasonCodeResponse"
+            },
+            "title": "Admission Reasons",
+            "type": "array"
+          },
+          "approval": {
+            "$ref": "#/components/schemas/ApprovalResponse"
+          },
+          "code_commit": {
+            "pattern": "^[0-9a-f]{40}$|^[0-9a-f]{64}$",
+            "title": "Code Commit",
+            "type": "string"
+          },
+          "coefficients": {
+            "items": {
+              "$ref": "#/components/schemas/CoefficientResponse"
+            },
+            "minItems": 1,
+            "title": "Coefficients",
+            "type": "array"
+          },
+          "design": {
+            "additionalProperties": true,
+            "title": "Design",
+            "type": "object"
+          },
+          "diagnostics": {
+            "additionalProperties": true,
+            "title": "Diagnostics",
+            "type": "object"
+          },
+          "environment": {
+            "additionalProperties": true,
+            "title": "Environment",
+            "type": "object"
+          },
+          "estimation": {
+            "additionalProperties": true,
+            "title": "Estimation",
+            "type": "object"
+          },
+          "gate_verdict": {
+            "enum": [
+              "READY",
+              "READY_WITH_LIMITS"
+            ],
+            "title": "Gate Verdict",
+            "type": "string"
+          },
+          "interpretation": {
+            "additionalProperties": true,
+            "title": "Interpretation",
+            "type": "object"
+          },
+          "limitations": {
+            "$ref": "#/components/schemas/LimitationsResponse"
+          },
+          "manifest_url": {
+            "minLength": 1,
+            "title": "Manifest Url",
+            "type": "string"
+          },
+          "model_id": {
+            "pattern": "^[a-z][a-z0-9_]{2,79}$",
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_version": {
+            "minimum": 1.0,
+            "title": "Model Version",
+            "type": "integer"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "published_by": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Published By",
+            "type": "string"
+          },
+          "reproduction": {
+            "additionalProperties": true,
+            "title": "Reproduction",
+            "type": "object"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "sample": {
+            "$ref": "#/components/schemas/RunSampleResponse"
+          },
+          "specification": {
+            "additionalProperties": true,
+            "title": "Specification",
+            "type": "object"
+          },
+          "tolerances": {
+            "$ref": "#/components/schemas/TolerancesResponse"
+          }
+        },
+        "required": [
+          "run_id",
+          "model_id",
+          "model_version",
+          "gate_verdict",
+          "sample",
+          "tolerances",
+          "code_commit",
+          "manifest_url",
+          "published_at",
+          "published_by",
+          "specification",
+          "design",
+          "estimation",
+          "coefficients",
+          "diagnostics",
+          "interpretation",
+          "limitations",
+          "environment",
+          "reproduction",
+          "approval"
+        ],
+        "title": "ModelRunDetailResponse",
+        "type": "object"
+      },
+      "ModelRunListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRunSummaryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ModelRunListResponse",
+        "type": "object"
+      },
+      "ModelRunSummaryResponse": {
+        "additionalProperties": false,
+        "description": "One published run in the catalog (API_SPECIFICATION ``/model-runs`` row).\n\nThe catalog lists published runs only; unpublished, failed or rejected\nruns do not exist in the backing table and are indistinguishable from\nabsent ones.",
+        "properties": {
+          "code_commit": {
+            "pattern": "^[0-9a-f]{40}$|^[0-9a-f]{64}$",
+            "title": "Code Commit",
+            "type": "string"
+          },
+          "gate_verdict": {
+            "enum": [
+              "READY",
+              "READY_WITH_LIMITS"
+            ],
+            "title": "Gate Verdict",
+            "type": "string"
+          },
+          "manifest_url": {
+            "minLength": 1,
+            "title": "Manifest Url",
+            "type": "string"
+          },
+          "model_id": {
+            "pattern": "^[a-z][a-z0-9_]{2,79}$",
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_version": {
+            "minimum": 1.0,
+            "title": "Model Version",
+            "type": "integer"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "published_by": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Published By",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "sample": {
+            "$ref": "#/components/schemas/RunSampleResponse"
+          },
+          "tolerances": {
+            "$ref": "#/components/schemas/TolerancesResponse"
+          }
+        },
+        "required": [
+          "run_id",
+          "model_id",
+          "model_version",
+          "gate_verdict",
+          "sample",
+          "tolerances",
+          "code_commit",
+          "manifest_url",
+          "published_at",
+          "published_by"
+        ],
+        "title": "ModelRunSummaryResponse",
+        "type": "object"
+      },
       "Observation": {
         "additionalProperties": false,
         "properties": {
@@ -1765,6 +2286,39 @@
         "maxLength": 200,
         "minLength": 1,
         "type": "string"
+      },
+      "ReasonCodeResponse": {
+        "additionalProperties": false,
+        "description": "One NI-051 gate reason code, verbatim (code, severity, detail).",
+        "properties": {
+          "code": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "minLength": 1,
+            "title": "Detail",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "rejecting",
+              "limit",
+              "informational"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "detail"
+        ],
+        "title": "ReasonCodeResponse",
+        "type": "object"
       },
       "ResolvedContext": {
         "additionalProperties": false,
@@ -2125,6 +2679,34 @@
         "title": "RiskInput",
         "type": "object"
       },
+      "RunSampleResponse": {
+        "additionalProperties": false,
+        "description": "The published sample window and size (half-open, gate-exact).",
+        "properties": {
+          "end_exclusive": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "title": "End Exclusive",
+            "type": "string"
+          },
+          "nobs": {
+            "minimum": 1.0,
+            "title": "Nobs",
+            "type": "integer"
+          },
+          "start": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end_exclusive",
+          "nobs"
+        ],
+        "title": "RunSampleResponse",
+        "type": "object"
+      },
       "Selection": {
         "additionalProperties": false,
         "properties": {
@@ -2199,6 +2781,28 @@
           "sources"
         ],
         "title": "SeriesResponse",
+        "type": "object"
+      },
+      "TolerancesResponse": {
+        "additionalProperties": false,
+        "description": "The declared reproduction tolerances of a published fit.",
+        "properties": {
+          "coefficient_atol": {
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "title": "Coefficient Atol",
+            "type": "string"
+          },
+          "coefficient_rtol": {
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "title": "Coefficient Rtol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "coefficient_rtol",
+          "coefficient_atol"
+        ],
+        "title": "TolerancesResponse",
         "type": "object"
       },
       "ValidationError": {
@@ -4439,6 +5043,354 @@
         "summary": "Resolved metric series from one approved dataset version",
         "tags": [
           "metrics"
+        ]
+      }
+    },
+    "/api/model-definitions": {
+      "get": {
+        "description": "List definitions derived from published runs (never from local reports).",
+        "operationId": "listModelDefinitions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDefinitionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Request failed validation"
+          }
+        },
+        "summary": "Public model definitions (published specifications only)",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/model-definitions/{model_id}": {
+      "get": {
+        "description": "One specification's definition from its latest published run.",
+        "operationId": "getModelDefinition",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9_]{2,79}$",
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDefinitionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Published model definition not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One public model definition",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/model-definitions/{model_id}/readiness": {
+      "get": {
+        "description": "The recorded gate verdict; a never-published verdict is the same 404.",
+        "operationId": "getModelReadiness",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9_]{2,79}$",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No published readiness verdict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "NI-051 gate verdict for one specification (public)",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/model-runs": {
+      "get": {
+        "description": "List published runs newest-first (unpublished runs are never listed).",
+        "operationId": "listModelRuns",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "model_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "pattern": "^[a-z][a-z0-9_]{2,79}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRunListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Request failed validation"
+          }
+        },
+        "summary": "Catalog of published model runs",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/model-runs/{run_id}": {
+      "get": {
+        "description": "Return one published run; non-published identities are the same 404.",
+        "operationId": "getModelRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRunDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Published run not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One published run with its results",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/model-runs/{run_id}/manifest": {
+      "get": {
+        "description": "Serve the verified bundle verbatim; ``research verify --bundle`` accepts it.",
+        "operationId": "getModelRunManifest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Canonical manifest bundle JSON"
+          },
+          "404": {
+            "description": "Published run not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Downloadable manifest bundle of one published run",
+        "tags": [
+          "models"
         ]
       }
     },

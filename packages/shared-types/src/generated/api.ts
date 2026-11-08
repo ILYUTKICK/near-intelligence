@@ -356,6 +356,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/model-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public model definitions (published specifications only)
+         * @description List definitions derived from published runs (never from local reports).
+         */
+        get: operations["listModelDefinitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-definitions/{model_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One public model definition
+         * @description One specification's definition from its latest published run.
+         */
+        get: operations["getModelDefinition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-definitions/{model_id}/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * NI-051 gate verdict for one specification (public)
+         * @description The recorded gate verdict; a never-published verdict is the same 404.
+         */
+        get: operations["getModelReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catalog of published model runs
+         * @description List published runs newest-first (unpublished runs are never listed).
+         */
+        get: operations["listModelRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One published run with its results
+         * @description Return one published run; non-published identities are the same 404.
+         */
+        get: operations["getModelRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-runs/{run_id}/manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Downloadable manifest bundle of one published run
+         * @description Serve the verified bundle verbatim; ``research verify --bundle`` accepts it.
+         */
+        get: operations["getModelRunManifest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -395,6 +515,25 @@ export interface components {
             request_id: string;
             /** Retryable */
             retryable: boolean;
+        };
+        /**
+         * ApprovalResponse
+         * @description The recorded operator review provenance of a published run.
+         */
+        ApprovalResponse: {
+            /**
+             * Decision
+             * @constant
+             */
+            decision: "approve";
+            /** Notes */
+            notes?: string | null;
+            /** Review Reference */
+            review_reference: string;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /** Reviewer */
+            reviewer: string;
         };
         /**
          * AvailableRanges
@@ -498,6 +637,31 @@ export interface components {
             selection: components["schemas"]["ResolvedSelection"];
             /** Series */
             series: components["schemas"]["SeriesResponse"][];
+        };
+        /**
+         * CoefficientResponse
+         * @description One recorded coefficient of a published fit (API_SPECIFICATION ``ModelRun``
+         *     ``coefficients`` row: term/estimate/standard_error/ci bounds/p_value).
+         *
+         *     Values are the fit manifest's finite float64 records verbatim; the
+         *     publication gate refuses NaN/Infinity, so a published coefficient is
+         *     always finite. ``p_value`` is recorded evidence, never a selection input.
+         */
+        CoefficientResponse: {
+            /** Ci95 High */
+            ci95_high?: number;
+            /** Ci95 Low */
+            ci95_low?: number;
+            /** Estimate */
+            estimate?: number;
+            /** Name */
+            name: string;
+            /** P Value */
+            p_value?: number;
+            /** Std Error */
+            std_error?: number;
+            /** T Stat */
+            t_stat?: number;
         };
         /** Coverage */
         Coverage: {
@@ -1069,6 +1233,21 @@ export interface components {
              */
             type: "observation" | "hypothesis" | "risk" | "conclusion";
         };
+        /**
+         * LimitationsResponse
+         * @description Limitations attached verbatim to the published run.
+         */
+        LimitationsResponse: {
+            /**
+             * Gate Limit Codes
+             * @default []
+             */
+            gate_limit_codes: string[];
+            /** Prohibited Labels */
+            prohibited_labels: string[];
+            /** Spec Limitation Notes */
+            spec_limitation_notes: string[];
+        };
         /** MetricListResponse */
         MetricListResponse: {
             /** Items */
@@ -1138,6 +1317,204 @@ export interface components {
             /** Specification Version */
             specification_version: string;
         };
+        /** ModelDefinitionListResponse */
+        ModelDefinitionListResponse: {
+            /** Items */
+            items: components["schemas"]["ModelDefinitionResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
+         * ModelDefinitionResponse
+         * @description One public model definition (API_SPECIFICATION ``ModelDefinition`` row).
+         *
+         *     Served from the latest published run of the specification: an unpublished
+         *     or rejected specification has no public definition. ``question`` is
+         *     mechanically composed from the specification's declared fields (see the
+         *     module docstring) — never an authored claim.
+         */
+        ModelDefinitionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Latest Published Run Id
+             * Format: uuid
+             */
+            latest_published_run_id: string;
+            limitations: components["schemas"]["LimitationsResponse"];
+            /** Model Id */
+            model_id: string;
+            /** Question */
+            question: string;
+            /** Readiness Rules */
+            readiness_rules: {
+                [key: string]: unknown;
+            };
+            /** Required Metric Ids */
+            required_metric_ids: string[];
+            /** Specification */
+            specification: {
+                [key: string]: unknown;
+            };
+            /** Version */
+            version: number;
+        };
+        /**
+         * ModelReadinessResponse
+         * @description The NI-051 gate verdict for one specification (public readiness record).
+         *
+         *     ``ready`` is true only for the admitted verdicts; every reason code the
+         *     gate recorded travels verbatim, and ``recorded_in_run_id`` names the
+         *     published run whose readiness report carries the verdict. A specification
+         *     never evaluated by a published readiness report is 404 — an unpublished
+         *     gate report never looks like a verdict.
+         */
+        ModelReadinessResponse: {
+            /** Model Id */
+            model_id: string;
+            /** Overall Verdict */
+            overall_verdict: string;
+            /** Ready */
+            ready: boolean;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: components["schemas"]["ReasonCodeResponse"][];
+            /**
+             * Recorded In Run Id
+             * Format: uuid
+             */
+            recorded_in_run_id: string;
+            /** Selected Specification */
+            selected_specification?: string | null;
+            /** Verdict */
+            verdict: string;
+        };
+        /**
+         * ModelRunDetailResponse
+         * @description One published run with its recorded results.
+         *
+         *     Every block is a projection of the verified manifests stored on the row:
+         *     the specification and design verbatim, the coefficient table, the
+         *     estimation summary, the NI-053 diagnostics battery, the template-rendered
+         *     interpretation, the limitations verbatim, the recorded environment and
+         *     reproduction contract, and the review approval. The full manifest set is
+         *     downloadable at ``manifest_url``.
+         */
+        ModelRunDetailResponse: {
+            /**
+             * Admission Reasons
+             * @default []
+             */
+            admission_reasons: components["schemas"]["ReasonCodeResponse"][];
+            approval: components["schemas"]["ApprovalResponse"];
+            /** Code Commit */
+            code_commit: string;
+            /** Coefficients */
+            coefficients: components["schemas"]["CoefficientResponse"][];
+            /** Design */
+            design: {
+                [key: string]: unknown;
+            };
+            /** Diagnostics */
+            diagnostics: {
+                [key: string]: unknown;
+            };
+            /** Environment */
+            environment: {
+                [key: string]: unknown;
+            };
+            /** Estimation */
+            estimation: {
+                [key: string]: unknown;
+            };
+            /**
+             * Gate Verdict
+             * @enum {string}
+             */
+            gate_verdict: "READY" | "READY_WITH_LIMITS";
+            /** Interpretation */
+            interpretation: {
+                [key: string]: unknown;
+            };
+            limitations: components["schemas"]["LimitationsResponse"];
+            /** Manifest Url */
+            manifest_url: string;
+            /** Model Id */
+            model_id: string;
+            /** Model Version */
+            model_version: number;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Published By */
+            published_by: string;
+            /** Reproduction */
+            reproduction: {
+                [key: string]: unknown;
+            };
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            sample: components["schemas"]["RunSampleResponse"];
+            /** Specification */
+            specification: {
+                [key: string]: unknown;
+            };
+            tolerances: components["schemas"]["TolerancesResponse"];
+        };
+        /** ModelRunListResponse */
+        ModelRunListResponse: {
+            /** Items */
+            items: components["schemas"]["ModelRunSummaryResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
+         * ModelRunSummaryResponse
+         * @description One published run in the catalog (API_SPECIFICATION ``/model-runs`` row).
+         *
+         *     The catalog lists published runs only; unpublished, failed or rejected
+         *     runs do not exist in the backing table and are indistinguishable from
+         *     absent ones.
+         */
+        ModelRunSummaryResponse: {
+            /** Code Commit */
+            code_commit: string;
+            /**
+             * Gate Verdict
+             * @enum {string}
+             */
+            gate_verdict: "READY" | "READY_WITH_LIMITS";
+            /** Manifest Url */
+            manifest_url: string;
+            /** Model Id */
+            model_id: string;
+            /** Model Version */
+            model_version: number;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Published By */
+            published_by: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            sample: components["schemas"]["RunSampleResponse"];
+            tolerances: components["schemas"]["TolerancesResponse"];
+        };
         /** Observation */
         Observation: {
             /**
@@ -1190,6 +1567,21 @@ export interface components {
             display_timezone: string;
         };
         Reason: string;
+        /**
+         * ReasonCodeResponse
+         * @description One NI-051 gate reason code, verbatim (code, severity, detail).
+         */
+        ReasonCodeResponse: {
+            /** Code */
+            code: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "rejecting" | "limit" | "informational";
+        };
         /**
          * ResolvedContext
          * @description Frozen chart inspection record (API_SPECIFICATION ``ResolvedContext``).
@@ -1379,6 +1771,18 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * RunSampleResponse
+         * @description The published sample window and size (half-open, gate-exact).
+         */
+        RunSampleResponse: {
+            /** End Exclusive */
+            end_exclusive: string;
+            /** Nobs */
+            nobs: number;
+            /** Start */
+            start: string;
+        };
         /** Selection */
         Selection: {
             /**
@@ -1419,6 +1823,16 @@ export interface components {
             selection: components["schemas"]["ResolvedSelection"];
             /** Sources */
             sources: components["schemas"]["DataSourceResponse"][];
+        };
+        /**
+         * TolerancesResponse
+         * @description The declared reproduction tolerances of a published fit.
+         */
+        TolerancesResponse: {
+            /** Coefficient Atol */
+            coefficient_atol: string;
+            /** Coefficient Rtol */
+            coefficient_rtol: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -2741,6 +3155,223 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listModelDefinitions: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDefinitionListResponse"];
+                };
+            };
+            /** @description Request failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getModelDefinition: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDefinitionResponse"];
+                };
+            };
+            /** @description Published model definition not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getModelReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelReadinessResponse"];
+                };
+            };
+            /** @description No published readiness verdict */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listModelRuns: {
+        parameters: {
+            query?: {
+                model_id?: string | null;
+                cursor?: string | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelRunListResponse"];
+                };
+            };
+            /** @description Request failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getModelRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelRunDetailResponse"];
+                };
+            };
+            /** @description Published run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getModelRunManifest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Canonical manifest bundle JSON */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Published run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
