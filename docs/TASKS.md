@@ -1235,7 +1235,12 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-040, NI-033
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Delivery claimed by:** Codex subagent /root/ni041_delivery, parent chat 01a1ba7d-239f-7483-b2d6-fc651744fe9b
+- **Delivery execution role:** B, with the authorized A/UI integration
+- **Delivery started at:** 2026-11-08T18:08:41+03:00
+- **Delivery branch/worktree:** feat/ni-041-main-delivery @ /Users/ilyutkinn/Desktop/Near, main-based HEAD 6aca1c1
+- **Delivery scope:** restore the already implemented and verified NI-041 history from 0378ec8 into the actual main-based tree. PR #68 was merged into its former stacked base after that base had already reached main; the NI-041 code therefore remains absent here. Preserve the original continuation/result evidence, NI-012 final acceptance, and the sequential-task instructions. NI-040 and NI-033 are verified DONE on this tree; no new feature or data collection is authorized by this delivery claim. Parent coordinator owns publication; independent acceptance remains waived only for NI-035/NI-041 by the user's explicit instruction.
 
 **Description:** Connect explorer/library selection to persisted document blocks.
 
