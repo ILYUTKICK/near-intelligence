@@ -19,6 +19,8 @@ from sqlalchemy.engine import URL
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--saved-charts-http", action="store_true",
+                        help="run saved-chart DB and production gateway HTTP checks only")
     parser.add_argument("--pg-bin", type=Path, required=True)
     parser.add_argument("--suite", choices=("all", "landing"), default="all",
                         help="landing runs NI-012 HTTP integration against a prebuilt web app")
@@ -107,7 +109,7 @@ def main() -> int:
                     "test_home_aggregation.py", "test_archive_import.py",
                     "test_dataset_staging.py", "test_metrics.py",
                     "test_refresh_adapter.py", "test_chart_registry.py",
-                    "test_delivery_apis.py",
+                    "test_delivery_apis.py", "test_saved_charts.py",
                     "test_profile.py", "test_documents.py", "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py"]
@@ -120,13 +122,15 @@ def main() -> int:
         if args.suite == "all" and os.environ.get("NI_LIVE_SMOKE") == "1":
             environment["NI_LIVE_SMOKE"] = "1"
             patterns.append("test_refresh_live_smoke.py")
+        if args.saved_charts_http:
+            patterns = ["test_saved_charts.py", "test_saved_charts_http.py"]
         returncode = 0
         with test_log.open("wb") as log:
             for pattern in patterns:
                 result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "apps/api/tests",
                                          "-p", pattern, "-v"], cwd=repo, env=environment,
                                         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                        timeout=120,
+                                        timeout=300 if os.environ.get("NI_BROWSER_HANDOFF") == "1" else 120,
                                         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
                 if result.returncode and not returncode:
                     returncode = result.returncode

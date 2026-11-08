@@ -1,0 +1,162 @@
+"""NI-035 real PostgreSQL/RLS/API regressions. All identities/data synthetic."""
+
+import datetime as dt
+import os
+import unittest
+from uuid import uuid4
+
+from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
+
+from near_api.auth.principal import Principal, get_principal
+from near_api.charts.registry import chart_by_chart_id
+from near_api.db.session import user_transaction
+from near_api.datasets import delivery
+from near_api.main import app
+import test_delivery_apis as fixtures
+from test_delivery_apis import METRIC_VOLUME, observation
+
+
+@unittest.skipUnless(os.environ.get("NI_ISOLATED_PG_TEST") == "1", "Use run-db-tests.py")
+class SavedChartsDatabaseTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        fixtures.DeliveryDatabaseTests.setUpClass.__func__(cls)
+        cls.alice = Principal(uuid4(), "Synthetic Alice", "UTC")
+        cls.bob = Principal(uuid4(), "Synthetic Bob", "UTC")
+        with cls.admin.begin() as connection:
+            for person in (cls.alice, cls.bob):
+                connection.execute(text("INSERT INTO app.users(id) VALUES (:id)"), {"id": person.id})
+
+    @classmethod
+    def tearDownClass(cls):
+        app.dependency_overrides.pop(get_principal, None)
+        fixtures.DeliveryDatabaseTests.tearDownClass.__func__(cls)
+
+    def setUp(self):
+        fixtures.DeliveryDatabaseTests.setUp(self)
+        self.actor = self.alice
+        app.dependency_overrides[get_principal] = lambda: self.actor
+        self.client = TestClient(app, raise_server_exceptions=False)
+        with self.admin.begin() as connection:
+            connection.execute(text("DELETE FROM app.idempotency_records"))
+            connection.execute(text("DELETE FROM app.saved_charts"))
+        self.dataset = fixtures.DeliveryDatabaseTests.stage_fixture(
+            self, f"ni035.{uuid4().hex[:16]}",
+            [observation(METRIC_VOLUME, dt.date(2026, 1, 1), value="123456789.123456789012345678901234",
+                         dimensions={"source": "SRC-LLAMA"})], [METRIC_VOLUME],
+            window=("2026-01-01", "2026-01-02"))
+        self.body = {
+            "chart_definition_version_id": str(chart_by_chart_id("intents-volume").id),
+            "label": "Synthetic saved volume", "mode": "live",
+            "dataset_version_id": str(self.dataset.dataset_version_id),
+            "selection": {"start": "2026-01-01", "end": "2026-01-02", "frequency": "day",
+                          "filters": {"source": "SRC-LLAMA"}},
+        }
+
+    def create(self, body=None, key=None):
+        response = self.client.post("/api/saved-charts", json=body or self.body,
+                                    headers={"Idempotency-Key": key} if key else {})
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        return response.json()
+
+    def test_save_reopen_edit_delete_preserves_definition_and_exact_values(self):
+        saved = self.create()
+        path = "/api/saved-charts/" + saved["id"]
+        response = self.client.get(path)
+        self.assertEqual(response.status_code, 200, response.text)
+        detail = response.json()
+        self.assertEqual(detail["saved_chart"]["selection"], self.body["selection"])
+        self.assertEqual(detail["view"]["series"][0]["points"][0]["value"],
+                         "123456789.123456789012345678901234")
+        self.assertFalse(detail["dataset_changed"])
+        renamed = self.client.patch(path, json={"label": "Renamed"})
+        self.assertEqual(renamed.status_code, 200, renamed.text)
+        self.assertEqual(self.client.get("/api/saved-charts", params={"q": "Renamed"}).json()["items"][0]["id"], saved["id"])
+        self.assertEqual(self.client.patch(path, json={"label": None}).json()["label"], None)
+        self.assertEqual(self.client.delete(path).status_code, 204)
+        self.assertEqual(self.client.get(path).status_code, 404)
+        with self.runtime.connect() as connection:
+            self.assertEqual(connection.execute(text("SELECT count(*) FROM app.chart_definitions WHERE id=:id"),
+                                               {"id": self.body["chart_definition_version_id"]}).scalar_one(), 1)
+
+    def test_bob_cannot_enumerate_read_mutate_or_use_alice_key(self):
+        key = str(uuid4())
+        saved = self.create(key=key)
+        self.actor = self.bob
+        listing = self.client.get("/api/saved-charts", params={"limit": 1})
+        self.assertEqual(listing.json(), {"items": [], "next_cursor": None})
+        path = "/api/saved-charts/" + saved["id"]
+        for verb in ("get", "patch", "delete"):
+            kwargs = {"json": {"label": "Stolen"}} if verb == "patch" else {}
+            response = getattr(self.client, verb)(path, **kwargs)
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.headers["cache-control"], "no-store")
+        other = self.create(key=key)
+        self.assertNotEqual(other["id"], saved["id"])
+        with user_transaction(self.runtime, self.bob.id) as connection:
+            self.assertEqual(connection.execute(text("SELECT count(*) FROM app.saved_charts WHERE id=:id"),
+                                               {"id": saved["id"]}).scalar_one(), 0)
+        with self.assertRaises(DBAPIError):
+            with user_transaction(self.runtime, self.bob.id) as connection:
+                connection.execute(text("UPDATE app.saved_charts SET owner_id=:owner WHERE id=:id"),
+                                   {"owner": self.bob.id, "id": saved["id"]})
+
+    def test_retry_replays_once_collision_is_409_and_owner_injection_rejected(self):
+        key = str(uuid4())
+        first = self.create(key=key)
+        self.assertEqual(first, self.create(key=key))
+        collision = self.client.post("/api/saved-charts", json={**self.body, "label": "Different"},
+                                     headers={"Idempotency-Key": key})
+        self.assertEqual(collision.status_code, 409)
+        self.assertEqual(len(self.client.get("/api/saved-charts").json()["items"]), 1)
+        for body in ({**self.body, "owner_id": str(self.bob.id)},
+                     {**self.body, "selection": {**self.body["selection"], "end": "2026-01-01"}},
+                     {**self.body, "selection": {**self.body["selection"], "filters": {"owner": "Bob"}}},
+                     {**self.body, "mode": "snapshot", "snapshot_id": str(uuid4())}):
+            response = self.client.post("/api/saved-charts", json=body)
+            self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(self.client.post("/api/saved-charts", json={**self.body,
+                          "dataset_version_id": str(uuid4())}).status_code, 404)
+
+    def test_explicit_context_edit_validates_and_reopens(self):
+        saved = self.create()
+        path = "/api/saved-charts/" + saved["id"]
+        selection = {**self.body["selection"], "end": "2026-01-03"}
+        response = self.client.patch(path, json={"selection": selection,
+                                                "dataset_version_id": str(self.dataset.dataset_version_id)})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.client.get(path).json()["saved_chart"]["selection"], selection)
+        for body in ({"mode": None}, {"selection": None}, {"dataset_version_id": None},
+                     {"selection": {**selection, "filters": {"source": "unknown"}}}):
+            self.assertEqual(self.client.patch(path, json=body).status_code, 422)
+        self.assertEqual(self.client.get(path).json()["saved_chart"]["selection"], selection)
+
+    def test_live_changed_badge_and_resolution_does_not_reorder_list(self):
+        saved = self.create()
+        replacement = fixtures.DeliveryDatabaseTests.stage_fixture(
+            self, f"ni035.{uuid4().hex[:16]}",
+            [observation(METRIC_VOLUME, dt.date(2026, 1, 1), value="999",
+                         dimensions={"source": "SRC-LLAMA"})], [METRIC_VOLUME],
+            window=("2026-01-01", "2026-01-02"))
+        delivery.reset_delivery_caches()
+        response = self.client.get("/api/saved-charts/" + saved["id"])
+        self.assertEqual(response.status_code, 200, response.text)
+        detail = response.json()
+        self.assertTrue(detail["dataset_changed"])
+        self.assertEqual(detail["view"]["dataset"]["id"], str(replacement.dataset_version_id))
+        self.assertEqual(detail["saved_chart"]["updated_at"], saved["updated_at"])
+        self.assertEqual(detail["saved_chart"]["selection"], saved["selection"])
+
+    def test_snapshot_storage_is_closed_until_real_ownership_contract_exists(self):
+        saved = self.create()
+        with self.assertRaises(DBAPIError):
+            with user_transaction(self.runtime, self.alice.id) as connection:
+                connection.execute(text("UPDATE app.saved_charts SET mode='snapshot', snapshot_id=:snapshot WHERE id=:id"),
+                                   {"snapshot": uuid4(), "id": saved["id"]})
+        app.dependency_overrides.pop(get_principal)
+        response = self.client.get("/api/saved-charts")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.headers["cache-control"], "no-store")

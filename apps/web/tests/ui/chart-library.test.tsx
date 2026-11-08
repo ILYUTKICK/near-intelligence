@@ -1065,10 +1065,10 @@ describe("ChartAuthActions — anonymous private-action continuation", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/selection are preserved in the sign-in link/);
   });
 
-  it("offers no fake save to a signed-in visitor", async () => {
+  it("offers saved-chart persistence to a signed-in visitor", async () => {
     installApiMock([AUTHENTICATED_SESSION]);
     renderActions();
-    await screen.findByText(/Saving charts to your workspace .* not implemented yet/);
+    await screen.findByRole("button", { name: "Save chart" });
     expect(screen.queryByRole("button", { name: "Sign in to save this chart" })).not.toBeInTheDocument();
     expect(routerPush).not.toHaveBeenCalled();
   });

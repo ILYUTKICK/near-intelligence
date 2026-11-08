@@ -90,6 +90,7 @@ class HomeContractTests(unittest.TestCase):
         # metrics/chart/dataset/source delivery routes and NI-054 added the
         # public model definition/readiness/run routes.
         self.assertEqual(set(schema["paths"]), {"/health", "/api/home", "/api/me",
+                "/api/saved-charts", "/api/saved-charts/{instance_id}",
                                                 "/api/documents",
                                                 "/api/documents/{document_id}",
                                                 "/api/documents/{document_id}/versions",

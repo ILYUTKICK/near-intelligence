@@ -35,13 +35,13 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof AuthConfigError ? error.message : "Server configuration error." },
-      { status: 503 },
+      { status: 503, headers: { "cache-control": "no-store" } },
     );
   }
 
   const session = decodeSessionCookie(request.cookies.get(SESSION_COOKIE)?.value);
   if (!session) {
-    const response = NextResponse.json({ error: "No valid session." }, { status: 401 });
+    const response = NextResponse.json({ error: "No valid session." }, { status: 401, headers: { "cache-control": "no-store" } });
     if (request.cookies.get(SESSION_COOKIE)?.value) {
       // Cookie present but expired/tampered: clear it so the client stops retrying.
       response.cookies.set(SESSION_COOKIE, "", {
@@ -59,5 +59,5 @@ export async function GET(request: NextRequest) {
     status: "ok",
     subject: jwtPayloadSubject(session.accessToken) ?? "unknown",
     expiresAt: new Date(session.expiresAt).toISOString(),
-  });
+  }, { headers: { "cache-control": "no-store" } });
 }

@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { SaveChartButton } from "../saved/SaveChartButton";
+import type { SaveInput } from "../saved/api";
+import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
 
 /**
  * Public-to-private action continuation (NI-034; reused by the public data
@@ -32,30 +35,52 @@ export function ChartAuthActions({
   nextPath,
   chartTitle,
   basePath = "/charts/",
+  saveInput,
 }: {
   nextPath: string;
   chartTitle: string;
   /** Internal-path base the continuation may target (with trailing slash). */
   basePath?: string;
+  saveInput?: SaveInput;
 }) {
   const router = useRouter();
-  const [session, setSession] = useState<"checking" | "anonymous" | "authenticated" | "unknown">("checking");
+  const [session, setSession] = useState<{
+    status: "checking" | "anonymous" | "authenticated" | "unknown";
+    subject: string | null;
+  }>({ status: "checking", subject: null });
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/auth/session", { credentials: "same-origin", signal: controller.signal })
-      .then((response) => {
-        if (response.ok) {
-          setSession("authenticated");
-        } else if (response.status === 401) {
-          setSession("anonymous");
-        } else {
-          setSession("unknown");
-        }
-      })
-      .catch(() => setSession("unknown"));
-    return () => controller.abort();
+    let controller = new AbortController();
+    function check(resetIdentity = false) {
+      controller.abort(); controller = new AbortController();
+      const signal = controller.signal;
+      setSession((previous) => ({ status: "checking", subject: resetIdentity ? null : previous.subject }));
+      fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store", signal })
+        .then(async (response) => {
+          if (response.status === 401) {
+            if (!signal.aborted) setSession({ status: "anonymous", subject: null });
+            return;
+          }
+          if (!response.ok) throw new Error("Session unavailable");
+          const value: unknown = await response.json();
+          if (!value || typeof value !== "object" || !("subject" in value)
+            || typeof value.subject !== "string" || !value.subject || value.subject === "unknown") {
+            throw new Error("Session identity unavailable");
+          }
+          if (!signal.aborted) setSession({ status: "authenticated", subject: value.subject });
+        })
+        .catch(() => { if (!signal.aborted) setSession((previous) => ({ ...previous, status: "unknown" })); });
+    }
+    const authChange = () => check(true);
+    const focus = () => check();
+    const storage = (event: StorageEvent) => { if (event.key === AUTH_CHANGE_STORAGE) check(true); };
+    check();
+    window.addEventListener(AUTH_CHANGE, authChange);
+    window.addEventListener("focus", focus);
+    window.addEventListener("storage", storage);
+    return () => { controller.abort(); window.removeEventListener(AUTH_CHANGE, authChange);
+      window.removeEventListener("focus", focus); window.removeEventListener("storage", storage); };
   }, []);
 
   function continueToSignIn(): void {
@@ -70,11 +95,20 @@ export function ChartAuthActions({
     router.push(`/login?next=${encodeURIComponent(nextPath)}`);
   }
 
-  if (session === "checking") {
+  // Retain the mounted attempt for a known subject while hiding all its UI.
+  // A verified different subject (or an explicit auth-change signal) resets it.
+  if (session.subject && saveInput) {
+    return <div key={`${session.subject}:${JSON.stringify(saveInput)}`}>
+      <SaveChartButton input={saveInput} suspended={session.status !== "authenticated"} />
+      {session.status === "unknown" ? <p role="status">The sign-in state could not be checked. Try returning to this window again.</p> : null}
+    </div>;
+  }
+
+  if (session.status === "checking") {
     return null;
   }
 
-  if (session === "anonymous") {
+  if (session.status === "anonymous") {
     return (
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap gap-2">
@@ -99,13 +133,9 @@ export function ChartAuthActions({
     );
   }
 
-  if (session === "authenticated") {
+  if (session.status === "authenticated") {
     return (
-      <p className="text-ui leading-ui text-text-secondary">
-        You are signed in. Saving charts to your workspace and adding them to research are
-        delivered by the saved-charts persistence, which is not implemented yet — nothing is
-        saved from this page rather than pretending otherwise.
-      </p>
+      <p className="text-ui leading-ui text-text-secondary">A resolved chart is required before saving.</p>
     );
   }
 

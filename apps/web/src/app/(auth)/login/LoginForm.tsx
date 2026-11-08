@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { announceAuthChange } from "@/lib/auth/change";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -42,6 +43,7 @@ export function LoginForm() {
         setError(body.error ?? "Sign-in failed. Try again.");
         return;
       }
+      announceAuthChange();
       // Client caches are cleared on account changes in NI-020; the redirect
       // target is the server-validated internal path.
       window.location.assign(body.returnTo ?? "/");

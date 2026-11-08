@@ -425,6 +425,7 @@ class DocumentRouteContractTests(unittest.TestCase):
         # NI-054 public model routes).
         self.assertEqual(set(schema["paths"]), {
             "/health", "/api/home", "/api/me",
+                "/api/saved-charts", "/api/saved-charts/{instance_id}",
             "/api/documents", "/api/documents/{document_id}",
             "/api/documents/{document_id}/versions",
             "/api/documents/{document_id}/versions/{version_id}",
