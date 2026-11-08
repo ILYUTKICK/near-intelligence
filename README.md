@@ -101,3 +101,12 @@ Compose mode and native development mode are alternatives; do not start both on 
 ## Delivery gates
 
 P0 requires real attributable data, public thesis/methodology, a reproducible statistical analysis, authentication, private persisted research, interactive charts, Add Chart/Add Insight, Markdown export and a deployed end-to-end workflow. Full H1 revenue econometrics remains gated on an adequate revenue series. An exploratory model on a clearly named observable proxy does not establish protocol revenue; see the fallback rules in [MVP_SCOPE.md](docs/MVP_SCOPE.md).
+
+NI-035 saved charts HTTP integration (production web build, disposable PostgreSQL, synthetic data/auth transport only):
+
+```sh
+pnpm build
+uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --saved-charts-http
+```
+
+Use your PostgreSQL 18 binary directory (macOS Homebrew: `/opt/homebrew/opt/postgresql@18/bin`). The saved suite exercises real cookie/CSRF forwarding, ES256 JWT verification, identity bootstrap, RLS, idempotent save/reopen and Bob's denied access. The six saved-chart API/DB regressions also run in the default database suite. The provider JWKS transport uses an ephemeral synthetic key and never contacts Supabase.

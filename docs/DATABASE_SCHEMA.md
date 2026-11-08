@@ -94,3 +94,7 @@ All four tables are FORCE RLS with near_operator-only policies; near_app has SEL
 ## Required migration verification
 
 Empty DB → head, rollback last reversible migration, upgrade again; two-user RLS tests over pooled connections; race two identical revision saves; reject cross-owner snapshot/document refs, dangling evidence and out-of-range NUMERIC. Verify restoring a backup preserves content/artifact hashes. No DB trigger is a substitute for validating rich editor schema in the document service.
+
+### NI-035 storage implementation
+
+Migration `0011_saved_charts` applies FORCE RLS with active-identity checks, composite `(id,owner_id)` uniqueness, RESTRICT references to the immutable chart definition and last resolved dataset, and user-delete cascade. P0 CHECKs require `mode='live'` and `snapshot_id IS NULL`; the target snapshot column must acquire its real same-owner FK before a P1 migration can lift that gate. Selection/label/mode edits advance `updated_at`; resolution-only dataset telemetry does not. The runtime cannot update owner or definition columns. Instance deletion leaves the global registries/datasets intact.

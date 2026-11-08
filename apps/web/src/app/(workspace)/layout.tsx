@@ -40,7 +40,7 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
       </header>
       <div className="mx-auto flex w-full max-w-(--width-content-max) flex-1 gap-0 px-0 md:px-4">
         <WorkspaceSidebar />
-        <main id="main-content" className="flex-1 p-4">
+        <main id="main-content" className="min-w-0 flex-1 p-4">
           {children}
         </main>
       </div>

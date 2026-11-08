@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { announceAuthChange } from "@/lib/auth/change";
 
 /**
  * Account menu (NI-021): sign-out through the same-origin gateway route,
@@ -34,6 +35,7 @@ export function AccountMenu() {
         headers: { "content-type": "application/json", "x-csrf-token": token },
         body: JSON.stringify({}),
       });
+      announceAuthChange();
       if (!response.ok) {
         setError((await response.json().catch(() => ({}))).error ?? "Sign out failed.");
         return;

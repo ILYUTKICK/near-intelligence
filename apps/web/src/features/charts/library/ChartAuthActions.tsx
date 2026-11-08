@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { SaveChartButton } from "../saved/SaveChartButton";
+import type { SaveInput } from "../saved/api";
+import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
 
 /**
  * Public-to-private action continuation (NI-034; reused by the public data
@@ -32,30 +35,35 @@ export function ChartAuthActions({
   nextPath,
   chartTitle,
   basePath = "/charts/",
+  saveInput,
 }: {
   nextPath: string;
   chartTitle: string;
   /** Internal-path base the continuation may target (with trailing slash). */
   basePath?: string;
+  saveInput?: SaveInput;
 }) {
   const router = useRouter();
   const [session, setSession] = useState<"checking" | "anonymous" | "authenticated" | "unknown">("checking");
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/auth/session", { credentials: "same-origin", signal: controller.signal })
-      .then((response) => {
-        if (response.ok) {
-          setSession("authenticated");
-        } else if (response.status === 401) {
-          setSession("anonymous");
-        } else {
-          setSession("unknown");
-        }
-      })
-      .catch(() => setSession("unknown"));
-    return () => controller.abort();
+    let controller = new AbortController();
+    function check() {
+      controller.abort(); controller = new AbortController();
+      const signal = controller.signal;
+      setSession("checking");
+      fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store", signal })
+        .then((response) => { if (!signal.aborted) setSession(response.ok ? "authenticated" : response.status === 401 ? "anonymous" : "unknown"); })
+        .catch(() => { if (!signal.aborted) setSession("unknown"); });
+    }
+    const storage = (event: StorageEvent) => { if (event.key === AUTH_CHANGE_STORAGE) check(); };
+    check();
+    window.addEventListener(AUTH_CHANGE, check);
+    window.addEventListener("focus", check);
+    window.addEventListener("storage", storage);
+    return () => { controller.abort(); window.removeEventListener(AUTH_CHANGE, check);
+      window.removeEventListener("focus", check); window.removeEventListener("storage", storage); };
   }, []);
 
   function continueToSignIn(): void {
@@ -100,12 +108,8 @@ export function ChartAuthActions({
   }
 
   if (session === "authenticated") {
-    return (
-      <p className="text-ui leading-ui text-text-secondary">
-        You are signed in. Saving charts to your workspace and adding them to research are
-        delivered by the saved-charts persistence, which is not implemented yet — nothing is
-        saved from this page rather than pretending otherwise.
-      </p>
+    return saveInput ? <SaveChartButton key={JSON.stringify(saveInput)} input={saveInput} /> : (
+      <p className="text-ui leading-ui text-text-secondary">A resolved chart is required before saving.</p>
     );
   }
 

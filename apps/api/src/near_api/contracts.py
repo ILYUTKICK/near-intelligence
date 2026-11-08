@@ -46,6 +46,8 @@ def install_contracts(app: FastAPI) -> None:
         request.state.request_id = uuid4()
         response = await call_next(request)
         response.headers["X-Request-ID"] = str(request.state.request_id)
+        if request.url.path == "/api/saved-charts" or request.url.path.startswith("/api/saved-charts/"):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.exception_handler(RequestValidationError)

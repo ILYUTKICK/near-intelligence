@@ -16,6 +16,8 @@ NI-030 adds the ingestion checkpoint zone (ingestion_checkpoints,
 ingestion_daily_counters) for the bounded scheduled refresh adapter.
 NI-037 adds the Idempotency-Key replay store (idempotency_records) for the
 document write routes.
+NI-035 adds the owner-scoped saved chart instances (saved_charts) that pin
+canonical analytical contexts to immutable chart definition versions.
 Remaining domain tables belong to their owning tasks and must keep these
 declarations in sync for the Alembic metadata drift check.
 """
@@ -285,6 +287,48 @@ class IdempotencyRecord(Base):
     response_body: Mapped[dict] = mapped_column(JSONB, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+
+
+class SavedChart(Base):
+    """NI-035 private context; P0 snapshot writes are database-gated.
+
+    Context/label edits bump recency, resolution-only telemetry does not.
+    Definition and dataset foreign keys are RESTRICT; owner deletion cascades.
+    """
+
+    __tablename__ = "saved_charts"
+    __table_args__ = (
+        CheckConstraint("label IS NULL OR label <> ''", name="label_nonempty"),
+        CheckConstraint("mode = 'live'", name="mode"),
+        CheckConstraint("snapshot_id IS NULL",
+                        name="snapshot_pairing"),
+        CheckConstraint("selection ? 'start' AND selection ? 'end' "
+                        "AND selection ? 'frequency' AND selection ? 'filters'",
+                        name="selection_keys"),
+        CheckConstraint("octet_length(selection::text) <= 4096", name="selection_size"),
+        UniqueConstraint("id", "owner_id", name="uq_saved_charts_id_owner"),
+        ForeignKeyConstraint(["owner_id"], ["app.users.id"],
+                             name="fk_saved_charts_owner", ondelete="CASCADE"),
+        ForeignKeyConstraint(["chart_definition_version_id"], ["app.chart_definitions.id"],
+                             name="fk_saved_charts_chart_definition", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["last_resolved_dataset_version_id"], ["app.dataset_versions.id"],
+                             name="fk_saved_charts_dataset", ondelete="RESTRICT"),
+        Index("ix_saved_charts_owner_updated_at", "owner_id", text("updated_at DESC"), "id"),
+        Index("ix_saved_charts_chart_definition", "chart_definition_version_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    owner_id: Mapped[UUID] = mapped_column(nullable=False)
+    chart_definition_version_id: Mapped[UUID] = mapped_column(nullable=False)
+    label: Mapped[str | None] = mapped_column(String(200))
+    mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    selection: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    last_resolved_dataset_version_id: Mapped[UUID | None]
+    snapshot_id: Mapped[UUID | None]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
                                                  server_default=func.now())
 
 
