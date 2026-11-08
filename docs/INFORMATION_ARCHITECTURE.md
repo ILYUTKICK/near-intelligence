@@ -10,7 +10,8 @@ Canonical product name: NEAR Intelligence. Labels and routes below override the 
 | Research | `/research` | Canonical published long-term thesis with H1–H4 and evidence anchors; public |
 | Data | `/data` | Default available category and chart catalog; public |
 | Data category | `/data/[category]` | Same analytical components as workspace; public |
-| Chart | `/charts/[chartId]` | Shareable public chart detail; public |
+| Chart library | `/charts` | Search/category catalog of every registered chart with its honest data status; public (NI-034) |
+| Chart | `/charts/[chartId]` | Shareable public chart detail with validated selection URL; public |
 | Methodology | `/methodology` | Definitions, sources, diagnostics and reproduction; public |
 | Model | `/models/[modelId]` | Published model runs/readiness/results; public |
 | Sign in | `/login` | Email/password sign-in and registration links |
@@ -39,6 +40,8 @@ Research editor route: `/workspace/research/[documentId]`. Model detail links to
 ## Context and orientation
 
 Data query parameters: `start=YYYY-MM-DD`, `end=YYYY-MM-DD` exclusive, `frequency=day`, `dataset_version=latest|UUID`, `source_id`, and chart-specific allowed filters. Units are part of chart/metric contracts; a unit switch resolves a valid alternative metric, never relabels the same values. Saved chart IDs and document IDs stay out of public URLs. Filter changes use replace-state; navigation to a new chart pushes history.
+
+Chart detail URLs (`/charts/{chart_id}`) carry the validated selection exactly as NI-034 implements it: `version` pins the immutable definition version, `start`/`end` the half-open UTC window within the definition version's bounded ranges, `dataset_version=UUID` pins a historical dataset (absent/`latest` resolves the newest approved one), and `filters` is a JSON object whose keys and values must come from that chart version's closed filter schema. Only these parameters are ever forwarded to the chart API; anything else in the URL — and any value failing validation — is dropped with a visible honest reason and never sent. Range and filter changes rewrite the URL with replace-state, so the chart version/range survive back/forward navigation. The library route `/charts` uses `q` (search), `category` (one of the five registry categories) and an opaque `cursor`.
 
 Public-to-private actions preserve a short-lived internal pending action with chart ID/version/range/filter context, never serialized private document content or arbitrary redirect URLs. After authentication show a destination picker; insertion occurs only after server validation and explicit destination choice. Breadcrumbs: Workspace → My Research → document title; Data → category → chart.
 
