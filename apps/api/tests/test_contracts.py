@@ -80,14 +80,16 @@ class ContractTests(TestCase):
             # The contract grows with implemented routes: NI-025 added /api/me,
             # NI-036 added the document revision routes, NI-037 added the
             # version detail route, NI-032 added the public
-            # metrics/chart/dataset/source delivery routes and NI-054 added
-            # the public model definition/readiness/run routes.
+            # metrics/chart/dataset/source delivery routes, NI-054 added
+            # the public model definition/readiness/run routes and NI-041
+            # added the chart-block insertion route.
             self.assertEqual(set(schema["paths"]), {
                 "/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
                 "/api/documents", "/api/documents/{document_id}",
                 "/api/documents/{document_id}/versions",
                 "/api/documents/{document_id}/versions/{version_id}",
+                "/api/documents/{document_id}/chart-blocks",
                 "/api/metrics", "/api/metrics/{metric_id}",
                 "/api/metrics/{metric_id}/series",
                 "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",

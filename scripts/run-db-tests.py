@@ -102,13 +102,15 @@ def main() -> int:
         # use), the NI-052 deterministic estimator (also offline research
         # code), the NI-053 diagnostics battery (same), the NI-054
         # publication gate + public model APIs (publish flow, migration 0010,
-        # RLS matrix) and the NI-036 document revision suites.
+        # RLS matrix), the NI-036 document revision suites and the NI-041
+        # chart-block insertion suites.
         patterns = ["test_database.py", "test_auth_bootstrap.py", "test_ownership_rls.py",
                     "test_home_aggregation.py", "test_archive_import.py",
                     "test_dataset_staging.py", "test_metrics.py",
                     "test_refresh_adapter.py", "test_chart_registry.py",
                     "test_delivery_apis.py", "test_saved_charts.py",
-                    "test_profile.py", "test_documents.py", "test_models_readiness.py",
+                    "test_profile.py", "test_documents.py", "test_chart_blocks.py",
+                    "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py"]
         # NI-030 bounded authorized live smoke: only when the operator
