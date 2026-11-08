@@ -35,8 +35,9 @@ Contract (API_SPECIFICATION row + protocol):
   already-inserted block and its context untouched — fresher data is a new,
   explicit decision, not a silent mutation (EDITOR_SPECIFICATION "Live versus
   fixed evidence"). Whole-document saves carry unchanged chart contexts
-  forward verbatim and reject changed/new chart blocks without a resolved
-  context (full server-side re-resolution arrives with NI-043).
+  forward verbatim; NI-042 explicit changed/new chart blocks build a context
+  from their validated inspected pin (general observed-context validation
+  and historical reconstruction remain NI-043).
 - **Idempotency.** ``Idempotency-Key: UUID`` reuses the NI-037 write-once
   replay store (migration 0009): a repeated identical owner/route/body
   request replays the ORIGINAL 201 result instead of appending a second
@@ -54,12 +55,15 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Mapping
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from sqlalchemy import Connection, Engine, func, select
 
 from near_api.auth.principal import Principal, get_principal, get_runtime_engine
+from near_api.charts.routes import _resolve_dataset_version
 from near_api.contracts import error_response
+from near_api.datasets import delivery
 from near_api.datasets.delivery import (
     DeliveryInvalidFilter,
     _context_hash,
@@ -94,7 +98,7 @@ from near_api.schemas.chart_blocks import (
 )
 from near_api.schemas.common import ErrorDetail
 from near_api.schemas.chart_selection import ChartSelection
-from near_api.schemas.delivery import ResolvedSelection
+from near_api.schemas.delivery import ChartViewResponse, ResolvedSelection
 
 router = APIRouter(prefix="/api", tags=["documents"])
 
@@ -392,6 +396,54 @@ def append_chart_block_in_transaction(connection: Connection, principal: Princip
 # --------------------------------------------------------------------------- #
 # HTTP route
 # --------------------------------------------------------------------------- #
+
+
+@router.get("/documents/{document_id}/chart-view",
+            response_model=ChartViewResponse, operation_id="getDocumentChartView",
+            summary="Inspect one canonical chart context for an owned working document",
+            responses={**_PRIVATE_ERROR_RESPONSES,
+                       503: {"description": "Approved chart data is unavailable"}})
+def get_document_chart_view(request: Request, principal: PrincipalDependency,
+                            engine: RuntimeEngineDependency, response: Response,
+                            document_id: UUID, chart_definition_version_id: UUID,
+                            start: date, end: date,
+                            dataset_version: Annotated[str, Query(max_length=36)],
+                            filters: Annotated[str | None, Query(max_length=2048)] = None,
+                            ) -> ChartViewResponse | JSONResponse:
+    """Resolve an editor inspection through the canonical public chart adapter.
+
+    The dataset choice is REQUIRED: normal reopen/range/filter requests send
+    the observed immutable UUID; only an explicit Refresh sends ``latest``.
+    Resolution does not mutate the document. A successful explicit editor
+    action adopts the returned selection + dataset UUID in one undoable edit,
+    and the ordinary CAS revision save validates and freezes those attrs.
+    New/duplicated unsaved blocks can be inspected too, without requiring a
+    persisted block id or accepting arbitrary routes/URLs. Historical readers
+    must use their revision pin (NI-043), never this working-view refresh.
+    """
+    with principal_transaction(engine, principal) as connection:
+        # Check ownership BEFORE resolving the requested scientific reference.
+        # This is the same safe404 as the document read/save routes.
+        service._owned_document_row(connection, principal, document_id)
+        try:
+            selection = ChartSelection(start=start, end=end, frequency="day",
+                                       filters=delivery.parse_filters_document(filters))
+            definition = load_chart_definition(connection, chart_definition_version_id,
+                                               error_path="query")
+            validate_selection_against_definition(definition, start, end,
+                                                   selection.filters)
+            requested_version = _resolve_dataset_version(dataset_version)
+            view = delivery.build_chart_view(
+                connection, chart_id=definition.chart_id, version=definition.version,
+                start=start, end=end, dataset_version=requested_version,
+                filters=dict(selection.filters))
+        except ValidationError:
+            return error_response(request, 422, "VALIDATION_ERROR",
+                                  "Request failed validation")
+        except DocumentSchemaError as error:
+            return _schema_error(request, error)
+    response.headers["Cache-Control"] = "no-store"
+    return view
 
 
 @router.post("/documents/{document_id}/chart-blocks",

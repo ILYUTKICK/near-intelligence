@@ -430,6 +430,7 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/documents/{document_id}/versions",
             "/api/documents/{document_id}/versions/{version_id}",
             "/api/documents/{document_id}/chart-blocks",
+            "/api/documents/{document_id}/chart-view",
             "/api/metrics", "/api/metrics/{metric_id}",
             "/api/metrics/{metric_id}/series",
             "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",
@@ -454,6 +455,19 @@ class DocumentRouteContractTests(unittest.TestCase):
             schema["paths"]["/api/documents/{document_id}/versions/{version_id}"]["get"]
             ["operationId"], "getDocumentVersion")
         # NI-041 insertion row: MutationResult<{block_id}> contract.
+        chart_view_path = schema["paths"]["/api/documents/{document_id}/chart-view"]
+        self.assertEqual(set(chart_view_path), {"get"})
+        inspection = chart_view_path["get"]
+        self.assertEqual(inspection["operationId"], "getDocumentChartView")
+        query = {item["name"]: item for item in inspection["parameters"]
+                 if item["in"] == "query"}
+        self.assertEqual(set(query), {"chart_definition_version_id", "start", "end",
+                                      "dataset_version", "filters"})
+        self.assertTrue(query["dataset_version"]["required"])
+        self.assertTrue(all(query[key]["required"] for key in
+                            ("chart_definition_version_id", "start", "end")))
+        self.assertEqual(inspection["responses"]["200"]["content"]["application/json"]
+                         ["schema"]["$ref"], "#/components/schemas/ChartViewResponse")
         chart_blocks_path = schema["paths"]["/api/documents/{document_id}/chart-blocks"]
         self.assertEqual(set(chart_blocks_path), {"post"})
         self.assertEqual(chart_blocks_path["post"]["operationId"], "addChartBlock")

@@ -144,6 +144,7 @@ export function ChartView({
   const [fetchedView, setFetchedView] = useState<ChartViewResponse | null>(null);
   const [loading, setLoading] = useState(Boolean(loader) && controlledView === undefined);
   const [error, setError] = useState<string | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const [visible, setVisible] = useState(typeof IntersectionObserver === "undefined");
 
@@ -244,12 +245,11 @@ export function ChartView({
     let disposed = false;
     let instance: EChartsLike | null = null;
     const option = built.option;
-    Promise.resolve(
-      factory(plotHostRef.current, {
+    const host = plotHostRef.current;
+    Promise.resolve().then(() => factory(host, {
         ...(width !== undefined ? { width } : {}),
         ...(height !== undefined ? { height } : {}),
-      }),
-    ).then((created) => {
+      })).then((created) => {
       if (disposed) {
         created.dispose();
         return;
@@ -257,6 +257,12 @@ export function ChartView({
       instance = created;
       chartRef.current = created;
       created.setOption(option);
+      setRenderError(null);
+    }).catch(() => {
+      if (!disposed) {
+        instance?.dispose(); instance = null; chartRef.current = null;
+        setRenderError("The plot could not render. The exact data table and prose remain available.");
+      }
     });
     return () => {
       disposed = true;
@@ -265,7 +271,7 @@ export function ChartView({
       }
       chartRef.current = null;
     };
-  }, [visible, plottable, built, factory, width, height]);
+  }, [visible, plottable, built, factory, width, height, retryToken]);
 
   // Container-driven resize (real browsers; the test stub is a no-op).
   useEffect(() => {
@@ -329,12 +335,13 @@ export function ChartView({
           </p>
         ) : null}
         {error ? <ErrorPanel message={error} onRetry={retry} /> : null}
+        {renderError ? <ErrorPanel message={renderError} onRetry={retry} /> : null}
         <div
           ref={plotHostRef}
           role="img"
           aria-label={built.summary}
           className="w-full"
-          style={width !== undefined ? { maxWidth: width } : undefined}
+          style={{ height: height ?? 320, ...(width !== undefined ? { maxWidth: width } : {}) }}
         />
         <SeriesTable model={built.table} title={definition.title} />
       </div>

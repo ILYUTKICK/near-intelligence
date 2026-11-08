@@ -45,13 +45,14 @@ with a typed reason, never a silent substitution):
   inspection records: their shape is validated by the schema module, while
   client-submitted top-level contexts are server-resolved with NI-043. A
   save carrying chart blocks carries their frozen NI-041 contexts forward
-  verbatim (immutably) and rejects a new or changed chart block, which only
-  the chart-blocks insertion endpoint (or NI-043's resolver) may introduce.
+  verbatim (immutably). NI-042 explicit new/changed blocks resolve from the
+  validated inspected dataset pin; general submitted contexts remain NI-043.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import Connection, Engine, insert, select, update
@@ -75,6 +76,7 @@ from near_api.documents.schema import (
     empty_document,
     parse_document,
 )
+from near_api.schemas.chart_selection import ChartSelection
 from near_api.repositories.documents import (
     DocumentRow,
     DocumentVersionRow,
@@ -428,25 +430,16 @@ def _version_row(connection: Connection, version_id: UUID) -> DocumentVersionRow
 def _resolve_observed_contexts(connection: Connection, canonical: CanonicalDocument,
                                observed_contexts: list,
                                document: DocumentRow) -> dict:
-    """Resolve the new revision's ``resolved_contexts`` map (keyed by block ID).
+    """Carry unchanged pins, or freeze an explicit NI-042 chart-context edit.
 
-    Two rules, both serving EDITOR_SPECIFICATION "Live versus fixed evidence"
-    ("save pins exactly that version ... rather than changing evidence
-    silently"):
-
-    - Client-submitted top-level contexts are still rejected (422): contexts
-      are resolved SERVER-side. The chart-blocks insertion endpoint
-      (:mod:`near_api.documents.chart_blocks`, NI-041) builds the frozen
-      ``ResolvedContext`` of a new chart block from registry-verified pins;
-      the general submitted-context validation of whole-document saves is
-      NI-043's resolver.
-    - A document that already carries chart blocks keeps their frozen
-      contexts: unchanged chart blocks (identical inspection identity)
-      carry their stored context forward VERBATIM into the new revision, and
-      a new or changed chart block is rejected — it must be inserted (or, for
-      NI-042's explicit edits, re-resolved) through the server-side flow,
-      never silently re-pinned. Contexts of blocks that no longer exist drop
-      out with their block; nothing else is rewritten.
+    The canonical node attrs are the inspected definition/dataset/selection.
+    They have already passed the same registry/approved dataset/reference
+    rules as insertion in ``_validate_database_references``. New/changed attrs
+    build a fresh server context through the NI-041 canonical hash helper;
+    no latest pointer is queried. Ordinary prose edits carry the old context
+    VERBATIM, including its original resolved_at, even during source outages.
+    General submitted-context/race validation remains NI-043. Removed blocks
+    lose their current context; old revision rows remain immutable.
     """
     if observed_contexts:
         raise ReferenceInvalid(
@@ -466,21 +459,22 @@ def _resolve_observed_contexts(connection: Connection, canonical: CanonicalDocum
     previous_contexts = previous.resolved_contexts or {}
     previous_charts = {chart.block_id: chart
                        for chart in parse_document(previous.content).live_charts}
+    contexts = {}
     for chart in canonical.live_charts:
+        block_id = str(chart.block_id)
         previous_chart = previous_charts.get(chart.block_id)
-        if previous_chart is None \
-                or chart_blocks.chart_inspection_state(previous_chart) \
-                != chart_blocks.chart_inspection_state(chart) \
-                or str(chart.block_id) not in previous_contexts:
-            raise ReferenceInvalid(
-                "A chart block was added or changed without its frozen inspection "
-                "context; insert chart blocks through the chart-blocks endpoint and "
-                "re-resolve changed selections explicitly (server-side context "
-                "resolution for whole-document saves arrives with NI-043)",
-                [("content", "chart_context_unresolved")])
-    surviving = canonical.block_ids
-    return {block_id: context for block_id, context in previous_contexts.items()
-            if UUID(block_id) in surviving}
+        if previous_chart is not None \
+                and chart_blocks.chart_inspection_state(previous_chart) \
+                == chart_blocks.chart_inspection_state(chart) \
+                and block_id in previous_contexts:
+            contexts[block_id] = previous_contexts[block_id]
+            continue
+        definition = chart_blocks.load_chart_definition(
+            connection, chart.chart_definition_version_id, error_path="content")
+        contexts[block_id] = chart_blocks.build_resolved_context(
+            definition, chart.observed_dataset_version_id,
+            ChartSelection.model_validate(chart.selection), resolved_at=datetime.now(UTC))
+    return contexts
 
 
 def _validate_database_references(connection: Connection,

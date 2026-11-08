@@ -9,9 +9,9 @@
  * resource cleanup.
  */
 import { axe } from "jest-axe";
-import { render, screen, waitFor, within, act } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Button } from "@/components/ui/button";
 import { ChartView } from "@/features/charts/renderer/ChartView";
@@ -565,5 +565,27 @@ describe("ChartView — accessibility", () => {
     // NI-007 rationale (component tests render fragments, not full pages).
     const results = await axe(document.body, { rules: { region: { enabled: false } } });
     expect(results).toHaveNoViolations();
+  });
+});
+
+
+describe("ChartView — localized rendering failures", () => {
+  it("catches a synchronous factory error, retains exact data, and retries without crashing", async () => {
+    const instance = { setOption: vi.fn(), dispose: vi.fn(), resize: vi.fn() };
+    const factory = vi.fn().mockImplementationOnce(() => { throw new Error("Synthetic factory failure"); }).mockReturnValue(instance);
+    render(<ChartView definition={baseDefinition} view={resolvedView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" factory={factory} />);
+    expect(await screen.findByText(/The plot could not render/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /exact data table/ })).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: /retry/i });
+    fireEvent.click(button);
+    await waitFor(() => expect(instance.setOption).toHaveBeenCalled());
+    expect(screen.queryByText(/The plot could not render/)).not.toBeInTheDocument();
+    expect(screen.getByRole("img")).toHaveStyle({ height: "320px" });
+  });
+  it("disposes an instance whose setOption fails while keeping the table", async () => {
+    const instance = { setOption: vi.fn(() => { throw new Error("Synthetic option failure"); }), dispose: vi.fn(), resize: vi.fn() };
+    render(<ChartView definition={baseDefinition} view={resolvedView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" factory={() => instance} />);
+    expect(await screen.findByText(/The plot could not render/)).toBeInTheDocument();
+    expect(instance.dispose).toHaveBeenCalledOnce(); expect(screen.getByRole("region", { name: /exact data table/ })).toBeInTheDocument();
   });
 });

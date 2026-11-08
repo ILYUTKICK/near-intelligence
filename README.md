@@ -136,7 +136,7 @@ NI-041 insertion HTTP integration (after the same frozen production build):
 uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --chart-insertion-http
 ```
 
-The isolated suite exercises the chart-block race/retry/ownership cases, then the actual web gateway and ES256 principal/RLS path. A newer dataset is published between inspection and insertion; the original pin survives insertion, replay, prose save and reopen. Bob cannot read or append to Alice's document. No external provider/account or research archive is used.
+The isolated suite exercises chart-block race/retry/ownership cases, then the actual web gateway and ES256 principal/RLS path. NI-042 adds the shared editor chart inspection route, explicit range/filter save/reopen, latest adoption, old-pin preservation and chart-outage/prose-save checks. A newer dataset is published between inspection and insertion; the original pin survives insertion, replay, prose save and reopen. Bob cannot read or append to Alice's document. No external provider/account or research archive is used.
 
 NI-024 Home continuation integration (after the production web build):
 

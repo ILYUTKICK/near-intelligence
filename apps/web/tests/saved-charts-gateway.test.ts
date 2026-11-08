@@ -77,4 +77,19 @@ describe("Saved charts same-origin gateway", () => {
     expect((await getDocument(request(), { params: Promise.resolve({ segments: [id, "arbitrary-path"] }) })).status).toBe(404);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+  it("forwards only the fixed chart-view read path, preserves pins and refuses arbitrary query fields", async () => {
+    const id = "44444444-4444-4444-8444-444444444444";
+    const fetcher = vi.fn(async () => new Response("{}", { status: 200 })); vi.stubGlobal("fetch", fetcher);
+    const path = { params: Promise.resolve({ segments: [id, "chart-view"] }) };
+    const incoming = new NextRequest(`http://localhost:3000/api/documents/${id}/chart-view?chart_definition_version_id=${id}&dataset_version=${id}&start=2026-11-01&end=2026-11-02`, { headers: request().headers });
+    const response = await getDocument(incoming, path);
+    expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("no-store");
+    const url = (fetcher.mock.calls[0] as unknown as [URL])[0];
+    expect(url.pathname).toBe(`/api/documents/${id}/chart-view`); expect(url.searchParams.get("dataset_version")).toBe(id);
+    const arbitrary = new NextRequest(`${incoming.url}&url=https://evil.example`, { headers: incoming.headers });
+    expect((await getDocument(arbitrary, path)).status).toBe(422);
+    expect((await postDocument(new NextRequest(incoming.url, { method: "POST", headers: incoming.headers }), path)).status).toBe(405);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
 });

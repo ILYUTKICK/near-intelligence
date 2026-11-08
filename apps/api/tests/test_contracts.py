@@ -90,6 +90,7 @@ class ContractTests(TestCase):
                 "/api/documents/{document_id}/versions",
                 "/api/documents/{document_id}/versions/{version_id}",
                 "/api/documents/{document_id}/chart-blocks",
+                "/api/documents/{document_id}/chart-view",
                 "/api/metrics", "/api/metrics/{metric_id}",
                 "/api/metrics/{metric_id}/series",
                 "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",

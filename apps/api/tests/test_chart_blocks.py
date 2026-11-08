@@ -9,7 +9,8 @@ integration evidence. Covered guarantees:
 - ownership is the verified principal's (Alice/Bob matrix at HTTP level);
 - the inspected evidence is frozen: the pinned dataset version and the
   ResolvedContext survive source changes verbatim, and a whole-document save
-  can neither re-pin nor inject/alter a chart block without its context;
+  carries unchanged contexts verbatim, while explicit NI-042 chart edits
+  resolve new validated contexts from their inspected immutable dataset pins;
 - duplicate retries with an Idempotency-Key replay the original result
   (timeout-after-commit) and concurrent submits admit exactly one block;
 - reference failures (unknown/unavailable definition, unapproved dataset,
@@ -662,70 +663,142 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
         self.assertEqual(revision_three["resolved_contexts"],
                          revision_two["resolved_contexts"])
 
-        # Changing the chart selection through a raw save is rejected: the
-        # inspected context would no longer describe the block (the explicit
-        # re-resolution flow arrives with NI-042/NI-043).
+        # NI-042 explicit edits freeze the supplied inspected pin and selection;
+        # this is not latest resolution (v2 exists, but v1 remains selected).
         changed = copy.deepcopy(revision_three["content"])
-        for node in changed["content"]:
-            if node["type"] == "liveChart":
-                node["attrs"]["selection"] = selection("2026-01-02", "2026-01-09")
-        with self.as_session(self.alice_id):
-            rejected = self.client.post(
-                f"/api/documents/{detail.document.id}/versions",
-                json={"schema_version": 1, "content": changed},
-                headers={"Authorization": "Bearer t.alice", "If-Match": '"3"'})
-        self.assertEqual(rejected.status_code, 422)
-        error = ErrorResponse.model_validate(rejected.json()).error
-        self.assertEqual(error.code, "REFERENCE_INVALID")
-        self.assertIn("chart_context_unresolved",
-                      str([detail.reason for detail in (error.details or ())]))
+        selected = {**selection("2026-01-02", "2026-01-09"),
+                    "filters": {"source": "SRC-LLAMA"}}
+        changed["content"][0]["attrs"]["selection"] = selected
+        changed_save = self.save_document(detail.document.id, changed, revision=3)
+        self.assertEqual(changed_save.status_code, 201, changed_save.text)
+        revision_four = self.stored_document(self.alice, detail.document.id)
+        changed_context = revision_four["resolved_contexts"][block_id]
+        self.assertEqual(changed_context["dataset_version_id"], str(dataset_v1))
+        self.assertEqual(changed_context["selection"], selected)
+        self.assertNotEqual(changed_context["context_hash"],
+                            revision_three["resolved_contexts"][block_id]["context_hash"])
+        self.assertEqual(changed_context["context_hash"], _context_hash(
+            {"id": CHART_ID}, dataset_v1,
+            ResolvedSelection.model_validate(selected), (METRIC_ID,)))
 
-        # Injecting a NEW chart block through a raw save is equally rejected.
-        injected = copy.deepcopy(revision_three["content"])
-        injected["content"].append({
-            "type": "liveChart",
-            "attrs": {"block_id": str(uuid4()),
-                      "chart_definition_version_id": str(CHART_ID),
-                      "mode": "live", "selection": selection(),
-                      "observed_dataset_version_id": str(dataset_v1)},
-        })
-        with self.as_session(self.alice_id):
-            rejected_new = self.client.post(
-                f"/api/documents/{detail.document.id}/versions",
-                json={"schema_version": 1, "content": injected},
-                headers={"Authorization": "Bearer t.alice", "If-Match": '"3"'})
-        self.assertEqual(rejected_new.status_code, 422)
+        # Refresh is also explicit: adopt the inspected v2 UUID; the saved
+        # context hash must describe exactly that new pin, not the old view.
+        refreshed = copy.deepcopy(revision_four["content"])
+        refreshed["content"][0]["attrs"]["observed_dataset_version_id"] = str(dataset_v2)
+        refreshed_save = self.save_document(detail.document.id, refreshed, revision=4)
+        self.assertEqual(refreshed_save.status_code, 201, refreshed_save.text)
+        revision_five = self.stored_document(self.alice, detail.document.id)
+        self.assertEqual(revision_five["resolved_contexts"][block_id]["dataset_version_id"],
+                         str(dataset_v2))
+        # A stale concurrent chart edit cannot bypass the revision lock.
+        stale = self.save_document(detail.document.id, changed, revision=4)
+        self.assertEqual(stale.status_code, 409, stale.text)
+        self.assertEqual(self.stored_document(self.alice, detail.document.id), revision_five)
 
-        # Deleting the chart block drops its context with the block; the
-        # document remains savable and a fresh insertion works again.
-        without_chart = copy.deepcopy(revision_three["content"])
+        # Duplicated/new node attrs resolve independently under the same
+        # canonical validation and frozen pin, without arbitrary contexts.
+        duplicated = copy.deepcopy(revision_five["content"])
+        new_node = copy.deepcopy(duplicated["content"][0])
+        new_block_id = str(uuid4())
+        new_node["attrs"]["block_id"] = new_block_id
+        duplicated["content"].append(new_node)
+        duplicate_save = self.save_document(detail.document.id, duplicated, revision=5)
+        self.assertEqual(duplicate_save.status_code, 201, duplicate_save.text)
+        revision_six = self.stored_document(self.alice, detail.document.id)
+        self.assertEqual(set(revision_six["resolved_contexts"]), {block_id, new_block_id})
+        self.assertEqual(revision_six["resolved_contexts"][new_block_id]["dataset_version_id"],
+                         str(dataset_v2))
+        self.assertEqual(revision_six["resolved_contexts"][block_id],
+                         revision_five["resolved_contexts"][block_id])
+
+        # Deleting chart blocks drops current contexts only. Historical
+        # evidence is immutable despite edits, refresh, duplicates and deletion.
+        without_chart = copy.deepcopy(revision_six["content"])
         without_chart["content"] = [node for node in without_chart["content"]
                                     if node["type"] != "liveChart"]
-        with self.as_session(self.alice_id):
-            deleted = self.client.post(
-                f"/api/documents/{detail.document.id}/versions",
-                json={"schema_version": 1, "content": without_chart},
-                headers={"Authorization": "Bearer t.alice", "If-Match": '"3"'})
+        deleted = self.save_document(detail.document.id, without_chart, revision=6)
         self.assertEqual(deleted.status_code, 201, deleted.text)
-        revision_four = self.stored_document(self.alice, detail.document.id)
-        self.assertEqual(revision_four["resolved_contexts"], {})
-        again = self.add_chart(detail.document.id,
-                               insert_payload(dataset_version_id=str(dataset_v2)),
-                               revision=4)
-        self.assertEqual(again.status_code, 201, again.text)
-        # The new block pins what the user inspected THIS time (v2), and the
-        # removed block's v1 context is gone — history keeps rev 3 as it was.
-        final = self.stored_document(self.alice, detail.document.id)
-        new_block_id = again.json()["value"]["block_id"]
-        self.assertEqual(final["resolved_contexts"][new_block_id]["dataset_version_id"],
-                         str(dataset_v2))
+        self.assertEqual(self.stored_document(self.alice, detail.document.id)["resolved_contexts"], {})
         with user_transaction(self.engine, self.alice_id) as connection:
             historical = connection.execute(text("""
-                SELECT resolved_contexts FROM app.document_versions
+                SELECT content, resolved_contexts FROM app.document_versions
                 WHERE document_id = :id AND revision = 3
             """), {"id": detail.document.id}).mappings().one()
-        self.assertEqual(historical["resolved_contexts"][block_id]["dataset_version_id"],
-                         str(dataset_v1))
+        self.assertEqual(historical["content"], revision_three["content"])
+        self.assertEqual(historical["resolved_contexts"], revision_three["resolved_contexts"])
+
+    def save_document(self, document_id, content, *, revision, subject_id=None,
+                      observed_contexts=None):
+        subject = subject_id or self.alice_id
+        with self.as_session(subject):
+            return self.client.post(
+                f"/api/documents/{document_id}/versions",
+                json={"schema_version": 1, "content": content,
+                      "observed_contexts": observed_contexts or []},
+                headers={"Authorization": f"Bearer t.{subject}",
+                         "If-Match": f'"{revision}"'})
+
+    def test_explicit_chart_edits_validate_references_and_owner_atomically(self):
+        detail = self.create_document(self.alice)
+        dataset_id = self.insert_dataset_version(self.dataset_key("explicit-edit"))
+        self.assertEqual(self.add_chart(detail.document.id,
+            insert_payload(dataset_version_id=str(dataset_id))).status_code, 201)
+        original = self.stored_document(self.alice, detail.document.id)
+        staged = self.insert_dataset_version(self.dataset_key("staged-edit"), status="staged")
+        cases = (
+            {"chart_definition_version_id": str(uuid4())},
+            {"chart_definition_version_id": str(UNAVAILABLE_CHART_ID)},
+            {"observed_dataset_version_id": str(staged)},
+            {"selection": {**selection(), "filters": {"source": "unapproved"}}},
+            {"mode": "snapshot", "snapshot_id": str(uuid4())},
+        )
+        for attrs in cases:
+            changed = copy.deepcopy(original["content"])
+            changed["content"][0]["attrs"].update(attrs)
+            response = self.save_document(detail.document.id, changed, revision=2)
+            self.assertEqual(response.status_code, 422, response.text)
+            self.assertEqual(self.stored_document(self.alice, detail.document.id), original)
+        changed = copy.deepcopy(original["content"])
+        changed["content"][0]["attrs"]["selection"] = selection("2026-01-02", "2026-01-09")
+        denied = self.save_document(detail.document.id, changed, revision=2,
+                                    subject_id=self.bob_id)
+        self.assertEqual(denied.status_code, 404)
+        submitted_context = self.save_document(
+            detail.document.id, changed, revision=2,
+            observed_contexts=[original["resolved_contexts"][next(iter(original["resolved_contexts"]))]])
+        self.assertEqual(submitted_context.status_code, 422, submitted_context.text)
+        self.assertEqual(self.stored_document(self.alice, detail.document.id), original)
+
+    def test_chart_view_auth_owner_and_explicit_dataset_choice(self):
+        detail = self.create_document(self.alice)
+        params = {"chart_definition_version_id": str(CHART_ID),
+                  "start": "2026-01-01", "end": "2026-01-08",
+                  "dataset_version": str(uuid4())}
+        path = f"/api/documents/{detail.document.id}/chart-view"
+        anonymous = self.client.get(path, params=params)
+        self.assertEqual(anonymous.status_code, 401)
+        with self.as_session(self.bob_id):
+            foreign = self.client.get(path, params=params,
+                                      headers={"Authorization": "Bearer t.bob"})
+            missing = self.client.get(f"/api/documents/{uuid4()}/chart-view", params=params,
+                                      headers={"Authorization": "Bearer t.bob"})
+        self.assertEqual(foreign.status_code, 404)
+        self.assertEqual(foreign.json()["error"]["message"], missing.json()["error"]["message"])
+        self.assertEqual(foreign.headers["Cache-Control"], "no-store")
+        with self.as_session(self.alice_id):
+            no_choice = {key: value for key, value in params.items() if key != "dataset_version"}
+            absent = self.client.get(path, params=no_choice,
+                                     headers={"Authorization": "Bearer t.alice"})
+            self.assertEqual(absent.status_code, 422)
+            for changes in ({"dataset_version": "https://example.com/data"},
+                            {"start": "2026-01-08", "end": "2026-01-01"},
+                            {"start": "2025-01-01"},
+                            {"filters": '{"source":"unapproved"}'},
+                            {"chart_definition_version_id": str(UNAVAILABLE_CHART_ID)}):
+                response = self.client.get(path, params={**params, **changes},
+                                           headers={"Authorization": "Bearer t.alice"})
+                self.assertEqual(response.status_code, 422, response.text)
+                self.assertEqual(response.headers["Cache-Control"], "no-store")
 
     def test_09_insertion_position_control(self):
         detail = self.create_document(self.alice)
