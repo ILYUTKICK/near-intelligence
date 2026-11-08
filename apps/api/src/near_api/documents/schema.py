@@ -536,6 +536,21 @@ def _parse_context(value, path: str) -> dict:
     _fail(path, "unsupported_context_shape")
 
 
+def canonical_context_json(value: object, *, path: str = "context") -> dict:
+    """Validate one frozen inspection record; return its canonical JSON.
+
+    NI-041 reuse point for the chart-block insertion service
+    (:mod:`near_api.documents.chart_blocks`): the ``ResolvedContext`` /
+    ``ModelContext`` field sets, UUID/timestamp/hash spellings and the
+    selection structure stay defined HERE once — a context-producing module
+    validates through this wrapper instead of re-implementing any rule, so a
+    stored context always matches the shape the canonical editor grammar and
+    the per-revision map expect. Raises :class:`DocumentSchemaError` on every
+    violation.
+    """
+    return _parse_context(value, path)
+
+
 # --------------------------------------------------------------------------- #
 # Top-level P0 blocks
 # --------------------------------------------------------------------------- #
