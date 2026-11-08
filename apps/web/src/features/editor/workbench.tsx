@@ -60,7 +60,7 @@ export function RecoveryView({
         This document opens read-only: {reason} ({path}).
       </p>
       <p className="text-body leading-body text-text-secondary mt-2">
-        The editor never reinterprets or discards content it cannot represent. The document's
+        The editor never reinterprets or discards content it cannot represent. The document&apos;s
         stored content is untouched — download it below or contact the operator with the reason
         shown above.
       </p>

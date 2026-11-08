@@ -6,6 +6,7 @@ import {
 } from "@tiptap/react";
 
 import { blockIdAttr, jsonAttr, stringAttr } from "../attributes";
+import { emitOpenBlockProperties } from "../ui-bridge";
 import { shortId } from "./display";
 
 import type { CanonicalCell, CanonicalTableColumn } from "../canonical";
@@ -115,7 +116,7 @@ export function DataTableBlockView({ node, editor, getPos }: NodeViewProps) {
           <p className="text-body leading-body text-text-secondary">
             Dataset projection of <span className="break-all">{shortId(attrs.dataset_version_id)}</span>
             {" "}— the projection renders from the pinned dataset version with the data tasks; the
-            block's structural operations are active now.
+            block&apos;s structural operations are active now.
           </p>
         )}
         <button
@@ -126,7 +127,7 @@ export function DataTableBlockView({ node, editor, getPos }: NodeViewProps) {
             if (typeof pos === "number") {
               editor.commands.setNodeSelection(pos);
             }
-            editor.storage.editorUiBridge.openBlockProperties(attrs.block_id);
+            emitOpenBlockProperties(editor, attrs.block_id);
           }}
         >
           Edit properties

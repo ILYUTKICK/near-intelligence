@@ -30,6 +30,12 @@ import { BlockToolbar } from "./block-toolbar";
 import { OutlinePane } from "./outline-pane";
 import { ContextPane } from "./context-pane";
 import { DeleteConfirmationDialog } from "./delete-confirmation";
+import {
+  EDITOR_OPEN_BLOCK_PROPERTIES,
+  EDITOR_REQUEST_BLOCK_DELETE,
+  EDITOR_SLASH_TRIGGER,
+  detailOf,
+} from "./ui-bridge";
 
 /**
  * The three-pane research editor workbench (NI-039):
@@ -127,22 +133,35 @@ export function EditorShell({ title, revision, updatedAt, content }: EditorShell
     };
   }, [editor]);
 
-  // -- bridges (node views -> shell, slash trigger -> shell) ---------------- //
+  // -- bridges (node views / keyboard -> shell, via bubbling DOM events) ---- //
 
   useEffect(() => {
-    if (!editor) {
+    const container = paperRef.current;
+    if (!editor || !container) {
       return;
     }
-    editor.storage.editorUiBridge.openBlockProperties = (_blockId: string | null) => {
+    const onOpenProperties = () => {
       setToolsCollapsed(false);
       setDrawerPane("tools");
     };
-    editor.storage.editorUiBridge.requestBlockDelete = (index: number) => {
+    const onRequestDelete = (event: Event) => {
+      const { index } = detailOf<{ index: number }>(event, { index: -1 });
       setDeleteRequest(buildDeleteRequest(editor, index));
-      return true;
     };
-    editor.storage.slashMenuTrigger.onTrigger = (position: number) => {
-      setSlashMenu({ position, coordinates: computeSlashCoordinates(editor, position, paperRef.current) });
+    const onSlashTrigger = (event: Event) => {
+      const { position } = detailOf<{ position: number }>(event, { position: -1 });
+      setSlashMenu({
+        position,
+        coordinates: computeSlashCoordinates(editor, position, container),
+      });
+    };
+    container.addEventListener(EDITOR_OPEN_BLOCK_PROPERTIES, onOpenProperties);
+    container.addEventListener(EDITOR_REQUEST_BLOCK_DELETE, onRequestDelete);
+    container.addEventListener(EDITOR_SLASH_TRIGGER, onSlashTrigger);
+    return () => {
+      container.removeEventListener(EDITOR_OPEN_BLOCK_PROPERTIES, onOpenProperties);
+      container.removeEventListener(EDITOR_REQUEST_BLOCK_DELETE, onRequestDelete);
+      container.removeEventListener(EDITOR_SLASH_TRIGGER, onSlashTrigger);
     };
   }, [editor]);
 

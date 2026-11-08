@@ -26,7 +26,7 @@ export const Divider = Node.create({
     return [{ tag: "hr[data-block-id]" }];
   },
 
-  renderHTML({ node, HTMLAttributes }) {
+  renderHTML({ HTMLAttributes }) {
     return [
       "hr",
       mergeAttributes(

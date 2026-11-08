@@ -329,7 +329,10 @@ function requireEnum<T extends string>(
 }
 
 function requireUuid(value: unknown, path: string, issues: IssueCollector): string {
-  if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+  if (typeof value !== "string") {
+    issues.add(path, "must_be_uuid_string");
+  }
+  if (!UUID_PATTERN.test(value)) {
     issues.add(path, "must_be_uuid");
   }
   return value.toLowerCase();
@@ -344,10 +347,17 @@ function requireUuidOrNull(
 }
 
 function requireTimestamp(value: unknown, path: string, issues: IssueCollector): string {
-  if (typeof value !== "string" || !TIMESTAMP_PATTERN.test(value)) {
+  if (typeof value !== "string") {
+    issues.add(path, "must_be_timestamp_string");
+  }
+  if (TIMESTAMP_PATTERN.test(value)) {
+    return value;
+  }
+  // A naive ISO datetime parses server-side but fails the timezone rule.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?$/.test(value)) {
     issues.add(path, "timestamp_requires_timezone");
   }
-  return value;
+  issues.add(path, "must_be_iso_timestamp");
 }
 
 function requireUnknownKeysOnly(
@@ -682,7 +692,10 @@ function parseHeadingBlock(node: Record<string, unknown>, path: string, issues: 
   const attrs = parseBlockAttrs(node, path, ["block_id", "level"], issues);
   const blockId = requireUuid(attrs.block_id, `${path}.attrs.block_id`, issues);
   const level = attrs.level;
-  if (typeof level !== "number" || !Number.isInteger(level) || level < 1 || level > 3) {
+  if (typeof level !== "number" || !Number.isInteger(level)) {
+    issues.add(`${path}.attrs.level`, "must_be_integer");
+  }
+  if (level < 1 || level > 3) {
     issues.add(`${path}.attrs.level`, "out_of_range");
   }
   if (node.content === undefined || node.content === null) {
@@ -959,25 +972,26 @@ function checkSameDocumentLinks(
   graph: LinkGraph,
   issues: IssueCollector,
 ): void {
-  for (const [index, block] of content.entries()) {
-    const path = `document.content[${index}]`;
+  // The server reports dangling same-document links with the bare "content"
+  // path (the whole link set is checked after parsing), not per attribute.
+  for (const block of content) {
     if (block.type === "insight") {
       if (block.attrs.hypothesis_id && !graph.hypothesisIds.has(block.attrs.hypothesis_id)) {
-        issues.add(`${path}.attrs.hypothesis_id`, "dangling_hypothesis_reference");
+        issues.add("content", "dangling_hypothesis_reference");
       }
     } else if (block.type === "risk") {
       if (block.attrs.related_hypothesis_id && !graph.hypothesisIds.has(block.attrs.related_hypothesis_id)) {
-        issues.add(`${path}.attrs.related_hypothesis_id`, "dangling_hypothesis_reference");
+        issues.add("content", "dangling_hypothesis_reference");
       }
     } else if (block.type === "evidence") {
       if (!graph.hypothesisIds.has(block.attrs.hypothesis_id)) {
-        issues.add(`${path}.attrs.hypothesis_id`, "dangling_hypothesis_reference");
+        issues.add("content", "dangling_hypothesis_reference");
       }
       if (block.attrs.target_kind === "insight" && !graph.insightIds.has(block.attrs.target_id)) {
-        issues.add(`${path}.attrs.target_id`, "dangling_insight_reference");
+        issues.add("content", "dangling_insight_reference");
       }
       if (block.attrs.target_kind === "chart_block" && !graph.chartBlockIds.has(block.attrs.target_id)) {
-        issues.add(`${path}.attrs.target_id`, "dangling_chart_block_reference");
+        issues.add("content", "dangling_chart_block_reference");
       }
     }
   }
@@ -992,6 +1006,9 @@ export function validateCanonicalDocument(value: unknown): CanonicalDocument {
   const issues = new IssueCollector();
   const root = requireObject(value, "document", issues);
   requireUnknownKeysOnly(root, ["schema_version", "type", "content"], "document", issues);
+  if (typeof root.schema_version !== "number" || !Number.isInteger(root.schema_version)) {
+    issues.add("document.schema_version", "must_be_integer");
+  }
   if (root.schema_version !== CANONICAL_SCHEMA_VERSION) {
     issues.add("document.schema_version", "unsupported_schema_version");
   }
@@ -1002,6 +1019,7 @@ export function validateCanonicalDocument(value: unknown): CanonicalDocument {
   if (contentValue.length > MAX_TOP_LEVEL_BLOCKS) {
     issues.add("document.content", "too_many_blocks");
   }
+  const seenBlockIds = new Set<string>();
   const content: CanonicalBlock[] = contentValue.map((node, index) => {
     const path = `document.content[${index}]`;
     const object = requireObject(node, path, issues);
@@ -1009,21 +1027,24 @@ export function validateCanonicalDocument(value: unknown): CanonicalDocument {
     if (typeof kind !== "string" || !(kind in BLOCK_PARSERS)) {
       issues.add(`${path}.type`, "unsupported_block_type");
     }
-    return BLOCK_PARSERS[kind as string](object, path, issues);
+    const block = BLOCK_PARSERS[kind as string](object, path, issues);
+    if (seenBlockIds.has(block.attrs.block_id)) {
+      // The server reports the position of the duplicate occurrence.
+      issues.add(path, "duplicate_block_id");
+    }
+    seenBlockIds.add(block.attrs.block_id);
+    return block;
   });
 
   const graph = buildLinkGraph(content);
   if (graph.insightIds.size !== content.filter((b) => b.type === "insight").length) {
-    issues.add("document.content", "duplicate_insight_id");
+    issues.add("content", "duplicate_insight_id");
   }
   if (graph.hypothesisIds.size !== content.filter((b) => b.type === "hypothesis").length) {
-    issues.add("document.content", "duplicate_hypothesis_id");
+    issues.add("content", "duplicate_hypothesis_id");
   }
   if (graph.evidenceIds.size !== content.filter((b) => b.type === "evidence").length) {
-    issues.add("document.content", "duplicate_evidence_id");
-  }
-  if (graph.blockIds.size !== content.length) {
-    issues.add("document.content", "duplicate_block_id");
+    issues.add("content", "duplicate_evidence_id");
   }
   checkSameDocumentLinks(content, graph, issues);
 

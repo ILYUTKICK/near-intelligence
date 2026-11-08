@@ -10,6 +10,7 @@ import {
   type CanonicalDocument,
 } from "./canonical";
 import { canonicalBlockToTiptap, tiptapToCanonicalDocument } from "./serialize";
+import { emitRequestBlockDelete } from "./ui-bridge";
 
 /**
  * P0 structural block operations (NI-039, EDITOR_SPECIFICATION "Block
@@ -432,7 +433,7 @@ export const BlockOperationShortcuts = Extension.create({
         if (findDependentBlocks(snapshot.content, block.attrs.block_id).length > 0) {
           // Route through the confirmation flow; the shell previews the
           // affected links and performs the removal only on explicit choice.
-          editor.storage.editorUiBridge.requestBlockDelete(index);
+          emitRequestBlockDelete(editor, index);
           return false;
         }
         return removeTopLevelBlocks(editor, [index]);

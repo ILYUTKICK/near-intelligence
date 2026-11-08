@@ -8,7 +8,7 @@ import {
   type CanonicalCell,
   type CanonicalTableColumn,
 } from "./canonical";
-import { blockLabel, topLevelNodePosition, type CurrentBlock } from "./commands";
+import { blockLabel, type CurrentBlock } from "./commands";
 import { RichFragmentView } from "./blocks/rich-fragment";
 import { fieldPair, formatTimestamp, shortId } from "./blocks/display";
 import { cn } from "@/lib/utils";

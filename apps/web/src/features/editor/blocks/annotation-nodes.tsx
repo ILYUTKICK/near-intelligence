@@ -6,6 +6,7 @@ import {
 } from "@tiptap/react";
 
 import { blockIdAttr, jsonAttr, stringAttr } from "../attributes";
+import { emitOpenBlockProperties } from "../ui-bridge";
 import type {
   CanonicalContext,
   CanonicalRiskBlock,
@@ -42,7 +43,7 @@ function EditPropertiesButton({ editor, getPos, blockId }: {
         if (typeof pos === "number") {
           editor.commands.setNodeSelection(pos);
         }
-        editor.storage.editorUiBridge.openBlockProperties(blockId);
+        emitOpenBlockProperties(editor, blockId);
       }}
     >
       Edit properties

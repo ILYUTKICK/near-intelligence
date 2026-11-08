@@ -13,7 +13,6 @@ import { LiveChart } from "./blocks/live-chart";
 import { blockIdAttr } from "./attributes";
 import { BlockOperationShortcuts } from "./commands";
 import { SlashMenuTrigger } from "./slash-menu";
-import { EditorUiBridge } from "./ui-bridge";
 import { StableBlockIds } from "./block-id";
 
 /**
@@ -97,5 +96,4 @@ export const EDITOR_EXTENSIONS = [
   StableBlockIds,
   BlockOperationShortcuts,
   SlashMenuTrigger,
-  EditorUiBridge,
 ];

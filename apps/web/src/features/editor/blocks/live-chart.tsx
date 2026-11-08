@@ -6,6 +6,7 @@ import {
 } from "@tiptap/react";
 
 import { blockIdAttr, jsonAttr, stringAttr } from "../attributes";
+import { emitOpenBlockProperties } from "../ui-bridge";
 import { shortId } from "./display";
 
 /**
@@ -88,7 +89,7 @@ function LiveChartBlockView({ node, editor, getPos }: NodeViewProps) {
         </dl>
         <p className="mt-2 text-metadata leading-metadata text-text-secondary">
           The interactive chart (hover, table, range controls) renders here with NI-041/NI-042.
-          The block's context pins and its structural operations are active now.
+          The block&apos;s context pins and its structural operations are active now.
         </p>
         <button
           type="button"
@@ -98,7 +99,7 @@ function LiveChartBlockView({ node, editor, getPos }: NodeViewProps) {
             if (typeof pos === "number") {
               editor.commands.setNodeSelection(pos);
             }
-            editor.storage.editorUiBridge.openBlockProperties(attrs.block_id);
+            emitOpenBlockProperties(editor, attrs.block_id);
           }}
         >
           Edit properties

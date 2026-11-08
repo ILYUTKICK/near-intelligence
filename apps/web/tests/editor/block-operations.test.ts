@@ -26,9 +26,15 @@ import {
   removeTopLevelBlocks,
 } from "@/features/editor/commands";
 import { EDITOR_EXTENSIONS } from "@/features/editor/extensions";
+import { EDITOR_REQUEST_BLOCK_DELETE } from "@/features/editor/ui-bridge";
 import { tiptapToCanonicalDocument } from "@/features/editor/serialize";
 import { newBlockId } from "@/features/editor/block-id";
-import { buildLinkGraph, type CanonicalBlock } from "@/features/editor/canonical";
+import {
+  buildLinkGraph,
+  type CanonicalBlock,
+  type CanonicalResolvedContext,
+  type CanonicalSelection,
+} from "@/features/editor/canonical";
 
 const HYPOTHESIS_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const EVIDENCE_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
@@ -36,8 +42,8 @@ const INSIGHT_ID = "99999999-9999-4999-8999-999999999999";
 const CHART_BLOCK_ID = "66666666-6666-4666-8666-666666666666";
 const CHART_DEF_ID = "88888888-8888-4888-8888-888888888888";
 const DATASET_ID = "77777777-7777-4777-8777-777777777777";
-const SELECTION = { start: "2026-01-01", end: "2026-02-01", frequency: "day", filters: {} };
-const RESOLVED_CONTEXT = {
+const SELECTION: CanonicalSelection = { start: "2026-01-01", end: "2026-02-01", frequency: "day", filters: {} };
+const RESOLVED_CONTEXT: CanonicalResolvedContext = {
   chart_definition_version_id: CHART_DEF_ID,
   dataset_version_id: DATASET_ID,
   selection: SELECTION,
@@ -157,7 +163,9 @@ describe("pure planners", () => {
       return ids[ids.length - 1];
     };
     const evidenceCopy = duplicateBlock(content[2], allocate);
-    expect(evidenceCopy.type).toBe("evidence");
+    if (evidenceCopy.type !== "evidence") {
+      throw new Error("fixture drift: expected an evidence block");
+    }
     expect(evidenceCopy.attrs.block_id).not.toBe(content[2].attrs.block_id);
     expect(evidenceCopy.attrs.evidence_id).not.toBe(EVIDENCE_ID);
     // The duplicated single evidence block still links to its existing
@@ -170,6 +178,9 @@ describe("pure planners", () => {
     expect(graph.hypothesisIds.has(evidenceCopy.attrs.hypothesis_id)).toBe(true);
 
     const insightCopy = duplicateBlock(content[4], allocate);
+    if (insightCopy.type !== "insight") {
+      throw new Error("fixture drift: expected an insight block");
+    }
     expect(insightCopy.attrs.insight_id).not.toBe(INSIGHT_ID);
     expect(insightCopy.attrs.hypothesis_id).toBe(HYPOTHESIS_ID);
     // The pinned ResolvedContext travels with the copy unchanged.
@@ -234,8 +245,12 @@ describe("editor operations serialize valid canonical schema", () => {
     const snapshot = expectValidSnapshot(editor);
     expect(snapshot.content[3].type).toBe("liveChart");
     expect(snapshot.content[4].type).toBe("liveChart");
-    expect(snapshot.content[4].attrs.block_id).not.toBe(CHART_BLOCK_ID);
-    expect(snapshot.content[4].attrs.chart_definition_version_id).toBe(CHART_DEF_ID);
+    const copy = snapshot.content[4];
+    if (copy.type !== "liveChart") {
+      throw new Error("fixture drift: expected a liveChart copy");
+    }
+    expect(copy.attrs.block_id).not.toBe(CHART_BLOCK_ID);
+    expect(copy.attrs.chart_definition_version_id).toBe(CHART_DEF_ID);
     expectValidSnapshot(editor);
     editor.destroy();
   });
@@ -308,12 +323,12 @@ describe("keyboard shortcuts", () => {
 
   it("routes a keyboard delete of a linked target through the confirmation bridge", () => {
     const editor = editorWith(linkedFixtureBlocks());
-    const requestSpy = vi.fn(() => true);
-    editor.storage.editorUiBridge.requestBlockDelete = requestSpy;
+    const requestSpy = vi.fn();
+    editor.view.dom.addEventListener(EDITOR_REQUEST_BLOCK_DELETE, requestSpy);
     editor.commands.setNodeSelection(positionOf(editor, 1)); // hypothesis with dependents
     // The shortcut must NOT delete: it requests the confirmation dialog.
     expect(pressShortcut(editor, "Mod-Shift-Backspace")).toBe(false);
-    expect(requestSpy).toHaveBeenCalledWith(1);
+    expect(requestSpy).toHaveBeenCalledTimes(1);
     expect(editor.state.doc.childCount).toBe(5);
     expectValidSnapshot(editor);
     editor.destroy();

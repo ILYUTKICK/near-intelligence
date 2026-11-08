@@ -11,7 +11,10 @@ import {
   CanonicalDocumentError,
   buildLinkGraph,
   validateCanonicalDocument,
+  type CanonicalAnyMark,
   type CanonicalBlock,
+  type CanonicalSelection,
+  type CanonicalText,
 } from "@/features/editor/canonical";
 
 const UUID_A = "11111111-1111-4111-8111-111111111111";
@@ -20,10 +23,10 @@ const UUID_C = "33333333-3333-4333-8333-333333333333";
 const UUID_D = "44444444-4444-4444-8444-444444444444";
 const UUID_E = "55555555-5555-4555-8555-555555555555";
 
-const TEXT = (text: string, marks?: Array<Record<string, unknown>>) =>
+const TEXT = (text: string, marks?: CanonicalAnyMark[]): CanonicalText =>
   marks ? { type: "text", text, marks } : { type: "text", text };
 
-const SELECTION = { start: "2026-01-01", end: "2026-02-01", frequency: "day", filters: {} };
+const SELECTION: CanonicalSelection = { start: "2026-01-01", end: "2026-02-01", frequency: "day", filters: {} };
 const RESOLVED_CONTEXT = {
   chart_definition_version_id: UUID_C,
   dataset_version_id: UUID_D,
@@ -244,11 +247,12 @@ describe("canonical validator — rejections", () => {
   });
 
   it("rejects a missing block_id and duplicates", () => {
-    expectInvalid(doc([{ type: "divider", attrs: {} }]), "document.content[0].attrs.block_id", "must_be_uuid");
+    expectInvalid(doc([{ type: "divider", attrs: {} }]), "document.content[0].attrs.block_id", "must_be_uuid_string");
+    expectInvalid(doc([{ type: "divider", attrs: { block_id: "not-a-uuid" } }]), "document.content[0].attrs.block_id", "must_be_uuid");
     expectInvalid(doc([
       { type: "divider", attrs: { block_id: UUID_A } },
       { type: "divider", attrs: { block_id: UUID_A } },
-    ]), "document.content", "duplicate_block_id");
+    ]), "document.content[1]", "duplicate_block_id");
     expectInvalid(doc([
       { type: "divider", attrs: { block_id: "not-a-uuid" } },
     ]), "document.content[0].attrs.block_id", "must_be_uuid");
@@ -279,7 +283,7 @@ describe("canonical validator — rejections", () => {
 
   it("rejects non-whitelisted marks and bad link targets", () => {
     expectInvalid(
-      doc([{ type: "paragraph", attrs: { block_id: UUID_A }, content: [TEXT("x", [{ type: "code" }])] }]),
+      doc([{ type: "paragraph", attrs: { block_id: UUID_A }, content: [TEXT("x", [{ type: "code" } as unknown as CanonicalAnyMark])] }]),
       "document.content[0].content[0].marks[0].type",
       "unsupported_value",
     );
@@ -447,7 +451,7 @@ describe("canonical validator — rejections", () => {
           explanation: "No hypothesis exists in this document (fixture)",
         },
       }]),
-      "document.content[0].attrs.hypothesis_id",
+      "content",
       "dangling_hypothesis_reference",
     );
     const hypothesisId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -478,7 +482,7 @@ describe("canonical validator — rejections", () => {
           },
         },
       ]),
-      "document.content[1].attrs.target_id",
+      "content",
       "dangling_insight_reference",
     );
   });
@@ -497,7 +501,7 @@ describe("canonical validator — rejections", () => {
     });
     expectInvalid(
       doc([hypothesis(UUID_A), hypothesis(UUID_B)]),
-      "document.content",
+      "content",
       "duplicate_hypothesis_id",
     );
   });
