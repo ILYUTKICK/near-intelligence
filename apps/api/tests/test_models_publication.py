@@ -773,6 +773,23 @@ class CliContractTests(unittest.TestCase):
         completed = self.verify("--bundle")
         self.assertEqual(completed.returncode, 2)
 
+    def test_publish_refuses_tampered_bundle_without_touching_the_database(self):
+        # The gate runs entirely before the database connection: a tampered
+        # bundle and even a bogus URL exit 4 without any write attempt.
+        tampered = self.directory / "tampered-publish"
+        shutil.copytree(self.directory / "run-bundle", tampered)
+        document = json.loads((tampered / "fit_manifest.json").read_text("utf-8"))
+        document["admission"]["verdict"] = "NOT_READY"
+        (tampered / "fit_manifest.json").write_text(
+            render_canonical(document), encoding="utf-8")
+        completed = subprocess.run(
+            [sys.executable, "-m", "near_api.research", "publish",
+             "--bundle", str(tampered), "--database-url", "postgresql+psycopg://"
+             "near_operator:no-such-host.invalid/db"],
+            cwd=REPO, env={**os.environ}, capture_output=True, text=True, timeout=180)
+        self.assertEqual(completed.returncode, 4, completed.stdout)
+        self.assertIn("gate refused", completed.stderr)
+
     def test_forwarded_verbs_still_forward(self):
         # The NI-052/NI-053 forwarding contract survives the new verbs:
         # `fit --help` reaches the module's own parser and exit code 2 comes

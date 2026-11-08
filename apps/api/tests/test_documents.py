@@ -421,7 +421,8 @@ class DocumentRouteContractTests(unittest.TestCase):
 
     def test_01_document_routes_are_documented_in_openapi(self):
         schema = self.client.get("/openapi.json").json()
-        # The contract grows with implemented routes (NI-032 public delivery).
+        # The contract grows with implemented routes (NI-032 public delivery,
+        # NI-054 public model routes).
         self.assertEqual(set(schema["paths"]), {
             "/health", "/api/home", "/api/me",
             "/api/documents", "/api/documents/{document_id}",
@@ -432,6 +433,10 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",
             "/api/data-sources", "/api/data-sources/{source_id}",
             "/api/datasets/{version_id}", "/api/datasets/{version_id}/manifest",
+            "/api/model-definitions", "/api/model-definitions/{model_id}",
+            "/api/model-definitions/{model_id}/readiness",
+            "/api/model-runs", "/api/model-runs/{run_id}",
+            "/api/model-runs/{run_id}/manifest",
         })
         self.assertEqual(schema["paths"]["/api/documents"]["post"]["operationId"],
                          "createDocument")
