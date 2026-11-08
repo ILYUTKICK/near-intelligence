@@ -1775,6 +1775,8 @@ Specification: [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 
 **Testing requirements:** Full attack matrix; JWT/JWKS and cross-tab account tests; malicious rich text/tooltip/file names; production secret scan.
 
+**Known regression input from NI-041 delivery (8 November 2026):** `apps/web/scripts/check-client-secrets.mjs` includes low-entropy JWT audience/issuer/JWKS/origin metadata in its secret list. With the local audience `authenticated`, the ordinary UI state literal produces exit 1 although independent scanning finds configured issuer/JWKS/origin/signing values absent from the production client. NI-062 must correct the scanner with a positive secret-leak regression and a public-metadata false-positive regression; the NI-041 delivery did not weaken it or claim it passed.
+
 ### NI-063 — Verify complete research workflow end to end
 
 - **Epic:** 13 — Quality and Security
