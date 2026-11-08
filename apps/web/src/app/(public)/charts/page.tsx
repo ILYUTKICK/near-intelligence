@@ -35,6 +35,18 @@ export default async function ChartLibraryPage({
   const values = await searchParams;
   const dropped: DroppedParam[] = [];
 
+  // Approved catalog parameters; anything else in the URL is dropped with an
+  // honest note and never forwarded (same gate as the detail selection).
+  const approvedLibraryParams = ["q", "category", "cursor"];
+  for (const key of Object.keys(values)) {
+    if (!approvedLibraryParams.includes(key)) {
+      dropped.push({
+        param: key,
+        reason: "unsupported URL parameter; it was not sent to the chart API",
+      });
+    }
+  }
+
   let q = singleValue(values, "q", dropped);
   if (q !== null) {
     q = q.trim();
