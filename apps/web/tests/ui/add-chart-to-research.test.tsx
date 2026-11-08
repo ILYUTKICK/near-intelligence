@@ -1,9 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "jest-axe";
+import { ChartAuthActions } from "@/features/charts/library/ChartAuthActions";
 import { AddChartToResearch } from "@/features/charts/add-to-research/AddChartToResearch";
 import { LoginForm } from "@/app/(auth)/login/LoginForm";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const id = "44444444-4444-4444-8444-444444444444";
 const dataset = "55555555-5555-4555-8555-555555555555";
@@ -65,6 +68,70 @@ describe("NI-041 destination confirmation", () => {
     await user.click(screen.getByRole("button", { name: "Retry confirmed insertion" }));
     await screen.findByRole("link", { name: "Open research" });
     expect(keys).toHaveLength(2); expect(keys[0]).toBe(keys[1]);
+  });
+
+  it("retains destination and retry keys through same-account focus and modal close", async () => {
+    const keys: string[] = [];
+    const creations: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {
+      if (url === "/api/auth/session") return response({ subject: "synthetic-alice" });
+      if (url === "/api/auth/csrf") return response({ token: "synthetic-csrf" });
+      if (url === "/api/documents" && options.method === "POST") {
+        creations.push(new Headers(options.headers).get("idempotency-key")!);
+        return response({ ...summary, content: {}, resolved_contexts: {} }, 201);
+      }
+      if (url.includes("chart-blocks")) {
+        keys.push(new Headers(options.headers).get("idempotency-key")!);
+        if (keys.length === 1) throw new Error("Lost response after commit");
+        return response({ document: { ...summary, revision: 4 }, value: { block_id: id } }, 201);
+      }
+      if (url === "/api/documents") return response({ items: [], next_cursor: null });
+      return response({ ...summary, revision: 4, content: {}, resolved_contexts: {} });
+    }));
+    const user = userEvent.setup();
+    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    await user.click(await screen.findByRole("button", { name: "Add to research" }));
+    await screen.findByText(/No existing research matches/);
+    await user.clear(screen.getByLabelText("New research title"));
+    await user.type(screen.getByLabelText("New research title"), "Synthetic retained draft");
+    await user.click(screen.getByRole("button", { name: "Confirm Add Chart" }));
+    await screen.findByRole("alert");
+    fireEvent(window, new Event("focus"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await screen.findByRole("dialog");
+    expect(screen.getByLabelText("New research title")).toHaveValue("Synthetic retained draft");
+    // Closing/reopening an uncertain attempt must also keep the same keys.
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Add to research" }));
+    const retry = await screen.findByRole("button", { name: "Retry confirmed insertion" });
+    await waitFor(() => expect(retry).toBeEnabled());
+    await user.click(retry);
+    await screen.findByRole("link", { name: "Open research" });
+    expect(creations).toHaveLength(1);
+    expect(keys).toHaveLength(2); expect(keys[1]).toBe(keys[0]);
+    // A new confirmation after acknowledged success is a new intent.
+    await user.click(screen.getByRole("button", { name: "Add to research" }));
+    const confirm = await screen.findByRole("button", { name: "Confirm Add Chart" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.click(confirm);
+    await screen.findByRole("link", { name: "Open research" });
+    expect(creations).toHaveLength(2); expect(creations[1]).not.toBe(creations[0]);
+    expect(keys[2]).not.toBe(keys[0]);
+  });
+
+  it("clears the old account's destination draft when focus verifies another subject", async () => {
+    let subject = "synthetic-alice";
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url === "/api/auth/session"
+      ? response({ subject }) : response({ items: [], next_cursor: null })));
+    const user = userEvent.setup();
+    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    await user.click(await screen.findByRole("button", { name: "Add to research" }));
+    await user.type(screen.getByLabelText("New research title"), " private Alice draft");
+    subject = "synthetic-bob";
+    fireEvent(window, new Event("focus"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(await screen.findByRole("button", { name: "Add to research" }));
+    expect(screen.getByLabelText("New research title")).toHaveValue("Research with chart");
   });
 
   it("returns focus to the trigger on keyboard cancel without inserting", async () => {

@@ -24,7 +24,9 @@ Mechanics: :func:`execute_idempotent` opens ONE principal transaction that
    ("timeout-after-commit" guarantee by construction).
 
 Request identity: the fingerprint covers route, verified owner and the
-canonical request BODY only — API_SPECIFICATION defines idempotency over
+canonical request BODY only. For a document-scoped mutation the route key
+contains the concrete document UUID (never the path template), so one
+destination cannot replay another destination's result. API_SPECIFICATION defines idempotency over
 owner/route/body, not headers. A retried save therefore replays the stored
 revision result even if the retry carries a refreshed If-Match (the stored
 result is exactly the state that payload's save produced); a genuinely

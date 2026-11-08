@@ -1425,6 +1425,28 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         self.assertEqual(counts, {"document_versions": 3, "document_blocks": 9,
                                   "insights": 1, "hypotheses": 1, "evidence_links": 1})
 
+    def test_version_replay_is_scoped_to_the_concrete_document(self):
+        first = service.create_document(self.engine, self.alice, title="Synthetic first")
+        second = service.create_document(self.engine, self.alice, title="Synthetic second")
+        foreign = service.create_document(self.engine, self.bob, title="Synthetic Bob")
+        payload = {"schema_version": SCHEMA_VERSION, "content": empty_document()}
+        headers = {"Authorization": "Bearer t.alice", "If-Match": '\"1\"',
+                   "Idempotency-Key": str(uuid4())}
+        with self.as_session(self.alice_id):
+            a = self.client.post(f"/api/documents/{first.document.id}/versions", json=payload, headers=headers)
+            self.assertEqual(a.status_code, 201, a.text)
+            denied = self.client.post(f"/api/documents/{foreign.document.id}/versions", json=payload, headers=headers)
+            self.assertEqual(denied.status_code, 404, denied.text)
+            b = self.client.post(f"/api/documents/{second.document.id}/versions", json=payload, headers=headers)
+            self.assertEqual(b.status_code, 201, b.text)
+            self.assertEqual(b.json()["document"]["id"], str(second.document.id))
+            self.assertNotEqual(a.json()["version"]["id"], b.json()["version"]["id"])
+            for document, result in ((first, a), (second, b)):
+                replay = self.client.post(f"/api/documents/{document.document.id}/versions", json=payload,
+                                          headers={**headers, "If-Match": '\"2\"'})
+                self.assertEqual(replay.json(), result.json())
+                self.assertEqual(self.table_counts(document.document.id)["document_versions"], 2)
+
     def test_17_idempotent_create_concurrent_same_key_single_document(self):
         key = uuid4()
         route = idempotency.ROUTE_CREATE_DOCUMENT

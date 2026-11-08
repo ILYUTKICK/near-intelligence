@@ -101,7 +101,7 @@ router = APIRouter(prefix="/api", tags=["documents"])
 PrincipalDependency = Annotated[Principal, Depends(get_principal)]
 RuntimeEngineDependency = Annotated[Engine, Depends(get_runtime_engine)]
 
-ROUTE_ADD_CHART_BLOCK = "POST /api/documents/{document_id}/chart-blocks"
+ROUTE_ADD_CHART_BLOCK = idempotency.ROUTE_ADD_CHART_BLOCK
 
 
 # --------------------------------------------------------------------------- #
@@ -433,12 +433,13 @@ def add_chart_block(request: Request, principal: PrincipalDependency,
         return 201, body
 
     if key is not None:
+        route_key = ROUTE_ADD_CHART_BLOCK.format(document_id=document_id)
         try:
             outcome = idempotency.execute_idempotent(
-                engine, principal, route_key=ROUTE_ADD_CHART_BLOCK,
+                engine, principal, route_key=route_key,
                 idempotency_key=key,
                 request_hash=idempotency.request_fingerprint(
-                    ROUTE_ADD_CHART_BLOCK, principal.id,
+                    route_key, principal.id,
                     payload.model_dump(mode="json")),
                 operation=execute)
         except idempotency.IdempotencyConflict:

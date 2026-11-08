@@ -988,7 +988,7 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 - **Priority:** P0
 - **Dependencies:** NI-019, NI-034
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #31
 - **Execution role:** B
 - **Started at:** 2026-11-08T05:27:41+03:00
@@ -1016,7 +1016,15 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 - **A contribution:** implemented real same-origin saved-chart gateway (signed cookie -> bearer; Origin/CSRF; bounded body; no-store), Save Chart on resolved public details, private list/search/rename/confirmed-removal and shared-renderer detail routes. Account-change/logout/visibility/focus invalidation clears private state before revalidation and discards old in-flight responses. Fixed the chart's workspace flex overflow with `min-w-0`.
 - **Verification:** frozen existing dependencies, no new package. Full disposable PostgreSQL 18 suite: 369 tests passed, no skips/failures, Alembic model drift clean. Frontend: 32 files / 373 tests passed with `vitest run --maxWorkers=2`, including retry-key reuse, CRUD/confirmation, axe, account-change race and gateway cookie/CSRF/body-size cases. Typecheck, lint, production build, API contract tests and generated-contract drift passed; documentation links checked. New saved-chart HTTP suite (`scripts/run-db-tests.py --pg-bin /opt/homebrew/opt/postgresql@18/bin --saved-charts-http`) passed through production Next.js, real ES256 JWT verification, bootstrap, CSRF and RLS, with only the JWKS transport replaced by an ephemeral synthetic key: save/retry/reopen and Bob GET/PATCH/DELETE denial.
 - **Browser evidence:** actual isolated IAB save -> Open saved chart -> reload -> list -> rename -> reopen passed; exact `12.123456789012345678901234` and source/range remained intact. Switching to Bob and opening Alice's URL showed the generic unavailable state. At 387px the corrected document width is 387px; [synthetic screenshot](qa/ni035-saved-chart-mobile.jpg). This is browser viewport verification; physical-phone release testing belongs to NI-064. The temporary servers/database were stopped and removed; original b9 files and stopped collectors were not modified.
-- **Reviewer:** pending independent role-A review of this continuation; status remains IN_PROGRESS until review. Implementation/verification is complete and ready for that handoff before proceeding to the user-assigned NI-041.
+- **Reviewer:** independent acceptance explicitly waived by the user on 8 November 2026; no independent approval is claimed.
+- **Review fixes claimed:** Codex / chat 01a1ba7d-239f-7483-b2d6-fc651744fe9b, roles A/B, 2026-11-08T13:59:40+03:00, feat/ni-035-continuation @ /Users/ilyutkinn/Desktop/Near. Fix same-account focus retry-key loss and parallel-mutation CSRF rotation; IN_PROGRESS until verification. NI-041 destination replay fix follows separately.
+
+**Review correction result — 8 November 2026:**
+- Preserved save attempt/result through same-subject focus checks (hidden while checking); explicit auth changes, logout and verified different subjects reset it. Added lost-response/focus and two identity-change regressions.
+- Reused verified CSRF cookies; concurrent first-token requests for one signed session produce the same opaque HMAC-based nonce. Tampered cookies still fail verification and are replaced; Origin/header-cookie validation is unchanged. Added four CSRF regressions and parallel token acquisition to the real gateway HTTP test.
+- **Verification:** focused 6-file run: 78 tests passed; full frontend: 33 files / 380 tests passed; lint, typecheck, production build, generated contract check and 600 documentation links passed. Saved-chart PostgreSQL/API regressions 6/6 plus production gateway HTTP E2E 1/1 passed, including real concurrent CSRF acquisition, signed JWT/bootstrap/RLS and Bob denial. Existing complete DB baseline remains 369 passed; no domain/schema migration changed in this correction.
+- **Acceptance:** all original task checks implemented and verified; independent acceptance waived by explicit user instruction, not presented as a second-participant approval. PR #67 remains for the operator to merge.
+- **Completed at:** 2026-11-08T14:05:37+03:00.
 
 ### NI-071 — Add advanced supported analytical filters
 
@@ -1183,7 +1191,7 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Priority:** P0
 - **Dependencies:** NI-040, NI-033
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** Claude agent for role B (ILYUTKICK), session dispatch #30
 - **Execution role:** B
 - **Started at:** 2026-11-08T05:11:00+03:00
@@ -1193,7 +1201,7 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Continuation execution role:** B, with required A/UI contribution under the user’s explicit authorization of both roles
 - **Resumed at:** 2026-11-08T13:12:16+03:00
 - **Continuation branch/worktree:** feat/ni-041-continuation @ /Users/ilyutkinn/Desktop/Near; stacked on feat/ni-035-continuation (PR #67) to reuse private gateway/actions
-- **User-authorized handoff:** The user explicitly transferred NI-035/NI-041 on 8 November and supplied the prior chat history. NI-035 implementation/verification is complete and awaiting independent review in #67. NI-040 and NI-033 are DONE on main. Original b8 HEAD fb5fe6d and five dirty files/patch/hashes were preserved under ignored .local/handoffs/NI-041; continue both existing commits and the supplied test fixes without editing original b8.
+- **User-authorized handoff:** The user explicitly transferred NI-035/NI-041 on 8 November and supplied the prior chat history. NI-035 is verified DONE in #67; independent acceptance of NI-035/NI-041 was explicitly waived by the user on 8 November. NI-040 and NI-033 are DONE on main. Original b8 HEAD fb5fe6d and five dirty files/patch/hashes were preserved under ignored .local/handoffs/NI-041; continue both existing commits and the supplied test fixes without editing original b8.
 
 **Description:** Connect explorer/library selection to persisted document blocks.
 
@@ -1211,7 +1219,15 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Verification:** full disposable PostgreSQL 18 suite: 384 tests passed, no failures/skips; migration/model drift clean. Frontend: 33 files / 380 tests passed with `vitest run --maxWorkers=2`; lint/typecheck/production build and API contract/client generation checks passed. The focused 4-file regression pass also passed (33 tests), including actual gateway path/CAS forwarding, immutable continuation, picker retry/focus/axe, filter round-trip and external redirect denial. No new dependency.
 - **HTTP E2E:** `scripts/run-db-tests.py --pg-bin /opt/homebrew/opt/postgresql@18/bin --chart-insertion-http` passed 15 chart-block regressions plus the real production Next -> cookie/CSRF -> ES256 JWT verification/bootstrap -> FastAPI/RLS -> PostgreSQL scenario. A newer approved dataset was published after inspection but before insertion; the original dataset/filter pin survived insertion, replay, later prose save and reopen. Bob GET/append to Alice's document returned 404. Only provider JWKS transport is synthetic; signature, principal and ownership checks execute normally.
 - **Browser evidence:** public chart -> login link with exact dataset UUID/range/filter -> controlled synthetic session -> owned destination picker/Create New -> one chart block (revision 2) -> inserted paragraph/typed note -> Save (revision 4) -> reload passed at 387px. Stored source SRC-LLAMA, range and observed dataset stayed visible and unchanged. [Synthetic browser evidence](qa/ni041-chart-insertion-mobile.jpg). No provider account was created/contacted; physical-phone release QA is not claimed. Temporary servers/databases were stopped/removed and original b8 is unchanged.
-- **Reviewer:** pending independent role-A review; status remains IN_PROGRESS and no PR is merged by this agent. NI-042 is not marked unblocked/DONE ahead of that acceptance.
+- **Reviewer:** independent acceptance explicitly waived by the user on 8 November 2026; no independent approval is claimed.
+- **Review fixes claimed:** Codex / chat 01a1ba7d-239f-7483-b2d6-fc651744fe9b, roles A/B, 2026-11-08T14:06:00+03:00, feat/ni-041-continuation @ /Users/ilyutkinn/Desktop/Near. Integrate the verified NI-035 fixes, preserve insertion attempts across same-account revalidation and bind replay to the concrete destination. The same route-template issue also affects the whole-document version path used to save inserted charts; fix it with the same bounded rule and regression. IN_PROGRESS until verification.
+
+**Review correction result — 8 November 2026:**
+- Integrated the verified NI-035 correction (75c9e42, PR #67 CI 42474253460 green). The insertion component now keeps draft/destination, stable creation/insertion keys and acknowledged results above the modal subtree. Same-subject revalidation hides it without losing state; a different verified subject discards it. Closing/reopening an uncertain insertion retains keys. A new confirmation after acknowledged success starts a fresh intent.
+- Chart insertion and whole-document version saves now use concrete document URLs as their replay/lock identity. Same-key/same-body writes to two owned documents each target the correct document; a foreign target remains 404; same-destination replay with refreshed If-Match remains idempotent. Added real DB regressions for both paths.
+- **Verification:** full disposable PostgreSQL 18 suite: 386 tests passed, no failures/skips, model/migration drift clean. Full frontend: 34 files / 391 tests passed; lint, typecheck and production build passed. Focused retry/account/CSRF regressions: 19 passed. API contract unit tests 6/6; OpenAPI/TS drift check and 604 documentation links passed. Production gateway HTTP suite: 16 chart-block regressions plus 1 actual Next -> CSRF -> ES256 JWT/bootstrap -> API/RLS -> PostgreSQL E2E passed, preserving inspected data across insertion/replay/prose save and denying Bob; it also checks concurrent first CSRF acquisition. No external provider/account, collector, real data import or new dependency.
+- **Acceptance:** all original NI-041 acceptance checks and the three review findings are addressed and verified. Independent acceptance explicitly waived by the user; no second-participant approval is claimed. PR #68 remains stacked on #67, with merge reserved for the operator. NI-042 work is not started in this correction.
+- **Completed at:** 2026-11-08T17:35:14+03:00.
 
 ### NI-042 — Complete interactive chart node behavior
 

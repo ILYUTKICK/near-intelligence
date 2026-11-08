@@ -449,6 +449,29 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
         self.assertEqual(self.table_counts(detail.document.id),
                          {"document_versions": 3, "document_blocks": 3})
 
+    def test_replay_is_scoped_to_the_concrete_destination(self):
+        first_doc = self.create_document(self.alice, "Synthetic first")
+        second_doc = self.create_document(self.alice, "Synthetic second")
+        foreign = self.create_document(self.bob, "Synthetic Bob")
+        dataset = self.insert_dataset_version(self.dataset_key("replay-destination"))
+        payload = insert_payload(dataset_version_id=str(dataset))
+        key = str(uuid4())
+        first = self.add_chart(first_doc.document.id, payload, key=key)
+        self.assertEqual(first.status_code, 201, first.text)
+        # An owned replay may never satisfy a request targeting another owner.
+        denied = self.add_chart(foreign.document.id, payload, key=key)
+        self.assertEqual(denied.status_code, 404, denied.text)
+        second = self.add_chart(second_doc.document.id, payload, key=key)
+        self.assertEqual(second.status_code, 201, second.text)
+        self.assertEqual(second.json()["document"]["id"], str(second_doc.document.id))
+        self.assertNotEqual(first.json()["value"]["block_id"], second.json()["value"]["block_id"])
+        for document, result in ((first_doc, first), (second_doc, second)):
+            replay = self.add_chart(document.document.id, payload, revision=2, key=key)
+            self.assertEqual(replay.status_code, 201)
+            self.assertEqual(replay.json(), result.json())
+            self.assertEqual(self.table_counts(document.document.id),
+                             {"document_versions": 2, "document_blocks": 1})
+
     def test_04_idempotent_concurrent_same_key_single_block(self):
         detail = self.create_document(self.alice)
         dataset_id = self.insert_dataset_version(self.dataset_key("intents"))
@@ -457,8 +480,9 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
         from near_api.documents import idempotency
         from near_api.documents.chart_blocks import append_chart_block_in_transaction
         key = uuid4()
+        route_key = idempotency.ROUTE_ADD_CHART_BLOCK.format(document_id=detail.document.id)
         fingerprint = idempotency.request_fingerprint(
-            idempotency.ROUTE_ADD_CHART_BLOCK, self.alice_id,
+            route_key, self.alice_id,
             insert_payload(dataset_version_id=str(dataset_id)))
         barrier = threading.Barrier(2)
         outcomes = {}
@@ -466,7 +490,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
         def run(engine, tag):
             barrier.wait()
             outcomes[tag] = idempotency.execute_idempotent(
-                engine, self.alice, route_key=idempotency.ROUTE_ADD_CHART_BLOCK,
+                engine, self.alice, route_key=route_key,
                 idempotency_key=key, request_hash=fingerprint,
                 operation=lambda connection: (201, {
                     "block_id": str(append_chart_block_in_transaction(
