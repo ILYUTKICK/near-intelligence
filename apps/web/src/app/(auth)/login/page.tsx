@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { safeInternalReturnTo } from "@/lib/auth/session";
 import Link from "next/link";
 
 import { DemoSignIn } from "@/app/(auth)/login/DemoSignIn";
@@ -10,7 +11,9 @@ import { PublicFooter } from "@/components/layout/PublicFooter";
 export const metadata: Metadata = { title: "Sign in — NEAR Intelligence" };
 
 /** Same-origin sign-in shell; registration/recovery links arrive with their flows. */
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
+  const { next } = await searchParams;
+  const returnTo = safeInternalReturnTo(typeof next === "string" && next.length <= 4096 ? next : null);
   return (
     <div className="flex min-h-dvh flex-col">
       <SkipLink />
@@ -22,14 +25,14 @@ export default function LoginPage() {
             Use your research account email. Verification and recovery emails come from the
             authentication provider; links only work for the origin they were issued for.
           </p>
-          <LoginForm />
+          <LoginForm returnTo={returnTo} />
           <p className="text-ui leading-ui text-text-secondary mt-6">
             New here?{" "}
             <Link href="/signup" className="text-accent underline underline-offset-2 hover:text-accent-hover">
               Create an account
             </Link>
           </p>
-          <DemoSignIn />
+          <DemoSignIn returnTo={returnTo} />
         </div>
       </main>
       <PublicFooter />

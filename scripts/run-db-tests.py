@@ -19,6 +19,7 @@ from sqlalchemy.engine import URL
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--chart-insertion-http", action="store_true")
     parser.add_argument("--saved-charts-http", action="store_true",
                         help="run saved-chart DB and production gateway HTTP checks only")
     parser.add_argument("--pg-bin", type=Path, required=True)
@@ -122,6 +123,8 @@ def main() -> int:
             patterns.append("test_refresh_live_smoke.py")
         if args.saved_charts_http:
             patterns = ["test_saved_charts.py", "test_saved_charts_http.py"]
+        if args.chart_insertion_http:
+            patterns = ["test_chart_blocks.py", "test_chart_insertion_http.py"]
         returncode = 0
         with test_log.open("wb") as log:
             for pattern in patterns:

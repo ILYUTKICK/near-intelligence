@@ -19,6 +19,7 @@
  */
 
 import type { JSONContent } from "@tiptap/core";
+import type { components } from "@near-intelligence/shared-types";
 
 export const CANONICAL_SCHEMA_VERSION = 1;
 export const MAX_TOP_LEVEL_BLOCKS = 200;
@@ -104,12 +105,7 @@ export interface CanonicalRichList {
 
 export type RichFragment = Array<CanonicalParagraph | CanonicalRichList>;
 
-export interface CanonicalSelection {
-  start: string;
-  end: string;
-  frequency: "day";
-  filters: Record<string, never>;
-}
+export type CanonicalSelection = components["schemas"]["ChartSelection"];
 
 /** Frozen chart inspection record (API_SPECIFICATION ResolvedContext). */
 export interface CanonicalResolvedContext {
@@ -412,10 +408,16 @@ function parseSelection(value: unknown, path: string, issues: IssueCollector): C
   }
   requireEnum(selection.frequency, `${path}.frequency`, ["day"], issues);
   const filters = requireObject(selection.filters, `${path}.filters`, issues);
-  if (Object.keys(filters).length > 0) {
-    issues.add(`${path}.filters`, "no_filters_approved");
+  if (Object.keys(filters).length > 32) issues.add(`${path}.filters`, "too_many_filters");
+  const checked: Array<[string, string]> = [];
+  for (const [key, value] of Object.entries(filters)) {
+    if (!key || key.length > 80 || typeof value !== "string" || !value || value.length > 200) {
+      issues.add(`${path}.filters`, "invalid_filter_shape");
+    }
+    checked.push([key, value as string]);
   }
-  return { start, end, frequency: "day", filters: {} };
+  // Values are preserved exactly; the API checks the immutable definition's domain.
+  return { start, end, frequency: "day", filters: Object.fromEntries(checked) };
 }
 
 function parseContext(value: unknown, path: string, issues: IssueCollector): CanonicalContext {

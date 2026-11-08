@@ -43,7 +43,7 @@ Contract (API_SPECIFICATION row + protocol):
   block, so a timeout-after-commit retry is safe; the same key with a
   different body is 409 ``IDEMPOTENCY_CONFLICT``.
 - **Snapshot mode.** ``mode:"snapshot"`` requires the same-owner research
-  snapshot registry (NI-035, P1) and is rejected as an unverifiable
+  snapshot registry (NI-044, P1) and is rejected as an unverifiable
   reference until that task lands — never tolerated as dangling data.
 """
 
@@ -60,9 +60,9 @@ from sqlalchemy import Connection, Engine, func, select
 
 from near_api.auth.principal import Principal, get_principal, get_runtime_engine
 from near_api.contracts import error_response
-from near_api.datasets.canonical import dump_canonical, sha256_hex
 from near_api.datasets.delivery import (
     DeliveryInvalidFilter,
+    _context_hash,
     validate_filters_against_schema,
 )
 from near_api.db.models import ChartDefinition, ChartMetric, MetricObservation
@@ -92,7 +92,9 @@ from near_api.schemas.chart_blocks import (
     ChartBlockMutationResponse,
     ChartBlockValue,
 )
-from near_api.schemas.common import ErrorDetail, Selection
+from near_api.schemas.common import ErrorDetail
+from near_api.schemas.chart_selection import ChartSelection
+from near_api.schemas.delivery import ResolvedSelection
 
 router = APIRouter(prefix="/api", tags=["documents"])
 
@@ -173,8 +175,7 @@ def validate_selection_against_definition(definition: ChartDefinitionRow,
     """Range/filter rules of one chart version (the NI-032 view rules, reused).
 
     The window may not exceed the definition's allowed maximum (the shared
-    ``Selection`` contract already bounds it at 366 days), and the filters —
-    an empty object in the P0 selection grammar — are validated against the
+    ``Selection`` contract already bounds it at 366 days), and the filters are validated against the
     definition's closed filter schema, so an inserted block can never carry a
     selection the explorer view itself would reject.
     """
@@ -216,12 +217,12 @@ def validate_document_chart(connection: Connection, chart: LiveChartNode) -> Non
     liveChart block verifies it exactly like the insertion endpoint does
     (registered available definition, allowed selection, approved pinned
     dataset with the required metrics). Snapshot mode stays gated on the
-    NI-035 research snapshot registry. Runs inside the save transaction.
+    P1 research snapshot registry (NI-044). Runs inside the save transaction.
     """
     if chart.mode == "snapshot":
         raise ReferenceInvalid(
             "Snapshot chart blocks require the research snapshot registry, which is "
-            "not available yet (arrives with NI-035)",
+            "not available yet (P1 NI-044)",
             [("content", "reference_unavailable")])
     definition = load_chart_definition(connection, chart.chart_definition_version_id,
                                        error_path="content")
@@ -252,18 +253,18 @@ def chart_inspection_state(chart: LiveChartNode) -> tuple:
 # --------------------------------------------------------------------------- #
 
 
-def _canonical_selection(selection: Selection) -> dict:
+def _canonical_selection(selection: ChartSelection) -> dict:
     """The canonical selection JSON of a validated request Selection."""
     return {
         "start": selection.start.isoformat(),
         "end": selection.end.isoformat(),
         "frequency": selection.frequency,
-        "filters": dict(selection.filters.model_dump()),
+        "filters": dict(selection.filters),
     }
 
 
 def build_resolved_context(definition: ChartDefinitionRow, dataset_version_id: UUID,
-                           selection: Selection, *, resolved_at: datetime) -> dict:
+                           selection: ChartSelection, *, resolved_at: datetime) -> dict:
     """Resolve the frozen inspection context of one inserted chart block.
 
     ``context_hash`` uses the NI-032 ChartView algorithm verbatim (canonical
@@ -275,17 +276,13 @@ def build_resolved_context(definition: ChartDefinitionRow, dataset_version_id: U
     """
     selection_json = _canonical_selection(selection)
     metric_versions = sorted(str(item) for item in definition.metric_definition_versions)
-    payload = {
-        "chart_definition_version_id": str(definition.id),
-        "dataset_version_id": str(dataset_version_id),
-        "selection": selection_json,
-        "metric_definition_versions": metric_versions,
-    }
     return canonical_context_json({
         "chart_definition_version_id": str(definition.id),
         "dataset_version_id": str(dataset_version_id),
         "selection": selection_json,
-        "context_hash": sha256_hex(dump_canonical(payload)),
+        "context_hash": _context_hash({"id": definition.id}, dataset_version_id,
+                                      ResolvedSelection.model_validate(selection_json),
+                                      definition.metric_definition_versions),
         "renderer_version": definition.renderer_version,
         "metric_definition_versions": metric_versions,
         "resolved_at": resolved_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
@@ -344,19 +341,19 @@ def append_chart_block_in_transaction(connection: Connection, principal: Princip
         raise ReferenceInvalid(
             "after_block_id does not reference a top-level block of this document",
             [("after_block_id", "dangling_after_block_reference")])
-    # Snapshot mode is an unverifiable reference until NI-035 lands (the same
+    # Snapshot mode is an unverifiable reference until P1 NI-044 lands (the same
     # gate the whole-document save path enforces for canonical nodes).
     if payload.mode == "snapshot":
         raise ReferenceInvalid(
             "Snapshot chart blocks require the research snapshot registry, which is "
-            "not available yet (arrives with NI-035)",
+            "not available yet (P1 NI-044)",
             [("mode", "reference_unavailable")])
 
     definition = load_chart_definition(connection, payload.chart_definition_version_id,
                                        error_path="chart_definition_version_id")
     validate_selection_against_definition(
         definition, payload.selection.start, payload.selection.end,
-        dict(payload.selection.filters.model_dump()))
+        dict(payload.selection.filters))
     service.require_approved_dataset(connection, payload.dataset_version_id,
                                      "dataset_version_id")
     require_metric_coverage(connection, definition, payload.dataset_version_id,

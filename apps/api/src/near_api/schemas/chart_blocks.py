@@ -10,11 +10,10 @@ owner field: the block identity and the pinned ``ResolvedContext`` are
 resolved server-side (documents/chart_blocks.py), so one confirmation is one
 valid block with one frozen evidence context.
 
-The ``selection`` reuses the shared :class:`near_api.schemas.common.Selection`
-contract (half-open UTC window, max 366 days, ``frequency: "day"``); its P0
-filter domain is empty, exactly like the canonical editor node grammar
-(documents/schema) and the NI-046 ``ResolvedContext`` — one selection shape,
-one source of truth across document JSON, contexts and API payloads.
+The selection reuses the bounded ChartSelection contract. Source/recipient/
+price-basis dimensions come from the registered charts; actual options are
+validated against the referenced immutable definition before persistence.
+The same shape is used in editor JSON and frozen inspection contexts.
 """
 
 from typing import Literal
@@ -22,7 +21,8 @@ from uuid import UUID
 
 from pydantic import model_validator
 
-from near_api.schemas.common import ContractModel, Selection
+from near_api.schemas.common import ContractModel
+from near_api.schemas.chart_selection import ChartSelection
 from near_api.schemas.home import DocumentSummary
 
 
@@ -39,7 +39,7 @@ class ChartBlockInsertRequest(ContractModel):
     """
 
     chart_definition_version_id: UUID
-    selection: Selection
+    selection: ChartSelection
     mode: Literal["live", "snapshot"]
     dataset_version_id: UUID
     snapshot_id: UUID | None = None

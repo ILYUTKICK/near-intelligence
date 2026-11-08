@@ -9,6 +9,7 @@ import {
   encodeSessionCookie,
   mintCsrfToken,
   secureCookies,
+  safeInternalReturnTo,
   verifyCsrfPair,
 } from "@/lib/auth/session";
 
@@ -45,9 +46,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing or invalid CSRF token." }, { status: 403 });
   }
 
-  let parsed: { displayEmail?: unknown } = {};
+  let parsed: { displayEmail?: unknown; returnTo?: unknown } = {};
   try {
-    parsed = (await request.json().catch(() => ({}))) as { displayEmail?: unknown };
+    parsed = (await request.json().catch(() => ({}))) as { displayEmail?: unknown; returnTo?: unknown };
   } catch {
     parsed = {};
   }
@@ -99,7 +100,8 @@ export async function POST(request: NextRequest) {
   }
 
   const secure = secureCookies();
-  const sessionResponse = NextResponse.json({ status: "session", demo: true });
+  const sessionResponse = NextResponse.json({ status: "session", demo: true, returnTo: safeInternalReturnTo(
+    typeof parsed.returnTo === "string" && parsed.returnTo.length <= 4096 ? parsed.returnTo : null) });
   sessionResponse.cookies.set(SESSION_COOKIE, encodeSessionCookie({
     accessToken: body.access_token,
     refreshToken: body.refresh_token,

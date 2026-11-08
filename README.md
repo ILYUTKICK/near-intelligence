@@ -110,3 +110,11 @@ uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postg
 ```
 
 Use your PostgreSQL 18 binary directory (macOS Homebrew: `/opt/homebrew/opt/postgresql@18/bin`). The saved suite exercises real cookie/CSRF forwarding, ES256 JWT verification, identity bootstrap, RLS, idempotent save/reopen and Bob's denied access. The six saved-chart API/DB regressions also run in the default database suite. The provider JWKS transport uses an ephemeral synthetic key and never contacts Supabase.
+
+NI-041 insertion HTTP integration (after the same frozen production build):
+
+```sh
+uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --chart-insertion-http
+```
+
+The isolated suite exercises the chart-block race/retry/ownership cases, then the actual web gateway and ES256 principal/RLS path. A newer dataset is published between inspection and insertion; the original pin survives insertion, replay, prose save and reopen. Bob cannot read or append to Alice's document. No external provider/account or research archive is used.

@@ -472,9 +472,12 @@ def _parse_selection(value, path: str) -> dict:
     if _require_enum(selection.get("frequency"), f"{path}.frequency", ("day",)) != "day":
         _fail(f"{path}.frequency", "unsupported_value")
     filters = _require_object(selection.get("filters"), f"{path}.filters")
-    if filters:
-        _fail(f"{path}.filters", "no_filters_approved")
-    return {"start": start, "end": end, "frequency": "day", "filters": {}}
+    from pydantic import ValidationError
+    from near_api.schemas.chart_selection import ChartSelection
+    try:
+        return ChartSelection.model_validate(selection).model_dump(mode="json")
+    except ValidationError:
+        _fail(path, "invalid_selection")
 
 
 def _require_sha256(value, path: str) -> str:

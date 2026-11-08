@@ -47,6 +47,7 @@ function providerReply(status: number, body: unknown) {
 async function demoRequest(options: {
   origin?: string | null;
   displayEmail?: string;
+  returnTo?: string;
   withoutCsrf?: boolean;
 }): Promise<NextRequest> {
   const headers = new Headers({ "content-type": "application/json" });
@@ -62,7 +63,7 @@ async function demoRequest(options: {
   return new NextRequest("http://localhost:3000/api/auth/demo", {
     method: "POST",
     headers,
-    body: JSON.stringify({ displayEmail: options.displayEmail ?? "visitor@example.test" }),
+    body: JSON.stringify({ displayEmail: options.displayEmail ?? "visitor@example.test", returnTo: options.returnTo }),
   });
 }
 
@@ -73,7 +74,7 @@ describe("Demo sign-in", () => {
     );
     const response = await demoPost(await demoRequest({ displayEmail: "visitor@example.test" }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: "session", demo: true });
+    expect(await response.json()).toEqual({ status: "session", demo: true, returnTo: "/" });
     const session = response.headers.getSetCookie().find((c) => c.startsWith("ni_session="));
     expect(session).toContain("HttpOnly");
     const [url, init] = providerFetchMock.mock.calls[0];
@@ -81,6 +82,14 @@ describe("Demo sign-in", () => {
     const sentBody = JSON.parse(init.body as string);
     expect(sentBody.is_anonymous).toBe(true);
     expect(sentBody.data.demo_email_label).toBe("visitor@example.test");
+  });
+
+  it("preserves an internal chart continuation and rejects external targets", async () => {
+    for (const [returnTo, expected] of [["/charts/intents-volume?dataset_version=synthetic", "/charts/intents-volume?dataset_version=synthetic"], ["https://foreign.example", "/"], ["//foreign.example", "/"]]) {
+      providerFetchMock.mockResolvedValueOnce(providerReply(200, { access_token: "synthetic-access", refresh_token: "synthetic-refresh", expires_in: 600 }));
+      const response = await demoPost(await demoRequest({ returnTo }));
+      expect((await response.json()).returnTo).toBe(expected);
+    }
   });
 
   it("treats the email as a display label only — absent labels are fine", async () => {

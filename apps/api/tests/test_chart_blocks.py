@@ -125,7 +125,7 @@ class ChartBlockContractTests(unittest.TestCase):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(selection={"start": "2026-01-01", "end": "2026-01-08",
                                           "frequency": "day",
-                                          "filters": {"source": "SRC-LLAMA"}}))
+                                          "filters": {"source": ["SRC-LLAMA"]}}))
         with self.assertRaises(ValidationError):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(block_id=str(uuid4()), owner_id=str(uuid4())))
@@ -225,9 +225,16 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
     def create_document(self, principal: Principal, title: str = "Synthetic research"):
         return service.create_document(self.engine, principal, title=title)
 
+    def dataset_key(self, name: str) -> str:
+        """A unique synthetic dataset key: dataset_versions are shared
+        scientific rows that survive between tests in the disposable cluster
+        (only app.users is reset in setUp)."""
+        return f"synthetic.{uuid4().hex[:8]}.{name}"
+
     def insert_dataset_version(self, dataset_key: str, *, version: int = 1,
                                status: str = "approved", with_metric: bool = True,
-                               with_observation: bool = True) -> UUID:
+                               with_observation: bool = True,
+                               sha: str = SHA256) -> UUID:
         """Synthetic dataset version fixture (no research data, no pipeline)."""
         dataset_id = uuid4()
         artifact_id = uuid4()
@@ -238,7 +245,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
                 VALUES (:id, :key, :sha, 10, 'application/json', 'internal', NULL,
                         'unverified')
             """), {"id": artifact_id, "key": f"synthetic/{dataset_id}.json",
-                   "sha": SHA256})
+                   "sha": sha})
             connection.execute(text("""
                 INSERT INTO app.dataset_versions(id, dataset_key, version, status,
                        start_date, end_date, frequency, pipeline_version,
@@ -247,7 +254,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
                         'synthetic-pipeline-1', :artifact, :sha)
             """), {"id": dataset_id, "key": dataset_key, "version": version,
                    "status": status, "start": DATASET_WINDOW[0],
-                   "end": DATASET_WINDOW[1], "artifact": artifact_id, "sha": SHA256})
+                   "end": DATASET_WINDOW[1], "artifact": artifact_id, "sha": sha})
             if with_metric:
                 connection.execute(text("""
                     INSERT INTO app.dataset_metrics(dataset_version_id,
@@ -302,7 +309,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
 
     def test_01_one_confirmation_appends_one_valid_block(self):
         detail = self.create_document(self.alice)
-        dataset_id = self.insert_dataset_version("synthetic.intents")
+        dataset_id = self.insert_dataset_version(self.dataset_key("intents"))
         response = self.add_chart(detail.document.id,
                                   insert_payload(dataset_version_id=str(dataset_id)))
         self.assertEqual(response.status_code, 201, response.text)
@@ -352,9 +359,28 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
         self.assertEqual(rows[0][1], {"schema_version": 1, "type": "doc", "content": []})
         self.assertEqual(rows[1][0], 2)
 
+    def test_source_filter_is_persisted_and_unsupported_values_are_rejected(self):
+        detail = self.create_document(self.alice)
+        dataset_id = self.insert_dataset_version(self.dataset_key("filtered"))
+        selected = {**selection(), "filters": {"source": "SRC-LLAMA"}}
+        payload = insert_payload(dataset_version_id=str(dataset_id), selection=selected)
+        response = self.add_chart(detail.document.id, payload)
+        self.assertEqual(response.status_code, 201, response.text)
+        stored = self.stored_document(self.alice, detail.document.id)
+        block_id = response.json()["value"]["block_id"]
+        self.assertEqual(stored["content"]["content"][0]["attrs"]["selection"], selected)
+        context = stored["resolved_contexts"][block_id]
+        self.assertEqual(context["selection"], selected)
+        ResolvedContext.model_validate(context)
+        changed = {**payload, "selection": {**selected, "filters": {"source": "unapproved"}}}
+        denied = self.add_chart(detail.document.id, changed, revision=2)
+        self.assertEqual(denied.status_code, 422)
+        self.assertEqual(denied.json()["error"]["code"], "FILTER_UNSUPPORTED")
+        self.assertEqual(self.stored_document(self.alice, detail.document.id)["revision"], 2)
+
     def test_02_owner_validated_between_alice_and_bob(self):
         alice_document = self.create_document(self.alice).document.id
-        dataset_id = self.insert_dataset_version("synthetic.intents")
+        dataset_id = self.insert_dataset_version(self.dataset_key("intents"))
         # Bob sees Alice's document as absent and cannot append to it.
         response = self.add_chart(alice_document,
                                   insert_payload(dataset_version_id=str(dataset_id)),
@@ -380,7 +406,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
 
     def test_03_duplicate_retry_is_idempotent(self):
         detail = self.create_document(self.alice)
-        dataset_id = self.insert_dataset_version("synthetic.intents")
+        dataset_id = self.insert_dataset_version(self.dataset_key("intents"))
         payload = insert_payload(dataset_version_id=str(dataset_id))
         key = str(uuid4())
         first = self.add_chart(detail.document.id, payload, key=key)
@@ -405,21 +431,27 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
         failed_key = str(uuid4())
         failed = self.add_chart(detail.document.id,
                                 insert_payload(chart_definition_version_id=str(uuid4())),
-                                key=failed_key)
+                                revision=2, key=failed_key)
         self.assertEqual(failed.status_code, 422)
-        recovered = self.add_chart(detail.document.id, payload, key=failed_key)
+        recovered = self.add_chart(detail.document.id, payload, revision=2,
+                                   key=failed_key)
         self.assertEqual(recovered.status_code, 201)
+        self.assertEqual(recovered.headers["ETag"], '"3"')
         # A different key never replays: plain CAS is now stale (honest 409).
-        stale = self.add_chart(detail.document.id, payload, key=str(uuid4()))
+        stale = self.add_chart(detail.document.id, payload, revision=2,
+                               key=str(uuid4()))
         self.assertEqual(stale.status_code, 409)
         self.assertEqual(ErrorResponse.model_validate(stale.json()).error.code,
                          "REVISION_CONFLICT")
+        # Successful writes: the first insertion (rev 2) and the recovered
+        # one (rev 3): projections contain 1 + 2 blocks across immutable revisions;
+        # every replay/conflict/failure stored nothing extra.
         self.assertEqual(self.table_counts(detail.document.id),
-                         {"document_versions": 3, "document_blocks": 2})
+                         {"document_versions": 3, "document_blocks": 3})
 
     def test_04_idempotent_concurrent_same_key_single_block(self):
         detail = self.create_document(self.alice)
-        dataset_id = self.insert_dataset_version("synthetic.intents")
+        dataset_id = self.insert_dataset_version(self.dataset_key("intents"))
         payload = ChartBlockInsertRequest.model_validate(
             insert_payload(dataset_version_id=str(dataset_id)))
         from near_api.documents import idempotency
@@ -458,7 +490,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
         from near_api.documents.chart_blocks import append_chart_block
 
         detail = self.create_document(self.alice)
-        dataset_id = self.insert_dataset_version("synthetic.intents")
+        dataset_id = self.insert_dataset_version(self.dataset_key("intents"))
         payload = ChartBlockInsertRequest.model_validate(
             insert_payload(dataset_version_id=str(dataset_id)))
         barrier = threading.Barrier(2)
@@ -491,7 +523,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
 
     def test_06_http_conflict_and_precondition_matrix(self):
         detail = self.create_document(self.alice)
-        dataset_id = self.insert_dataset_version("synthetic.intents")
+        dataset_id = self.insert_dataset_version(self.dataset_key("intents"))
         payload = insert_payload(dataset_version_id=str(dataset_id))
         with self.as_session(self.alice_id):
             headers = {"Authorization": "Bearer t.alice"}
@@ -520,8 +552,8 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
 
     def test_07_reference_failures_are_typed_and_leave_zero_rows(self):
         detail = self.create_document(self.alice)
-        staged = self.insert_dataset_version("synthetic.staged", status="staged")
-        approved_empty = self.insert_dataset_version("synthetic.empty",
+        staged = self.insert_dataset_version(self.dataset_key("staged"), status="staged")
+        approved_empty = self.insert_dataset_version(self.dataset_key("empty"),
                                                      with_metric=False,
                                                      with_observation=False)
         cases = (
@@ -562,7 +594,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
                 json=insert_payload(selection={"start": "2026-01-01",
                                                "end": "2026-01-08",
                                                "frequency": "day",
-                                               "filters": {"source": "SRC-LLAMA"}}),
+                                               "filters": {"source": ["SRC-LLAMA"]}}),
                 headers={"Authorization": "Bearer t.alice", "If-Match": '"1"'})
         self.assertEqual(filtered.status_code, 422)
         self.assertEqual(ErrorResponse.model_validate(filtered.json()).error.code,
@@ -570,15 +602,18 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
 
     def test_08_inspected_evidence_survives_source_changes(self):
         detail = self.create_document(self.alice)
-        dataset_v1 = self.insert_dataset_version("synthetic.intents", version=1)
+        source_key = self.dataset_key("intents")
+        dataset_v1 = self.insert_dataset_version(source_key, version=1)
         inserted = self.add_chart(detail.document.id,
                                   insert_payload(dataset_version_id=str(dataset_v1)))
         self.assertEqual(inserted.status_code, 201, inserted.text)
         block_id = inserted.json()["value"]["block_id"]
         revision_two = self.stored_document(self.alice, detail.document.id)
 
-        # A "source change": a newer approved dataset version of the same key.
-        dataset_v2 = self.insert_dataset_version("synthetic.intents", version=2)
+        # A "source change": a newer approved dataset version of the same key
+        # (different content hash — the (key, sha) dedup pair is immutable).
+        dataset_v2 = self.insert_dataset_version(source_key, version=2,
+                                                 sha="b" * 64)
         self.assertNotEqual(dataset_v1, dataset_v2)
 
         # The old revision is untouched — no silent re-pin, no hash drift.
@@ -677,7 +712,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
                 json={"schema_version": 1, "content": base},
                 headers={"Authorization": "Bearer t.alice", "If-Match": '"1"'})
         self.assertEqual(saved.status_code, 201, saved.text)
-        dataset_id = self.insert_dataset_version("synthetic.intents")
+        dataset_id = self.insert_dataset_version(self.dataset_key("intents"))
         first_block = base["content"][0]["attrs"]["block_id"]
         anchored = self.add_chart(
             detail.document.id,
@@ -704,7 +739,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
                 json={"schema_version": 1, "content": document_with(199)},
                 headers={"Authorization": "Bearer t.alice", "If-Match": '"1"'})
         self.assertEqual(saved.status_code, 201, saved.text)
-        dataset_id = self.insert_dataset_version("synthetic.intents")
+        dataset_id = self.insert_dataset_version(self.dataset_key("intents"))
         full = self.add_chart(detail.document.id,
                               insert_payload(dataset_version_id=str(dataset_id)),
                               revision=2)
@@ -715,8 +750,10 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
         self.assertEqual(over.status_code, 413)
         self.assertEqual(ErrorResponse.model_validate(over.json()).error.code,
                          "PAYLOAD_TOO_LARGE")
+        # Projections are per revision: 199 blocks (rev 2) + 200 (rev 3); the
+        # rejected 413 insertion added no partial rows.
         self.assertEqual(self.table_counts(detail.document.id),
-                         {"document_versions": 3, "document_blocks": 200})
+                         {"document_versions": 3, "document_blocks": 399})
 
 
 # --------------------------------------------------------------------------- #
