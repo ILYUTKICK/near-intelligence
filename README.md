@@ -96,6 +96,25 @@ pnpm test:api:unit          # offline API suites
 pnpm test:api:db            # needs local PostgreSQL 18 binaries
 ```
 
+NI-012 landing integration uses production Next.js and FastAPI over loopback HTTP
+with a fresh disposable PostgreSQL 18 cluster (no auth/provider service):
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --suite landing
+# Optional offline reproduction with the separately supplied local research archive:
+NI_LANDING_ARCHIVE_ROOT=/absolute/path/to/research uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --suite landing
+```
+
+Use your PostgreSQL 18 binary directory (Homebrew macOS:
+`/opt/homebrew/opt/postgresql@18/bin`). The default run stages visibly synthetic
+regression data; the opt-in archive run reads the existing longitudinal flows
+and daily analysis, stages them only in the disposable test database, and
+checks both source files remain byte-identical. Neither mode contacts providers
+or supplies production seed data. The test checks visible metric cards against
+the real API response, explicit unavailable data, and API outage recovery.
+
 Compose mode and native development mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Web `.env` loading is implemented explicitly in [apps/web/src/lib/env.ts](apps/web/src/lib/env.ts) and API loading in [apps/api/src/near_api/settings.py](apps/api/src/near_api/settings.py); missing required configuration makes `/health` return a readable 503 on both services. Production settings and health gates: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example).
 
 ## Delivery gates

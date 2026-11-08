@@ -93,3 +93,12 @@ jobs:
             echo "=== initdb/start logs ==="; cat .local/ni003-pg-*/*-command.log || true
             exit 1
           }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Landing HTTP integration (synthetic data, isolated database)
+        run: uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --suite landing

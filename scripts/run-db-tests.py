@@ -20,6 +20,8 @@ from sqlalchemy.engine import URL
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pg-bin", type=Path, required=True)
+    parser.add_argument("--suite", choices=("all", "landing"), default="all",
+                        help="landing runs NI-012 HTTP integration against a prebuilt web app")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     local = (repo / ".local").resolve()
@@ -109,11 +111,13 @@ def main() -> int:
                     "test_profile.py", "test_documents.py", "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py"]
+        if args.suite == "landing":
+            patterns = ["test_landing_integration.py"]
         # NI-030 bounded authorized live smoke: only when the operator
         # explicitly sets NI_LIVE_SMOKE=1 in the invoking environment (the same
         # gate the smoke file itself requires) does one real finalized-header
         # request run inside this disposable cluster, after the standard suites.
-        if os.environ.get("NI_LIVE_SMOKE") == "1":
+        if args.suite == "all" and os.environ.get("NI_LIVE_SMOKE") == "1":
             environment["NI_LIVE_SMOKE"] = "1"
             patterns.append("test_refresh_live_smoke.py")
         returncode = 0
