@@ -130,3 +130,9 @@ and wired into the NI-039 workbench; contracts are unchanged:
   key and cleared once the server acknowledges. On load, a differing draft is offered with
   an explicit Restore/Discard choice; a draft failing the canonical validation says why and
   offers discard only. Storage failures degrade honestly (no draft, autosave still active).
+
+## NI-041 insertion integration
+
+Confirmed Add Chart from a resolved public detail appends through the owned revision-checked endpoint and stores the inspected definition/dataset/range/filters with its frozen context. Canonical chart selections preserve registered source/recipient/price-basis dimensions as bounded strings; the server checks options against the immutable chart version. The client selection type is generated from OpenAPI. A liveChart metadata node now displays its inspected filters on reopen; interactive rendering/controls remain NI-042. Subsequent prose saves carry unchanged server contexts forward verbatim; selection/definition/pin changes remain an explicit re-resolution gate for NI-043. Password and demo sign-in retain the internal pinned chart continuation, and document mutations/autosave supply Origin/CSRF through the same-origin gateway. [Synthetic insertion/reopen evidence](qa/ni041-chart-insertion-mobile.jpg) includes a saved text edit with the chart pin retained; it does not claim physical-phone release QA.
+
+NI-041 review correction: retries are scoped to the concrete destination for chart insertion and document-version saves. Same-user focus checks hide/revalidate private action UI while retaining confirmed attempt state; identity changes discard it. Closing an uncertain insertion keeps its keys for retry, while acknowledged success followed by another confirmation starts a new intent.

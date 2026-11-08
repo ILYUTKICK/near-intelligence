@@ -93,6 +93,7 @@ function errorResponse(status: number, code: string, message: string, details?: 
 function mockApi(handlers: Array<(url: string, init: RequestInit) => Response | undefined>) {
   const requests: CapturedRequest[] = [];
   const fetchMock = vi.fn((input: RequestInfo | URL, init: RequestInit = {}) => {
+    if (String(input) === "/api/auth/csrf") return Promise.resolve(new Response(JSON.stringify({ token: "synthetic-csrf" }), { headers: { "content-type": "application/json" } }));
     const url = String(input);
     requests.push({ url, init });
     for (const handler of handlers) {

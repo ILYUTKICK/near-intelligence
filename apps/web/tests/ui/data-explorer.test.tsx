@@ -1015,7 +1015,7 @@ describe("Data chart detail island — selection URLs and continuation stay /dat
     expect(href.startsWith("/login?next=")).toBe(true);
     const next = decodeURIComponent(String(href).split("next=")[1]);
     expect(next).toBe(
-      `/data/revenue/gross-fees?${serializeSelectionQuery(baseSelection)}`,
+      `/data/revenue/gross-fees?${serializeSelectionQuery({ ...baseSelection, datasetVersion: "a3333333-3333-4333-8333-333333333333" })}`,
     );
     expect(screen.getByRole("status")).toHaveTextContent(/selection are preserved in the sign-in link/);
   });

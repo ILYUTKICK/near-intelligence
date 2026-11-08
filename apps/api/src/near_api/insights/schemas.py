@@ -84,7 +84,8 @@ from near_api.documents.schema import (
     TARGET_KINDS,
     canonical_rich_body_json,
 )
-from near_api.schemas.common import ContractModel, Selection
+from near_api.schemas.common import ContractModel
+from near_api.schemas.chart_selection import ChartSelection
 
 # --------------------------------------------------------------------------- #
 # Taxonomy (single source: the canonical node taxonomy of documents.schema)
@@ -150,8 +151,8 @@ class ResolvedContext(ContractModel):
 
     Contains the selected range (``selection.start``/``selection.end`` with the
     half-open UTC window rules of :class:`near_api.schemas.common.Selection`),
-    the filters as passed (the approved filter domain is empty until a filter
-    schema is registered), the immutable pinned dataset version and the stable
+    the bounded registered filter dimensions as passed (the referenced chart
+    definition controls the exact allowed values), the immutable pinned dataset version and the stable
     version identifiers whose ``context_hash`` binds them together. Server
     resolution/verification of every id happens where the context is created;
     this contract keeps a stored context from drifting afterwards.
@@ -159,7 +160,7 @@ class ResolvedContext(ContractModel):
 
     chart_definition_version_id: UUID
     dataset_version_id: UUID
-    selection: Selection
+    selection: ChartSelection
     context_hash: Sha256Hex
     renderer_version: Annotated[str, StringConstraints(min_length=1, max_length=80)]
     metric_definition_versions: tuple[UUID, ...] = Field(max_length=100)

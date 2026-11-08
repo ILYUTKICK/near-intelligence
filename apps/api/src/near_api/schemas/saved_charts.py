@@ -11,7 +11,8 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, Field
 
-from near_api.schemas.common import ContractModel, Selection
+from near_api.schemas.common import ContractModel
+from near_api.schemas.chart_selection import ChartSelection
 from near_api.schemas.delivery import ChartViewResponse
 
 SAVED_CHART_MODES = ("live", "snapshot")
@@ -21,10 +22,10 @@ read time, labeled); ``snapshot`` pins an owner-matched research snapshot
 REFERENCE_INVALID)."""
 
 
-class SavedChartSelectionInput(Selection):
+class SavedChartSelectionInput(ChartSelection):
     """Create-time canonical selection (half-open window rules inherited)."""
 
-    filters: dict[str, str] = Field(max_length=32)
+    pass
 
 
 class SavedChartCreateRequest(ContractModel):

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { GET as getCsrf } from "@/app/api/auth/csrf/route";
+import { privateFetch } from "@/lib/auth/private-fetch";
 import { savedRequest } from "@/features/charts/saved/api";
 import { CSRF_COOKIE, SESSION_COOKIE, encodeSessionCookie, mintCsrfToken, verifyCsrfPair } from "@/lib/auth/session";
 
@@ -18,7 +19,7 @@ afterEach(() => { vi.unstubAllGlobals(); for (const key of Object.keys(environme
 const session = () => encodeSessionCookie({ accessToken: "synthetic-access", refreshToken: "synthetic-refresh", expiresAt: Date.now() + 60_000 });
 const request = (cookie: string) => new NextRequest("http://localhost:3000/api/auth/csrf", { headers: { cookie } });
 
-it.each([false, true])("accepts parallel saved-chart writes (existing CSRF cookie: %s)", async (existing) => {
+it.each([[false, "saved"], [true, "saved"], [false, "document"], [true, "document"]] as const)("accepts parallel writes (existing cookie: %s, client: %s)", async (existing, client) => {
   const sessionCookie = `${SESSION_COOKIE}=${session()}`;
   let csrfCookie = existing ? mintCsrfToken() : "";
   let release!: () => void;
@@ -38,7 +39,9 @@ it.each([false, true])("accepts parallel saved-chart writes (existing CSRF cooki
     statuses.push(status);
     return new Response("{}", { status });
   }));
-  await Promise.all([0, 1].map(() => savedRequest("/api/saved-charts", z.unknown(), { method: "POST", body: "{}" })));
+  await Promise.all([0, 1].map(() => client === "saved"
+    ? savedRequest("/api/saved-charts", z.unknown(), { method: "POST", body: "{}" })
+    : privateFetch("/api/documents", { method: "POST", body: "{}" })));
   expect(statuses).toEqual([201, 201]);
 });
 

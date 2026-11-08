@@ -14,7 +14,7 @@ import { shortId } from "./display";
  * mode + selection + observed dataset pin. The block is atomic — it is
  * selected, moved, duplicated and deleted as one unit, and its context pins
  * travel with it. Interactive chart rendering inside the editor and the
- * chart properties flow arrive with NI-041/NI-042; until then the node view
+ * chart properties flow arrive with NI-042; until then the node view
  * shows the persisted context honestly instead of a placeholder chart.
  */
 export const LiveChart = Node.create({
@@ -53,7 +53,7 @@ function LiveChartBlockView({ node, editor, getPos }: NodeViewProps) {
     block_id: string | null;
     chart_definition_version_id: string | null;
     mode: string | null;
-    selection: { start?: string; end?: string } | null;
+    selection: { start?: string; end?: string; filters?: Record<string, string> } | null;
     observed_dataset_version_id: string | null;
     snapshot_id: string | null;
   };
@@ -78,6 +78,8 @@ function LiveChartBlockView({ node, editor, getPos }: NodeViewProps) {
           <dd>
             {selection.start ?? "?"} – {selection.end ?? "?"} (UTC, half-open)
           </dd>
+          <dt>Inspected filters</dt>
+          <dd className="break-words">{Object.entries(selection.filters ?? {}).map(([key, value]) => `${key}: ${value}`).join("; ") || "None"}</dd>
           <dt>Observed dataset version</dt>
           <dd className="break-all">{shortId(attrs.observed_dataset_version_id)}</dd>
           {attrs.snapshot_id ? (
@@ -88,7 +90,7 @@ function LiveChartBlockView({ node, editor, getPos }: NodeViewProps) {
           ) : null}
         </dl>
         <p className="mt-2 text-metadata leading-metadata text-text-secondary">
-          The interactive chart (hover, table, range controls) renders here with NI-041/NI-042.
+          The interactive chart (hover, table, range controls) renders here with NI-042.
           The block&apos;s context pins and its structural operations are active now.
         </p>
         <button

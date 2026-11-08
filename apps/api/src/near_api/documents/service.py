@@ -30,19 +30,23 @@ with a typed reason, never a silent substitution):
 - same-document links (evidence -> hypothesis/insight/chart block,
   insight/risk -> hypothesis) are validated purely by
   :mod:`near_api.documents.schema`;
-- ``dataTable.dataset_version_id`` (and, once the NI-031 registry lifts the
-  chart gate, chart ``observed_dataset_version_id``) must reference an
-  APPROVED dataset version (public data visibility, NI-028 tables);
+- ``dataTable.dataset_version_id`` and liveChart
+  ``observed_dataset_version_id`` must reference an APPROVED dataset version
+  (public data visibility, NI-028 tables);
+- liveChart blocks are verified against the NI-031 chart registry (NI-041:
+  registered ``available`` definition, allowed selection, pinned dataset
+  covering the required metrics — the shared rules of
+  :mod:`near_api.documents.chart_blocks`); snapshot chart mode and
+  ``model_run`` evidence targets still require registries that do not exist
+  yet (NI-035 research snapshots, NI-054 model runs) and are rejected until
+  those tasks land — an unverifiable reference is invalid, not tolerated;
 - evidence ``citation`` targets must reference a public immutable artifact;
-- liveChart blocks, snapshot chart mode and ``model_run`` evidence targets
-  require registries that do not exist yet (NI-031 chart registry, NI-035
-  research snapshots, NI-054 model runs) and are rejected until those tasks
-  land — an unverifiable reference is invalid, not tolerated;
 - insight ``context`` and top-level ``observed_contexts`` are frozen
   inspection records: their shape is validated by the schema module, while
-  server-side resolution and pin freezing arrive with the chart system
-  (NI-041/NI-043), so a P0 save accepts only an empty context list and does
-  not re-resolve historical context ids.
+  client-submitted top-level contexts are server-resolved with NI-043. A
+  save carrying chart blocks carries their frozen NI-041 contexts forward
+  verbatim (immutably) and rejects a new or changed chart block, which only
+  the chart-blocks insertion endpoint (or NI-043's resolver) may introduce.
 """
 
 from __future__ import annotations
@@ -196,22 +200,38 @@ def save_revision_in_transaction(connection: Connection, principal: Principal,
         raise RevisionConflict(document.revision)
     canonical = parse_document(document_payload)
     _validate_database_references(connection, canonical)
-    resolved_contexts = _resolve_observed_contexts(canonical, observed_contexts)
+    resolved_contexts = _resolve_observed_contexts(connection, canonical,
+                                                   observed_contexts, document)
+    return _commit_new_revision(connection, principal, document, canonical=canonical,
+                                resolved_contexts=resolved_contexts)
+
+
+def _commit_new_revision(connection: Connection, principal: Principal,
+                         document: DocumentRow, *, canonical: CanonicalDocument,
+                         resolved_contexts: dict) -> DocumentDetail:
+    """Shared revision tail: version row + projections + pointer, one step.
+
+    Used by the whole-document save (:func:`save_revision_in_transaction`)
+    and the chart-block insertion
+    (:func:`near_api.documents.chart_blocks.append_chart_block_in_transaction`)
+    so both write the immutable version, its projections and the advanced
+    pointer identically inside their transaction.
+    """
     new_revision = document.revision + 1
     version_id = uuid4()
     connection.execute(_insert_version().values(
-        id=version_id, document_id=document_id, owner_id=principal.id,
+        id=version_id, document_id=document.id, owner_id=principal.id,
         revision=new_revision, schema_version=SCHEMA_VERSION,
         content=canonical.canonical, resolved_contexts=resolved_contexts,
         content_sha256=canonical.content_sha256))
-    write_projections(connection, principal, document_id=document_id,
+    write_projections(connection, principal, document_id=document.id,
                       version_id=version_id,
                       projections=build_projections(canonical))
     connection.execute(update(Document)
-                       .where(Document.id == document_id,
+                       .where(Document.id == document.id,
                               owner_scope(Document.owner_id, principal.id))
                        .values(revision=new_revision, current_version_id=version_id))
-    document = _locked_document(connection, principal, document_id)
+    document = _locked_document(connection, principal, document.id)
     version = _version_row(connection, version_id)
     return DocumentDetail(document=document, version=version, content=version.content,
                           resolved_contexts=version.resolved_contexts or {})
@@ -405,38 +425,80 @@ def _version_row(connection: Connection, version_id: UUID) -> DocumentVersionRow
     return DocumentVersionRow(**row)
 
 
-def _resolve_observed_contexts(canonical: CanonicalDocument,
-                               observed_contexts: list) -> dict:
-    """Context pinning arrives with the chart system (NI-041/NI-043).
+def _resolve_observed_contexts(connection: Connection, canonical: CanonicalDocument,
+                               observed_contexts: list,
+                               document: DocumentRow) -> dict:
+    """Resolve the new revision's ``resolved_contexts`` map (keyed by block ID).
 
-    resolved_contexts is keyed by block ID and pins chart/model inspection
-    state. Because P0 chart blocks cannot exist (the chart registry is a
-    NI-031 gate), a non-empty context list can never reference a block of this
-    document and is rejected instead of being stored as unverifiable data.
+    Two rules, both serving EDITOR_SPECIFICATION "Live versus fixed evidence"
+    ("save pins exactly that version ... rather than changing evidence
+    silently"):
+
+    - Client-submitted top-level contexts are still rejected (422): contexts
+      are resolved SERVER-side. The chart-blocks insertion endpoint
+      (:mod:`near_api.documents.chart_blocks`, NI-041) builds the frozen
+      ``ResolvedContext`` of a new chart block from registry-verified pins;
+      the general submitted-context validation of whole-document saves is
+      NI-043's resolver.
+    - A document that already carries chart blocks keeps their frozen
+      contexts: unchanged chart blocks (identical inspection identity)
+      carry their stored context forward VERBATIM into the new revision, and
+      a new or changed chart block is rejected — it must be inserted (or, for
+      NI-042's explicit edits, re-resolved) through the server-side flow,
+      never silently re-pinned. Contexts of blocks that no longer exist drop
+      out with their block; nothing else is rewritten.
     """
     if observed_contexts:
         raise ReferenceInvalid(
-            "observed_contexts pin chart/model inspection state; no chart block of "
-            "this document can carry a context until the chart registry lands",
+            "observed_contexts are resolved server-side: a chart block's frozen "
+            "context is created by the chart-blocks insertion endpoint, and "
+            "submitted context validation arrives with NI-043",
             [("observed_contexts", "reference_unavailable")])
-    return {}
+    if not canonical.live_charts:
+        # No chart block of this revision can carry a chart context; contexts
+        # are only ever keyed by (existing) chart block ids in P0.
+        return {}
+    from near_api.documents import chart_blocks  # deferred: chart_blocks imports this module's service internals
+
+    if document.current_version_id is None:
+        raise ValueError(f"Document {document.id} has no current revision")
+    previous = _version_row(connection, document.current_version_id)
+    previous_contexts = previous.resolved_contexts or {}
+    previous_charts = {chart.block_id: chart
+                       for chart in parse_document(previous.content).live_charts}
+    for chart in canonical.live_charts:
+        previous_chart = previous_charts.get(chart.block_id)
+        if previous_chart is None \
+                or chart_blocks.chart_inspection_state(previous_chart) \
+                != chart_blocks.chart_inspection_state(chart) \
+                or str(chart.block_id) not in previous_contexts:
+            raise ReferenceInvalid(
+                "A chart block was added or changed without its frozen inspection "
+                "context; insert chart blocks through the chart-blocks endpoint and "
+                "re-resolve changed selections explicitly (server-side context "
+                "resolution for whole-document saves arrives with NI-043)",
+                [("content", "chart_context_unresolved")])
+    surviving = canonical.block_ids
+    return {block_id: context for block_id, context in previous_contexts.items()
+            if UUID(block_id) in surviving}
 
 
 def _validate_database_references(connection: Connection,
                                   canonical: CanonicalDocument) -> None:
     """Validate every database-backed reference; runs inside the save transaction."""
     if canonical.live_charts:
-        # The chart definition registry (NI-031) does not exist yet: no
-        # chart_definition_version_id can be verified, so a liveChart block is
-        # an unverifiable reference rather than tolerated dangling data.
-        raise ReferenceInvalid(
-            "Live chart blocks require the chart definition registry, which is not "
-            "available yet (arrives with NI-031)",
-            [("content", "reference_unavailable")])
+        # NI-041 lifted the NI-031 gate: a liveChart block is verified against
+        # the chart registry (registered available definition, allowed
+        # selection, approved pinned dataset covering the required metrics)
+        # with the same shared rules the insertion endpoint enforces.
+        from near_api.documents import chart_blocks  # deferred: chart_blocks imports this module's service internals
+
+        for chart in canonical.live_charts:
+            chart_blocks.validate_document_chart(connection, chart)
     for table in canonical.data_tables:
         if table.dataset_version_id is not None:
-            _require_approved_dataset(connection, table.dataset_version_id,
-                                      "dataTable.dataset_version_id")
+            require_approved_dataset(connection, table.dataset_version_id,
+                                     "dataTable.dataset_version_id")
     for item in canonical.evidence:
         if item.target_kind == "model_run":
             raise ReferenceInvalid(
@@ -455,9 +517,14 @@ def _validate_database_references(connection: Connection,
                     [("content", "dangling_citation_target")])
 
 
-def _require_approved_dataset(connection: Connection, dataset_version_id: UUID,
-                              path: str) -> None:
-    """A pinned dataset must be an approved (public) immutable version."""
+def require_approved_dataset(connection: Connection, dataset_version_id: UUID,
+                             path: str) -> None:
+    """A pinned dataset must be an approved (public) immutable version.
+
+    Shared reference rule (NI-036 dataTable pins, NI-041 liveChart pins):
+    staged/validated/rejected versions never leak existence and are never
+    substituted with a latest pointer — the pinned id is the evidence.
+    """
     exists = connection.execute(
         select(DatasetVersion.id).where(DatasetVersion.id == dataset_version_id,
                                         DatasetVersion.status == "approved")
@@ -480,6 +547,7 @@ __all__ = [
     "list_document_details",
     "list_document_versions",
     "rename_document",
+    "require_approved_dataset",
     "save_revision",
     "save_revision_in_transaction",
 ]

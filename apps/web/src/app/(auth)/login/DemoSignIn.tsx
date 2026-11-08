@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { announceAuthChange } from "@/lib/auth/change";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -13,7 +14,7 @@ import { Label } from "@/components/ui/label";
  * never verified and never used for authentication. Clearly labeled as demo
  * so it cannot be mistaken for a production account path.
  */
-export function DemoSignIn() {
+export function DemoSignIn({ returnTo = "/" }: { returnTo?: string }) {
   const router = useRouter();
   const [displayEmail, setDisplayEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -35,14 +36,15 @@ export function DemoSignIn() {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json", "x-csrf-token": token },
-        body: JSON.stringify({ displayEmail }),
+        body: JSON.stringify({ displayEmail, returnTo }),
       });
-      const body = (await response.json()) as { error?: string };
+      const body = (await response.json()) as { error?: string; returnTo?: string };
       if (!response.ok) {
         setError(body.error ?? "Demo sign-in failed.");
         return;
       }
-      router.push("/");
+      announceAuthChange();
+      router.push(body.returnTo ?? "/");
     } catch {
       setError("The authentication service is unavailable. Try again shortly.");
     } finally {

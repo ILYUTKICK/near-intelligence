@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
  * shown generically — the UI can never distinguish an unknown email from a
  * wrong password (anti-enumeration). Pending state blocks duplicate submits.
  */
-export function LoginForm() {
+export function LoginForm({ returnTo = "/" }: { returnTo?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export function LoginForm() {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json", "x-csrf-token": token },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, returnTo }),
       });
       const body = (await response.json()) as { error?: string; returnTo?: string };
       if (!response.ok) {
