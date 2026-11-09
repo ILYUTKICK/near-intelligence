@@ -1,15 +1,31 @@
-# NI-003 DB contribution. API/web/worker packaging is NI-066; nothing ingests data.
+# NI-066 — portable local runtime. Default `docker compose up -d` starts the
+# real deployment (db, api, web) and nothing else. One-shot operator actions
+# are explicit and never auto-start:
+#   docker compose run --rm migrate    # Alembic upgrade head (near_migrator role)
+#   docker compose run --rm worker     # process queued export jobs once (near_app + near_operator lease)
+#   docker compose run --rm refresh    # ONE guarded finalized-header refresh attempt (profile `refresh`, off by default)
+# Nothing here ingests data on boot: no collector code has a startup path
+# (NI-030), the refresh adapter is refusal-by-default in a fresh environment,
+# and provider credentials from .env are never injected into any container.
+# Secrets live in the ignored root .env; images contain none (see
+# .dockerignore and deployment/README.md).
 services:
   db:
-    image: postgres:18.6-bookworm
+    image: postgres:18.6-bookworm@sha256:f1ea2a1a4fb7b68d4836be1fdcb8a6466a89b072158bf9d97663600538c294c5
     environment:
       POSTGRES_DB: near_intelligence
       POSTGRES_USER: near_bootstrap
-      POSTGRES_PASSWORD: ${DB_BOOTSTRAP_PASSWORD:?Set DB_BOOTSTRAP_PASSWORD}
-      DB_RUNTIME_PASSWORD: ${DB_RUNTIME_PASSWORD:?Set DB_RUNTIME_PASSWORD}
-      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:?Set DB_MIGRATION_PASSWORD}
-      DB_OPERATOR_PASSWORD: ${DB_OPERATOR_PASSWORD:?Set DB_OPERATOR_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_BOOTSTRAP_PASSWORD:?Set DB_BOOTSTRAP_PASSWORD in .env}
+      # scripts/db/010-roles.sql reads these via psql \getenv at initdb time
+      # (NI-003); all four must be set, distinct and non-placeholder.
+      DB_BOOTSTRAP_PASSWORD: ${DB_BOOTSTRAP_PASSWORD:?Set DB_BOOTSTRAP_PASSWORD in .env}
+      DB_RUNTIME_PASSWORD: ${DB_RUNTIME_PASSWORD:?Set DB_RUNTIME_PASSWORD in .env}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:?Set DB_MIGRATION_PASSWORD in .env}
+      DB_OPERATOR_PASSWORD: ${DB_OPERATOR_PASSWORD:?Set DB_OPERATOR_PASSWORD in .env}
     ports:
+      # Loopback only, for native host-side development. The api/web/worker
+      # services reach the database over the internal Compose network (host
+      # `db`); the port is never published beyond 127.0.0.1.
       - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       # PostgreSQL 18+ image stores its versioned cluster below /var/lib/postgresql.
@@ -20,7 +36,132 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - internal
     restart: "no"
+
+  # Explicit one-shot migration step — never part of `up`, never run by the
+  # HTTP services (DEPLOYMENT.md: no automatic migrations on startup).
+  migrate:
+    image: near-intelligence-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    profiles: ["migrate"]
+    command: [".venv/bin/python", "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql+psycopg://near_migrator:${DB_MIGRATION_PASSWORD:?Set DB_MIGRATION_PASSWORD in .env}@db:5432/near_intelligence
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+
+  api:
+    image: near-intelligence-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: [".venv/bin/python", "-m", "uvicorn", "near_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # App configuration comes from the ignored root .env (Supabase dev project,
+    # auth secrets, LOG_LEVEL). Container-facing endpoints/credentials are
+    # overridden here: inside the network the database host is `db`, and the
+    # four DB role passwords never appear in the web container.
+    env_file:
+      - .env
+    environment:
+      API_INTERNAL_URL: http://api:8000
+      DATABASE_URL: postgresql+psycopg://near_app:${DB_RUNTIME_PASSWORD:?Set DB_RUNTIME_PASSWORD in .env}@db:5432/near_intelligence
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+
+  web:
+    image: near-intelligence-web:local
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    env_file:
+      - .env
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    ports:
+      - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+
+  # Export worker (NI-058): operator-invoked CLI, one queued-batch pass per
+  # invocation, then exit. The near_operator URL is the documented lease
+  # credential path; it is only used for lease claim/sweep columns, never for
+  # plan or bundle bytes (those move through the job owner's near_app
+  # transaction). Run explicitly: `docker compose run --rm worker`.
+  worker:
+    image: near-intelligence-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    profiles: ["worker"]
+    command:
+      - ".venv/bin/python"
+      - "-m"
+      - "near_api.exports.worker"
+      - "--database-url"
+      - "postgresql+psycopg://near_app:${DB_RUNTIME_PASSWORD:?Set DB_RUNTIME_PASSWORD in .env}@db:5432/near_intelligence"
+      - "--operator-database-url"
+      - "postgresql+psycopg://near_operator:${DB_OPERATOR_PASSWORD:?Set DB_OPERATOR_PASSWORD in .env}@db:5432/near_intelligence"
+      - "--worker-id"
+      - "compose-worker"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+
+  # Bounded data refresh (NI-030): explicitly OFF by default. In a fresh
+  # environment the effective allowlist is empty and this exits with the typed
+  # refusal (code 3) before any network request. It makes at most ONE guarded
+  # attempt per invocation; the host timer (NI-067/DEPLOYMENT.md) decides
+  # cadence, never this file. Not part of `up` even with --profile unless the
+  # operator runs it explicitly.
+  refresh:
+    image: near-intelligence-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    profiles: ["refresh"]
+    command:
+      - ".venv/bin/python"
+      - "-m"
+      - "near_api.ingestion.refresh"
+      - "--once"
+      - "--database-url"
+      - "postgresql+psycopg://near_operator:${DB_OPERATOR_PASSWORD:?Set DB_OPERATOR_PASSWORD in .env}@db:5432/near_intelligence"
+      - "--storage-root"
+      - "/var/lib/near-intelligence/artifacts"
+    volumes:
+      - near_artifacts:/var/lib/near-intelligence/artifacts
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+
+networks:
+  internal:
+    driver: bridge
 
 volumes:
   near_db:
+  near_artifacts:

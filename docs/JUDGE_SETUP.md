@@ -1,57 +1,237 @@
-# Judge and contributor setup
+# Judge and contributor setup — tested clean-clone sequence (NI-066)
 
-Status 5 November 2026: **the Python dependency environment is ready; the full application is not yet implemented/deployable.** This file is the release runbook entry point. NI-066 and NI-069 must turn the future release steps below into commands tested from a clean clone. Do not present a successful dependency installation as a working product deployment.
+Status 10 November 2026: **the P0 application runtime is implemented and this
+sequence was executed end to end** (fresh frozen installs, migrations, both
+services, and one real export processed by the worker — see "Verification
+record" at the bottom for what exactly ran and where). The repository does NOT
+contain the raw research archive, so data pages boot into their honest
+explicit "unavailable" states; nothing is ever faked to fill the gap. No
+command below starts a collector or a provider request.
 
-## 1. Repository access
+Two alternative run modes are documented; do not start both on the same ports.
 
-Repository:[ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence), private. Judges need explicitly granted read access or a separately authorized release artifact. Collaborator access for BkycnocTbI does not automatically give judges access. No visibility change or judge invitation is part of the dependency setup.
+- **Compose mode** (recommended): `docker compose up -d` starts db + api + web.
+- **Native mode**: processes on the host against a Compose-or-native
+  PostgreSQL 18 database.
+
+## 1. Prerequisites
+
+| Tool | Version | Check |
+| --- | --- | --- |
+| Git | any recent | `git --version` |
+| Node.js | 24 LTS family (`.node-version`) | `node --version` — verified with v24.22.2 |
+| pnpm | 12.16.1 (pinned via `packageManager`) | `corepack enable && pnpm --version` — verified 12.16.1 |
+| CPython | 3.13 family (`.python-version`) | `python3.13 --version` — containers use 3.13.18 |
+| uv | 0.12.13 or compatible | `uv --version` |
+| Docker + Compose | for Compose mode and images | `docker version` — verified with Docker 29.9.2 (macOS ARM64) |
+
+On macOS with Homebrew's keg-only `node@24`, prefix the PATH first:
+
+```sh
+export PATH="/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+corepack enable --install-directory /tmp/ni066-bin && export PATH="/tmp/ni066-bin:$PATH"
+```
+
+(Any user-writable directory works; `corepack pnpm --version` must print
+`12.16.1`, matching the `packageManager` pin in [package.json](../package.json).)
+
+## 2. Clone
 
 ```sh
 git clone https://github.com/ILYUTKICK/near-intelligence.git
 cd near-intelligence
 ```
 
-Use the release's exact commit/tag once available. A branch name alone is mutable. Read README and this file before running any command.
+The repository is private; judges need explicitly granted read access. Pin the
+exact release commit/tag once one is published (NI-069).
 
-## 2. What works now
-
-Install CPython 3.13, create an isolated environment and install the pinned dependency set:
+## 3. Frozen installs
 
 ```sh
-python3.13 -m venv .venv
-.venv/bin/python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
-.venv/bin/python -m pip check
+pnpm install --frozen-lockfile            # exit 0 — verified fresh on 2026-11-10
+uv sync --project apps/api --frozen       # exit 0 — verified fresh on 2026-11-10
+uv lock --check --project apps/api        # OK — the lock is the exact source
 ```
 
-The declared frontend tool versions are pinned and tool-checked: with Node 24 and its bundled corepack on PATH, `corepack pnpm --version` must report `12.16.1` from the `packageManager` pin in [package.json](../package.json); `.node-version` declares the Node 24 LTS family. The web skeleton boots: `pnpm install --frozen-lockfile` then `pnpm --filter web dev` (or `build` + `start`) serves apps/web on :3000 where `/health` must return 200 JSON; without the root `.env` it returns a readable 503. The API skeleton boots the same way: `uv sync --project apps/api --frozen` then `uv run --project apps/api uvicorn near_api.main:app --reload --port 8000` serves apps/api on :8000 with the same `/health` behavior. See [DEPENDENCIES.md](DEPENDENCIES.md) for verified versions, the hex-digest note and platform caveats. Database migrations, authentication and Compose services below remain unimplemented.
+These install packages only; nothing starts. Windows remains untested here
+(see [DEPENDENCIES.md](DEPENDENCIES.md) for platform caveats).
 
-These commands install packages only. They require package-index access or an independently prepared matching wheelhouse. They do not start the application, create users, run migrations or access a blockchain provider. Windows uses the corresponding .venv\Scripts\python.exe path and remains untested here. [Dependency policy and actual checks](DEPENDENCIES.md) specifies supported/tested platforms and version-update rules.
+## 4. Configuration
 
-The current repository contains documentation, dependency manifests and visual mockups. Research Markdown reports are included; raw research data, SQL and analysis/collection scripts remain excluded under the user's sharing instruction. Some linked artifact paths intentionally refer to the unshared local archive.
+```sh
+cp .env.example .env
+```
 
-## 3. Required before a judge can deploy the completed product
+Then edit `.env` (it is git-ignored; never commit it):
 
-| Requirement | Deliverable / responsible tasks | Verification required |
-| --- | --- | --- |
-| Frontend runtime | package.json, pinned Node/pnpm and pnpm-lock.yaml; NI-001/NI-002 web part **done**: skeleton boots, frozen install/build verified | Frozen install and production build from a clean clone pass for the skeleton; real public/workspace pages build in their own tasks |
-| Python application | Actual near_api source, pyproject.toml/uv.lock and synchronized root requirements.txt; NI-002 **done for the skeleton**: lock frozen at the reviewed baseline with parity checked, package imports and `/health` verified | Dependency hashes match the lock; package imports and health endpoint work (verified for the skeleton; domain endpoints arrive in their own tasks) |
-| Database | PostgreSQL service/roles and committed Alembic migrations; NI-003 | Empty database migrates with documented commands and correct runtime permissions |
-| Authentication | Documented local or development Supabase Auth setup and callback/cookie config; NI-016–NI-020 | A new judge can create/use isolated credentials; no production service-role secret or disabled authorization shortcut |
-| Configuration | Complete .env.example with required vs optional fields and service hostnames; NI-002/NI-066 | Missing settings fail clearly; copy-and-configure steps actually tested |
-| Containers/startup | Dockerfiles, Compose services/volumes and exact one-path startup; NI-066 | docker compose up --build (target command, not available today) plus documented migration/setup produces healthy services |
-| Real evidence | Permitted, versioned dataset/model-code artifacts, hashes and reviewed source definitions; NI-026–NI-030/NI-054 | Judge has real input access without hidden developer directories, paid queries or invented seed metrics |
-| Model reproduction | Fixed recipe/config/code/locks/manifest; NI-054 | Clean offline rerun matches dataset/design hashes and statistics under stated tolerances |
-| Full workflow | Public research→login→chart→document→insight→export; NI-063/NI-069 | Browser/API/DB persistence, two-user isolation and downloaded evidence actually verified |
-| Operations | TLS/deployment settings, backups/restore, release tag; NI-067/NI-068 | Final-origin auth and a rehearsed recovery path |
+1. **Database secrets** — generate four DISTINCT values (`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`; at least 24 characters, no
+   `REPLACE` substring, URL-encode if they contain `@`/`:`):
+   `DB_BOOTSTRAP_PASSWORD`, `DB_RUNTIME_PASSWORD`, `DB_MIGRATION_PASSWORD`,
+   `DB_OPERATOR_PASSWORD`. They map to the four DB roles described in
+   [DATABASE_SETUP.md](DATABASE_SETUP.md).
+2. **Auth (real Supabase dev project)** — set `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_JWT_ISSUER`,
+   `SUPABASE_JWKS_URL`, `SUPABASE_JWT_AUDIENCE` (default `authenticated`),
+   `SUPABASE_JWT_ALGORITHM=ES256`, plus
+   `AUTH_COOKIE_SIGNING_SECRET` and `CSRF_SIGNING_SECRET`
+   (`openssl rand -base64 32`). To sign in, the dev project needs **Anonymous
+   sign-ins enabled** (that is how the clearly labeled Demo sign-in creates a
+   real isolated session — operator decision recorded in
+   [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md)).
 
-No app command in the target column is claimed to work at this stage. Do not start stopped collectors or issue cloud/paid queries to fill a missing data bundle. The existing sharing restriction is a real release gate: obtain explicit permission for a permitted sanitized/versioned bundle or provide an authorized reproducible retrieval path and disclose any access barrier.
+   Honest limitation: the product supports Supabase Auth only. There is NO
+   supported "local synthetic auth mode" — the synthetic session keys seen in
+   the repository exist only inside the isolated test harness
+   (`scripts/run-db-tests.py` and the e2e harness), never in the product.
+   Without reachable provider configuration, login fails honestly while
+   public pages and both `/health` endpoints still work.
+3. **Runtime URLs** — keep `APP_ENV=development`,
+   `APP_ORIGIN=http://localhost:3000`,
+   `AUTH_ALLOWED_REDIRECT_ORIGINS=http://localhost:3000`. The `DATABASE_URL`,
+   `MIGRATION_DATABASE_URL` and `OPERATOR_DATABASE_URL` localhost values in
+   `.env.example` are for native mode; Compose builds its own container-side
+   URLs from the four DB secrets, so the `localhost` values never enter a
+   container. If host ports 3000/8000/5432 are occupied, set
+   `WEB_HOST_PORT` / `API_HOST_PORT` / `DB_PORT` and align `APP_ORIGIN`
+   accordingly.
 
-## 4. Required final-release command sequence
+## 5. Data availability (input bundle)
 
-NI-066 must document one fully tested path covering prerequisites, clone/tag, environment settings, services, migrations, input import, health URLs, model rerun and shutdown/reset. A judge should not need to inspect application code to discover a missing startup step. Separate Docker and native alternatives; do not start both on the same ports.
+What a fresh clone CAN ship: documentation, model code and preregistered
+configs, and Markdown research reports. What it CANNOT ship: the raw saved
+research datasets, SQL and collection scripts (excluded from GitHub by the
+user's sharing instruction; the local archive is machine-only). Therefore:
 
-Do not use a fabricated database seed, public mocked dashboard, automatic paid source backfill or disabled authentication as a deployment shortcut. Development fixtures belong only in clearly isolated test environments.
+- With no input bundle, public data/chart pages render their explicit typed
+  "unavailable" states (NI-032). Missing is not zero; nothing is fabricated.
+- Real data arrives only via (a) a separately authorized, versioned,
+  sanitized bundle handoff to the judge (not downloadable from the repository
+  today), or (b) the operator-approved bounded refresh CLI (NI-030) — one
+  guarded attempt per invocation, budgets persisted, effective allowlist
+  empty in every fresh environment until an operator approves a source row.
+- The legacy collectors are stopped (`STOP_PUBLIC_COLLECTION`); no command in
+  this runbook resumes them.
 
-## 5. Release verification record
+## 6. Run — Compose mode
 
-Before the demo, NI-069 records the exact commit/tag, machine/OS/CPU, Python/Node/Docker versions, commands and outputs, required credentials/access, setup time, tested URLs, dataset/model manifest hashes and remaining limitations. Record actual checks, not a copied acceptance checklist. Linux/container runtime verification is still required; Linux wheel availability alone does not satisfy this gate.
+```sh
+docker compose build            # near-intelligence-web:local + near-intelligence-api:local
+docker compose up -d            # db + api + web ONLY — verified; nothing else starts
+docker compose run --rm migrate # explicit Alembic upgrade head as near_migrator
+docker compose ps               # db, api, web all (healthy)
+```
+
+`up` never runs migrations, ingestion or the worker. The one-shot operator
+actions are explicit:
+
+- `docker compose run --rm migrate` — migrations (re-runnable; exits 0 when
+  already current, and refuses non-`near_migrator` credentials with a
+  readable error — both verified).
+- `docker compose run --rm worker` — processes currently queued export jobs
+  once and exits (near_app for job-owner transactions, near_operator for the
+  lease; verified: empty queue → `processed 0 export job(s)`, exit 0).
+- `docker compose --profile refresh run --rm refresh` — ONE guarded refresh
+  attempt (near_operator). In a fresh environment this refuses with exit 3
+  (`source_not_approved`) before any network request — verified.
+
+## 7. Run — native mode (alternative)
+
+Start only the database (Compose below, or your own PostgreSQL 18 with
+`scripts/db/010-roles.sql` — see [DATABASE_SETUP.md](DATABASE_SETUP.md)):
+
+```sh
+docker compose up -d db
+```
+
+Migrate and run the services as host processes (env vars override the
+localhost `.env` values when you changed ports):
+
+```sh
+export MIGRATION_DATABASE_URL="postgresql+psycopg://near_migrator:<DB_MIGRATION_PASSWORD>@localhost:5432/near_intelligence"
+uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head   # exit 0 — verified
+
+export DATABASE_URL="postgresql+psycopg://near_app:<DB_RUNTIME_PASSWORD>@localhost:5432/near_intelligence"
+export API_INTERNAL_URL=http://localhost:8000
+uv run --project apps/api uvicorn near_api.main:app --port 8000          # verified /health 200
+
+API_INTERNAL_URL=http://localhost:8000 pnpm --filter web start           # verified /health 200
+```
+
+The export worker runs the same way (the Node renderer resolves from the repo
+layout; the seams `NEAR_CHART_RENDERER_NODE`/`NEAR_CHART_RENDERER_SCRIPT`
+exist for operator pinning and tests):
+
+```sh
+export OPERATOR_DATABASE_URL="postgresql+psycopg://near_operator:<DB_OPERATOR_PASSWORD>@localhost:5432/near_intelligence"
+uv run --project apps/api python -m near_api.exports.worker \
+  --database-url "$DATABASE_URL" --operator-database-url "$OPERATOR_DATABASE_URL"
+```
+
+## 8. Verify
+
+1. **Health/readiness** — `curl http://localhost:3000/health` and
+   `curl http://localhost:8000/health` both return 200 JSON
+   (`{"status":"ok",...}`; verified). A container/process missing required
+   configuration returns a readable 503 naming the missing variables —
+   verified for both images (`CONFIGURATION_ERROR: ... APP_ENV: Field
+   required; ...`).
+2. **Migration state** — `docker compose run --rm migrate` exits 0 on an
+   already-migrated database; the applied head is `0012_export_jobs`.
+3. **One export through the worker** (the full product path; verified
+   end to end on 2026-11-10 — see the record at the bottom):
+   1. Sign in via the clearly labeled **Demo** block on `/login` (creates a
+      real anonymous provider session with full RLS ownership), or use
+      email sign-in if you enabled it.
+   2. Create a research document, type a paragraph, save a revision.
+   3. Export → the dialog queues a job; run the worker (Compose or native
+      command above) to process it; the dialog then downloads the ZIP.
+   4. Unzip: `manifest.json` pins the exact revision, version id,
+      `content_sha256` and per-file SHA-256 hashes — all re-verifiable.
+
+   A prose-only export needs no dataset; chart blocks additionally need an
+   approved dataset version in the scientific zone (see section 5). Without a
+   session the export routes are owner-checked and generic-404 (verified by
+   the NI-058/NI-063 suites: Bob cannot create, poll or download).
+4. **Images contain no secrets/data** — see
+   [deployment/README.md](../deployment/README.md) for the recorded digest
+   pins and the context-boundary test (`.env`, `research/`, `product-plan/`
+   never enter the build context; verified by exporting the exact context).
+
+## 9. Shutdown and reset
+
+```sh
+docker compose down          # stop everything; volumes persist for the next session
+docker compose down -v       # also drop the DB and artifact volumes (full reset)
+```
+
+`down -v` destroys all local data — it is a reset, not a repair. Never delete
+a volume to "fix" a credential mismatch on a database you care about.
+
+## 10. Verification record (2026-11-10, NI-066 dispatch, macOS ARM64, Docker 29.9.2)
+
+Executed in this dispatch, from a clean worktree of origin/main af69f9a:
+`pnpm install --frozen-lockfile` exit 0 (566 packages); `uv sync --project
+apps/api --frozen` exit 0 (49 packages); `uv lock --check` OK; fresh Compose
+volume `docker compose up -d` (db+api+web all healthy); api `/health` 200,
+web `/health` 200, landing 200; `docker compose run --rm migrate` exit 0
+(applied head `0012_export_jobs`, roles `near_app`/`near_migrator`/
+`near_operator`/`near_bootstrap` verified); re-run exit 0 (idempotent);
+wrong-role migration refused with the readable
+`Migrations require the separate near_migrator psycopg credential` (exit 1);
+worker one-shot on an empty queue exit 0; refresh one-shot with a `near_app`
+URL refused (exit 5, typed credential error) and with the `near_operator`
+URL refused with exit 3 `source_not_approved` before any request; both images
+probed without configuration → readable 503s; build context exported and
+contained no `.env`/`research/`/`product-plan/`/`node_modules`. The full
+authenticated journey (demo session → document → revision 2 → export job →
+worker `succeeded` → download → ZIP manifest hashes verified) ran on the
+native runtime against a fresh disposable database on non-default ports
+(3000/8000/5432 were occupied by unrelated local projects on this machine;
+the ports themselves are a configuration matter, not a code path). The
+in-image renderer check (Python boundary → packaged Node renderer → verified
+SVG/CSV/hashes, echarts 6.1.0, node 24.22.2) ran inside the API image.
+
+Not yet verified (recorded, not claimed): Linux container runtime execution
+(acceptance keeps this gate for the release rehearsal, NI-069), production
+TLS origin (NI-067), and restore drills (NI-068). Windows native remains
+untested (see [DEPENDENCIES.md](DEPENDENCIES.md)).
