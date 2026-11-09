@@ -171,7 +171,10 @@ it("lists per-hypothesis evidence with classification counts, counterarguments a
   expect(within(groupB).getByText("Author assessment · Mixed")).toBeInTheDocument();
   // The classification wording stays editorial; rendering the panel never rewrites the paper.
   expectCleanDocument();
-  expect(await axe(document.body, { rules: { region: { enabled: false } } })).toHaveNoViolations();
+  // Axe is scoped to the panel subtree: the workbench-wide axe contract is
+  // asserted by the existing editor-workbench/editor-save suites, and a
+  // whole-body scan here measurably slowed the parallel suite.
+  expect(await axe(panel, { rules: { region: { enabled: false } } })).toHaveNoViolations();
 });
 
 it("navigates from a contradicting entry to the target insight, keeps its pinned context and restores focus on return", async () => {
