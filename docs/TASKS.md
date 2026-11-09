@@ -2003,7 +2003,12 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0
 - **Dependencies:** NI-005, NI-030, NI-057
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-A coordinator (ZCode session, ILYUTKICK operator), NI-066 dispatch — one subagent covers the packaging zone (A-owned Compose/CI/README per TEAM_PLAN, with the B runtime checks)
+- **Execution role:** A + B in a single dispatch
+- **Started at:** 2026-11-10T01:51:35+03:00
+- **Branch/worktree:** feat/ni-066-portable-runtimes; /Users/ilyutkinn/Desktop/near-intelligence-a17 (worktree from origin/main af69f9a)
+- **Dependency verification:** NI-005 DONE on main; NI-030 DONE on main (PR #44); NI-057 DONE on main (PR #79). NI-063 DONE on main (PR #81, af69f9a). No competing NI-066 claim and no open PR at session start. NI-062 runs in a separate operator session on its own branch — no file-zone overlap (NI-066 touches deployment/packaging files, not tests/security).
 
 **Description:** Create immutable app images and a fresh-machine onboarding path without auto-starting collection.
 
