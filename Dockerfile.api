@@ -1,0 +1,90 @@
+# NI-066 — production API/export-runtime image. One immutable Python runtime
+# (apps/api + frozen uv.lock venv) that also carries the pinned Node chart
+# renderer (NI-057) so the export worker CLI (`python -m near_api.exports.worker`)
+# can spawn it through the packaged NEAR_CHART_RENDERER_NODE/SCRIPT seams.
+# The renderer is only ever a subprocess of the export worker / operator CLI —
+# no ingestion, collector or scheduler code starts in this image, on any entry
+# path. Base images are pinned by digest (multi-arch manifest index, checked
+# live on 2026-11-10 — see deployment/README.md).
+
+# --- Stage 1: renderer runtime closure -------------------------------------
+# From the frozen workspace install, extract exactly what the NI-057 renderer
+# executes at runtime: the render script, the three TypeScript option-builder
+# modules it imports (Node 24 strips the erasable types; view/format imports
+# stay runtime imports), and the resolved echarts/zrender/tslib/zod trees.
+# Type-only imports (@near-intelligence/shared-types, echarts option types)
+# are erased and deliberately not packaged.
+FROM node:24-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS renderer-deps
+
+ENV CI=1
+WORKDIR /app
+RUN corepack enable
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/web/package.json apps/web/
+COPY packages/shared-types/package.json packages/shared-types/
+RUN pnpm install --frozen-lockfile
+
+COPY apps/web/scripts/render-charts.mjs apps/web/scripts/
+COPY apps/web/src/features/charts/renderer/option-builder.ts \
+     apps/web/src/features/charts/renderer/format.ts \
+     apps/web/src/features/charts/renderer/view-types.ts \
+     apps/web/src/features/charts/renderer/
+
+RUN mkdir -p /renderer/apps/web/scripts /renderer/apps/web/src/features/charts/renderer \
+ && cp apps/web/scripts/render-charts.mjs /renderer/apps/web/scripts/ \
+ && cp apps/web/src/features/charts/renderer/option-builder.ts \
+       apps/web/src/features/charts/renderer/format.ts \
+       apps/web/src/features/charts/renderer/view-types.ts \
+       /renderer/apps/web/src/features/charts/renderer/ \
+ && node -e "const path=require('node:path');const fs=require('node:fs');const req=require('module').createRequire('/app/apps/web/package.json');function rootOf(name){try{return path.dirname(req.resolve(name+'/package.json'))}catch(e){const echartsRoot=path.dirname(req.resolve('echarts/package.json'));const sibling=path.join(path.dirname(echartsRoot),name);if(fs.existsSync(sibling))return fs.realpathSync(sibling);const link=path.join('/app/apps/web/node_modules',name);if(fs.existsSync(link))return fs.realpathSync(link);throw e}}for(const name of ['echarts','zrender','tslib','zod']){fs.cpSync(rootOf(name),'/renderer/node_modules/'+name,{recursive:true,dereference:true})}"
+
+# --- Stage 2: Python environment from the frozen lock ----------------------
+FROM python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72 AS api-builder
+
+# uv 0.12.13 is the version that froze apps/api/uv.lock (docs/DEPENDENCIES.md);
+# --frozen never re-resolves.
+COPY --from=ghcr.io/astral-sh/uv:0.12.13@sha256:b485bd65cc2cf1c9a93b3554012c9c3778cf7b1b5fd3d3096ce9e1226c97e1e6 /uv /usr/local/bin/uv
+
+ENV UV_PYTHON_PREFERENCE=only-system
+WORKDIR /app/apps/api
+COPY apps/api/ ./
+RUN uv sync --frozen
+
+# --- Stage 3: runtime -------------------------------------------------------
+FROM python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72 AS runtime
+
+# Node binary only (same Debian bookworm base as the node image). The renderer
+# needs the runtime, not npm/corepack.
+COPY --from=node:24-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 /usr/local/bin/node /usr/local/bin/node
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    ARTIFACT_ROOT=/var/lib/near-intelligence/artifacts \
+    NEAR_CHART_RENDERER_NODE=/usr/local/bin/node \
+    NEAR_CHART_RENDERER_SCRIPT=/app/apps/web/scripts/render-charts.mjs
+
+WORKDIR /app/apps/api
+# The repo layout is preserved (apps/api + apps/web/scripts) so the renderer
+# script default path (resolved from the charts.py module location) and the
+# upward node_modules resolution both hit the packaged paths.
+COPY --from=api-builder /app/apps/api /app/apps/api
+COPY --from=renderer-deps /renderer /app
+
+# Sanity: node runs on this base before anything depends on it.
+RUN /usr/local/bin/node --version \
+ && useradd --uid 10001 --user-group --create-home near \
+ && mkdir -p /var/lib/near-intelligence/artifacts \
+ && chown -R near:near /var/lib/near-intelligence
+
+USER near
+EXPOSE 8000
+
+# Readiness mirrors the product /health contract: 200 healthy, the readable
+# 503 (missing/invalid configuration) unhealthy.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=6 \
+  CMD [".venv/bin/python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"]
+
+# Default entry: the HTTP service. Compose overrides the command for the
+# one-shot migrate/worker/refresh services; nothing ever starts collection.
+CMD [".venv/bin/python", "-m", "uvicorn", "near_api.main:app", "--host", "0.0.0.0", "--port", "8000"]

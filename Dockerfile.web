@@ -1,0 +1,63 @@
+# NI-066 — production web image (Next.js). Multi-stage: frozen pnpm install,
+# production build, then a prod-only runtime. Base images are pinned by digest
+# (multi-arch manifest index, checked live on 2026-11-10 — see
+# deployment/README.md; node:24-slim runs Node v24.22.2, matching .node-version).
+FROM node:24-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS base
+
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    CI=1
+WORKDIR /app
+# pnpm comes from the `packageManager` pin in package.json (pnpm 12.16.1 with
+# its sha512 integrity suffix; corepack verifies it on first use).
+RUN corepack enable
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/web/package.json apps/web/
+COPY packages/shared-types/package.json packages/shared-types/
+
+# Full frozen install (dev deps included — build stages only).
+FROM base AS deps
+RUN pnpm install --frozen-lockfile
+
+# Production build from the complete source tree.
+FROM deps AS build
+COPY apps/web/ apps/web/
+COPY packages/shared-types/ packages/shared-types/
+RUN pnpm --filter web build
+
+# Prod-only dependency tree for the runtime stage (no dev deps, no caches).
+FROM base AS prod-deps
+RUN pnpm install --frozen-lockfile --prod
+
+FROM node:24-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS runtime
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+
+# Workspace manifests so the runtime's repo-root discovery (pnpm-workspace.yaml
+# anchor in apps/web/src/lib/env.ts) still resolves. No .env is ever baked in:
+# Compose/runtime environments inject the values explicitly.
+COPY package.json pnpm-workspace.yaml ./
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=prod-deps /app/packages/shared-types/node_modules ./packages/shared-types/node_modules
+COPY --from=build /app/apps/web/.next ./apps/web/.next
+COPY --from=build /app/apps/web/package.json ./apps/web/package.json
+COPY --from=build /app/apps/web/next.config.ts ./apps/web/next.config.ts
+COPY --from=build /app/packages/shared-types/package.json ./packages/shared-types/package.json
+COPY --from=build /app/packages/shared-types/src ./packages/shared-types/src
+
+# next start writes runtime caches below .next.
+RUN chown -R node:node /app/apps/web/.next
+
+USER node
+EXPOSE 3000
+WORKDIR /app/apps/web
+
+# Readiness mirrors the product /health contract: 200 healthy, anything else
+# (including the readable 503 on missing configuration) unhealthy.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=6 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]
+
+CMD ["node", "./node_modules/next/dist/bin/next", "start", "--port", "3000"]
