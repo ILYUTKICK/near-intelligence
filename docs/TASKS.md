@@ -1515,7 +1515,13 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-048
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex `/root`, chat `01a1bd1f-f988-7c82-9339-80fb05e336c0`
+- **Execution role:** B with A editor handoff
+- **Started at:** 2026-11-09T17:17:01+03:00
+- **Branch/worktree:** `feat/ni-049-evidence-links`, `D:/хахатон/near-intelligence`
+- **Dependency verification:** NI-048 is DONE on `origin/main` (`90bd266`, merged PR #74). No competing NI-049 claim or open PR.
+- **Handoff:** B owns the evidence revision service and target validation. A owns the editor picker, generated client and acceptance checks.
 
 **Description:** Connect supporting, contradicting and uncertain artifacts to hypotheses without dangling references.
 
