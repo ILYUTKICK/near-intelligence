@@ -435,6 +435,9 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/csv",
             "/api/documents/{document_id}/chart-blocks",
             "/api/documents/{document_id}/chart-view",
+            "/api/documents/{document_id}/exports",
+            "/api/documents/{document_id}/exports/{job_id}",
+            "/api/documents/{document_id}/exports/{job_id}/download",
             "/api/documents/{document_id}/insights",
             "/api/documents/{document_id}/insights/{insight_id}",
             "/api/documents/{document_id}/hypotheses",
@@ -490,6 +493,24 @@ class DocumentRouteContractTests(unittest.TestCase):
             chart_blocks_path["post"]["responses"]["201"]["content"]["application/json"]
             ["schema"],
             {"$ref": "#/components/schemas/ChartBlockMutationResponse"})
+        # NI-058 export rows: create/poll/download live inside the document's
+        # owned namespace so ownership resolves through ONE compositional chain.
+        exports_path = schema["paths"]["/api/documents/{document_id}/exports"]
+        self.assertEqual(set(exports_path), {"post"})
+        self.assertEqual(exports_path["post"]["operationId"], "createDocumentExport")
+        self.assertEqual(exports_path["post"]["responses"]["202"]["content"]
+                         ["application/json"]["schema"],
+                         {"$ref": "#/components/schemas/ExportJobResponse"})
+        export_job_path = schema["paths"]["/api/documents/{document_id}/exports/{job_id}"]
+        self.assertEqual(set(export_job_path), {"get"})
+        self.assertEqual(export_job_path["get"]["operationId"], "getDocumentExport")
+        export_download_path = schema["paths"][
+            "/api/documents/{document_id}/exports/{job_id}/download"]
+        self.assertEqual(set(export_download_path), {"get"})
+        self.assertEqual(export_download_path["get"]["operationId"],
+                         "downloadDocumentExport")
+        for component in ("DocumentExportRequest", "ExportJobResponse"):
+            self.assertIn(component, schema["components"]["schemas"])
         for component in ("DocumentRenameRequest", "VersionListResponse",
                           "VersionDetailResponse", "VersionSummaryResponse",
                           "ChartBlockInsertRequest", "ChartBlockMutationResponse",
@@ -514,6 +535,10 @@ class DocumentRouteContractTests(unittest.TestCase):
               "selection": {"start": "2025-01-01", "end": "2025-01-08",
                             "frequency": "day", "filters": {}},
               "mode": "live", "dataset_version_id": str(uuid4())}),
+            ("post", f"/api/documents/{uuid4()}/exports",
+             {"document_version_id": str(uuid4()), "format": "markdown_zip"}),
+            ("get", f"/api/documents/{uuid4()}/exports/{uuid4()}", None),
+            ("get", f"/api/documents/{uuid4()}/exports/{uuid4()}/download", None),
             ("get", f"/api/documents/{uuid4()}/hypotheses", None),
             ("post", f"/api/documents/{uuid4()}/hypotheses",
              {"block_id": str(uuid4()), "statement": "Synthetic question", "assessment": "untested"}),
