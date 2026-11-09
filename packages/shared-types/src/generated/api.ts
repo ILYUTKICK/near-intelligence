@@ -305,6 +305,83 @@ export interface paths {
         patch: operations["updateDocumentEvidence"];
         trace?: never;
     };
+    "/api/documents/{document_id}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create (idempotently) the Markdown ZIP export job of the acknowledged revision
+         * @description Queue one Markdown ZIP export of the owned document's current revision.
+         *
+         *     The frozen export plan is built in the same transaction that inserts the
+         *     job (NI-056): the requested revision must be the document's acknowledged
+         *     current version — a valid but superseded revision is the typed 409
+         *     ``REVISION_NOT_ACKNOWLEDGED`` (save/rename again and export the new
+         *     current revision), and an unresolvable pin or reference is the typed 422.
+         *     With an ``Idempotency-Key: UUID`` a repeated identical owner/route/body
+         *     request replays the ORIGINAL job instead of creating a second one; the
+         *     same key with a different body is a 409 idempotency collision.
+         */
+        post: operations["createDocumentExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/exports/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Poll one owned export job (typed lifecycle states)
+         * @description Return the export job's typed state, computed at read time.
+         *
+         *     ``expired`` is reported the moment the artifact TTL passes — before and
+         *     independently of the worker's documented sweep — so the state is always
+         *     honest.
+         */
+        get: operations["getDocumentExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/exports/{job_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download the finished export ZIP (owner-only, unexpired)
+         * @description Stream the stored ZIP of one succeeded, unexpired export job.
+         *
+         *     The bytes are re-verified against the job's recorded SHA-256 before they
+         *     are returned; anything else (queued/running, failed, expired, corrupt)
+         *     is a typed refusal — never a stale or altered file.
+         */
+        get: operations["downloadDocumentExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{document_id}/hypotheses": {
         parameters: {
             query?: never;
@@ -1137,6 +1214,28 @@ export interface components {
             title: string;
         };
         /**
+         * DocumentExportRequest
+         * @description POST /documents/{id}/exports body.
+         *
+         *     ``document_version_id`` must be the document's acknowledged current
+         *     revision at request time (API_SPECIFICATION: "Client first saves then
+         *     uses acknowledged version ID") — the frozen plan is built only while the
+         *     requested revision is current, so title and content always describe the
+         *     same revision. A valid but superseded revision is a typed 409.
+         */
+        DocumentExportRequest: {
+            /**
+             * Document Version Id
+             * Format: uuid
+             */
+            document_version_id: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "markdown_zip" | "pdf";
+        };
+        /**
          * DocumentListResponse
          * @description GET /documents response: bounded page with an opaque next cursor.
          */
@@ -1473,6 +1572,51 @@ export interface components {
             items: components["schemas"]["EvidenceTarget"][];
             /** Next Cursor */
             next_cursor: string | null;
+        };
+        /**
+         * ExportJobResponse
+         * @description The typed lifecycle state of one owned export job.
+         *
+         *     ``download_path`` is the same-origin owner-checked download route and is
+         *     set only while the bundle is downloadable (``succeeded`` and unexpired);
+         *     ``error_code`` is set exactly when ``status`` is ``failed``. No field of
+         *     this response carries a server filesystem path or a credential.
+         */
+        ExportJobResponse: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Document Version Id
+             * Format: uuid
+             */
+            document_version_id: string;
+            /** Download Path */
+            download_path?: string | null;
+            /** Error Code */
+            error_code?: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Format
+             * @constant
+             */
+            format: "markdown_zip";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "succeeded" | "failed" | "expired";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -4029,6 +4173,248 @@ export interface operations {
             };
             /** @description If-Match precondition is required */
             428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createDocumentExport: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportJobResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Export is not downloadable in its current lifecycle state, or the Idempotency-Key was reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The export artifact has expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getDocumentExport: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportJobResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Export is not downloadable in its current lifecycle state, or the Idempotency-Key was reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The export artifact has expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    downloadDocumentExport: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/zip": string;
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Export is not downloadable in its current lifecycle state, or the Idempotency-Key was reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The export artifact has expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
