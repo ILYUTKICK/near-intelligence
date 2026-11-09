@@ -504,7 +504,7 @@ class OpenAPIPublicationTests(unittest.TestCase):
     def setUpClass(cls):
         cls.client = TestClient(app, raise_server_exceptions=False)
 
-    def test_01_components_and_insight_routes_are_published(self):
+    def test_01_components_and_annotation_routes_are_published(self):
         schema = self.client.get("/openapi.json").json()
         components = schema["components"]["schemas"]
         for name in ("InsightInput", "Insight", "HypothesisInput", "Hypothesis",
@@ -532,7 +532,14 @@ class OpenAPIPublicationTests(unittest.TestCase):
                          {"get": "listDocumentInsights", "post": "createDocumentInsight"})
         self.assertEqual({method: route["operationId"] for method, route in item.items()},
                          {"patch": "updateDocumentInsight", "delete": "deleteDocumentInsight"})
-        self.assertNotIn("/api/documents/{document_id}/hypotheses", schema["paths"])
+        hypotheses = schema["paths"]["/api/documents/{document_id}/hypotheses"]
+        hypothesis = schema["paths"]["/api/documents/{document_id}/hypotheses/{hypothesis_id}"]
+        self.assertEqual({method: route["operationId"] for method, route in hypotheses.items()},
+                         {"get": "listDocumentHypotheses", "post": "createDocumentHypothesis"})
+        self.assertEqual({method: route["operationId"] for method, route in hypothesis.items()},
+                         {"patch": "updateDocumentHypothesis", "delete": "deleteDocumentHypothesis"})
+        self.assertEqual(set(components["HypothesisPatchRequest"]["properties"]), {"statement", "assessment"})
+        self.assertEqual(components["HypothesisDeleteRequest"]["required"], ["remove_evidence_links"])
         self.assertNotIn("/api/documents/{document_id}/evidence", schema["paths"])
 
     def test_02_openapi_builds_repeatably_without_schema_conflicts(self):

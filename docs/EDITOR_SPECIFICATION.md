@@ -158,3 +158,11 @@ In the working editor, a successful range/filter edit or Refresh submits a typed
 Add Insight from a saved chart opens a form with its exact dataset, UTC window, filters and observation time. The author chooses a type, classification, note and optional existing hypothesis. A public chart offers the same fields after sign-in and owned document selection. The confirmed public attempt retains the inspected version, note and retry key through a lost response.
 
 Edit insight updates the saved annotation through the revision API and preserves its evidence context. Delete insight previews the affected evidence blocks and requires explicit confirmation to remove them in the same revision. The editor adopts the server-acknowledged revision when its local paper still matches the starting state. A stale CAS response leaves the draft open for recovery.
+
+## Hypothesis authoring (NI-048)
+
+Add hypothesis inserts a new card after the selected saved block, or starts an empty paper. The statement and the author's assessment can be edited on the saved card. Authors choose Untested, Supported, Mixed, Weakened or Insufficient data. The card lists evidence from the same revision separately. The outline selects the card by its stable block ID, and Properties shows its hypothesis ID. Historical papers keep their own text, assessment and evidence counts.
+
+Edits keep the original IDs and author time, including when evidence already links to the hypothesis. Delete hypothesis, the block toolbar and keyboard deletion of a selected hypothesis use the same confirmation. Cleanup removes linked evidence blocks and clears hypothesis links from insights and risks while keeping their authored content. A stale revision keeps the draft and requires review before retrying. If the same hypothesis has changed, reopen its current revision before editing it.
+
+The synthetic desktop smoke test created a card with Insufficient data, changed the statement and assessment to Mixed, and reopened revision 3 with the same hypothesis ID. [Desktop evidence](qa/ni048-hypothesis-desktop.jpg)

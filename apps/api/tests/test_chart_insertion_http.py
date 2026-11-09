@@ -1,4 +1,4 @@
-"""NI-041/042/043 real gateway/JWT/DB insertion, edits and frozen reads."""
+"""Real gateway/JWT/DB checks for charts and revision annotations."""
 import copy
 import csv
 import datetime as dt
@@ -206,6 +206,31 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         self.assertEqual(amended.json()["value"]["context"], saved_note["context"])
         self.assertEqual(amended.json()["value"]["classification"], "contradicting")
 
+        hypotheses = path + "/hypotheses"
+        hypothesis_block_id = str(uuid4())
+        headers.update({"If-Match": '"8"', "Idempotency-Key": str(uuid4())})
+        authored = client.post(hypotheses, json={
+            "block_id": hypothesis_block_id, "after_block_id": note_id,
+            "statement": "Synthetic gateway hypothesis", "assessment": "insufficient_data",
+        }, headers=headers)
+        self.assertEqual(authored.status_code, 201, authored.text)
+        hypothesis = authored.json()["value"]
+        hypothesis_path = f"{hypotheses}/{hypothesis['id']}"
+        hypothesis_version = authored.json()["version"]["id"]
+        headers.update({"If-Match": '"9"', "Idempotency-Key": str(uuid4())})
+        reassessed = client.patch(hypothesis_path, json={"statement": "Synthetic revised question", "assessment": "mixed"}, headers=headers)
+        self.assertEqual(reassessed.status_code, 200, reassessed.text)
+        current_hypothesis = reassessed.json()["value"]
+        self.assertEqual(current_hypothesis["id"], hypothesis["id"])
+        self.assertEqual(current_hypothesis["block_id"], hypothesis_block_id)
+        self.assertEqual(current_hypothesis["authored_at"], hypothesis["authored_at"])
+        self.assertEqual(current_hypothesis["assessment"], "mixed")
+        current = client.get(hypotheses)
+        self.assertEqual(current.headers["cache-control"], "no-store")
+        self.assertEqual(current.json(), [current_hypothesis])
+        self.assertEqual(client.get(hypotheses, params={"version_id": hypothesis_version}).json(), [hypothesis])
+        self.assertEqual(client.get(hypotheses, params={"owner_id": str(uuid4())}).status_code, 422)
+
         client.cookies.set("ni_session", session_cookie("bob"))
         self.assertEqual(client.get(path).status_code, 404)
         self.assertEqual(client.post(path + "/chart-blocks", json=payload, headers=headers).status_code, 404)
@@ -214,8 +239,17 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         self.assertEqual(client.get(historical + "/csv").status_code, 404)
         self.assertEqual(client.get(insights).status_code, 404)
         self.assertEqual(client.patch(note_path, json={"classification": "supporting"}, headers=headers).status_code, 404)
+        self.assertEqual(client.get(hypotheses, params={"version_id": hypothesis_version}).status_code, 404)
+        self.assertEqual(client.patch(hypothesis_path, json={"assessment": "supported"}, headers=headers).status_code, 404)
         denied_save = client.post(path + "/versions", json=edit_body, headers=headers)
         self.assertEqual(denied_save.status_code, 404, denied_save.text)
-        print("NI-041/042/043/047 gateway E2E: insert/retry, observed save after publication, "
-              "identical old view/CSV, pinned insight create/edit/history, explicit refresh, "
-              "chart outage + prose save, Bob denied", flush=True)
+        client.cookies.set("ni_session", session_cookie("alice"))
+        headers.update({"If-Match": '"10"', "Idempotency-Key": str(uuid4()),
+                        "x-csrf-token": client.get("/api/auth/csrf").json()["token"]})
+        removed = client.request("DELETE", hypothesis_path, json={"remove_evidence_links": False}, headers=headers)
+        self.assertEqual(removed.status_code, 200, removed.text)
+        self.assertEqual(removed.json()["value"], {"deleted_id": hypothesis["id"]})
+        self.assertEqual(client.get(hypotheses).json(), [])
+        self.assertEqual(client.get(hypotheses, params={"version_id": hypothesis_version}).json(), [hypothesis])
+        print("NI-041/042/043/047/048 gateway E2E: exact chart/insight pins, hypothesis CRUD/history, "
+              "explicit refresh, chart outage + prose save, Bob denied", flush=True)

@@ -11,6 +11,7 @@ import {
 import { blockLabel, type CurrentBlock } from "./commands";
 import { RichFragmentView } from "./blocks/rich-fragment";
 import { fieldPair, formatTimestamp, shortId } from "./blocks/display";
+import { assessmentLabel } from "./hypotheses/assessment";
 import { cn } from "@/lib/utils";
 
 /**
@@ -262,7 +263,7 @@ const LATER_TASKS_NOTE: Record<string, string> = {
   insight:
     "Use Edit insight on the saved block to revise its note. The evidence context stays pinned.",
   hypothesis:
-    "Assessment editing and linked evidence counts arrive with NI-048; the block and its structural operations are active now.",
+    "Use Edit hypothesis on the saved block to update the statement or author assessment. Linked evidence keeps the same hypothesis ID.",
   evidence:
     "Evidence link editing arrives with NI-049; the block and its structural operations are active now.",
   risk: "Risk body rich-text editing arrives with the annotation tasks; the title is edited on the card itself.",
@@ -428,7 +429,8 @@ export function ContextPane({
         {currentBlock.canonicalType === "hypothesis" ? (
           <div>
             <InfoList>
-              {fieldPair("Assessment", (attrs.assessment as string | null) ?? "—", "hassess")}
+              {fieldPair("Hypothesis ID", shortId(attrs.hypothesis_id as string | null), "hid")}
+              {fieldPair("Author assessment", assessmentLabel(attrs.assessment as string | null), "hassess")}
               {fieldPair("Authored at", formatTimestamp(attrs.authored_at as string | null), "ha")}
               {fieldPair("Modified at", formatTimestamp(attrs.modified_at as string | null), "hm")}
             </InfoList>

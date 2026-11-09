@@ -2,6 +2,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import {
   NodeViewWrapper,
   ReactNodeViewRenderer,
+  useEditorState,
   type NodeViewProps,
 } from "@tiptap/react";
 
@@ -16,6 +17,7 @@ import { fieldPair, formatTimestamp, shortId } from "./display";
 import { RichFragmentView } from "./rich-fragment";
 import { Button } from "@/components/ui/button";
 import { useChartEditorContext } from "./chart-context";
+import { assessmentLabel } from "../hypotheses/assessment";
 
 /**
  * Canonical typed research annotation blocks (P0): `insight`, `hypothesis`,
@@ -214,6 +216,7 @@ export const Hypothesis = Node.create({
 });
 
 function HypothesisBlockView({ node, editor, getPos }: NodeViewProps) {
+  const account = useChartEditorContext();
   const attrs = node.attrs as {
     block_id: string | null;
     hypothesis_id: string | null;
@@ -222,6 +225,14 @@ function HypothesisBlockView({ node, editor, getPos }: NodeViewProps) {
     authored_at: string | null;
     modified_at: string | null;
   };
+  const linkedEvidence = useEditorState({ editor, selector: ({ editor }) => {
+    let count = 0;
+    editor.state.doc.forEach(block => {
+      if (block.type.name === "evidence" && block.attrs.hypothesis_id === attrs.hypothesis_id) count++;
+    });
+    return count;
+  } });
+  const blockId = attrs.block_id;
   return (
     <NodeViewWrapper
       data-hypothesis-block-view
@@ -232,18 +243,25 @@ function HypothesisBlockView({ node, editor, getPos }: NodeViewProps) {
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-ui text-ui leading-ui font-medium text-text">Hypothesis</p>
           <span className="rounded-control border border-control-border px-1.5 py-0.5 text-metadata leading-metadata text-text-secondary">
-            {attrs.assessment ?? "—"}
+            Author assessment · {assessmentLabel(attrs.assessment)}
           </span>
         </div>
         <p className="mt-2 text-body leading-body text-text">{attrs.statement ?? ""}</p>
         <p className="mt-2 text-metadata leading-metadata text-text-secondary">
           Authored {formatTimestamp(attrs.authored_at)} · Modified {formatTimestamp(attrs.modified_at)}
         </p>
-        <p className="mt-1 text-metadata leading-metadata text-text-secondary italic">
-          Assessment editing and linked evidence counts arrive with NI-048; the block and its
-          structural operations are active now.
+        <p className="mt-1 text-metadata leading-metadata text-text-secondary">
+          {linkedEvidence} linked evidence {linkedEvidence === 1 ? "block" : "blocks"}
         </p>
-        <EditPropertiesButton editor={editor} getPos={getPos} blockId={attrs.block_id} />
+        <div className="flex flex-wrap items-baseline gap-2">
+          <EditPropertiesButton editor={editor} getPos={getPos} blockId={blockId} />
+          {editor.isEditable && account?.onHypothesisAction && blockId ? <>
+            <Button variant="quiet" disabled={!account.ready || !account.saved}
+              onClick={() => account.onHypothesisAction?.({ kind: "edit", blockId })}>Edit hypothesis</Button>
+            <Button variant="quiet" disabled={!account.ready || !account.saved}
+              onClick={() => account.onHypothesisAction?.({ kind: "delete", blockId })}>Delete hypothesis</Button>
+          </> : null}
+        </div>
       </div>
     </NodeViewWrapper>
   );

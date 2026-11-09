@@ -1483,7 +1483,13 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-047
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** Codex `/root`, chat `01a1bd1f-f988-7c82-9339-80fb05e336c0`
+- **Execution role:** B with A editor handoff
+- **Started at:** 2026-11-09T13:12:22+03:00
+- **Branch/worktree:** `feat/ni-048-hypotheses`, `D:/хахатон/near-intelligence`
+- **Dependency verification:** NI-047 is DONE on `origin/main` (`597cd85`, merged PR #73). No other open PR or active NI-048 claim.
+- **Handoff:** Codex `/root/ni048` implemented the B hypothesis revision endpoints and database checks. Codex `/root` implemented the A editor, generated client integration and production gateway check.
 
 **Description:** Let researchers state an independent question and record an authored evidence assessment.
 
@@ -1494,6 +1500,14 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 **Acceptance criteria:** Untested/insufficient/mixed states available; no automated support badge from missing metrics; existing evidence references remain valid on text edit.
 
 **Testing requirements:** CRUD/reopen; assessment state matrix; same-document FK and deletion reference tests.
+
+- **Result:** An authored statement and five manual assessment states persist through the owned revision API. Editing preserves IDs, original authorship and existing evidence relationships. The card, outline and context pane share stable navigation. Explicit cleanup removes evidence links and detaches insight and risk references while preserving their content and history.
+- **Verification:** The focused disposable PostgreSQL 18.6 run passed 71 tests (13 Home, 29 documents, 19 annotation contracts and 10 annotation DB tests). The five new cases cover CRUD and history, manual assessments, CAS and replay, cross-owner references, linked deletion, and authorship through full-document saves. The API contract suite passed 6 tests. Twenty-five targeted Vitest checks passed for hypothesis forms, keyboard deletion, the toolbar and Properties.
+- **CI verification:** All three jobs passed on `5228845`. Web ran 440 tests across 40 files and passed strict types, lint, production build and documentation links. The database job ran 428 checks across the full, Landing and chart-insertion suites. Its production gateway scenario verified hypothesis create, edit, current and historical reads, delete and Bob denial. The API job confirmed OpenAPI and TypeScript are current. [CI run](https://github.com/ILYUTKICK/near-intelligence/actions/runs/42631374938)
+- **Desktop evidence:** A synthetic document on the isolated Next.js dev, FastAPI and PostgreSQL stack was created and reopened. The edited statement and Mixed assessment persisted in revision 3 with the original ID and author time. The disposable Windows copy used the named `@next/env` import for Webpack compatibility. [Screenshot](qa/ni048-hypothesis-desktop.jpg)
+- **Reviewer:** Codex `/root` reviewed the API, revision and reference behavior. Codex `/root/ni048` independently reviewed the editor and approved the follow-up that routes Backspace/Delete on a selected hypothesis through the same confirmation as the card and toolbar. The review covered session and save guards, refreshed consent and stable outline navigation.
+- **Completed at:** 2026-11-09T17:09:04+03:00
+- **Delivery:** [PR #74](https://github.com/ILYUTKICK/near-intelligence/pull/74) targets `main` and awaits owner merge.
 
 ### NI-049 — Implement evidence relationships and classifications
 

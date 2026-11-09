@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import type { components } from "@near-intelligence/shared-types";
 import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
 import type { InsightAction } from "../insights/editor-dialog";
+import type { HypothesisAction } from "../hypotheses/editor-dialog";
 
 export type ChartObservation = components["schemas"]["ResolvedContext"];
 interface ChartEditorContextValue {
@@ -14,16 +15,18 @@ interface ChartEditorContextValue {
   signal?: AbortSignal;
   onObserve?: (blockId: string, observation: ChartObservation) => void;
   onInsightAction?: (action: InsightAction) => void;
+  onHypothesisAction?: (action: HypothesisAction) => void;
 }
 const ChartEditorContext = createContext<ChartEditorContextValue | null>(null);
 export const useChartEditorContext = () => useContext(ChartEditorContext);
 export const HistoricalRevisionContext = createContext<{ documentId: string; versionId: string; sessionSignal: AbortSignal } | null>(null);
 
-/** One identity guard per editor, shared by chart reads and insight actions. */
-export function ChartEditorProvider({ documentId, saved, enabled, revision, onObserve, onInsightAction, children }: {
+/** One identity guard per editor, shared by chart reads and annotation actions. */
+export function ChartEditorProvider({ documentId, saved, enabled, revision, onObserve, onInsightAction, onHypothesisAction, children }: {
   documentId: string; saved: boolean; enabled: boolean; revision?: number;
   onObserve?: ChartEditorContextValue["onObserve"];
-  onInsightAction?: ChartEditorContextValue["onInsightAction"]; children: ReactNode;
+  onInsightAction?: ChartEditorContextValue["onInsightAction"];
+  onHypothesisAction?: ChartEditorContextValue["onHypothesisAction"]; children: ReactNode;
 }) {
   const [session, setSession] = useState<{ subject: string | null; ready: boolean; signal?: AbortSignal }>({ subject: null, ready: false });
   const owner = useRef<string | null>(null);
@@ -52,5 +55,5 @@ export function ChartEditorProvider({ documentId, saved, enabled, revision, onOb
     return () => { controller.abort(); window.removeEventListener(AUTH_CHANGE, check); window.removeEventListener("focus", check);
       window.removeEventListener("storage", storage); document.removeEventListener("visibilitychange", check); };
   }, [documentId, enabled]);
-  return <ChartEditorContext value={{ documentId, saved, revision, onObserve, onInsightAction, ...session }}>{children}</ChartEditorContext>;
+  return <ChartEditorContext value={{ documentId, saved, revision, onObserve, onInsightAction, onHypothesisAction, ...session }}>{children}</ChartEditorContext>;
 }

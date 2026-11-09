@@ -59,8 +59,9 @@ import {
   getDocument,
 } from "@/features/documents/list/documents-api";
 import { DOCUMENT_TITLE_MAX_LENGTH } from "@/features/documents/list/documents-schema";
-import { EditorInsightDialog, type InsightAction, type InsightIntent } from "./insights/editor-dialog";
-import type { InsightSave } from "./insights/api";
+import type { AnnotationSave } from "./annotation-mutation";
+import { EditorInsightDialog, type InsightAction } from "./insights/editor-dialog";
+import { EditorHypothesisDialog, type HypothesisAction } from "./hypotheses/editor-dialog";
 
 /**
  * The three-pane research editor workbench (NI-039):
@@ -104,6 +105,9 @@ interface DeleteRequest {
   dependents: readonly DependentBlock[];
 }
 
+type AnnotationAction = { kind: "insight"; action: InsightAction } | { kind: "hypothesis"; action: HypothesisAction };
+type AnnotationIntent = AnnotationAction & { content: CanonicalDocument; revision: number };
+
 export function EditorShell({ documentId, title, revision, updatedAt, content }: EditorShellProps) {
   const router = useRouter();
   // The conflict dialog opens declaratively whenever a 409 state exists and
@@ -112,8 +116,8 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   const [conflictDismissedAt, setConflictDismissedAt] = useState<string | null>(null);
   const [conflictBusy, setConflictBusy] = useState(false);
   const [conflictActionError, setConflictActionError] = useState<string | null>(null);
-  const [insightIntent, setInsightIntent] = useState<InsightIntent | null>(null);
-  const insightTrigger = useRef<HTMLElement | null>(null);
+  const [annotationIntent, setAnnotationIntent] = useState<AnnotationIntent | null>(null);
+  const annotationTrigger = useRef<HTMLElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const paperRef = useRef<HTMLDivElement>(null);
   const observations = useRef(new Map<string, ChartObservation>());
@@ -178,7 +182,8 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   }, [editor]);
 
   const [outline, setOutline] = useState<OutlineEntry[]>([]);
-  const [hasEvidenceActions, setHasEvidenceActions] = useState(content.content.some(block => block.type === "liveChart" || block.type === "insight"));
+  const [hasEvidenceActions, setHasEvidenceActions] = useState(content.content.some(block =>
+    block.type === "liveChart" || block.type === "insight" || block.type === "hypothesis"));
   const [blockCount, setBlockCount] = useState(content.content.length);
   const [currentBlock, setCurrentBlock] = useState<CurrentBlock | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -217,13 +222,13 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   // Manual save (button and Mod+S): during a conflict the button reopens the
   // explicit resolution dialog instead of racing another 409.
   const handleSaveNow = useCallback(() => {
-    if (insightIntent) return;
+    if (annotationIntent) return;
     if (controller.status.kind === "conflict") {
       setConflictDismissedAt(null);
       return;
     }
     controller.saveNow();
-  }, [controller, insightIntent]);
+  }, [controller, annotationIntent]);
 
   // Mod+S inside the research editor claims the browser save shortcut for
   // the document save (standard editor behavior; the listener lives on the
@@ -366,7 +371,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   const refreshDoc = useCallback((current: Editor, contentChanged: boolean) => {
     const document = current.getJSON();
     setOutline(deriveOutline(document));
-    setHasEvidenceActions(document.content?.some(block => block.type === "liveChart" || block.type === "insight") ?? false);
+    setHasEvidenceActions(document.content?.some(block => block.type === "liveChart" || block.type === "insight" || block.type === "hypothesis") ?? false);
     setBlockCount(current.state.doc.childCount);
     setCurrentBlock(currentTopLevelBlock(current));
     if (contentChanged) onEditorChanged();
@@ -397,49 +402,67 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
     };
   }, [editor, refreshDoc]);
 
-  const openInsight = useCallback((action: InsightAction) => {
+  const openAnnotation = useCallback((request: AnnotationAction) => {
     const current = editorRef.current;
-    if (!current || !controller.isClean(controller.revision) || controller.draft) return;
+    if (!current || annotationIntent) return;
+    if (!controller.isClean(controller.revision) || controller.draft) {
+      if (request.kind === "hypothesis") announce("Resolve the recovered draft or save the current edits to change a hypothesis.");
+      return;
+    }
     const snapshot = canonicalSnapshot(current);
-    const selected = snapshot.content.find(block => block.attrs.block_id === action.blockId);
-    if (selected?.type !== (action.kind === "create" ? "liveChart" : "insight")) return;
-    insightTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setInsightIntent({ action, content: snapshot, revision: controller.revision });
-  }, [controller]);
+    const { action } = request;
+    if (request.kind === "hypothesis" && action.kind === "create") {
+      const only = snapshot.content.length === 1 ? snapshot.content[0] : null;
+      // Tiptap supplies an empty paragraph even when the server has no blocks.
+      const afterBlockId = only?.type === "paragraph" && only.content.length === 0 ? undefined : currentTopLevelBlock(current)?.blockId ?? undefined;
+      request = { kind: "hypothesis", action: { kind: "create", afterBlockId } };
+    } else if ("blockId" in action) {
+      const selected = snapshot.content.find(block => block.attrs.block_id === action.blockId);
+      if (selected?.type !== (action.kind === "create" ? "liveChart" : request.kind)) return;
+    }
+    annotationTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setAnnotationIntent({ ...request, content: snapshot, revision: controller.revision });
+  }, [controller, annotationIntent, announce]);
 
-  const adoptInsightPaper = useCallback((savedContent: CanonicalDocument, revision: number, savedAt: string) => {
+  const openInsight = useCallback((action: InsightAction) => openAnnotation({ kind: "insight", action }), [openAnnotation]);
+  const openHypothesis = useCallback((action: HypothesisAction) => openAnnotation({ kind: "hypothesis", action }), [openAnnotation]);
+
+  const adoptAnnotationPaper = useCallback((savedContent: CanonicalDocument, revision: number, savedAt: string) => {
     const current = editorRef.current;
-    if (!current || !insightIntent || !controller.isClean(insightIntent.revision) || controller.draft
-      || JSON.stringify(canonicalSnapshot(current)) !== JSON.stringify(insightIntent.content)) return false;
+    if (!current || !annotationIntent || !controller.isClean(annotationIntent.revision) || controller.draft
+      || JSON.stringify(canonicalSnapshot(current)) !== JSON.stringify(annotationIntent.content)) return false;
     if (!current.chain().setMeta("addToHistory", false).setContent(canonicalToTiptapDoc(savedContent), { emitUpdate: false }).run()) {
       throw new Error("The saved revision could not be loaded into the editor.");
     }
     refreshDoc(current, false);
     controller.adoptServerState(revision, savedAt);
     return true;
-  }, [controller, insightIntent, refreshDoc]);
+  }, [controller, annotationIntent, refreshDoc]);
 
-  const acceptInsightSave = useCallback((result: InsightSave) => {
-    if (!insightIntent) return;
+  const acceptAnnotationSave = useCallback((result: AnnotationSave) => {
+    if (!annotationIntent) return;
+    const label = annotationIntent.kind === "insight" ? "Insight" : "Hypothesis";
     const savedContent = validateCanonicalDocument(result.version.content);
-    if (!adoptInsightPaper(savedContent, result.version.revision, result.document.updated_at)) {
-      announce("Insight change saved on the server. Your local edits are still in the editor. Resolve the revision conflict to load the saved change.");
+    if (!adoptAnnotationPaper(savedContent, result.version.revision, result.document.updated_at)) {
+      announce(`${label} change saved on the server. Your local edits are still in the editor. Resolve the revision conflict to load the saved change.`);
+    } else if (annotationIntent.action.kind === "delete") {
+      announce(`${label} deleted from this revision.`);
     } else {
-      announce(insightIntent.action.kind === "delete" ? "Insight deleted from this revision." : "Insight saved with its pinned context.");
+      announce(annotationIntent.kind === "insight" ? "Insight saved with its pinned context." : "Hypothesis saved.");
     }
-    setInsightIntent(null);
-  }, [adoptInsightPaper, announce, insightIntent]);
+    setAnnotationIntent(null);
+  }, [adoptAnnotationPaper, announce, annotationIntent]);
 
-  const reloadInsightPaper = useCallback((content: CanonicalDocument, revision: number, savedAt: string) => {
-    if (!insightIntent || !adoptInsightPaper(content, revision, savedAt)) {
+  const reloadAnnotationPaper = useCallback((content: CanonicalDocument, revision: number, savedAt: string) => {
+    if (!annotationIntent || !adoptAnnotationPaper(content, revision, savedAt)) {
       throw new Error("Local edits are still in the editor. Save them before reopening this form.");
     }
-    setInsightIntent({ ...insightIntent, content, revision });
-    announce("Loaded the current revision. Review the retained insight draft before saving.");
-  }, [adoptInsightPaper, announce, insightIntent]);
+    setAnnotationIntent({ ...annotationIntent, content, revision });
+    announce(`Loaded the current revision. Review the retained ${annotationIntent.kind} draft before saving.`);
+  }, [adoptAnnotationPaper, announce, annotationIntent]);
 
-  const restoreInsightFocus = useCallback(() => {
-    const trigger = insightTrigger.current;
+  const restoreAnnotationFocus = useCallback(() => {
+    const trigger = annotationTrigger.current;
     if (trigger?.isConnected) trigger.focus();
     else editorRef.current?.view.focus();
   }, []);
@@ -457,6 +480,11 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
     };
     const onRequestDelete = (event: Event) => {
       const { index } = detailOf<{ index: number }>(event, { index: -1 });
+      const block = editor.state.doc.maybeChild(index);
+      if (block?.type.name === "hypothesis" && typeof block.attrs.block_id === "string") {
+        openHypothesis({ kind: "delete", blockId: block.attrs.block_id });
+        return;
+      }
       setDeleteRequest(buildDeleteRequest(editor, index));
     };
     const onSlashTrigger = (event: Event) => {
@@ -474,7 +502,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
       container.removeEventListener(EDITOR_REQUEST_BLOCK_DELETE, onRequestDelete);
       container.removeEventListener(EDITOR_SLASH_TRIGGER, onSlashTrigger);
     };
-  }, [editor]);
+  }, [editor, openHypothesis]);
 
   // -- operations ------------------------------------------------------------ //
 
@@ -527,6 +555,10 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
     if (!block) {
       return;
     }
+    if (block.type === "hypothesis") {
+      openHypothesis({ kind: "delete", blockId: block.attrs.block_id });
+      return;
+    }
     const dependents = findDependentBlocks(snapshot.content, block.attrs.block_id);
     if (dependents.length > 0) {
       // Explicit preview of the affected links before anything is removed.
@@ -539,7 +571,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
     }
     const ok = removeTopLevelBlocks(editor, [currentBlock.index]);
     announce(ok ? "Block deleted. You can undo this." : "The block could not be deleted.");
-  }, [editor, currentBlock, announce]);
+  }, [editor, currentBlock, announce, openHypothesis]);
 
   const confirmDelete = useCallback(() => {
     if (!editor || !deleteRequest) {
@@ -591,15 +623,14 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
       if (!editor) {
         return;
       }
-      let position: number | null = null;
-      editor.state.doc.forEach((node, offset) => {
-        if (node.attrs.block_id === blockId) {
-          position = offset;
-        }
-      });
-      if (position !== null) {
-        editor.chain().focus().setTextSelection(position + 1).run();
-        announce("Selected the heading in the paper.");
+      const index = editor.getJSON().content?.findIndex(node => node.attrs?.block_id === blockId) ?? -1;
+      if (index >= 0) {
+        const position = topLevelNodePosition(editor, index);
+        const hypothesis = editor.state.doc.child(index).type.name === "hypothesis";
+        const selection = editor.chain().focus();
+        if (hypothesis) selection.setNodeSelection(position).run();
+        else selection.setTextSelection(position + 1).run();
+        announce(hypothesis ? "Selected the hypothesis in the paper." : "Selected the heading in the paper.");
       }
       setDrawerPane(null);
     },
@@ -610,8 +641,9 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   const displayedUpdatedAt = savedAt ?? updatedAt;
 
   return (
-    <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasEvidenceActions} saved={controller.status.kind === "clean"}
-      revision={controller.revision} onObserve={recordObservation} onInsightAction={controller.draft ? undefined : openInsight}>
+    <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasEvidenceActions || annotationIntent?.kind === "hypothesis"}
+      saved={controller.status.kind === "clean"} revision={controller.revision} onObserve={recordObservation}
+      onInsightAction={controller.draft ? undefined : openInsight} onHypothesisAction={controller.draft ? undefined : openHypothesis}>
     <div className="flex flex-col gap-4" data-testid="editor-workbench">
       <p aria-live="polite" role="status" data-testid="editor-announcement" className="sr-only">
         {announcement}
@@ -677,6 +709,8 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
 
       <div className="flex flex-wrap items-start gap-2">
         <InsertMenuButton onInsert={handleInsert} disabled={!editor} />
+        <Button variant="secondary" disabled={!editor || controller.status.kind !== "clean" || Boolean(controller.draft)}
+          onClick={() => openHypothesis({ kind: "create" })}>Add hypothesis</Button>
         <BlockToolbar
           currentBlock={currentBlock}
           blockCount={blockCount}
@@ -866,8 +900,10 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
         onDownloadLocalCopy={handleDownloadLocalCopy}
         onSaveAsNewCopy={() => void handleConflictNewCopy()}
       />
-      {insightIntent ? <EditorInsightDialog intent={insightIntent} onClose={() => setInsightIntent(null)}
-        onSaved={acceptInsightSave} onReload={reloadInsightPaper} restoreFocus={restoreInsightFocus} /> : null}
+      {annotationIntent?.kind === "insight" ? <EditorInsightDialog intent={annotationIntent} onClose={() => setAnnotationIntent(null)}
+        onSaved={acceptAnnotationSave} onReload={reloadAnnotationPaper} restoreFocus={restoreAnnotationFocus} /> : null}
+      {annotationIntent?.kind === "hypothesis" ? <EditorHypothesisDialog intent={annotationIntent} onClose={() => setAnnotationIntent(null)}
+        onSaved={acceptAnnotationSave} onReload={reloadAnnotationPaper} restoreFocus={restoreAnnotationFocus} /> : null}
     </div>
     </ChartEditorProvider>
   );

@@ -1,15 +1,14 @@
 import type { JSONContent } from "@tiptap/core";
 
 /**
- * Heading outline derivation (NI-039, EDITOR_SPECIFICATION "Outline follows
- * heading IDs"). Entries anchor to the heading's stable block_id — never to
- * mutable text slugs — so the outline stays accurate after undo, reorder and
- * text edits. Pure and canonical-shaped for direct testing.
+ * Outline entries use stable block IDs so heading and hypothesis navigation
+ * survives text edits, reorders and undo.
  */
 export interface OutlineEntry {
   blockId: string;
   level: 1 | 2 | 3;
   text: string;
+  hypothesisId?: string;
 }
 
 function headingText(node: JSONContent): string {
@@ -22,17 +21,16 @@ export function deriveOutline(doc: JSONContent): OutlineEntry[] {
   const content = doc.type === "doc" ? (doc.content ?? []) : [doc];
   const entries: OutlineEntry[] = [];
   for (const node of content) {
-    if (node.type !== "heading") {
+    const blockId = node.attrs?.block_id;
+    if (typeof blockId !== "string") continue;
+    if (node.type === "hypothesis" && typeof node.attrs?.hypothesis_id === "string" && typeof node.attrs.statement === "string") {
+      entries.push({ blockId, level: 2, text: node.attrs.statement, hypothesisId: node.attrs.hypothesis_id });
       continue;
     }
     const level = node.attrs?.level;
-    const blockId = node.attrs?.block_id;
-    if (typeof blockId !== "string" || (level !== 1 && level !== 2 && level !== 3)) {
-      // The stable-ID plugin guarantees block ids; headings outside 1-3 do
-      // not exist in the assembled schema. Skip defensively, never guess.
-      continue;
+    if (node.type === "heading" && (level === 1 || level === 2 || level === 3)) {
+      entries.push({ blockId, level, text: headingText(node) });
     }
-    entries.push({ blockId, level, text: headingText(node) });
   }
   return entries;
 }

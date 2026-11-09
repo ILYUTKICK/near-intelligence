@@ -1,11 +1,11 @@
-"""NI-047 HTTP and atomic revision checks on disposable PostgreSQL."""
+"""NI-047 and NI-048 annotation HTTP checks on disposable PostgreSQL."""
 
 import copy
 import os
 import unittest
 from datetime import UTC, datetime
 from unittest.mock import patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import text
 
@@ -25,12 +25,17 @@ def insight_payload(context, **changes):
     }
 
 
+def hypothesis_payload(**changes):
+    return {"block_id": str(uuid4()), "statement": "Synthetic research question",
+            "assessment": "untested", **changes}
+
+
 def document_with(*nodes):
     return {"schema_version": 1, "type": "doc", "content": list(nodes)}
 
 
 @unittest.skipUnless(os.environ.get("NI_ISOLATED_PG_TEST") == "1", "Use scripts/run-db-tests.py")
-class DocumentInsightDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.TestCase):
+class DocumentAnnotationDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.TestCase):
     def request(self, method, path, *, body=None, revision=None, key=None, subject=None, params=None):
         headers = {"Authorization": "Bearer synthetic"}
         if revision is not None:
@@ -339,3 +344,251 @@ class DocumentInsightDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture, uni
         self.assertEqual(rejected["details"], [{"path": "context", "reason": "insight_context_immutable"}])
         self.assertEqual(self.success(self.request(
             "GET", collection, params={"version_id": str(previous.version.id)}), 200), historical)
+
+    def test_hypothesis_crud_reopens_in_document_order_with_manual_assessments(self):
+        document_id = self.create_document(self.alice).document.id
+        path = f"/api/documents/{document_id}"
+        collection = path + "/hypotheses"
+        self.assertEqual(self.success(self.request("GET", collection), 200), [])
+
+        source = chart_fixtures.text_paragraph("Synthetic research question")
+        prose = chart_fixtures.text_paragraph("Synthetic neighboring note")
+        source_id, prose_id = (node["attrs"]["block_id"] for node in (source, prose))
+        seeded = self.success(self.save(path, 1, document_with(source, prose)), 201)
+        created = self.success(self.request(
+            "POST", collection, body=hypothesis_payload(block_id=source_id), revision=2), 201)
+        original = created["value"]
+        self.assertEqual(set(original), {"id", "document_id", "block_id", "statement",
+                                         "assessment", "authored_at", "modified_at"})
+        self.assertEqual(original["block_id"], source_id)
+        self.assertEqual(original["document_id"], str(document_id))
+        self.assertNotEqual(original["id"], source_id)
+        self.assertEqual(UUID(original["id"]).version, 4)
+        self.assertEqual(original["authored_at"], original["modified_at"])
+        self.assertTrue(original["authored_at"].endswith("Z"))
+        self.assertEqual(self.success(self.request(
+            "GET", collection, params={"version_id": seeded["version"]["id"]}), 200), [])
+
+        insert = hypothesis_payload(after_block_id=source_id, statement="Synthetic alternative")
+        inserted = self.success(self.request("POST", collection, body=insert, revision=3), 201)
+        appended = self.success(self.request("POST", collection, body=hypothesis_payload(), revision=4), 201)
+        self.assertEqual([node["attrs"]["block_id"] for node in appended["version"]["content"]["content"]],
+                         [source_id, inserted["value"]["block_id"], prose_id, appended["value"]["block_id"]])
+        for payload, reason in (
+            (hypothesis_payload(block_id=source_id), "hypothesis_conversion_requires_paragraph"),
+            (hypothesis_payload(block_id=prose_id, after_block_id=source_id), "duplicate_block_id"),
+        ):
+            error = self.failure(self.request("POST", collection, body=payload, revision=5),
+                                 422, "REFERENCE_INVALID")
+            self.assertEqual(error["details"], [{"path": "block_id", "reason": reason}])
+
+        item = f"{collection}/{original['id']}"
+        prior = original
+        for revision, assessment in enumerate(
+                ("supported", "mixed", "weakened", "insufficient_data", "untested"), start=5):
+            with self.subTest(assessment=assessment):
+                updated = self.success(self.request(
+                    "PATCH", item, body={"assessment": assessment}, revision=revision), 200)
+                value = updated["value"]
+                self.assertEqual(value, {**original, "assessment": assessment,
+                                         "modified_at": value["modified_at"]})
+                self.assertGreater(datetime.fromisoformat(value["modified_at"]),
+                                   datetime.fromisoformat(prior["modified_at"]))
+                prior = value
+        delete_path = f"{collection}/{appended['value']['id']}"
+        removed = self.success(self.request(
+            "DELETE", delete_path, body={"remove_evidence_links": False}, revision=10), 200)
+        reopened = self.success(self.request("GET", path), 200)
+        self.assertEqual(reopened["revision"], 11)
+        self.assertEqual(reopened["current_version_id"], removed["version"]["id"])
+        self.assertEqual(reopened["content"], removed["version"]["content"])
+        self.assertEqual(self.success(self.request("GET", collection), 200), [prior, inserted["value"]])
+        self.assertEqual(self.success(self.request(
+            "GET", collection, params={"version_id": created["version"]["id"]}), 200), [original])
+
+    def test_hypothesis_cas_replay_and_request_validation(self):
+        first_doc = self.create_document(self.alice).document.id
+        second_doc = self.create_document(self.alice).document.id
+        collection = f"/api/documents/{first_doc}/hypotheses"
+        payload = hypothesis_payload()
+        key = uuid4()
+        self.failure(self.request("POST", collection, body=payload), 428, "PRECONDITION_REQUIRED")
+        with self.as_session(self.alice_id):
+            bare = self.client.post(collection, json=payload, headers={
+                "Authorization": "Bearer synthetic", "If-Match": "1",
+            })
+        self.failure(bare, 428, "PRECONDITION_REQUIRED")
+        self.failure(self.request("POST", collection, body=payload, revision=1, key="malformed"),
+                     422, "VALIDATION_ERROR")
+        for forbidden in ("owner_id", "hypothesis_id", "authored_at", "modified_at"):
+            self.failure(self.request("POST", collection, revision=1, body={**payload, forbidden: "x"}),
+                         422, "VALIDATION_ERROR")
+
+        response = self.request("POST", collection, body=payload, revision=1, key=key)
+        created = self.success(response, 201)
+        self.assertEqual(response.headers["ETag"], '"2"')
+        item = f"{collection}/{created['value']['id']}"
+        for invalid in ({}, {"assessment": None}, {"assessment": "unknown"},
+                        {"statement": None}, {"statement": "  "}, {"statement": "x" * 2001},
+                        {"block_id": payload["block_id"]}, {"authored_at": created["value"]["authored_at"]}):
+            self.failure(self.request("PATCH", item, revision=2, body=invalid), 422, "VALIDATION_ERROR")
+        for invalid in ({}, {"remove_evidence_links": "true"}):
+            self.failure(self.request("DELETE", item, revision=2, body=invalid), 422, "VALIDATION_ERROR")
+
+        replay = self.request("POST", collection, body=payload, revision=1, key=key)
+        self.assertEqual(self.success(replay, 201), created)
+        self.assertEqual(replay.headers["ETag"], '"2"')
+        self.failure(self.request("POST", collection, revision=2, key=key,
+                                  body={**payload, "statement": "Different synthetic question"}),
+                     409, "IDEMPOTENCY_CONFLICT")
+        other = self.success(self.request("POST", f"/api/documents/{second_doc}/hypotheses",
+                                          revision=1, key=key, body=payload), 201)
+        self.assertNotEqual(other["value"]["id"], created["value"]["id"])
+        self.assertEqual(other["value"]["document_id"], str(second_doc))
+
+        edit = {"statement": "Synthetic revised question"}
+        stale = self.failure(self.request("PATCH", item, body=edit, revision=1), 409, "REVISION_CONFLICT")
+        self.assertEqual(stale["details"], [{"path": "If-Match", "reason": "current_revision:2"}])
+        changed = self.success(self.request("PATCH", item, body=edit, revision=2, key=key), 200)
+        self.assertEqual(self.success(self.request("PATCH", item, body=edit, revision=2, key=key), 200), changed)
+        self.assertEqual(changed["value"]["statement"], edit["statement"])
+        self.assertEqual(self.counts(first_doc, changed["version"]["id"]), (3, 1, 0, 0))
+
+    def test_hypothesis_references_are_scoped_to_the_owned_revision(self):
+        alice_doc = self.create_document(self.alice).document.id
+        alice_other_doc = self.create_document(self.alice).document.id
+        bob_doc = self.create_document(self.bob).document.id
+        collection = f"/api/documents/{alice_doc}/hypotheses"
+        payload = hypothesis_payload()
+        key = uuid4()
+        created = self.success(self.request("POST", collection, body=payload, revision=1, key=key), 201)
+        hypothesis_id = created["value"]["id"]
+        version = {"version_id": created["version"]["id"]}
+        expected = self.failure(self.request("GET", f"/api/documents/{uuid4()}/hypotheses",
+                                             subject=self.bob_id), 404, "NOT_FOUND")
+        for method, suffix, body in (
+            ("GET", "", None), ("POST", "", payload),
+            ("PATCH", f"/{hypothesis_id}", {"assessment": "mixed"}),
+            ("DELETE", f"/{hypothesis_id}", {"remove_evidence_links": True}),
+        ):
+            error = self.failure(self.request(method, collection + suffix, body=body, revision=1,
+                                              key=key, subject=self.bob_id), 404, "NOT_FOUND")
+            self.assertEqual(error["message"], expected["message"])
+            self.assertNotIn("details", error)
+        self.failure(self.request("GET", collection, params=version, subject=self.bob_id), 404, "NOT_FOUND")
+
+        for document_id, owner in ((alice_other_doc, self.alice_id), (bob_doc, self.bob_id)):
+            path = f"/api/documents/{document_id}"
+            other = path + "/hypotheses"
+            self.failure(self.request("GET", other, params=version, subject=owner), 404, "NOT_FOUND")
+            self.failure(self.request("PATCH", f"{other}/{hypothesis_id}", revision=1, subject=owner,
+                                      body={"statement": "Synthetic edit"}), 404, "NOT_FOUND")
+            self.failure(self.request("DELETE", f"{other}/{hypothesis_id}", revision=1, subject=owner,
+                                      body={"remove_evidence_links": True}), 404, "NOT_FOUND")
+            anchored = self.failure(self.request(
+                "POST", other, body=hypothesis_payload(after_block_id=payload["block_id"]),
+                revision=1, subject=owner), 422, "REFERENCE_INVALID")
+            self.assertEqual(anchored["details"], [{"path": "after_block_id",
+                                                   "reason": "dangling_after_block_reference"}])
+            for node in (document_fixtures.risk_attrs(hypothesis_id),
+                         document_fixtures.evidence_attrs(hypothesis_id, "citation", str(uuid4()))):
+                error = self.failure(self.request("POST", path + "/versions", revision=1, subject=owner,
+                                                  body={"schema_version": 1, "content": document_with(node)}),
+                                     422, "REFERENCE_INVALID")
+                self.assertEqual(error["details"], [{"path": "content", "reason": "dangling_hypothesis_reference"}])
+            self.assertEqual(self.success(self.request("GET", other, subject=owner), 200), [])
+        with principal_transaction(self.engine, self.bob) as connection:
+            self.assertEqual(connection.scalar(text(
+                "SELECT count(*) FROM app.hypotheses WHERE document_id = :id"), {"id": alice_doc}), 0)
+
+    def test_hypothesis_text_edit_and_confirmed_cleanup_keep_unrelated_content(self):
+        document_id = self.create_document(self.alice).document.id
+        path = f"/api/documents/{document_id}"
+        collection = path + "/hypotheses"
+        first = self.success(self.request("POST", collection, body=hypothesis_payload(), revision=1), 201)["value"]
+        second = self.success(self.request("POST", collection, body=hypothesis_payload(), revision=2), 201)["value"]
+        dataset = self.publish_volume(self.dataset_key("hypothesis-cleanup"), "7")
+        context = chart_fixtures.volume_context(self.operator, dataset.dataset_version_id)
+        insight = self.success(self.request("POST", path + "/insights", revision=3,
+                                            body=insight_payload(context, hypothesis_id=first["id"])), 201)
+        first_risk = document_fixtures.risk_attrs(first["id"])
+        second_risk = document_fixtures.risk_attrs(second["id"])
+        linked_risks = self.success(self.save(path, 4, document_with(
+            *insight["version"]["content"]["content"], first_risk, second_risk)), 201)["version"]
+        second_item = f"{collection}/{second['id']}"
+        no_consent = {"remove_evidence_links": False}
+        conflict = self.failure(self.request("DELETE", second_item, revision=5, body=no_consent),
+                                409, "REFERENCE_IN_USE")
+        self.assertEqual(conflict["details"], [{"path": "remove_evidence_links", "reason": "linked_risks:1"}])
+
+        first_evidence, second_evidence = (
+            document_fixtures.evidence_attrs(value["id"], "insight", insight["value"]["id"])
+            for value in (first, second)
+        )
+        linked = self.success(self.save(path, 5, document_with(
+            *linked_risks["content"]["content"], first_evidence, second_evidence)), 201)["version"]
+        item = f"{collection}/{first['id']}"
+        statement = "Synthetic research question with a revised statement"
+        edited = self.success(self.request("PATCH", item, revision=6, body={"statement": statement}), 200)
+        value = edited["value"]
+        self.assertEqual(value, {**first, "statement": statement, "modified_at": value["modified_at"]})
+        self.assertGreater(datetime.fromisoformat(value["modified_at"]),
+                           datetime.fromisoformat(first["modified_at"]))
+        edited_version = edited["version"]
+        self.assertEqual(edited_version["content"]["content"][1:], linked["content"]["content"][1:])
+        with principal_transaction(self.engine, self.alice) as connection:
+            row = connection.execute(text("""
+                SELECT hypothesis_id, block_id, statement, assessment, authored_at, modified_at
+                FROM app.hypotheses WHERE document_version_id = :version AND hypothesis_id = :hypothesis
+            """), {"version": edited_version["id"], "hypothesis": first["id"]}).one()
+            self.assertEqual(row, (UUID(first["id"]), UUID(first["block_id"]), statement, "untested",
+                                   datetime.fromisoformat(first["authored_at"]),
+                                   datetime.fromisoformat(value["modified_at"])))
+
+        key = uuid4()
+        rejected = self.failure(self.request("DELETE", item, revision=7, body=no_consent, key=key),
+                                409, "REFERENCE_IN_USE")
+        self.assertEqual(rejected["details"], [
+            {"path": "remove_evidence_links", "reason": f"linked_{kind}:1"}
+            for kind in ("evidence", "insights", "risks")
+        ])
+        self.assertEqual(self.counts(document_id, edited_version["id"]), (7, 7, 1, 2))
+        consent = {"remove_evidence_links": True}
+        response = self.request("DELETE", item, revision=7, body=consent, key=key)
+        deleted = self.success(response, 200)
+        self.assertEqual(response.headers["ETag"], '"8"')
+        self.assertEqual(deleted["value"], {"deleted_id": first["id"]})
+        self.assertEqual(self.success(self.request("DELETE", item, revision=7, body=consent, key=key), 200), deleted)
+        self.failure(self.request("DELETE", item, revision=8, body=consent), 404, "NOT_FOUND")
+        self.assertEqual(self.counts(document_id, deleted["version"]["id"]), (8, 5, 1, 1))
+        self.assertEqual(self.counts(document_id, edited_version["id"]), (8, 7, 1, 2))
+        _, kept_insight, kept_first_risk, kept_second_risk, kept_evidence = deleted["version"]["content"]["content"]
+        _, _, old_insight, old_first_risk, old_second_risk, _, old_second_evidence = linked["content"]["content"]
+        self.assertEqual(kept_insight["attrs"], {
+            **{key: value for key, value in old_insight["attrs"].items() if key != "hypothesis_id"},
+            "modified_at": kept_insight["attrs"]["modified_at"],
+        })
+        self.assertEqual(kept_first_risk, {**old_first_risk, "attrs": {
+            key: value for key, value in old_first_risk["attrs"].items() if key != "related_hypothesis_id"
+        }})
+        self.assertEqual(kept_second_risk, old_second_risk)
+        self.assertEqual(kept_evidence, old_second_evidence)
+        self.assertEqual(self.success(self.request("GET", collection), 200), [second])
+        self.assertEqual(self.success(self.request(
+            "GET", collection, params={"version_id": edited_version["id"]}), 200), [value, second])
+
+    def test_hypothesis_authorship_and_identity_survive_full_document_saves(self):
+        document_id = self.create_document(self.alice).document.id
+        path = f"/api/documents/{document_id}"
+        hypothesis = document_fixtures.hypothesis_attrs()
+        source = document_with(hypothesis)
+        initial = self.success(self.save(path, 1, source), 201)["version"]["content"]["content"][0]["attrs"]
+        self.assertNotEqual(initial["authored_at"], hypothesis["attrs"]["authored_at"])
+        self.assertEqual(initial["authored_at"], initial["modified_at"])
+        followup = copy.deepcopy(source)
+        followup["content"].append(chart_fixtures.text_paragraph("Synthetic follow-up note"))
+        saved = self.success(self.save(path, 2, followup), 201)["version"]["content"]
+        self.assertEqual(saved["content"][0]["attrs"], initial)
+        followup["content"][0]["attrs"]["block_id"] = str(uuid4())
+        rejected = self.failure(self.save(path, 3, followup), 422, "REFERENCE_INVALID")
+        self.assertEqual(rejected["details"], [{"path": "block_id", "reason": "hypothesis_block_mismatch"}])

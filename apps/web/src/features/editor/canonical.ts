@@ -49,7 +49,7 @@ export type ChartMode = "live" | "snapshot";
 
 export const INSIGHT_TYPES: readonly InsightType[] = ["observation", "hypothesis", "risk", "conclusion"];
 export const CLASSIFICATIONS: readonly Classification[] = ["supporting", "contradicting", "uncertain"];
-const ASSESSMENTS: readonly Assessment[] = ["untested", "supported", "mixed", "weakened", "insufficient_data"];
+export const ASSESSMENTS: readonly Assessment[] = ["untested", "supported", "mixed", "weakened", "insufficient_data"];
 const TARGET_KINDS: readonly EvidenceTargetKind[] = ["insight", "chart_block", "model_run", "citation"];
 const CHART_MODES: readonly ChartMode[] = ["live", "snapshot"];
 const DATA_TABLE_COLUMN_TYPES = ["string", "number", "date"] as const;
