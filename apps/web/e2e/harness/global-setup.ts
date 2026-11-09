@@ -16,7 +16,7 @@
  * No provider, collector or non-loopback network access happens anywhere.
  */
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { pgBin, repoRoot, statePath } from "./state";

@@ -112,3 +112,46 @@ jobs:
         run: uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --suite landing
       - name: Frozen research chart HTTP integration (synthetic data, isolated database)
         run: uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --chart-insertion-http
+
+  # NI-063: the complete research-workflow e2e journey on the real stack
+  # (disposable loopback PostgreSQL 18 + FastAPI + production next start).
+  # Node/pnpm and the production build come BEFORE the run — the export
+  # worker's chart renderer and `next start` need them (the NI-058 lesson).
+  e2e:
+    name: e2e (research workflow journey, disposable stack)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL 18 from PGDG
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-18
+          sudo mkdir -p /var/run/postgresql
+          sudo chown -R "$(whoami)" /var/run/postgresql
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --project apps/api --frozen
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Install the pinned Chromium build
+        run: pnpm --filter web exec playwright install --with-deps chromium
+      - name: Research workflow e2e journey (synthetic data, loopback stack)
+        run: pnpm --filter web exec playwright test --config e2e/playwright.config.ts
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: apps/web/test-results/
+          retention-days: 7
