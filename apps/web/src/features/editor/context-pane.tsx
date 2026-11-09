@@ -265,7 +265,7 @@ const LATER_TASKS_NOTE: Record<string, string> = {
   hypothesis:
     "Use Edit hypothesis on the saved block to update the statement or author assessment. Linked evidence keeps the same hypothesis ID.",
   evidence:
-    "Evidence link editing arrives with NI-049; the block and its structural operations are active now.",
+    "Use Edit evidence link on the saved block to revise its target, classification or explanation.",
   risk: "Risk body rich-text editing arrives with the annotation tasks; the title is edited on the card itself.",
   dataTable: "Cells are edited below; the block serializes through the canonical schema.",
 };

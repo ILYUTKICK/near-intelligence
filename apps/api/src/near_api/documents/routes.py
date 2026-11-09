@@ -192,7 +192,7 @@ def _replay_response(outcome: idempotency.IdempotentOutcome, *,
 def mutate_document_annotation(
     request: Request, engine: Engine, principal: Principal, *,
     route: str, status: int, if_match: str | None, idempotency_key: str | None,
-    payload: ContractModel, response_model: type[DocumentSaveResponse],
+    payload: ContractModel | None, response_model: type[DocumentSaveResponse],
     operation: Callable[[Connection, int], tuple[service.DocumentDetail, ContractModel]],
 ) -> JSONResponse:
     """Apply a revision mutation and record the same response used on replay."""
@@ -217,10 +217,10 @@ def mutate_document_annotation(
             outcome = idempotency.IdempotentOutcome(False, response_status, body)
         else:
             route_key = f"{request.method} /api{route}"
+            request_body = payload.model_dump(mode="json", exclude_unset=True) if payload is not None else {}
             outcome = idempotency.execute_idempotent(
                 engine, principal, route_key=route_key, idempotency_key=key,
-                request_hash=idempotency.request_fingerprint(
-                    route_key, principal.id, payload.model_dump(mode="json", exclude_unset=True)),
+                request_hash=idempotency.request_fingerprint(route_key, principal.id, request_body),
                 operation=execute)
     except idempotency.IdempotencyConflict as error:
         return error_response(request, 409, "IDEMPOTENCY_CONFLICT", str(error))

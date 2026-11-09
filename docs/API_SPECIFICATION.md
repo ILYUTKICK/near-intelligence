@@ -233,7 +233,7 @@ headers and a `content_sha256` ETag; latest pointers with `max-age=60`.
 
 ## Insights, hypotheses and evidence
 
-NI-046 defines the annotation contracts in `apps/api/src/near_api/insights/schemas.py`. NI-047 and NI-048 implement the insight and hypothesis routes and generate their TypeScript contracts from OpenAPI. NI-049 covers evidence mutations. Inputs reject owner fields and author timestamps. Responses add stable IDs and server-authored UTC timestamps. The canonical editor grammar validates rich-text bodies up to 10,000 plain-text characters.
+NI-046 defines the annotation contracts in `apps/api/src/near_api/insights/schemas.py`. NI-047, NI-048 and NI-049 implement the insight, hypothesis and evidence routes. TypeScript contracts are generated from OpenAPI. Inputs reject owner fields and author timestamps. Responses add stable IDs and server-authored UTC timestamps. The canonical editor grammar validates rich-text bodies up to 10,000 plain-text characters.
 
 These are convenience operations on the current document JSON; all writes require If-Match and return a new document revision. Stable IDs persist across versions; GET can take `version_id` for historical views. PATCH schemas are partial corresponding Input schemas, with required final-state validation.
 
@@ -247,16 +247,19 @@ These are convenience operations on the current document JSON; all writes requir
 | POST `/documents/{id}/hypotheses` | `HypothesisCreateRequest` → 201 `HypothesisMutationResponse` | Owner and optional same-revision insertion anchor or paragraph conversion | 404/409/422/428 |
 | PATCH `/documents/{id}/hypotheses/{hypothesisId}` | `HypothesisPatchRequest` → 200 `HypothesisMutationResponse` | Current owned hypothesis and revision | 404/409/422/428 |
 | DELETE `/documents/{id}/hypotheses/{hypothesisId}` | `{remove_evidence_links:boolean}` → 200 `HypothesisDeleteResponse` | Owner and revision. Linked cleanup requires true | 404/409/422/428 |
-| GET `/documents/{id}/evidence` | `hypothesis_id?,version_id?` → Evidence list | Parent owner and parent references | 404/422 |
-| POST `/documents/{id}/evidence` | EvidenceInput → 201 MutationResult<Evidence> | Parent owner, same-revision targets or published public run/citation | 404/409/422/428 |
-| PATCH `/documents/{id}/evidence/{evidenceId}` | partial EvidenceInput → MutationResult<Evidence> | Parent owner and target validation | 404/409/422/428 |
-| DELETE `/documents/{id}/evidence/{evidenceId}` | no body → MutationResult<`{deleted_id}`> | Parent owner | 404/409/428 |
+| GET `/documents/{id}/evidence` | `hypothesis_id?,version_id?` → Evidence list in document order | Parent owner, version parent and hypothesis in the requested revision | 404/422 |
+| POST `/documents/{id}/evidence` | `EvidenceCreateRequest` → 201 `EvidenceMutationResponse` | Owner and same-revision or public immutable target | 404/409/422/428 |
+| PATCH `/documents/{id}/evidence/{evidenceId}` | `EvidencePatchRequest` → 200 `EvidenceMutationResponse` | Current owned evidence and validated merged link | 404/409/422/428 |
+| DELETE `/documents/{id}/evidence/{evidenceId}` | no body → 200 `EvidenceDeleteResponse` | Current owned evidence and revision | 404/409/428 |
+| GET `/documents/{id}/evidence-targets` | `target_kind=model_run\|citation,cursor?,limit?` → `EvidenceTargetListResponse` | Parent owner and public catalog | 404/422 |
 
 Hypothesis/Evidence responses add stable id, document_id, authored_at and modified_at to their Input schema. Create with an existing block ID converts/updates the selected node after explicit client confirmation; otherwise client supplies a new UUID and the service inserts a block. Rich text body cannot contain arbitrary HTML/scripts. Insight context is immutable unless an explicit replacement context is submitted and displayed as a new revision.
 
 NI-047 insight writes use the quoted `If-Match` revision and accept an `Idempotency-Key` scoped to the verified owner, operation and concrete document path. The response returns the acknowledged `document`, immutable `version` and `value`. A chart anchor must match the saved chart's definition, dataset and selection. A public inspection can append to an owned document without an anchor. The server verifies the exact approved context and records its own timestamp. PATCH preserves the original context unless it supplies an explicit verified replacement. DELETE with linked evidence returns `409 REFERENCE_IN_USE` until cleanup is confirmed. All reads use `no-store` and return the same 404 for missing and foreign nested IDs.
 
 NI-048 hypothesis writes use the same quoted revision, idempotency scope and response envelope. A new block can append or follow `after_block_id`. An existing paragraph can convert in place when `after_block_id` is absent. PATCH takes at least one of `statement` and `assessment` and preserves the block and hypothesis IDs and original authorship. Assessment is always author-supplied. A linked DELETE returns `409 REFERENCE_IN_USE` with affected counts until cleanup is confirmed. Confirmed cleanup removes evidence links and clears optional hypothesis references from insights and risks in the same revision, preserving their authored content. Historical reads retain the original annotations and links.
+
+NI-049 evidence writes use the same revision and idempotency rules. POST appends, inserts after `after_block_id` or converts an existing paragraph when the anchor is absent. PATCH accepts at least one of the hypothesis, classification, target kind, target ID and explanation. The merged link must still resolve. Both write paths preserve the block and evidence IDs for an existing link. Private targets resolve in the same revision. Shared targets must identify a published model run or an immutable artifact with public scope. Public picker pages expose IDs and safe labels. Evidence timestamps come from its first appearance and most recent change up to the requested revision. Historical reads return the stored relationship for that revision.
 
 ## Snapshots, models and public research
 

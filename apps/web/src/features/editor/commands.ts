@@ -416,42 +416,35 @@ export function duplicateTopLevelBlock(editor: Editor, index: number): boolean {
  */
 export const BlockOperationShortcuts = Extension.create({
   name: "blockOperationShortcuts",
-  // A selected hypothesis needs confirmation before the default keymap deletes it.
+  // Route selected annotations and referenced targets to confirmation before the default keymap.
   priority: 110,
 
   addKeyboardShortcuts() {
-    const deleteSelectedHypothesis = () => {
-      const editor = this.editor;
-      const { selection } = editor.state;
-      if (!(selection instanceof NodeSelection) || selection.node.type.name !== "hypothesis") return false;
-      emitRequestBlockDelete(editor, currentTopLevelIndex(editor));
+    const confirmationTypes = new Set(["hypothesis", "evidence", "liveChart", "insight"]);
+    const requestConfirmation = (editor: Editor, index: number) => {
+      const snapshot = canonicalSnapshot(editor);
+      const block = snapshot.content[index];
+      if (!block || (block.type !== "hypothesis" && block.type !== "evidence"
+        && findDependentBlocks(snapshot.content, block.attrs.block_id).length === 0)) return false;
+      emitRequestBlockDelete(editor, index);
       return true;
     };
+    const guardNodeDeletion = () => {
+      const { selection } = this.editor.state;
+      return selection instanceof NodeSelection && confirmationTypes.has(selection.node.type.name)
+        && requestConfirmation(this.editor, currentTopLevelIndex(this.editor));
+    };
     return {
-      Backspace: deleteSelectedHypothesis,
-      Delete: deleteSelectedHypothesis,
+      Backspace: guardNodeDeletion,
+      Delete: guardNodeDeletion,
       "Mod-Alt-ArrowUp": () => moveTopLevelBlock(this.editor, currentTopLevelIndex(this.editor), -1),
       "Mod-Alt-ArrowDown": () => moveTopLevelBlock(this.editor, currentTopLevelIndex(this.editor), 1),
       "Mod-Shift-d": () => duplicateTopLevelBlock(this.editor, currentTopLevelIndex(this.editor)),
       "Mod-Shift-Backspace": () => {
         const editor = this.editor;
         const index = currentTopLevelIndex(editor);
-        const snapshot = canonicalSnapshot(editor);
-        const block = snapshot.content[index];
-        if (!block) {
-          return false;
-        }
-        if (block.type === "hypothesis") {
-          emitRequestBlockDelete(editor, index);
-          return true;
-        }
-        if (findDependentBlocks(snapshot.content, block.attrs.block_id).length > 0) {
-          // Route through the confirmation flow; the shell previews the
-          // affected links and performs the removal only on explicit choice.
-          emitRequestBlockDelete(editor, index);
-          return false;
-        }
-        return removeTopLevelBlocks(editor, [index]);
+        return requestConfirmation(editor, index)
+          || (index < editor.state.doc.childCount && removeTopLevelBlocks(editor, [index]));
       },
     };
   },

@@ -9,7 +9,7 @@ export const annotationClient = () => createApiClient(window.location.origin, pr
 export const annotationHeaders = (revision: number, key: string) => ({ "if-match": `"${revision}"`, "idempotency-key": key });
 
 export function acknowledgeAnnotation<T extends AnnotationSave>(
-  result: { data?: T; response: Response; error?: unknown }, documentId: string, label: "insight" | "hypothesis",
+  result: { data?: T; response: Response; error?: unknown }, documentId: string, label: "insight" | "hypothesis" | "evidence link",
 ): T {
   const { data, response } = result;
   if (!response.ok) {

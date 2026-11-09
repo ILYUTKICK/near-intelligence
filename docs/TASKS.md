@@ -1521,7 +1521,7 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Started at:** 2026-11-09T17:17:01+03:00
 - **Branch/worktree:** `feat/ni-049-evidence-links`, `D:/хахатон/near-intelligence`
 - **Dependency verification:** NI-048 is DONE on `origin/main` (`90bd266`, merged PR #74). No competing NI-049 claim or open PR.
-- **Handoff:** B owns the evidence revision service and target validation. A owns the editor picker, generated client and acceptance checks.
+- **Handoff:** Codex `/root/ni049` implemented the B evidence revision service and target validation. Codex `/root` implemented the A picker, generated client integration and production gateway check.
 
 **Description:** Connect supporting, contradicting and uncertain artifacts to hypotheses without dangling references.
 
@@ -1532,6 +1532,10 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 **Acceptance criteria:** For/against evidence can coexist; cross-document private links rejected; no unvalidated polymorphic target ID; projections match canonical content.
 
 **Testing requirements:** Dangling/cross-owner/cross-doc target tests; duplicate/remap; historical revision preserves prior relationship; unknown model/citation.
+
+- **Result:** Supporting, contradicting and uncertain evidence can coexist on a saved hypothesis. The picker offers same-revision charts and insights or paged public model runs and citations. Mutations preserve stable IDs and write canonical content and projections together. Explicit cleanup protects linked targets. An old revision keeps its original links. A conflict involving a changed private pin retains the explanation and requires the author to choose the target again.
+- **Verification:** Disposable PostgreSQL 18.6 passed 76 focused tests (13 Home, 29 documents, 20 annotation contracts and 14 annotation DB tests) and all 6 API contract tests. Cases cover both owners, foreign and missing targets, actual synthetic model publication, public versus private/internal citation scope, duplicate/remap, history and projections. Thirty-four targeted web tests passed for authoring, public paging, stale-pin reselection, linked deletion and editor lifecycle. The generated contracts, strict source types and affected lint checks passed. CI is pending.
+- **Reviewer:** Codex `/root` reviewed the B owner, stable identity and target validation rules. Codex `/root/ni049` independently reviewed the editor and approved follow-ups for changed pins, selected-block confirmation and safe focus restoration.
 
 ### NI-050 — Build evidence navigation and research context panels
 

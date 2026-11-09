@@ -252,6 +252,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{document_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List evidence in a current or historical owned document revision */
+        get: operations["listDocumentEvidence"];
+        put?: never;
+        /** Add evidence to an owned document */
+        post: operations["createDocumentEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/evidence-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List selectable public evidence targets for an owned document */
+        get: operations["listDocumentEvidenceTargets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/evidence/{evidence_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove evidence from the current owned document revision */
+        delete: operations["deleteDocumentEvidence"];
+        options?: never;
+        head?: never;
+        /** Edit evidence in the current owned document revision */
+        patch: operations["updateDocumentEvidence"];
+        trace?: never;
+    };
     "/api/documents/{document_id}/hypotheses": {
         parameters: {
             query?: never;
@@ -1284,6 +1337,55 @@ export interface components {
             target_kind: "insight" | "chart_block" | "model_run" | "citation";
         };
         /**
+         * EvidenceCreateRequest
+         * @description Append, insert after a current block, or convert a current paragraph.
+         */
+        EvidenceCreateRequest: {
+            /** After Block Id */
+            after_block_id?: string | null;
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "supporting" | "contradicting" | "uncertain";
+            /** Explanation */
+            explanation: string;
+            /**
+             * Hypothesis Id
+             * Format: uuid
+             */
+            hypothesis_id: string;
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "insight" | "chart_block" | "model_run" | "citation";
+        };
+        /** EvidenceDeleteResponse */
+        EvidenceDeleteResponse: {
+            document: components["schemas"]["DocumentSummary"];
+            value: components["schemas"]["EvidenceDeleteValue"];
+            version: components["schemas"]["VersionDetailResponse"];
+        };
+        /** EvidenceDeleteValue */
+        EvidenceDeleteValue: {
+            /**
+             * Deleted Id
+             * Format: uuid
+             */
+            deleted_id: string;
+        };
+        /**
          * EvidenceInput
          * @description POST /documents/{id}/evidence body (API_SPECIFICATION ``EvidenceInput``).
          *
@@ -1320,6 +1422,57 @@ export interface components {
              * @enum {string}
              */
             target_kind: "insight" | "chart_block" | "model_run" | "citation";
+        };
+        /** EvidenceMutationResponse */
+        EvidenceMutationResponse: {
+            document: components["schemas"]["DocumentSummary"];
+            value: components["schemas"]["Evidence"];
+            version: components["schemas"]["VersionDetailResponse"];
+        };
+        /**
+         * EvidencePatchRequest
+         * @description Edit the relationship and explanation while retaining its identity.
+         */
+        EvidencePatchRequest: {
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification?: "supporting" | "contradicting" | "uncertain";
+            /** Explanation */
+            explanation?: string;
+            /**
+             * Hypothesis Id
+             * Format: uuid
+             */
+            hypothesis_id?: string;
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id?: string;
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind?: "insight" | "chart_block" | "model_run" | "citation";
+        };
+        /** EvidenceTarget */
+        EvidenceTarget: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** EvidenceTargetListResponse */
+        EvidenceTargetListResponse: {
+            /** Items */
+            items: components["schemas"]["EvidenceTarget"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3478,6 +3631,410 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listDocumentEvidence: {
+        parameters: {
+            query?: {
+                hypothesis_id?: string | null;
+                version_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Evidence"][];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createDocumentEvidence: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidenceCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceMutationResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listDocumentEvidenceTargets: {
+        parameters: {
+            query: {
+                target_kind: "model_run" | "citation";
+                cursor?: string | null;
+                limit?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceTargetListResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteDocumentEvidence: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceDeleteResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateDocumentEvidence: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidencePatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceMutationResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };

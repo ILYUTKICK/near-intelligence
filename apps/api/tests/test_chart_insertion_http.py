@@ -231,6 +231,37 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         self.assertEqual(client.get(hypotheses, params={"version_id": hypothesis_version}).json(), [hypothesis])
         self.assertEqual(client.get(hypotheses, params={"owner_id": str(uuid4())}).status_code, 422)
 
+        evidence = path + "/evidence"
+        targets = path + "/evidence-targets"
+        catalog = client.get(targets, params={"target_kind": "model_run", "limit": 1})
+        self.assertEqual(catalog.status_code, 200, catalog.text)
+        self.assertEqual(catalog.headers["cache-control"], "no-store")
+        self.assertEqual(client.get(targets, params={"target_kind": "insight"}).status_code, 422)
+        supporting = {"block_id": str(uuid4()), "hypothesis_id": hypothesis["id"], "classification": "supporting",
+                      "target_kind": "insight", "target_id": saved_note["id"], "explanation": "Synthetic supporting link"}
+        headers.update({"If-Match": '"10"', "Idempotency-Key": str(uuid4())})
+        linked = client.post(evidence, json=supporting, headers=headers)
+        self.assertEqual(linked.status_code, 201, linked.text)
+        earlier_link = linked.json()["value"]
+        evidence_version = linked.json()["version"]["id"]
+        headers["If-Match"] = '"11"'
+        self.assertEqual(client.post(evidence, json=supporting, headers=headers).json(), linked.json())
+        headers["Idempotency-Key"] = str(uuid4())
+        opposing = {**supporting, "block_id": str(uuid4()), "classification": "contradicting", "target_kind": "chart_block",
+                    "target_id": block["attrs"]["block_id"], "explanation": "Synthetic opposing link"}
+        opposed = client.post(evidence, json=opposing, headers=headers)
+        self.assertEqual(opposed.status_code, 201, opposed.text)
+        evidence_path = f"{evidence}/{opposed.json()['value']['id']}"
+        filters = {"hypothesis_id": hypothesis["id"], "version_id": evidence_version}
+        self.assertEqual(client.get(evidence, params=filters).json(), [earlier_link])
+        links = client.get(evidence, params={"hypothesis_id": hypothesis["id"]}).json()
+        self.assertEqual({item["classification"] for item in links}, {"supporting", "contradicting"})
+        headers.update({"If-Match": '"12"', "Idempotency-Key": str(uuid4())})
+        retargeted = client.patch(evidence_path, json={"target_kind": "insight", "target_id": saved_note["id"]}, headers=headers)
+        self.assertEqual(retargeted.status_code, 200, retargeted.text)
+        self.assertEqual(retargeted.json()["value"]["target_id"], saved_note["id"])
+        self.assertEqual(retargeted.json()["value"]["id"], opposed.json()["value"]["id"])
+
         client.cookies.set("ni_session", session_cookie("bob"))
         self.assertEqual(client.get(path).status_code, 404)
         self.assertEqual(client.post(path + "/chart-blocks", json=payload, headers=headers).status_code, 404)
@@ -241,15 +272,24 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         self.assertEqual(client.patch(note_path, json={"classification": "supporting"}, headers=headers).status_code, 404)
         self.assertEqual(client.get(hypotheses, params={"version_id": hypothesis_version}).status_code, 404)
         self.assertEqual(client.patch(hypothesis_path, json={"assessment": "supported"}, headers=headers).status_code, 404)
+        self.assertEqual(client.get(evidence, params=filters).status_code, 404)
+        self.assertEqual(client.get(targets, params={"target_kind": "citation"}).status_code, 404)
+        self.assertEqual(client.patch(evidence_path, json={"classification": "uncertain"}, headers=headers).status_code, 404)
         denied_save = client.post(path + "/versions", json=edit_body, headers=headers)
         self.assertEqual(denied_save.status_code, 404, denied_save.text)
         client.cookies.set("ni_session", session_cookie("alice"))
-        headers.update({"If-Match": '"10"', "Idempotency-Key": str(uuid4()),
+        headers.update({"If-Match": '"13"', "Idempotency-Key": str(uuid4()),
                         "x-csrf-token": client.get("/api/auth/csrf").json()["token"]})
-        removed = client.request("DELETE", hypothesis_path, json={"remove_evidence_links": False}, headers=headers)
+        detached = client.delete(evidence_path, headers=headers)
+        self.assertEqual(detached.status_code, 200, detached.text)
+        self.assertEqual(detached.json()["value"], {"deleted_id": opposed.json()["value"]["id"]})
+        headers.update({"If-Match": '"14"', "Idempotency-Key": str(uuid4())})
+        removed = client.request("DELETE", hypothesis_path, json={"remove_evidence_links": True}, headers=headers)
         self.assertEqual(removed.status_code, 200, removed.text)
         self.assertEqual(removed.json()["value"], {"deleted_id": hypothesis["id"]})
         self.assertEqual(client.get(hypotheses).json(), [])
         self.assertEqual(client.get(hypotheses, params={"version_id": hypothesis_version}).json(), [hypothesis])
-        print("NI-041/042/043/047/048 gateway E2E: exact chart/insight pins, hypothesis CRUD/history, "
+        self.assertEqual(client.get(evidence).json(), [])
+        self.assertEqual(client.get(evidence, params=filters).json(), [earlier_link])
+        print("NI-041/042/043/047/048/049 gateway E2E: exact chart/insight pins, hypothesis and evidence CRUD/history, "
               "explicit refresh, chart outage + prose save, Bob denied", flush=True)
