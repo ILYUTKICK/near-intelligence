@@ -52,6 +52,8 @@ from near_api.db.session import create_runtime_engine, user_transaction
 from near_api.documents import service
 from near_api.documents.context_resolver import (
     ChartDefinitionRow,
+    build_resolved_context,
+    load_chart_definition,
     validate_selection_against_definition,
 )
 from near_api.documents.schema import canonical_context_json, parse_document
@@ -59,6 +61,7 @@ from near_api.insights.schemas import ResolvedContext
 from near_api.main import app
 from near_api.metrics.registry import definition_by_metric_id
 from near_api.schemas.chart_blocks import ChartBlockInsertRequest
+from near_api.schemas.chart_selection import ChartSelection
 from near_api.schemas.common import ErrorResponse
 from near_api.schemas.delivery import ResolvedSelection
 import test_delivery_apis as data_fixture
@@ -96,6 +99,14 @@ def observed_context(view: dict) -> dict:
         "metric_definition_versions": view["definition"]["metric_definition_ids"],
         "resolved_at": view["resolved_at"],
     }
+
+
+def volume_context(operator, dataset_id: UUID, *, selected: dict | None = None) -> dict:
+    with operator.connect() as connection:
+        definition = load_chart_definition(connection, CHART_ID, error_path="context")
+    return build_resolved_context(
+        definition, dataset_id, ChartSelection.model_validate(selected or selection()),
+        resolved_at=dt.datetime.now(dt.UTC)).model_dump(mode="json")
 
 
 def text_paragraph(text: str) -> dict:
@@ -189,16 +200,31 @@ class ChartBlockContractTests(unittest.TestCase):
                          {"text/csv"})
 
 
-@unittest.skipUnless(os.environ.get("NI_ISOLATED_PG_TEST") == "1",
-                     "Use scripts/run-db-tests.py")
-class ChartBlockServiceDatabaseTests(unittest.TestCase):
-    """Insertion guarantees on the disposable PostgreSQL cluster."""
+def register_test_chart_catalog(operator) -> None:
+    from near_api.charts.registry import register_charts
+    from near_api.metrics.registry import register_definitions
+
+    sources = {"SRC-LLAMA": "DefiLlama saved snapshots",
+               "SRC-DASHBOARD": "NEAR Dashboard",
+               "SRC-BQ": "BigQuery export", "SRC-PRICE": "Saved price snapshots",
+               "SRC-FASTNEAR": "FastNear indexed blocks",
+               "SRC-NEAR-RPC": "NEAR public RPC"}
+    with operator.begin() as connection:
+        for source_id, name in sources.items():
+            connection.execute(text("""
+                INSERT INTO app.sources(id, name, access_status, license_status)
+                VALUES (:id, :name, 'documented', 'unverified')
+                ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+            """), {"id": source_id, "name": name})
+        register_definitions(connection)
+        register_charts(connection)
+
+
+class ChartBlockDatabaseFixture:
+    """Registered chart, two accounts and disposable PostgreSQL connections."""
 
     @classmethod
     def setUpClass(cls):
-        from near_api.charts.registry import register_charts
-        from near_api.metrics.registry import register_definitions
-
         cls.repo = Path(__file__).resolve().parents[3]
         cls.config = Config(str(cls.repo / "apps/api/alembic.ini"))
         cls.engine = create_runtime_engine(os.environ["NI_TEST_RUNTIME_URL"], pool_size=1)
@@ -208,20 +234,7 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
         cls.admin = create_engine(os.environ["NI_TEST_ADMIN_URL"], poolclass=NullPool,
                                   hide_parameters=True)
         command.upgrade(cls.config, "head")
-        sources = {"SRC-LLAMA": "DefiLlama saved snapshots",
-                   "SRC-DASHBOARD": "NEAR Dashboard",
-                   "SRC-BQ": "BigQuery export", "SRC-PRICE": "Saved price snapshots",
-                   "SRC-FASTNEAR": "FastNear indexed blocks",
-                   "SRC-NEAR-RPC": "NEAR public RPC"}
-        with cls.operator.begin() as connection:
-            for source_id, name in sources.items():
-                connection.execute(text("""
-                    INSERT INTO app.sources(id, name, access_status, license_status)
-                    VALUES (:id, :name, 'documented', 'unverified')
-                    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
-                """), {"id": source_id, "name": name})
-            register_definitions(connection)
-            register_charts(connection)
+        register_test_chart_catalog(cls.operator)
 
     @classmethod
     def tearDownClass(cls):
@@ -341,7 +354,48 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
             return self.client.post(f"/api/documents/{document_id}/chart-blocks",
                                     json=payload, headers=headers)
 
-    # -- lifecycle ------------------------------------------------------------ #
+    def publish_volume(self, key, value):
+        if not hasattr(self, "directory"):
+            tmp = tempfile.TemporaryDirectory(prefix="ni043-", dir=os.environ["NI_TEST_TMP_DIR"])
+            self.addCleanup(tmp.cleanup)
+            self.directory = Path(tmp.name)
+            self.storage_root = self.directory / "storage"
+        dimensions = {"source": "SRC-LLAMA"}
+        return data_fixture.DeliveryDatabaseTests.stage_fixture(
+            self, key,
+            [data_fixture.observation(METRIC_ID, dt.date(2026, 1, 1), value=value,
+                                      bound_kind="lower", dimensions=dimensions),
+             data_fixture.observation(METRIC_ID, dt.date(2026, 1, 2), value=None,
+                                      dimensions=dimensions)],
+            [METRIC_ID], window=("2026-01-01", "2026-01-03"))
+
+    def preview_volume(self, document_id, *, dataset_version="latest", start="2026-01-01",
+                       end="2026-01-04"):
+        with self.as_session(self.alice_id):
+            response = self.client.get(
+                f"/api/documents/{document_id}/chart-view",
+                params={"chart_definition_version_id": str(CHART_ID), "start": start,
+                        "end": end, "dataset_version": str(dataset_version),
+                        "filters": json.dumps({"source": "SRC-LLAMA"})},
+                headers={"Authorization": "Bearer t.alice"})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def chart_document(self, preview):
+        block_id = str(uuid4())
+        return block_id, {"type": "doc", "schema_version": 1, "content": [
+            {"type": "liveChart", "attrs": {
+                "block_id": block_id, "mode": "live", "selection": preview["selection"],
+                "chart_definition_version_id": preview["definition"]["id"],
+                "observed_dataset_version_id": preview["dataset"]["id"],
+            }},
+        ]}
+
+
+@unittest.skipUnless(os.environ.get("NI_ISOLATED_PG_TEST") == "1",
+                     "Use scripts/run-db-tests.py")
+class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCase):
+    """Insertion guarantees on the disposable PostgreSQL cluster."""
 
     def test_01_one_confirmation_appends_one_valid_block(self):
         detail = self.create_document(self.alice)
@@ -835,49 +889,12 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 422, response.text)
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
 
-    def publish_volume(self, key, value):
-        if not hasattr(self, "directory"):
-            tmp = tempfile.TemporaryDirectory(prefix="ni043-", dir=os.environ["NI_TEST_TMP_DIR"])
-            self.addCleanup(tmp.cleanup)
-            self.directory = Path(tmp.name)
-            self.storage_root = self.directory / "storage"
-        dimensions = {"source": "SRC-LLAMA"}
-        return data_fixture.DeliveryDatabaseTests.stage_fixture(
-            self, key,
-            [data_fixture.observation(METRIC_ID, dt.date(2026, 1, 1), value=value,
-                                      bound_kind="lower", dimensions=dimensions),
-             data_fixture.observation(METRIC_ID, dt.date(2026, 1, 2), value=None,
-                                      dimensions=dimensions)],
-            [METRIC_ID], window=("2026-01-01", "2026-01-03"))
-
-    def preview_volume(self, document_id, *, dataset_version="latest", start="2026-01-01",
-                       end="2026-01-04"):
-        with self.as_session(self.alice_id):
-            response = self.client.get(
-                f"/api/documents/{document_id}/chart-view",
-                params={"chart_definition_version_id": str(CHART_ID), "start": start,
-                        "end": end, "dataset_version": str(dataset_version),
-                        "filters": json.dumps({"source": "SRC-LLAMA"})},
-                headers={"Authorization": "Bearer t.alice"})
-        self.assertEqual(response.status_code, 200, response.text)
-        return response.json()
-
     def historical_chart(self, document_id, version_id, block_id, suffix="view", *,
                          subject=None, params=None):
         with self.as_session(subject or self.alice_id):
             return self.client.get(
                 f"/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/{suffix}",
                 params=params, headers={"Authorization": "Bearer synthetic"})
-
-    def chart_document(self, preview):
-        block_id = str(uuid4())
-        return block_id, {"type": "doc", "schema_version": 1, "content": [
-            {"type": "liveChart", "attrs": {
-                "block_id": block_id, "mode": "live", "selection": preview["selection"],
-                "chart_definition_version_id": preview["definition"]["id"],
-                "observed_dataset_version_id": preview["dataset"]["id"],
-            }},
-        ]}
 
     def test_frozen_chart_survives_publication_before_and_after_save(self):
         document_id = self.create_document(self.alice).document.id

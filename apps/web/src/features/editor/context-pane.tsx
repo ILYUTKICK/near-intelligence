@@ -260,7 +260,7 @@ const LATER_TASKS_NOTE: Record<string, string> = {
   liveChart:
     "Use the chart controls in the paper to inspect sources, apply a range or filter, and explicitly refresh its observed dataset. These changes are document edits.",
   insight:
-    "Structured insight authoring arrives with NI-047; the block and its structural operations are active now.",
+    "Use Edit insight on the saved block to revise its note. The evidence context stays pinned.",
   hypothesis:
     "Assessment editing and linked evidence counts arrive with NI-048; the block and its structural operations are active now.",
   evidence:

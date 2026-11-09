@@ -101,10 +101,8 @@ def install_contracts(app: FastAPI) -> None:
         if app.openapi_schema is None:
             schema = get_openapi(title=app.title, version=app.version, routes=app.routes,
                                  openapi_version=app.openapi_version)
-            # NI-046: the insight/evidence/hypothesis/risk contracts are
-            # published in components before their convenience routes exist
-            # (NI-047/048/049), so the generated TypeScript client already
-            # carries the validation types.
+            # Keep reusable annotation models visible before their routes ship.
+            # Route responses such as Insight come directly from FastAPI.
             _, common = models_json_schema(
                 [(model, "validation")
                  for model in (*CONTRACT_MODELS, *INSIGHT_CONTRACT_MODELS)],

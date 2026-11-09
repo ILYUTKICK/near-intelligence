@@ -247,7 +247,7 @@ class RichTextList(ContractModel):
 
 
 RichTextBody = Annotated[
-    tuple[Annotated["RichTextParagraph | RichTextList", Field(discriminator="type")], ...],
+    tuple[Annotated[RichTextParagraph | RichTextList, Field(discriminator="type")], ...],
     Field(min_length=1),
 ]
 """Bounded, sanitized annotation body (API_SPECIFICATION ``body:RichText``).
@@ -395,7 +395,7 @@ INSIGHT_CONTRACT_MODELS = (
     ResolvedContext, ModelContext,
     RichTextLinkAttrs, RichTextBoldMark, RichTextItalicMark, RichTextLinkMark,
     RichTextRun, RichTextParagraph, RichTextListItem, RichTextList,
-    InsightInput, Insight, HypothesisInput, Hypothesis,
+    InsightInput, HypothesisInput, Hypothesis,
     EvidenceInput, Evidence, RiskInput,
 )
 """Contracts published in the OpenAPI ``components`` (NI-004 mechanism) so the

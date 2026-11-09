@@ -1744,8 +1744,8 @@
             "items": {
               "discriminator": {
                 "mapping": {
-                  "bullet_list": "#/components/schemas/RichTextList",
-                  "ordered_list": "#/components/schemas/RichTextList",
+                  "bullet_list": "#/components/schemas/RichTextList-Output",
+                  "ordered_list": "#/components/schemas/RichTextList-Output",
                   "paragraph": "#/components/schemas/RichTextParagraph"
                 },
                 "propertyName": "type"
@@ -1755,7 +1755,7 @@
                   "$ref": "#/components/schemas/RichTextParagraph"
                 },
                 {
-                  "$ref": "#/components/schemas/RichTextList"
+                  "$ref": "#/components/schemas/RichTextList-Output"
                 }
               ]
             },
@@ -1833,6 +1833,145 @@
           "modified_at"
         ],
         "title": "Insight",
+        "type": "object"
+      },
+      "InsightCreateRequest": {
+        "additionalProperties": false,
+        "description": "Create a chart insight, optionally inserting it after a current block.",
+        "properties": {
+          "after_block_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Block Id"
+          },
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "body": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList-Input",
+                  "ordered_list": "#/components/schemas/RichTextList-Input",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList-Input"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Body",
+            "type": "array"
+          },
+          "classification": {
+            "enum": [
+              "supporting",
+              "contradicting",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ResolvedContext"
+          },
+          "hypothesis_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis Id"
+          },
+          "type": {
+            "enum": [
+              "observation",
+              "hypothesis",
+              "risk",
+              "conclusion"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "type",
+          "classification",
+          "body",
+          "context"
+        ],
+        "title": "InsightCreateRequest",
+        "type": "object"
+      },
+      "InsightDeleteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "remove_evidence_links": {
+            "title": "Remove Evidence Links",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "remove_evidence_links"
+        ],
+        "title": "InsightDeleteRequest",
+        "type": "object"
+      },
+      "InsightDeleteResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentSummary"
+          },
+          "value": {
+            "$ref": "#/components/schemas/InsightDeleteValue"
+          },
+          "version": {
+            "$ref": "#/components/schemas/VersionDetailResponse"
+          }
+        },
+        "required": [
+          "version",
+          "document",
+          "value"
+        ],
+        "title": "InsightDeleteResponse",
+        "type": "object"
+      },
+      "InsightDeleteValue": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_id": {
+            "format": "uuid",
+            "title": "Deleted Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted_id"
+        ],
+        "title": "InsightDeleteValue",
         "type": "object"
       },
       "InsightInput": {
@@ -1918,6 +2057,93 @@
           "context"
         ],
         "title": "InsightInput",
+        "type": "object"
+      },
+      "InsightMutationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentSummary"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Insight"
+          },
+          "version": {
+            "$ref": "#/components/schemas/VersionDetailResponse"
+          }
+        },
+        "required": [
+          "version",
+          "document",
+          "value"
+        ],
+        "title": "InsightMutationResponse",
+        "type": "object"
+      },
+      "InsightPatchRequest": {
+        "additionalProperties": false,
+        "description": "Omission keeps a field. A null hypothesis_id removes the association.",
+        "properties": {
+          "body": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList-Input",
+                  "ordered_list": "#/components/schemas/RichTextList-Input",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList-Input"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Body",
+            "type": "array"
+          },
+          "classification": {
+            "enum": [
+              "supporting",
+              "contradicting",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ResolvedContext",
+            "title": "Context"
+          },
+          "hypothesis_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis Id"
+          },
+          "type": {
+            "enum": [
+              "observation",
+              "hypothesis",
+              "risk",
+              "conclusion"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "InsightPatchRequest",
         "type": "object"
       },
       "LimitationsResponse": {
@@ -2826,6 +3052,60 @@
         "title": "RichTextList",
         "type": "object"
       },
+      "RichTextList-Input": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/RichTextListItem-Input"
+            },
+            "minItems": 1,
+            "title": "Content",
+            "type": "array"
+          },
+          "type": {
+            "enum": [
+              "bullet_list",
+              "ordered_list"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "RichTextList",
+        "type": "object"
+      },
+      "RichTextList-Output": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/RichTextListItem-Output"
+            },
+            "minItems": 1,
+            "title": "Content",
+            "type": "array"
+          },
+          "type": {
+            "enum": [
+              "bullet_list",
+              "ordered_list"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "RichTextList",
+        "type": "object"
+      },
       "RichTextListItem": {
         "additionalProperties": false,
         "description": "One list item. The canonical parser enforces the ordering rule (a nested\nlist must follow a paragraph) and the depth <= 3 bound before these shapes\nare constructed.",
@@ -2846,6 +3126,86 @@
                 },
                 {
                   "$ref": "#/components/schemas/RichTextList"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Content",
+            "type": "array"
+          },
+          "type": {
+            "const": "list_item",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "RichTextListItem",
+        "type": "object"
+      },
+      "RichTextListItem-Input": {
+        "additionalProperties": false,
+        "description": "One list item. The canonical parser enforces the ordering rule (a nested\nlist must follow a paragraph) and the depth <= 3 bound before these shapes\nare constructed.",
+        "properties": {
+          "content": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList-Input",
+                  "ordered_list": "#/components/schemas/RichTextList-Input",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList-Input"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Content",
+            "type": "array"
+          },
+          "type": {
+            "const": "list_item",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "RichTextListItem",
+        "type": "object"
+      },
+      "RichTextListItem-Output": {
+        "additionalProperties": false,
+        "description": "One list item. The canonical parser enforces the ordering rule (a nested\nlist must follow a paragraph) and the depth <= 3 bound before these shapes\nare constructed.",
+        "properties": {
+          "content": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList-Output",
+                  "ordered_list": "#/components/schemas/RichTextList-Output",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList-Output"
                 }
               ]
             },
@@ -5116,6 +5476,615 @@
         "summary": "Inspect one canonical chart context for an owned working document",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/insights": {
+      "get": {
+        "operationId": "listDocumentInsights",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Insight"
+                  },
+                  "title": "Response Listdocumentinsights",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "List insights in a current or historical owned document revision",
+        "tags": [
+          "insights"
+        ]
+      },
+      "post": {
+        "operationId": "createDocumentInsight",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Revision conflict (document moved) or Idempotency-Key reused with a different request"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Document exceeds a hard size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "If-Match precondition is required"
+          }
+        },
+        "summary": "Add an inspected chart insight to an owned document",
+        "tags": [
+          "insights"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/insights/{insight_id}": {
+      "delete": {
+        "operationId": "deleteDocumentInsight",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "insight_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Insight Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightDeleteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Revision, idempotency or linked-evidence conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Document exceeds a hard size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "If-Match precondition is required"
+          }
+        },
+        "summary": "Remove an insight with explicitly confirmed evidence cleanup",
+        "tags": [
+          "insights"
+        ]
+      },
+      "patch": {
+        "operationId": "updateDocumentInsight",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "insight_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Insight Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightPatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Revision conflict (document moved) or Idempotency-Key reused with a different request"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Document exceeds a hard size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "If-Match precondition is required"
+          }
+        },
+        "summary": "Edit an insight in the current owned document revision",
+        "tags": [
+          "insights"
         ]
       }
     },

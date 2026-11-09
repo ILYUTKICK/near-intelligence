@@ -1,5 +1,6 @@
 import { Component, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ChartView, type ChartSelection, type ChartViewResponse } from "@/features/charts/renderer/ChartView";
+import { ChartView, type ChartSelection } from "@/features/charts/renderer/ChartView";
+import { chartObservation, inspectionKey } from "@/features/charts/renderer/observation-context";
 import { filterEnumOptions, filterLabel } from "@/features/charts/library/filter-controls";
 import { isIsoCalendarDate, windowDays } from "@/features/charts/library/selection-url";
 import { HistoricalRevisionContext, useChartEditorContext } from "./chart-context";
@@ -88,9 +89,6 @@ export interface ChartBlockAttrs {
   observed_dataset_version_id: string;
 }
 const CONTROL_CLASS = "min-h-11 max-w-full rounded-control border border-control-border bg-surface px-3 py-2 font-ui text-base sm:text-ui touch-manipulation leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 aria-disabled:opacity-60";
-export function inspectionKey(definitionId: string, selection: ChartSelection | ChartViewResponse["selection"], datasetId: string) {
-  return JSON.stringify([definitionId, selection.start, selection.end, Object.entries(selection.filters ?? {}).sort(), datasetId]);
-}
 type Context = NonNullable<ReturnType<typeof useChartEditorContext>>;
 
 /** The renderer may fail independently of the enclosing text editor. */
@@ -132,15 +130,11 @@ export function InteractiveChart({ attrs, context, onApply }: {
     if (!candidate || applied.current?.candidate === candidate || !context.ready || candidate.signal.aborted
       || candidate.key !== attrsKey || candidate.attempt !== generation.current
       || candidate.subject !== context.subject || candidate.documentId !== context.documentId) return;
-    const { definition, dataset, selection, context_hash, resolved_at } = candidate.view;
+    const { definition, dataset, selection } = candidate.view;
     const nextKey = inspectionKey(definition.id, selection, dataset.id);
     applied.current = { candidate, revision: context.revision };
     if (nextKey === attrsKey) return;
-    if (attrs.block_id) context.onObserve?.(attrs.block_id, {
-      chart_definition_version_id: definition.id, dataset_version_id: dataset.id,
-      selection, context_hash, resolved_at, renderer_version: definition.renderer_version,
-      metric_definition_versions: definition.metric_definition_ids,
-    });
+    if (attrs.block_id) context.onObserve?.(attrs.block_id, chartObservation(candidate.view));
     onApply({ selection, observed_dataset_version_id: dataset.id });
   }, [candidate, attrsKey, attrs.block_id, context, onApply]);
   const candidateMatchesNode = candidate && candidate.subject === context.subject && candidate.documentId === context.documentId
@@ -203,6 +197,7 @@ export function InteractiveChart({ attrs, context, onApply }: {
   const properties = definition?.filter_schema["properties"];
   const filterKeys = properties && typeof properties === "object" && !Array.isArray(properties) ? Object.keys(properties).sort() : [];
   const enabled = context.ready && attrs.mode === "live";
+  const canAddInsight = enabled && context.saved && !loading && Boolean(view && attrs.block_id && context.onInsightAction);
   const draftRangeError = definition && (!isIsoCalendarDate(selection.start) || !isIsoCalendarDate(selection.end)
     || windowDays(selection.start, selection.end) < 1 || windowDays(selection.start, selection.end) > definition.available_ranges.max_days);
 
@@ -222,9 +217,14 @@ export function InteractiveChart({ attrs, context, onApply }: {
     <div className="flex flex-wrap gap-2">
       <button type="button" className={CONTROL_CLASS} disabled={!context.ready || attrs.mode !== "live"} onClick={() => setRetry(value => value + 1)}>Retry chart</button>
       <button type="button" className={CONTROL_CLASS} disabled={!enabled} onClick={() => void resolve(attrs.selection, "latest", true)}>Refresh to latest and save observation</button>
-      <button type="button" className={CONTROL_CLASS} disabled aria-describedby={`insight-gate-${attrs.block_id}`}>Add Insight</button>
+      <button type="button" className={CONTROL_CLASS} disabled={!canAddInsight}
+        aria-describedby={canAddInsight ? undefined : `insight-gate-${attrs.block_id}`} onClick={() => {
+          if (canAddInsight && view && attrs.block_id) {
+            context.onInsightAction?.({ kind: "create", blockId: attrs.block_id, context: chartObservation(view) });
+          }
+        }}>Add Insight</button>
     </div>
-    <p id={`insight-gate-${attrs.block_id}`} className="text-metadata text-text-secondary">Add Insight is unavailable until insight authoring can preserve the chart context.</p>
+    {!canAddInsight ? <p id={`insight-gate-${attrs.block_id}`} className="text-metadata text-text-secondary">Open a saved, resolved chart in your research to add an insight.</p> : null}
     {view && context.ready ? <>
       <ChartBoundary resetKey={`${attrsKey}:${retry}`}>
         <ChartView definition={view.definition} view={view} mode="historical" selection={attrs.selection}

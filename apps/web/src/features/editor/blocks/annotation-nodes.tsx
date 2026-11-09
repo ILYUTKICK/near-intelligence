@@ -14,6 +14,8 @@ import type {
 } from "../canonical";
 import { fieldPair, formatTimestamp, shortId } from "./display";
 import { RichFragmentView } from "./rich-fragment";
+import { Button } from "@/components/ui/button";
+import { useChartEditorContext } from "./chart-context";
 
 /**
  * Canonical typed research annotation blocks (P0): `insight`, `hypothesis`,
@@ -124,6 +126,7 @@ export const Insight = Node.create({
 });
 
 function InsightBlockView({ node, editor, getPos }: NodeViewProps) {
+  const account = useChartEditorContext();
   const attrs = node.attrs as {
     block_id: string | null;
     insight_id: string | null;
@@ -159,11 +162,17 @@ function InsightBlockView({ node, editor, getPos }: NodeViewProps) {
           {attrs.hypothesis_id ? `Linked hypothesis: ${shortId(attrs.hypothesis_id)} · ` : ""}
           Authored {formatTimestamp(attrs.authored_at)} · Modified {formatTimestamp(attrs.modified_at)}
         </p>
-        <p className="mt-1 text-metadata leading-metadata text-text-secondary italic">
-          Structured insight fields are edited with the annotation flows (NI-047); the block and its
-          structural operations are active now.
-        </p>
-        <EditPropertiesButton editor={editor} getPos={getPos} blockId={attrs.block_id} />
+        <div className="flex flex-wrap items-baseline gap-2">
+          <EditPropertiesButton editor={editor} getPos={getPos} blockId={attrs.block_id} />
+          {editor.isEditable && account?.onInsightAction && attrs.block_id ? <>
+            <Button variant="quiet" disabled={!account.ready || !account.saved} onClick={() => {
+              if (attrs.block_id) account.onInsightAction?.({ kind: "edit", blockId: attrs.block_id });
+            }}>Edit insight</Button>
+            <Button variant="quiet" disabled={!account.ready || !account.saved} onClick={() => {
+              if (attrs.block_id) account.onInsightAction?.({ kind: "delete", blockId: attrs.block_id });
+            }}>Delete insight</Button>
+          </> : null}
+        </div>
       </div>
     </NodeViewWrapper>
   );

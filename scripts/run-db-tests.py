@@ -25,8 +25,8 @@ def main() -> int:
     parser.add_argument("--saved-charts-http", action="store_true",
                         help="run saved-chart DB and production gateway HTTP checks only")
     parser.add_argument("--pg-bin", type=Path, required=True)
-    parser.add_argument("--suite", choices=("all", "landing"), default="all",
-                        help="landing runs NI-012 HTTP integration against a prebuilt web app")
+    parser.add_argument("--suite", choices=("all", "landing", "insights"), default="all",
+                        help="run all database suites, landing HTTP integration, or focused insight checks")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     local = (repo / ".local").resolve()
@@ -114,12 +114,14 @@ def main() -> int:
                     "test_dataset_staging.py", "test_metrics.py",
                     "test_refresh_adapter.py", "test_chart_registry.py",
                     "test_delivery_apis.py", "test_saved_charts.py",
-                    "test_profile.py", "test_documents.py", "test_chart_blocks.py",
+                    "test_profile.py", "test_documents.py", "test_chart_blocks.py", "test_document_insights.py",
                     "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py"]
         if args.suite == "landing":
             patterns = ["test_landing_integration.py"]
+        if args.suite == "insights":
+            patterns = ["test_home_aggregation.py", "test_documents.py", "test_insights.py", "test_document_insights.py"]
         # NI-030 bounded authorized live smoke: only when the operator
         # explicitly sets NI_LIVE_SMOKE=1 in the invoking environment (the same
         # gate the smoke file itself requires) does one real finalized-header

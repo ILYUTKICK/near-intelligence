@@ -504,7 +504,7 @@ class OpenAPIPublicationTests(unittest.TestCase):
     def setUpClass(cls):
         cls.client = TestClient(app, raise_server_exceptions=False)
 
-    def test_01_components_are_published_without_new_routes(self):
+    def test_01_components_and_insight_routes_are_published(self):
         schema = self.client.get("/openapi.json").json()
         components = schema["components"]["schemas"]
         for name in ("InsightInput", "Insight", "HypothesisInput", "Hypothesis",
@@ -526,8 +526,12 @@ class OpenAPIPublicationTests(unittest.TestCase):
         self.assertIn("modified_at", components["Insight"]["required"])
         self.assertNotIn("authored_at", components["InsightInput"]["required"])
         self.assertNotIn("owner_id", components["InsightInput"]["properties"])
-        # No convenience routes exist yet: paths are unchanged by this task.
-        self.assertNotIn("/api/documents/{document_id}/insights", schema["paths"])
+        collection = schema["paths"]["/api/documents/{document_id}/insights"]
+        item = schema["paths"]["/api/documents/{document_id}/insights/{insight_id}"]
+        self.assertEqual({method: route["operationId"] for method, route in collection.items()},
+                         {"get": "listDocumentInsights", "post": "createDocumentInsight"})
+        self.assertEqual({method: route["operationId"] for method, route in item.items()},
+                         {"patch": "updateDocumentInsight", "delete": "deleteDocumentInsight"})
         self.assertNotIn("/api/documents/{document_id}/hypotheses", schema["paths"])
         self.assertNotIn("/api/documents/{document_id}/evidence", schema["paths"])
 

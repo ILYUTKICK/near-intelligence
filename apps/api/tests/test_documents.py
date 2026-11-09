@@ -52,6 +52,7 @@ from near_api.documents.schema import (
 )
 from near_api.main import app
 from near_api.schemas.common import ErrorResponse
+import test_chart_blocks as chart_fixtures
 
 TS = "2026-11-06T12:00:00Z"
 SELECTION = {"start": "2025-01-01", "end": "2025-02-01", "frequency": "day", "filters": {}}
@@ -167,12 +168,13 @@ def data_table_attrs(**changes) -> dict:
     return {"type": "dataTable", "attrs": table_attrs}
 
 
-def full_document() -> dict:
+def full_document(*, insight_context: dict | None = None) -> dict:
     """One fixture containing every savable P0 block type (charts are a
     NI-031 registry gate and are exercised separately)."""
     hypothesis = hypothesis_attrs()
     hypothesis_id = hypothesis["attrs"]["hypothesis_id"]
-    insight = insight_attrs(hypothesis_id=hypothesis_id)
+    insight = insight_attrs(hypothesis_id=hypothesis_id,
+                            context=insight_context or resolved_context())
     evidence = evidence_attrs(hypothesis_id, "insight", insight["attrs"]["insight_id"])
     return {"schema_version": SCHEMA_VERSION, "type": "doc", "content": [
         {"type": "paragraph",
@@ -433,6 +435,8 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/csv",
             "/api/documents/{document_id}/chart-blocks",
             "/api/documents/{document_id}/chart-view",
+            "/api/documents/{document_id}/insights",
+            "/api/documents/{document_id}/insights/{insight_id}",
             "/api/metrics", "/api/metrics/{metric_id}",
             "/api/metrics/{metric_id}/series",
             "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",
@@ -530,6 +534,14 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         cls.admin = create_engine(os.environ["NI_TEST_ADMIN_URL"], poolclass=NullPool,
                                   hide_parameters=True)
         command.upgrade(cls.config, "head")
+        cls.seed_insight_context()
+
+    @classmethod
+    def seed_insight_context(cls):
+        chart_fixtures.register_test_chart_catalog(cls.operator)
+        dataset_id = chart_fixtures.ChartBlockDatabaseFixture.insert_dataset_version(
+            cls, f"synthetic.{uuid4().hex[:8]}.document-notes")
+        cls.insight_context = chart_fixtures.volume_context(cls.operator, dataset_id)
 
     @classmethod
     def tearDownClass(cls):
@@ -556,6 +568,9 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         self.client = TestClient(app, raise_server_exceptions=False)
 
     # -- helpers ------------------------------------------------------------ #
+
+    def full_document(self) -> dict:
+        return full_document(insight_context=copy.deepcopy(self.insight_context))
 
     def as_session(self, subject):
         """HTTP calls run the real dependency chain with a stubbed verifier."""
@@ -654,7 +669,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         first_hash = detail.version.content_sha256
         saved = service.save_revision(
             self.engine, self.alice, detail.document.id,
-            expected_revision=1, document_payload=full_document())
+            expected_revision=1, document_payload=self.full_document())
         self.assertEqual(saved.document.revision, 2)
         self.assertEqual(saved.document.current_version_id, saved.version.id)
         self.assertEqual(saved.version.revision, 2)
@@ -696,7 +711,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
                          "content": [block("divider")
                                      for _ in range(MAX_TOP_LEVEL_BLOCKS + 1)]},
         }
-        dangling = full_document()
+        dangling = self.full_document()
         dangling["content"][5]["attrs"]["hypothesis_id"] = str(uuid4())
         invalid_payloads["dangling_evidence"] = dangling
         for name, payload in invalid_payloads.items():
@@ -712,7 +727,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 service.save_revision(self.engine, self.alice, detail.document.id,
                                       expected_revision=revision,
-                                      document_payload=full_document())
+                                      document_payload=self.full_document())
         self.assertEqual(self.table_counts(detail.document.id), before)
         with user_transaction(self.engine, self.alice_id) as connection:
             row = connection.execute(text(
@@ -721,12 +736,11 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         self.assertEqual((row[0], row[1]), (revision, pointer))
 
     def test_04_revision_content_hash_matches_canonical_bytes(self):
-        document = full_document()
+        document = self.full_document()
         detail = self.create_document(self.alice)
         saved = service.save_revision(self.engine, self.alice, detail.document.id,
                                       expected_revision=1, document_payload=document)
-        expected = hashlib.sha256(
-            canonical_bytes(parse_document(document).canonical)).hexdigest()
+        expected = hashlib.sha256(canonical_bytes(parse_document(saved.content).canonical)).hexdigest()
         self.assertEqual(saved.version.content_sha256, expected)
         # Resaving identical content creates a new immutable revision with the
         # same hash (no deduplication of revision history).
@@ -737,7 +751,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
 
     def test_05_concurrent_cas_race_admits_exactly_one_writer(self):
         detail = self.create_document(self.alice)
-        payload_a = full_document()
+        payload_a = self.full_document()
         payload_b = empty_document()
         barrier = threading.Barrier(2)
         results: dict[int, object] = {}
@@ -781,7 +795,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         self.assertEqual(winner.version.id, document[1])
 
     def test_06_projection_round_trip_matches_canonical_content(self):
-        document = full_document()
+        document = self.full_document()
         document["content"][4]["attrs"]["body"] = [
             paragraph_node("Observation body"),
             {"type": "ordered_list", "content": [
@@ -840,7 +854,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         approved = self.insert_dataset_version(f"synthetic-approved-{uuid4().hex[:8]}")
         staged = self.insert_dataset_version(f"synthetic-staged-{uuid4().hex[:8]}",
                                              status="staged")
-        document = full_document()
+        document = self.full_document()
         table_reference = data_table_attrs(dataset_version_id=str(approved))
         document["content"].append(table_reference)
         detail = self.create_document(self.alice)
@@ -894,7 +908,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         detail = self.create_document(self.alice, "Alice synthetic")
         saved = service.save_revision(self.engine, self.alice, detail.document.id,
                                       expected_revision=1,
-                                      document_payload=full_document())
+                                      document_payload=self.full_document())
         with self.assertRaises(ResourceNotFound):
             service.get_document_detail(self.engine, self.bob, detail.document.id)
         with self.assertRaises(ResourceNotFound):
@@ -951,7 +965,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             # Missing If-Match is 428 before any validation side effect.
             missing = self.client.post(f"/api/documents/{document_id}/versions",
                                        json={"schema_version": SCHEMA_VERSION,
-                                             "content": full_document()},
+                                             "content": self.full_document()},
                                        headers=alice_headers)
             self.assertEqual(missing.status_code, 428)
             error = ErrorResponse.model_validate(missing.json())
@@ -962,13 +976,13 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
                     malformed = self.client.post(
                         f"/api/documents/{document_id}/versions",
                         json={"schema_version": SCHEMA_VERSION,
-                              "content": full_document()},
+                              "content": self.full_document()},
                         headers={"If-Match": header, **alice_headers})
                     self.assertEqual(malformed.status_code, 428)
             # Stale revision is 409 REVISION_CONFLICT with the current revision.
             stale = self.client.post(
                 f"/api/documents/{document_id}/versions",
-                json={"schema_version": SCHEMA_VERSION, "content": full_document()},
+                json={"schema_version": SCHEMA_VERSION, "content": self.full_document()},
                 headers={"If-Match": '"9"', **alice_headers})
             self.assertEqual(stale.status_code, 409)
             conflict = ErrorResponse.model_validate(stale.json())
@@ -977,7 +991,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             # A valid CAS save returns 201 with the new ETag and version detail.
             saved = self.client.post(
                 f"/api/documents/{document_id}/versions",
-                json={"schema_version": SCHEMA_VERSION, "content": full_document()},
+                json={"schema_version": SCHEMA_VERSION, "content": self.full_document()},
                 headers={"If-Match": '"1"', **alice_headers})
             self.assertEqual(saved.status_code, 201)
             self.assertEqual(saved.headers["ETag"], '"2"')
@@ -990,7 +1004,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             self.assertEqual(save_body["document"]["current_version_id"],
                              save_body["version"]["id"])
             # Invalid content is a typed 422 and leaves the document untouched.
-            invalid = copy.deepcopy(full_document())
+            invalid = copy.deepcopy(self.full_document())
             invalid["content"].append({"type": "iframe",
                                        "attrs": {"block_id": str(uuid4())}})
             rejected = self.client.post(
@@ -1090,6 +1104,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
                 "SELECT to_regclass('app.evidence_links')")))
         command.upgrade(self.config, "head")
         command.check(self.config)
+        self.seed_insight_context()
         with self.admin.connect() as connection:
             names = connection.execute(text("""
                 SELECT relname FROM pg_class c JOIN pg_namespace n
@@ -1104,7 +1119,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
 
     def test_12_http_rename_creates_revision_noop_keeps_history(self):
         alice_headers = {"Authorization": "Bearer t.alice"}
-        full_payload = full_document()
+        full_payload = self.full_document()
         with self.as_session(self.alice_id):
             created = self.client.post("/api/documents",
                                        json={"title": "Original title"},
@@ -1117,6 +1132,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             self.assertEqual(saved.status_code, 201)
             revision_two_id = saved.json()["version"]["id"]
             revision_two_sha = saved.json()["version"]["content_sha256"]
+            revision_two_content = saved.json()["version"]["content"]
             # Missing If-Match is 428; malformed is the same precondition failure.
             missing = self.client.patch(f"/api/documents/{document_id}",
                                         json={"title": "Renamed"},
@@ -1153,8 +1169,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
                 headers=alice_headers)
             self.assertEqual(detail.status_code, 200)
             self.assertEqual(detail.json()["content_sha256"], revision_two_sha)
-            self.assertEqual(detail.json()["content"],
-                             parse_document(full_payload).canonical)
+            self.assertEqual(detail.json()["content"], revision_two_content)
             # A PATCH without a title change is a no-op: no revision is created.
             noop = self.client.patch(
                 f"/api/documents/{document_id}", json={"title": "Renamed title"},
@@ -1185,7 +1200,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
 
     def test_13_delete_cascades_children_and_retains_shared_scientific_data(self):
         dataset_id = self.insert_dataset_version("synthetic-delete-retention")
-        content = full_document()
+        content = self.full_document()
         content["content"][-1] = data_table_attrs(dataset_version_id=str(dataset_id))
         alice_headers = {"Authorization": "Bearer t.alice"}
         with self.as_session(self.alice_id):
@@ -1262,7 +1277,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
                                        headers=alice_headers)
             document_id = created.json()["id"]
             first_version_id = created.json()["current_version_id"]
-            second_payload = full_document()
+            second_payload = self.full_document()
             for payload in (second_payload, empty_document()):
                 saved = self.client.post(
                     f"/api/documents/{document_id}/versions",
@@ -1385,7 +1400,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         key = str(uuid4())
         alice_headers = {"Authorization": "Bearer t.alice"}
         save_headers = {"If-Match": '"1"', "Idempotency-Key": key, **alice_headers}
-        payload = {"schema_version": SCHEMA_VERSION, "content": full_document()}
+        payload = {"schema_version": SCHEMA_VERSION, "content": self.full_document()}
         with self.as_session(self.alice_id):
             created = self.client.post("/api/documents", json={"title": "Autosave"},
                                        headers=alice_headers)
@@ -1424,7 +1439,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             # now stale and the conflict is the honest 409.
             stale = self.client.post(
                 f"/api/documents/{document_id}/versions",
-                json={"schema_version": SCHEMA_VERSION, "content": full_document()},
+                json={"schema_version": SCHEMA_VERSION, "content": self.full_document()},
                 headers={"If-Match": '"1"', "Idempotency-Key": str(uuid4()),
                          **alice_headers})
             self.assertEqual(stale.status_code, 409)

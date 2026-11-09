@@ -107,6 +107,17 @@ def _document_response(detail: service.DocumentDetail) -> DocumentResponse:
                             resolved_contexts=detail.resolved_contexts)
 
 
+def _document_save_response(detail: service.DocumentDetail) -> DocumentSaveResponse:
+    version = detail.version
+    return DocumentSaveResponse(
+        version=VersionDetailResponse(
+            id=version.id, document_id=version.document_id, revision=version.revision,
+            schema_version=version.schema_version, content_sha256=version.content_sha256,
+            created_at=version.created_at, content=detail.content,
+            resolved_contexts=detail.resolved_contexts),
+        document=_document_summary(detail.document))
+
+
 def _schema_error(request: Request, error: DocumentSchemaError):
     """Map canonical validation failures to their typed error envelope."""
     if isinstance(error, DocumentTooLarge):
@@ -481,16 +492,7 @@ def save_document_version(request: Request, principal: PrincipalDependency,
             connection, principal, document_id, expected_revision=expected,
             document_payload=payload.content,
             observed_contexts=list(payload.observed_contexts))
-        body = DocumentSaveResponse(
-            version=VersionDetailResponse(
-                id=detail.version.id, document_id=detail.version.document_id,
-                revision=detail.version.revision,
-                schema_version=detail.version.schema_version,
-                content_sha256=detail.version.content_sha256,
-                created_at=detail.version.created_at, content=detail.content,
-                resolved_contexts=detail.resolved_contexts),
-            document=_document_summary(detail.document))
-        return 201, body.model_dump(mode="json")
+        return 201, _document_save_response(detail).model_dump(mode="json")
 
     if key is not None:
         route_key = idempotency.ROUTE_SAVE_DOCUMENT_VERSION.format(document_id=document_id)
@@ -536,12 +538,4 @@ def save_document_version(request: Request, principal: PrincipalDependency,
         return _schema_error(request, error)
     response.headers["Cache-Control"] = "no-store"
     response.headers["ETag"] = _etag(detail.document.revision)
-    return DocumentSaveResponse(
-        version=VersionDetailResponse(
-            id=detail.version.id, document_id=detail.version.document_id,
-            revision=detail.version.revision,
-            schema_version=detail.version.schema_version,
-            content_sha256=detail.version.content_sha256,
-            created_at=detail.version.created_at, content=detail.content,
-            resolved_contexts=detail.resolved_contexts),
-        document=_document_summary(detail.document))
+    return _document_save_response(detail)

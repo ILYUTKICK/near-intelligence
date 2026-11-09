@@ -47,8 +47,8 @@ export type Assessment = "untested" | "supported" | "mixed" | "weakened" | "insu
 export type EvidenceTargetKind = "insight" | "chart_block" | "model_run" | "citation";
 export type ChartMode = "live" | "snapshot";
 
-const INSIGHT_TYPES: readonly InsightType[] = ["observation", "hypothesis", "risk", "conclusion"];
-const CLASSIFICATIONS: readonly Classification[] = ["supporting", "contradicting", "uncertain"];
+export const INSIGHT_TYPES: readonly InsightType[] = ["observation", "hypothesis", "risk", "conclusion"];
+export const CLASSIFICATIONS: readonly Classification[] = ["supporting", "contradicting", "uncertain"];
 const ASSESSMENTS: readonly Assessment[] = ["untested", "supported", "mixed", "weakened", "insufficient_data"];
 const TARGET_KINDS: readonly EvidenceTargetKind[] = ["insight", "chart_block", "model_run", "citation"];
 const CHART_MODES: readonly ChartMode[] = ["live", "snapshot"];

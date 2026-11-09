@@ -1457,6 +1457,7 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Started at:** 2026-11-09T11:47:38+03:00
 - **Branch/worktree:** `feat/ni-047-chart-insights`, `D:/хахатон/near-intelligence`
 - **Dependency verification:** NI-046, NI-040 and NI-043 are DONE on `origin/main` (`a7fa401`). No open PR or active NI-047 claim at selection.
+- **Handoff:** Codex `/root/ni047` implements the B insight service and DB tests. Codex `/root` implements the A editor and public chart forms, generated client, gateway and production HTTP check.
 
 **Description:** Allow observations/risks/conclusions to survive chart refresh and document reopen.
 
@@ -1467,6 +1468,11 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 **Acceptance criteria:** An insight stays tied to original data after live refresh; saves update canonical JSON/projections atomically; owner and revision checked.
 
 **Testing requirements:** Create/edit/reopen after new dataset; Bob reference denial; deleting linked insight with/without cleanup;409 conflict.
+
+- **Result:** Add Insight works from the editor and the public chart destination picker. The API verifies the pinned chart observation, writes canonical content and projections atomically, and exposes owned current and historical reads. An edit keeps the original evidence context. Deletion with linked evidence requires explicit cleanup. The editor retains a draft across a stale revision and reloads for review only when the target still matches.
+- **Verification:** The native PostgreSQL 18.6 `--suite insights` run passed 66 tests with synthetic fixtures (13 Home, 29 documents, 19 insight contracts and 5 insight DB tests). Cases include republishing and refreshing around an anchored save, pinned historical reads, invalid pins, Bob ownership/reference checks, replay, stale CAS, linked deletion, and a legacy duplicate followed by a prose save. The offline affected contract run passed 41 tests.
+- **Reviewer:** Codex `/root` reviewed the B implementation and verified the conversion pin rule. Codex `/root/ni047` independently reviewed the web handoff and rechecked the recovery-draft gate, stale revision recovery, removed-hypothesis notice and save-race guards.
+- **Pending verification:** The local Vitest worker stalled on the new tests and the existing autosave control run. The clean Linux CI run will verify the web suite and the production gateway scenario.
 
 ### NI-048 — Implement hypothesis blocks and assessments
 

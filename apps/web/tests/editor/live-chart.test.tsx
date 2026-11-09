@@ -39,7 +39,7 @@ describe("Interactive editor chart", () => {
     expect(screen.getByText("Sources & definitions")).toBeInTheDocument();
     expect(screen.getByText("Chart definition and pinned context")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add Insight" })).toBeDisabled();
-    expect(screen.getByText(/insight authoring can preserve/)).toBeInTheDocument(); expect(apply).not.toHaveBeenCalled();
+    expect(screen.getByText(/saved, resolved chart/)).toBeInTheDocument(); expect(apply).not.toHaveBeenCalled();
     expect(loader.mock.calls[0]?.[3]).toBe(attrs.observed_dataset_version_id);
   });
   it("keeps range/filter drafts local and resolves before one explicit persisted edit", async () => {

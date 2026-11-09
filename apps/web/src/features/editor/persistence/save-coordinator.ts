@@ -311,7 +311,7 @@ export class SaveCoordinator {
    * Adopts a server state after an explicit reload: the editor now holds the
    * server content, which becomes the acknowledged baseline.
    */
-  adoptServerState(revision: number): void {
+  adoptServerState(revision: number, savedAt: string | null = null): void {
     if (this.stopped || this.inFlight) {
       return;
     }
@@ -320,7 +320,7 @@ export class SaveCoordinator {
     this.cancelTimers();
     this.retainedAttempt = null;
     this.followUpManual = false;
-    this.setStatus({ kind: "clean", revision, savedAt: null });
+    this.setStatus({ kind: "clean", revision, savedAt });
   }
 
   /** Cancels timers and ignores all future work (component unmount). */
