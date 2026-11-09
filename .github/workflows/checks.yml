@@ -62,6 +62,8 @@ jobs:
           # NI-057: the chart renderer boundary spawns the pinned Node script;
           # node and the workspace node_modules are installed above.
           uv run python -m unittest discover -s tests -p test_exports_charts.py -v
+          # NI-058: the Markdown bundle/manifest/ZIP packaging (offline part).
+          uv run python -m unittest discover -s tests -p test_exports_bundle.py -v
       - name: Generated client matches the API contract
         run: node packages/shared-types/scripts/generate.mjs --check
 

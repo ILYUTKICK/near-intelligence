@@ -18,6 +18,9 @@ NI-037 adds the Idempotency-Key replay store (idempotency_records) for the
 document write routes.
 NI-035 adds the owner-scoped saved chart instances (saved_charts) that pin
 canonical analytical contexts to immutable chart definition versions.
+NI-058 adds the owner-scoped Markdown ZIP export jobs (export_jobs): the
+queued/leased/TTL-bounded job rows that freeze the NI-056 export IR and hold
+the finished owner-private ZIP bytes.
 Remaining domain tables belong to their owning tasks and must keep these
 declarations in sync for the Alembic metadata drift check.
 """
@@ -330,6 +333,85 @@ class SavedChart(Base):
                                                  server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
                                                  server_default=func.now())
+
+
+class ExportJob(Base):
+    """One owner-scoped Markdown ZIP export job (NI-058).
+
+    Mirrors migration 0012 exactly (DATABASE_SCHEMA.md "export_jobs", the
+    implemented shape): ``plan`` holds the FROZEN export IR canonical bytes
+    built at request time (the worker renders only from them, so later edits
+    never reach the bundle), ``bundle`` holds the finished ZIP bytes with
+    their SHA-256 and size, and the lifecycle columns carry the operator
+    lease, the attempt cap and the TTL. Bytes live owner-scoped inside this
+    RLS-protected row: no public artifact key and no server filesystem path.
+    """
+
+    __tablename__ = "export_jobs"
+    __table_args__ = (
+        CheckConstraint("format = 'markdown_zip'", name="format"),
+        CheckConstraint("status IN ('queued','running','succeeded','failed','expired')",
+                        name="status"),
+        CheckConstraint("revision > 0", name="revision"),
+        CheckConstraint(r"plan_sha256 ~ '^[0-9a-f]{64}$'", name="plan_hash"),
+        CheckConstraint("octet_length(plan) <= 33554432", name="plan_size"),
+        CheckConstraint(r"bundle_sha256 IS NULL OR bundle_sha256 ~ '^[0-9a-f]{64}$'",
+                        name="bundle_hash"),
+        CheckConstraint("bundle_byte_size IS NULL OR bundle_byte_size >= 0",
+                        name="bundle_size"),
+        CheckConstraint("(status = 'succeeded') = (bundle IS NOT NULL) "
+                        "AND (bundle IS NULL) = (bundle_sha256 IS NULL) "
+                        "AND (bundle IS NULL) = (bundle_byte_size IS NULL)",
+                        name="bundle_pairing"),
+        CheckConstraint("(status = 'failed') = (error_code IS NOT NULL)",
+                        name="error_code"),
+        CheckConstraint("attempts >= 0", name="attempts"),
+        CheckConstraint("status <> 'queued' OR attempts = 0", name="queued_fresh"),
+        CheckConstraint("(status = 'running') = (leased_until IS NOT NULL)",
+                        name="lease_pairing"),
+        CheckConstraint("(attempts > 0) = (leased_by IS NOT NULL)",
+                        name="worker_pairing"),
+        CheckConstraint("(status NOT IN ('succeeded','failed') OR completed_at IS NOT NULL) "
+                        "AND (completed_at IS NULL OR status IN ('succeeded','failed','expired'))",
+                        name="completed_pairing"),
+        UniqueConstraint("id", "owner_id", name="uq_export_jobs_id_owner"),
+        UniqueConstraint("owner_id", "idempotency_key", name="uq_export_jobs_owner_idempotency"),
+        ForeignKeyConstraint(["owner_id"], ["app.users.id"],
+                             name="fk_export_jobs_owner", ondelete="CASCADE"),
+        ForeignKeyConstraint(["document_id", "owner_id"], ["app.documents.id", "app.documents.owner_id"],
+                             name="fk_export_jobs_document", ondelete="CASCADE"),
+        ForeignKeyConstraint(["document_version_id", "document_id", "owner_id"],
+                             ["app.document_versions.id", "app.document_versions.document_id",
+                              "app.document_versions.owner_id"],
+                             name="fk_export_jobs_version", ondelete="CASCADE"),
+        Index("ix_export_jobs_status_created", "status", "created_at", "id"),
+        Index("ix_export_jobs_owner_created", "owner_id", text("created_at DESC"), "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    owner_id: Mapped[UUID] = mapped_column(nullable=False)
+    document_id: Mapped[UUID] = mapped_column(nullable=False)
+    document_version_id: Mapped[UUID] = mapped_column(nullable=False)
+    format: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False,
+                                        server_default=text("'queued'"))
+    idempotency_key: Mapped[UUID | None]
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    plan: Mapped[bytes] = mapped_column(nullable=False)
+    plan_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    bundle: Mapped[bytes | None]
+    bundle_sha256: Mapped[str | None] = mapped_column(String(64))
+    bundle_byte_size: Mapped[int | None] = mapped_column(BigInteger)
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    leased_by: Mapped[str | None] = mapped_column(String(120))
+    leased_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Source(Base):
