@@ -450,14 +450,15 @@ describe("context tools", () => {
     expect(screen.getByText(/of 1000 allowed cells/)).toBeInTheDocument();
   });
 
-  it("shows annotation contract fields for the selected evidence block", async () => {
+  it("shows the stable hypothesis ID and author assessment in Properties", async () => {
     await renderReady(LINKED_DOC);
     // Move the selection onto the evidence card through the properties
     // pane's own reflection of the first block (the fixture's evidence is
     // second; the hypothesis is first and shows its own contract fields).
     const pane = screen.getAllByTestId("context-pane")[0];
-    expect(pane).toHaveTextContent(/Assessment/);
-    expect(pane).toHaveTextContent(/untested/);
+    expect(pane).toHaveTextContent("Hypothesis ID");
+    expect(pane).toHaveTextContent("Author assessment");
+    expect(pane).toHaveTextContent("Untested");
     expect(pane).toHaveTextContent(/2026-11-08T00:00:00Z/);
   });
 });
