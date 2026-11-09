@@ -1,10 +1,11 @@
 /** NI-050 evidence navigation panel tests (synthetic fixtures, visibly labeled). */
 import { axe } from "jest-axe";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { chartObservation } from "@/features/charts/renderer/observation-context";
 import { loadDocumentChart } from "@/features/editor/blocks/chart-api";
+import { AddInsightToResearch } from "@/features/editor/insights/public-insight";
 import { ResearchDocumentEditor } from "@/features/editor/workbench";
 import { shortId } from "@/features/editor/blocks/display";
 import { definition, metric, observation, series, view } from "../ui/renderer/fixtures";
@@ -137,9 +138,9 @@ async function renderReady(content: unknown[], options: { evidence?: () => unkno
 const CONTENT = [hypothesisA, hypothesisB, insight, chartBlock, risk, supportingEvidence, contradictingEvidence, chartEvidence];
 
 /** The document stays clean: no navigation in the panel may dirty the paper. */
-function expectCleanDocument() {
+function expectCleanDocument(expectedRevision: number = REVISION) {
   const status = screen.getByTestId("save-status");
-  expect(status).toHaveTextContent(`Revision ${REVISION}`);
+  expect(status).toHaveTextContent(`Revision ${expectedRevision}`);
   expect(status).not.toHaveTextContent("Unsaved changes");
 }
 
@@ -275,4 +276,73 @@ it("shows an honest empty state for research without hypotheses", async () => {
   const panel = await screen.findByTestId("evidence-navigation-panel");
   expect(within(panel).getByText(/No hypotheses in this research yet/)).toBeInTheDocument();
   expect(within(panel).queryAllByTestId("evidence-entry")).toHaveLength(0);
+});
+
+it("completes the J4 chain: explorer Add Insight after destination selection, then evidence navigation", async () => {
+  const user = userEvent.setup();
+  const posts: Array<{ headers: Record<string, string | null>; body: Record<string, unknown> }> = [];
+  const summary = { id: DOC_ID, title: "Synthetic navigation research", revision: REVISION, schema_version: 1,
+    current_version_id: VERSION_ID, created_at: TIMESTAMP, updated_at: TIMESTAMP, progress: { headings: 0, charts: 1, insights: 0 } };
+  const saved = (nextContent: unknown[], nextRevision: number) => Response.json({
+    document: { ...summary, revision: nextRevision },
+    version: { id: VERSION_ID, document_id: DOC_ID, revision: nextRevision, schema_version: 1, created_at: TIMESTAMP,
+      content_sha256: "a".repeat(64), content: paper(nextContent), resolved_contexts: {} },
+    value: insight.attrs,
+  });
+  let content: unknown[] = [hypothesisA, hypothesisB, risk];
+  let revision = REVISION;
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : String(input), location.origin);
+    if (url.pathname === "/api/auth/session") return Response.json({ subject: "synthetic-alice" });
+    if (url.pathname === "/api/auth/csrf") return Response.json({ token: "synthetic-csrf" });
+    if (url.pathname === "/api/documents") return Response.json({ items: [summary], next_cursor: null });
+    if (url.pathname === `/api/documents/${DOC_ID}/insights` && input instanceof Request) {
+      const request = new Request(input, init);
+      posts.push({ headers: { "if-match": request.headers.get("if-match"), csrf: request.headers.get("x-csrf-token") },
+        body: await request.json() });
+      // The server allocates the stable insight id the evidence links target.
+      const created = { ...insight, attrs: { ...insight.attrs,
+        body: [{ type: "paragraph", content: [{ type: "text", text: "Synthetic explorer insight" }] }] } };
+      content = [hypothesisA, hypothesisB, risk, chartBlock, created, supportingEvidence, contradictingEvidence];
+      revision = 5;
+      return saved(content, revision);
+    }
+    if (url.pathname === `/api/documents/${DOC_ID}`) {
+      return Response.json({ ...summary, revision, content: paper(content), resolved_contexts: {} });
+    }
+    if (url.pathname === `/api/documents/${DOC_ID}/evidence`) return Response.json(evidenceList());
+    throw new Error(`Unexpected synthetic request ${url.pathname}`);
+  }));
+
+  // Phase 1 — the explorer context: Add Insight opens, the destination is
+  // selected inside it (AddChartToResearch precedent), and the created
+  // insight freezes the inspected context through the shared insights API.
+  render(<AddInsightToResearch context={insightContext} suspended={false} />);
+  await user.click(await screen.findByRole("button", { name: "Add Insight" }));
+  await user.type(await screen.findByLabelText("Insight text"), "Synthetic explorer insight");
+  await user.selectOptions(screen.getByLabelText("Destination"),
+    await screen.findByRole("option", { name: "Synthetic navigation research" }));
+  await user.selectOptions(await screen.findByLabelText("Linked hypothesis"), HYPOTHESIS_B_ID);
+  await user.click(screen.getByRole("button", { name: "Confirm Add Insight" }));
+  expect(await screen.findByRole("link", { name: "Open research" })).toHaveAttribute("href", `/workspace/research/${DOC_ID}`);
+  expect(posts).toHaveLength(1);
+  expect(posts[0].headers["if-match"]).toBe(`"${REVISION}"`);
+  expect(posts[0].headers.csrf).toBe("synthetic-csrf");
+  expect(posts[0].body).toMatchObject({ context: insightContext, hypothesis_id: HYPOTHESIS_B_ID,
+    type: "observation", classification: "uncertain" });
+
+  // Phase 2 — reopen the research: the linked graph navigates like any other.
+  cleanup();
+  render(<ResearchDocumentEditor documentId={DOC_ID} />);
+  await screen.findByRole("textbox", { name: "Research paper editor" });
+  const panel = await screen.findByTestId("evidence-navigation-panel");
+  await waitFor(() => expect(within(panel).getAllByTestId("evidence-entry").length).toBeGreaterThan(0));
+  const entry = within(panel).getByRole("button", { name: "Show contradicting evidence in the paper (Insight in this research)" });
+  await user.click(entry);
+  expect(screen.getByTestId("editor-announcement")).toHaveTextContent("Showing the insight in the paper");
+  const insightCard = screen.getByLabelText("Insight block");
+  expect(insightCard).toHaveTextContent("Synthetic explorer insight");
+  expect(insightCard).toHaveTextContent("2026-11-01 – 2026-11-06 (UTC, half-open)");
+  expect(insightCard).toHaveTextContent(shortId(insightContext.dataset_version_id));
+  expectCleanDocument(5);
 });
