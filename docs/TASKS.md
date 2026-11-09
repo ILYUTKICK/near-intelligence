@@ -1842,7 +1842,12 @@ Specification: [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 - **Priority:** P0
 - **Dependencies:** NI-035, NI-050
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-A agent (ILYUTKICK operator dispatch, ZCode session), NI-061 parallel dispatch
+- **Execution role:** A with in-agent API-test coverage per the 9 November 2026 parallel-dispatch instruction
+- **Started at:** 2026-11-09T20:07:54+03:00
+- **Branch/worktree:** feat/ni-061-invariant-suite; /Users/ilyutkinn/Desktop/near-intelligence-a14 (worktree stacked on feat/ni-050-evidence-navigation head 0eaacfb)
+- **Dependency verification:** NI-035 DONE on origin/main (merged); NI-050 implemented, independently reviewed (approved) and CI-green on OPEN PR #76 awaiting owner merge — claim basis recorded per the NI-037/NI-036 open-PR precedent; PR to be retargeted to main after #76 merges.
 
 **Description:** Verify financial and research invariants across DB/API/editor boundaries.
 
