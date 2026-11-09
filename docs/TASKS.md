@@ -1748,7 +1748,12 @@ Specification: [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-043, NI-050, NI-054
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-B agent (ILYUTKICK operator dispatch, ZCode session), NI-056 dispatch
+- **Execution role:** B
+- **Started at:** 2026-11-09T19:59:49+03:00
+- **Branch/worktree:** feat/ni-056-export-ir; /Users/ilyutkinn/Desktop/near-intelligence-b10 (worktree stacked on feat/ni-050-evidence-navigation head 0eaacfb)
+- **Dependency verification:** NI-043 DONE on origin/main (merged); NI-054 DONE on origin/main (merged PR #57). NI-050 is implemented, independently role-B-reviewed (approved, PR comment) and CI-green on OPEN PR #76 awaiting owner merge — claim basis recorded per the NI-037/NI-036 open-PR dependency precedent; this PR targets the NI-050 branch and must be retargeted to main immediately after #76 merges, before the owner merges it.
 
 **Description:** Translate an acknowledged immutable revision into a complete export plan.
 
