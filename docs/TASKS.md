@@ -1776,7 +1776,12 @@ Specification: [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-056, NI-033
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-A coordinator (ZCode session, ILYUTKICK operator), NI-057 dispatch — one subagent covers the A Node-renderer zone and the B Python-subprocess zone per the 9 November 2026 parallel-dispatch/no-review instruction
+- **Execution role:** A + B in a single dispatch
+- **Started at:** 2026-11-09T21:47:37+03:00
+- **Branch/worktree:** feat/ni-057-chart-assets; /Users/ilyutkinn/Desktop/near-intelligence-a15 (worktree from origin/main 916ac87)
+- **Dependency verification:** NI-056 DONE on main (merged PR #77, 916ac87; card closure rides the docs commit in PR #78); NI-033 DONE on main (merged PR #49). No competing NI-057 claim and no open PR conflict at session start.
 
 **Description:** Reuse chart data/options for portable exported evidence.
 
