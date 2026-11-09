@@ -1808,7 +1808,12 @@ Specification: [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
 - **Priority:** P0
 - **Dependencies:** NI-057, NI-040
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-A coordinator (ZCode session, ILYUTKICK operator), NI-058 dispatch — one subagent covers the B API/jobs/migrations zone and the A editor-dialog + client-regeneration zone per the 9 November 2026 parallel-dispatch/no-review instruction
+- **Execution role:** A + B in a single dispatch
+- **Started at:** 2026-11-09T22:39:35+03:00
+- **Branch/worktree:** feat/ni-058-export-bundle; /Users/ilyutkinn/Desktop/near-intelligence-b11 (worktree from origin/main e89bc59)
+- **Dependency verification:** NI-057 DONE on main (merged PR #79, head d4c6b9f, tree verified at e89bc59); NI-040 DONE on main (merged PR #58). No competing NI-058 claim and no open PR at session start.
 
 **Description:** Provide one reliable complete MVP export rather than several incomplete formats.
 
