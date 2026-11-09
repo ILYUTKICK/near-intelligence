@@ -562,7 +562,7 @@ class ExportIrDatabaseTests(unittest.TestCase):
         dataset_id = self.stage_volume(self.dataset_key("intents"), "12.5")
         created, saved = self.create_full_document(
             self.alice, dataset_id=dataset_id, table_dataset_id=dataset_id)
-        with self.operator.begin() as connection:
+        with self.admin.begin() as connection:
             connection.execute(text("""
                 UPDATE app.artifacts SET sha256 = :broken
                 WHERE id = (SELECT manifest_artifact_id FROM app.dataset_versions
