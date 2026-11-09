@@ -107,6 +107,7 @@ export async function listDocuments(
 export async function createDocument(input: {
   title: string;
   idempotencyKey: string;
+  signal?: AbortSignal;
 }): Promise<DocumentResponse> {
   const response = await privateFetch("/api/documents", {
     method: "POST",
@@ -117,6 +118,7 @@ export async function createDocument(input: {
       "idempotency-key": input.idempotencyKey,
     },
     body: JSON.stringify({ title: input.title }),
+    signal: input.signal,
   });
   assertJsonContentType(response);
   const body: unknown = await response.json();

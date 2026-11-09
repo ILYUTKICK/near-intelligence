@@ -42,6 +42,7 @@ from near_api.schemas.home import DocumentSummary, HomeResponse, HomeIndicator
 from near_api.workspace.aggregation import HomeOverview, home_overview
 from near_api.documents import service as document_service
 import test_documents as document_fixtures
+import test_chart_blocks as chart_fixtures
 import test_delivery_apis as delivery_fixtures
 from near_api.charts import saved
 from near_api.charts.registry import chart_by_chart_id
@@ -108,6 +109,8 @@ class HomeContractTests(unittest.TestCase):
                                                 "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/csv",
                                                 "/api/documents/{document_id}/chart-blocks",
                                                 "/api/documents/{document_id}/chart-view",
+                                                "/api/documents/{document_id}/insights",
+                                                "/api/documents/{document_id}/insights/{insight_id}",
                                                 "/api/metrics",
                                                 "/api/metrics/{metric_id}",
                                                 "/api/metrics/{metric_id}/series",
@@ -489,8 +492,14 @@ class HomeContextDatabaseTests(unittest.TestCase):
             return home_overview(connection, actor).to_home_response()
 
     def test_current_canonical_notes_and_progress_exclude_history_and_other_owner(self):
+        day = datetime(2026, 1, 1).date()
+        dataset = delivery_fixtures.DeliveryDatabaseTests.stage_fixture(
+            self, f"ni024.notes.{uuid4().hex[:12]}",
+            [delivery_fixtures.observation(delivery_fixtures.METRIC_VOLUME, day, value="12.5")],
+            [delivery_fixtures.METRIC_VOLUME], window=("2026-01-01", "2026-01-02"))
+        context = chart_fixtures.volume_context(self.operator, dataset.dataset_version_id)
         document = document_service.create_document(self.runtime, self.alice, title="Synthetic Alice current")
-        old_note = document_fixtures.insight_attrs()
+        old_note = document_fixtures.insight_attrs(context=context)
         heading = document_fixtures.block("heading", level=1)
         heading["content"] = [{"type": "text", "text": "Synthetic heading"}]
         document_service.save_revision(self.runtime, self.alice, document.document.id,
@@ -498,13 +507,13 @@ class HomeContextDatabaseTests(unittest.TestCase):
                                                  "content": [heading, old_note]})
         # Same immutable note ID across revisions must appear exactly once;
         # the removed old heading must not inflate workflow completion.
-        notes = [old_note] + [document_fixtures.insight_attrs() for _ in range(6)]
+        notes = [old_note] + [document_fixtures.insight_attrs(context=context) for _ in range(6)]
         document_service.save_revision(self.runtime, self.alice, document.document.id,
             expected_revision=2, document_payload={"type": "doc", "schema_version": 1, "content": notes})
         bob_doc = document_service.create_document(self.runtime, self.bob, title="Synthetic Bob private")
         document_service.save_revision(self.runtime, self.bob, bob_doc.document.id,
             expected_revision=1, document_payload={"type": "doc", "schema_version": 1,
-                                                 "content": [heading, document_fixtures.insight_attrs()]})
+                                                 "content": [heading, document_fixtures.insight_attrs(context=context)]})
         home = self.overview(self.alice)
         self.assertEqual(home.counts.documents, 1)
         self.assertEqual(home.recent_documents[0].progress.model_dump(),

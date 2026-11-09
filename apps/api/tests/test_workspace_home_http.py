@@ -5,11 +5,12 @@ The inherited harness verifies ES256/JWKS, cookie/Origin/CSRF, principal and RLS
 NI_BROWSER_HANDOFF=1 keeps this disposable stack for native-browser review.
 """
 from unittest.mock import patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import text
 
 from near_api.datasets import delivery
+import test_chart_blocks as chart_fixture
 import test_documents as documents_fixture
 import test_saved_charts_http as gateway_fixture
 
@@ -31,7 +32,9 @@ class WorkspaceHomeHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         document = created.json()
         self.http_document_id = document["id"]
         path = "/api/documents/" + document["id"]
-        content = documents_fixture.full_document()
+        context = chart_fixture.volume_context(
+            self.operator, UUID(body["dataset_version_id"]), selected=body["selection"])
+        content = documents_fixture.full_document(insight_context=context)
         headers.update({"If-Match": '"1"', "Idempotency-Key": str(uuid4())})
         saved = client.post(path + "/versions", json={"schema_version": 1, "content": content,
                                                        "observed_contexts": []}, headers=headers)
@@ -41,7 +44,7 @@ class WorkspaceHomeHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         self.assertEqual(home["recent_documents"][0]["revision"], 2)
         self.assertEqual(home["recent_documents"][0]["progress"], {"headings": 1, "charts": 0, "insights": 1})
         self.assertEqual(len(home["recent_insights"]), 1)
-        self.assertEqual(client.get(path).json()["content"], documents_fixture.parse_document(content).canonical)
+        self.assertEqual(client.get(path).json()["content"], saved.json()["version"]["content"])
         workspace = client.get("/workspace")
         self.assertEqual(workspace.status_code, 200)
         self.assertIn("no-store", workspace.headers["cache-control"])

@@ -1,13 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import type { components } from "@near-intelligence/shared-types";
 
 import { Button } from "@/components/ui/button";
 import { SaveChartButton } from "../saved/SaveChartButton";
 import { AddChartToResearch } from "../add-to-research/AddChartToResearch";
 import type { SaveInput } from "../saved/api";
 import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
+import { AddInsightToResearch } from "@/features/editor/insights/public-insight";
 
 /**
  * Public-to-private action continuation (NI-034; reused by the public data
@@ -37,12 +39,14 @@ export function ChartAuthActions({
   chartTitle,
   basePath = "/charts/",
   saveInput,
+  insightContext,
 }: {
   nextPath: string;
   chartTitle: string;
   /** Internal-path base the continuation may target (with trailing slash). */
   basePath?: string;
   saveInput?: SaveInput;
+  insightContext?: components["schemas"]["ResolvedContext"];
 }) {
   const router = useRouter();
   const [session, setSession] = useState<{
@@ -99,9 +103,12 @@ export function ChartAuthActions({
   // Retain the mounted attempt for a known subject while hiding all its UI.
   // A verified different subject (or an explicit auth-change signal) resets it.
   if (session.subject && saveInput) {
-    return <div key={`${session.subject}:${JSON.stringify(saveInput)}`} className="flex flex-wrap gap-2">
-      <SaveChartButton input={saveInput} suspended={session.status !== "authenticated"} />
-      <AddChartToResearch input={saveInput} suspended={session.status !== "authenticated"} />
+    return <div key={session.subject} className="flex flex-wrap gap-2">
+      <Fragment key={JSON.stringify(saveInput)}>
+        <SaveChartButton input={saveInput} suspended={session.status !== "authenticated"} />
+        <AddChartToResearch input={saveInput} suspended={session.status !== "authenticated"} />
+      </Fragment>
+      {insightContext ? <AddInsightToResearch context={insightContext} suspended={session.status !== "authenticated"} /> : null}
       {session.status === "unknown" ? <p role="status">The sign-in state could not be checked. Try returning to this window again.</p> : null}
     </div>;
   }
@@ -120,6 +127,7 @@ export function ChartAuthActions({
           <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
             Sign in to add it to research
           </Button>
+          {insightContext ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to add an insight</Button> : null}
         </div>
         {pending ? (
           <p role="status" className="text-ui leading-ui text-text-secondary">

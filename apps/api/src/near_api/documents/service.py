@@ -43,11 +43,14 @@ with a typed reason, never a silent substitution):
 - evidence ``citation`` targets must reference a public immutable artifact;
 - Top-level ``observed_contexts`` are compared with server-resolved pins.
   Unchanged chart contexts carry forward verbatim after verification.
+- new insight pins are verified against immutable chart inputs, and existing
+  insight contexts change only through an explicit replacement.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import Connection, Engine, insert, select, update
@@ -61,7 +64,12 @@ from near_api.db.security import (
     principal_transaction,
     scoped_page,
 )
-from near_api.documents.context_resolver import require_approved_dataset, resolve_revision_contexts
+from near_api.documents.context_resolver import (
+    require_approved_dataset,
+    resolve_revision_contexts,
+    same_chart_pins,
+    verify_chart_context,
+)
 from near_api.documents.projections import build_projections, write_projections
 from near_api.documents.schema import (
     MAX_TITLE_CHARS,
@@ -69,6 +77,7 @@ from near_api.documents.schema import (
     CanonicalDocument,
     DocumentSchemaError,
     ReferenceInvalid,
+    canonical_context_json,
     empty_document,
     parse_document,
 )
@@ -185,23 +194,43 @@ def save_revision_in_transaction(connection: Connection, principal: Principal,
                                  observed_contexts: list[ResolvedContext | dict] | None = None,
                                  ) -> DocumentDetail:
     """Transaction-scoped :func:`save_revision` (used by the idempotent save)."""
+    document, previous = lock_current_revision(
+        connection, principal, document_id, expected_revision=expected_revision)
+    return save_locked_revision(
+        connection, principal, document, previous, document_payload,
+        observed_contexts=observed_contexts)
+
+
+def lock_current_revision(connection: Connection, principal: Principal, document_id: UUID,
+                          *, expected_revision: int) -> tuple[DocumentRow, DocumentVersionRow]:
+    """Lock the verified owner's document and check CAS before editing its content."""
     if isinstance(expected_revision, bool) or not isinstance(expected_revision, int) \
             or expected_revision < 1:
         raise DocumentSchemaError("If-Match must be the quoted current revision",
                                   [("If-Match", "invalid_revision")])
-    if observed_contexts is None:
-        observed_contexts = []
-    if not isinstance(observed_contexts, list):
-        raise DocumentSchemaError("observed_contexts must be an array",
-                                  [("observed_contexts", "must_be_array")])
     document = _locked_document(connection, principal, document_id)
     if document.revision != expected_revision:
         raise RevisionConflict(document.revision)
     if document.current_version_id is None:
         raise ValueError(f"Document {document.id} has no current revision")
+    return document, _version_row(connection, document.current_version_id)
+
+
+def save_locked_revision(connection: Connection, principal: Principal, document: DocumentRow,
+                         previous: DocumentVersionRow, document_payload: dict, *,
+                         observed_contexts: list[ResolvedContext | dict] | None = None,
+                         replace_insight_context_id: UUID | None = None) -> DocumentDetail:
+    """Validate and commit a complete revision after :func:`lock_current_revision`."""
+    if observed_contexts is None:
+        observed_contexts = []
+    if not isinstance(observed_contexts, list):
+        raise DocumentSchemaError("observed_contexts must be an array",
+                                  [("observed_contexts", "must_be_array")])
     canonical = parse_document(document_payload)
+    if canonical.insights:
+        canonical = _prepare_insights(connection, canonical, previous,
+                                      replace_context_id=replace_insight_context_id)
     _validate_database_references(connection, canonical)
-    previous = _version_row(connection, document.current_version_id)
     resolved_contexts = resolve_revision_contexts(
         connection, canonical, previous, observed_contexts=observed_contexts)
     return _commit_new_revision(connection, principal, document, canonical=canonical,
@@ -453,6 +482,57 @@ def _validate_database_references(connection: Connection,
                     [("content", "dangling_citation_target")])
 
 
+def _prepare_insights(connection: Connection, canonical: CanonicalDocument,
+                      previous: DocumentVersionRow, *,
+                      replace_context_id: UUID | None) -> CanonicalDocument:
+    """Author timestamps and verify new pins on every document save path."""
+    prior_by_id = {
+        node["attrs"]["insight_id"]: node["attrs"]
+        for node in previous.content.get("content", ())
+        if node["type"] == "insight"
+    }
+    content = list(canonical.canonical["content"])
+    now = datetime.now(UTC)
+    timestamp = now.isoformat()
+    replacement_id = str(replace_context_id)
+    for position, node in enumerate(content):
+        if node["type"] != "insight":
+            continue
+        attrs = dict(node["attrs"])
+        insight_id = attrs["insight_id"]
+        prior = prior_by_id.get(insight_id)
+        if prior is not None and prior["block_id"] != attrs["block_id"]:
+            raise ReferenceInvalid("An existing insight keeps its block_id",
+                                   [("block_id", "insight_block_mismatch")])
+        if (prior is not None and attrs["context"] != prior["context"]
+                and "chart_definition_version_id" in prior["context"]
+                and "chart_definition_version_id" in attrs["context"]
+                and same_chart_pins(ResolvedContext.model_validate(attrs["context"]),
+                                    ResolvedContext.model_validate(prior["context"]))):
+            attrs["context"] = prior["context"]
+        if prior is None or attrs["context"] != prior["context"]:
+            if prior is not None and insight_id != replacement_id:
+                raise ReferenceInvalid(
+                    "Changing an insight context requires an explicit insight edit",
+                    [("context", "insight_context_immutable")])
+            if "chart_definition_version_id" not in attrs["context"]:
+                raise ReferenceInvalid("New insight contexts must reference a chart",
+                                       [("context", "reference_unavailable")])
+            verified = verify_chart_context(
+                connection, ResolvedContext.model_validate(attrs["context"]), resolved_at=now)
+            attrs["context"] = canonical_context_json(verified.model_dump(mode="json"))
+        if prior is None:
+            attrs.update(authored_at=timestamp, modified_at=timestamp)
+        else:
+            attrs.update(authored_at=prior["authored_at"], modified_at=prior["modified_at"])
+            if attrs != prior:
+                attrs["modified_at"] = timestamp
+        content[position] = {**node, "attrs": attrs}
+    if content == canonical.canonical["content"]:
+        return canonical
+    return parse_document({**canonical.canonical, "content": content})
+
+
 __all__ = [
     "DocumentDetail",
     "RevisionConflict",
@@ -463,8 +543,10 @@ __all__ = [
     "get_document_version",
     "list_document_details",
     "list_document_versions",
+    "lock_current_revision",
     "rename_document",
     "require_approved_dataset",
+    "save_locked_revision",
     "save_revision",
     "save_revision_in_transaction",
 ]

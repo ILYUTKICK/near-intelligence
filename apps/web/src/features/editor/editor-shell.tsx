@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { canonicalToTiptapDoc } from "./serialize";
 import { ChartEditorProvider, type ChartObservation } from "./blocks/chart-context";
-import { inspectionKey } from "./blocks/live-chart";
+import { inspectionKey } from "@/features/charts/renderer/observation-context";
 import { EDITOR_EXTENSIONS } from "./extensions";
 import { deriveOutline, type OutlineEntry } from "./outline";
 import {
@@ -59,6 +59,8 @@ import {
   getDocument,
 } from "@/features/documents/list/documents-api";
 import { DOCUMENT_TITLE_MAX_LENGTH } from "@/features/documents/list/documents-schema";
+import { EditorInsightDialog, type InsightAction, type InsightIntent } from "./insights/editor-dialog";
+import type { InsightSave } from "./insights/api";
 
 /**
  * The three-pane research editor workbench (NI-039):
@@ -110,6 +112,8 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   const [conflictDismissedAt, setConflictDismissedAt] = useState<string | null>(null);
   const [conflictBusy, setConflictBusy] = useState(false);
   const [conflictActionError, setConflictActionError] = useState<string | null>(null);
+  const [insightIntent, setInsightIntent] = useState<InsightIntent | null>(null);
+  const insightTrigger = useRef<HTMLElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const paperRef = useRef<HTMLDivElement>(null);
   const observations = useRef(new Map<string, ChartObservation>());
@@ -174,7 +178,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   }, [editor]);
 
   const [outline, setOutline] = useState<OutlineEntry[]>([]);
-  const [hasCharts, setHasCharts] = useState(content.content.some(block => block.type === "liveChart"));
+  const [hasEvidenceActions, setHasEvidenceActions] = useState(content.content.some(block => block.type === "liveChart" || block.type === "insight"));
   const [blockCount, setBlockCount] = useState(content.content.length);
   const [currentBlock, setCurrentBlock] = useState<CurrentBlock | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -213,12 +217,13 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   // Manual save (button and Mod+S): during a conflict the button reopens the
   // explicit resolution dialog instead of racing another 409.
   const handleSaveNow = useCallback(() => {
+    if (insightIntent) return;
     if (controller.status.kind === "conflict") {
       setConflictDismissedAt(null);
       return;
     }
     controller.saveNow();
-  }, [controller]);
+  }, [controller, insightIntent]);
 
   // Mod+S inside the research editor claims the browser save shortcut for
   // the document save (standard editor behavior; the listener lives on the
@@ -358,20 +363,19 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
 
   // -- editor state derivation (doc + selection driven) --------------------- //
 
+  const refreshDoc = useCallback((current: Editor, contentChanged: boolean) => {
+    const document = current.getJSON();
+    setOutline(deriveOutline(document));
+    setHasEvidenceActions(document.content?.some(block => block.type === "liveChart" || block.type === "insight") ?? false);
+    setBlockCount(current.state.doc.childCount);
+    setCurrentBlock(currentTopLevelBlock(current));
+    if (contentChanged) onEditorChanged();
+  }, [onEditorChanged]);
+
   useEffect(() => {
     if (!editor) {
       return;
     }
-    const refreshDoc = (contentChanged: boolean) => {
-      const currentDocument = editor.getJSON();
-      setOutline(deriveOutline(currentDocument));
-      setHasCharts(currentDocument.content?.some(block => block.type === "liveChart") ?? false);
-      setBlockCount(editor.state.doc.childCount);
-      setCurrentBlock(currentTopLevelBlock(editor));
-      if (contentChanged) {
-        onEditorChanged();
-      }
-    };
     const refreshSelection = () => {
       setCurrentBlock(currentTopLevelBlock(editor));
       // Typing away from the trigger closes the slash menu (a new keystroke
@@ -381,15 +385,64 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
     // The initial derivation is NOT a content change: the editor holds the
     // loaded baseline (adoptBaseline adopts it), and marking it dirty would
     // schedule a phantom save.
-    refreshDoc(false);
-    const onUpdate = () => refreshDoc(true);
+    let active = true;
+    queueMicrotask(() => { if (active) refreshDoc(editor, false); });
+    const onUpdate = () => refreshDoc(editor, true);
     editor.on("update", onUpdate);
     editor.on("selectionUpdate", refreshSelection);
     return () => {
+      active = false;
       editor.off("update", onUpdate);
       editor.off("selectionUpdate", refreshSelection);
     };
-  }, [editor, onEditorChanged]);
+  }, [editor, refreshDoc]);
+
+  const openInsight = useCallback((action: InsightAction) => {
+    const current = editorRef.current;
+    if (!current || !controller.isClean(controller.revision) || controller.draft) return;
+    const snapshot = canonicalSnapshot(current);
+    const selected = snapshot.content.find(block => block.attrs.block_id === action.blockId);
+    if (selected?.type !== (action.kind === "create" ? "liveChart" : "insight")) return;
+    insightTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setInsightIntent({ action, content: snapshot, revision: controller.revision });
+  }, [controller]);
+
+  const adoptInsightPaper = useCallback((savedContent: CanonicalDocument, revision: number, savedAt: string) => {
+    const current = editorRef.current;
+    if (!current || !insightIntent || !controller.isClean(insightIntent.revision) || controller.draft
+      || JSON.stringify(canonicalSnapshot(current)) !== JSON.stringify(insightIntent.content)) return false;
+    if (!current.chain().setMeta("addToHistory", false).setContent(canonicalToTiptapDoc(savedContent), { emitUpdate: false }).run()) {
+      throw new Error("The saved revision could not be loaded into the editor.");
+    }
+    refreshDoc(current, false);
+    controller.adoptServerState(revision, savedAt);
+    return true;
+  }, [controller, insightIntent, refreshDoc]);
+
+  const acceptInsightSave = useCallback((result: InsightSave) => {
+    if (!insightIntent) return;
+    const savedContent = validateCanonicalDocument(result.version.content);
+    if (!adoptInsightPaper(savedContent, result.version.revision, result.document.updated_at)) {
+      announce("Insight change saved on the server. Your local edits are still in the editor. Resolve the revision conflict to load the saved change.");
+    } else {
+      announce(insightIntent.action.kind === "delete" ? "Insight deleted from this revision." : "Insight saved with its pinned context.");
+    }
+    setInsightIntent(null);
+  }, [adoptInsightPaper, announce, insightIntent]);
+
+  const reloadInsightPaper = useCallback((content: CanonicalDocument, revision: number, savedAt: string) => {
+    if (!insightIntent || !adoptInsightPaper(content, revision, savedAt)) {
+      throw new Error("Local edits are still in the editor. Save them before reopening this form.");
+    }
+    setInsightIntent({ ...insightIntent, content, revision });
+    announce("Loaded the current revision. Review the retained insight draft before saving.");
+  }, [adoptInsightPaper, announce, insightIntent]);
+
+  const restoreInsightFocus = useCallback(() => {
+    const trigger = insightTrigger.current;
+    if (trigger?.isConnected) trigger.focus();
+    else editorRef.current?.view.focus();
+  }, []);
 
   // -- bridges (node views / keyboard -> shell, via bubbling DOM events) ---- //
 
@@ -557,6 +610,8 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   const displayedUpdatedAt = savedAt ?? updatedAt;
 
   return (
+    <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasEvidenceActions} saved={controller.status.kind === "clean"}
+      revision={controller.revision} onObserve={recordObservation} onInsightAction={controller.draft ? undefined : openInsight}>
     <div className="flex flex-col gap-4" data-testid="editor-workbench">
       <p aria-live="polite" role="status" data-testid="editor-announcement" className="sr-only">
         {announcement}
@@ -710,10 +765,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
         <section data-pane="paper" className="min-w-0">
           <div ref={paperRef} className="relative rounded-surface border border-border bg-surface p-6">
             {editor ? (
-              <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasCharts} saved={controller.status.kind === "clean"}
-                revision={controller.revision} onObserve={recordObservation}>
-                <EditorContent editor={editor} />
-              </ChartEditorProvider>
+              <EditorContent editor={editor} />
             ) : (
               <div className="flex flex-col gap-3" role="status" aria-label="Loading editor">
                 <Skeleton className="h-8 w-2/3" />
@@ -814,7 +866,10 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
         onDownloadLocalCopy={handleDownloadLocalCopy}
         onSaveAsNewCopy={() => void handleConflictNewCopy()}
       />
+      {insightIntent ? <EditorInsightDialog intent={insightIntent} onClose={() => setInsightIntent(null)}
+        onSaved={acceptInsightSave} onReload={reloadInsightPaper} restoreFocus={restoreInsightFocus} /> : null}
     </div>
+    </ChartEditorProvider>
   );
 }
 

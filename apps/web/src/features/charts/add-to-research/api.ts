@@ -6,10 +6,10 @@ export type InsertChartInput = components["schemas"]["ChartBlockInsertRequest"];
 const resultSchema: z.ZodType<components["schemas"]["ChartBlockMutationResponse"]> = z.object({
   document: documentSummarySchema, value: z.object({ block_id: z.uuid() }),
 });
-export async function insertChart(documentId: string, revision: number, input: InsertChartInput, key: string) {
+export async function insertChart(documentId: string, revision: number, input: InsertChartInput, key: string, signal?: AbortSignal) {
   const response = await privateFetch(`/api/documents/${documentId}/chart-blocks`, {
     method: "POST", headers: { "content-type": "application/json", "if-match": `"${revision}"`, "idempotency-key": key },
-    body: JSON.stringify(input),
+    body: JSON.stringify(input), signal,
   });
   if (!response.ok) throw new Error(response.status === 409
     ? "The research changed. Confirm again to append to its current revision; existing work will be retained."

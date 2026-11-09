@@ -252,6 +252,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{document_id}/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List insights in a current or historical owned document revision */
+        get: operations["listDocumentInsights"];
+        put?: never;
+        /** Add an inspected chart insight to an owned document */
+        post: operations["createDocumentInsight"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/insights/{insight_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an insight with explicitly confirmed evidence cleanup */
+        delete: operations["deleteDocumentInsight"];
+        options?: never;
+        head?: never;
+        /** Edit an insight in the current owned document revision */
+        patch: operations["updateDocumentInsight"];
+        trace?: never;
+    };
     "/api/documents/{document_id}/versions": {
         parameters: {
             query?: never;
@@ -1449,7 +1485,7 @@ export interface components {
              */
             block_id: string;
             /** Body */
-            body: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList"])[];
+            body: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList-Output"])[];
             /**
              * Classification
              * @enum {string}
@@ -1479,6 +1515,53 @@ export interface components {
              * @enum {string}
              */
             type: "observation" | "hypothesis" | "risk" | "conclusion";
+        };
+        /**
+         * InsightCreateRequest
+         * @description Create a chart insight, optionally inserting it after a current block.
+         */
+        InsightCreateRequest: {
+            /** After Block Id */
+            after_block_id?: string | null;
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /** Body */
+            body: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList-Input"])[];
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "supporting" | "contradicting" | "uncertain";
+            context: components["schemas"]["ResolvedContext"];
+            /** Hypothesis Id */
+            hypothesis_id?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "observation" | "hypothesis" | "risk" | "conclusion";
+        };
+        /** InsightDeleteRequest */
+        InsightDeleteRequest: {
+            /** Remove Evidence Links */
+            remove_evidence_links: boolean;
+        };
+        /** InsightDeleteResponse */
+        InsightDeleteResponse: {
+            document: components["schemas"]["DocumentSummary"];
+            value: components["schemas"]["InsightDeleteValue"];
+            version: components["schemas"]["VersionDetailResponse"];
+        };
+        /** InsightDeleteValue */
+        InsightDeleteValue: {
+            /**
+             * Deleted Id
+             * Format: uuid
+             */
+            deleted_id: string;
         };
         /**
          * InsightInput
@@ -1515,6 +1598,34 @@ export interface components {
              * @enum {string}
              */
             type: "observation" | "hypothesis" | "risk" | "conclusion";
+        };
+        /** InsightMutationResponse */
+        InsightMutationResponse: {
+            document: components["schemas"]["DocumentSummary"];
+            value: components["schemas"]["Insight"];
+            version: components["schemas"]["VersionDetailResponse"];
+        };
+        /**
+         * InsightPatchRequest
+         * @description Omission keeps a field. A null hypothesis_id removes the association.
+         */
+        InsightPatchRequest: {
+            /** Body */
+            body?: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList-Input"])[];
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification?: "supporting" | "contradicting" | "uncertain";
+            /** Context */
+            context?: components["schemas"]["ResolvedContext"];
+            /** Hypothesis Id */
+            hypothesis_id?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type?: "observation" | "hypothesis" | "risk" | "conclusion";
         };
         /**
          * LimitationsResponse
@@ -1967,6 +2078,26 @@ export interface components {
              */
             type: "bullet_list" | "ordered_list";
         };
+        /** RichTextList */
+        "RichTextList-Input": {
+            /** Content */
+            content: components["schemas"]["RichTextListItem-Input"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bullet_list" | "ordered_list";
+        };
+        /** RichTextList */
+        "RichTextList-Output": {
+            /** Content */
+            content: components["schemas"]["RichTextListItem-Output"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bullet_list" | "ordered_list";
+        };
         /**
          * RichTextListItem
          * @description One list item. The canonical parser enforces the ordering rule (a nested
@@ -1976,6 +2107,36 @@ export interface components {
         RichTextListItem: {
             /** Content */
             content: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList"])[];
+            /**
+             * Type
+             * @constant
+             */
+            type: "list_item";
+        };
+        /**
+         * RichTextListItem
+         * @description One list item. The canonical parser enforces the ordering rule (a nested
+         *     list must follow a paragraph) and the depth <= 3 bound before these shapes
+         *     are constructed.
+         */
+        "RichTextListItem-Input": {
+            /** Content */
+            content: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList-Input"])[];
+            /**
+             * Type
+             * @constant
+             */
+            type: "list_item";
+        };
+        /**
+         * RichTextListItem
+         * @description One list item. The canonical parser enforces the ordering rule (a nested
+         *     list must follow a paragraph) and the depth <= 3 bound before these shapes
+         *     are constructed.
+         */
+        "RichTextListItem-Output": {
+            /** Content */
+            content: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList-Output"])[];
             /**
              * Type
              * @constant
@@ -3223,6 +3384,349 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listDocumentInsights: {
+        parameters: {
+            query?: {
+                version_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Insight"][];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createDocumentInsight: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InsightCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightMutationResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteDocumentInsight: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                insight_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InsightDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightDeleteResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision, idempotency or linked-evidence conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateDocumentInsight: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                insight_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InsightPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightMutationResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };

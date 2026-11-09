@@ -1451,7 +1451,13 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-046, NI-040, NI-043
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** Codex `/root`, chat `01a1bd1f-f988-7c82-9339-80fb05e336c0`
+- **Execution role:** B with A editor handoff
+- **Started at:** 2026-11-09T11:47:38+03:00
+- **Branch/worktree:** `feat/ni-047-chart-insights`, `D:/хахатон/near-intelligence`
+- **Dependency verification:** NI-046, NI-040 and NI-043 are DONE on `origin/main` (`a7fa401`). No open PR or active NI-047 claim at selection.
+- **Handoff:** Codex `/root/ni047` implemented the B insight service and DB tests. Codex `/root` implemented the A editor and public chart forms, generated client, gateway and production HTTP check.
 
 **Description:** Allow observations/risks/conclusions to survive chart refresh and document reopen.
 
@@ -1462,6 +1468,14 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 **Acceptance criteria:** An insight stays tied to original data after live refresh; saves update canonical JSON/projections atomically; owner and revision checked.
 
 **Testing requirements:** Create/edit/reopen after new dataset; Bob reference denial; deleting linked insight with/without cleanup;409 conflict.
+
+- **Result:** Add Insight works from the editor and the public chart destination picker. The API verifies the pinned chart observation, writes canonical content and projections atomically, and exposes owned current and historical reads. An edit keeps the original evidence context. Deletion with linked evidence requires explicit cleanup. The editor retains a draft across a stale revision and reloads for review only when the target still matches.
+- **Verification:** The native PostgreSQL 18.6 `--suite insights` run passed 66 tests with synthetic fixtures (13 Home, 29 documents, 19 insight contracts and 5 insight DB tests). Cases include republishing and refreshing around an anchored save, pinned historical reads, invalid pins, Bob ownership/reference checks, replay, stale CAS, linked deletion, and a legacy duplicate followed by a prose save. The offline affected contract run passed 41 tests.
+- **CI verification:** All three jobs passed on `9cc4267`. Web ran 436 tests across 39 files and passed strict types, lint and the production build. The disposable PostgreSQL job passed 423 checks across the full, Landing and chart-insertion runs. The production gateway test covers insight create, edit and historical read after republishing, plus Bob denial. The API job verified generated OpenAPI and TypeScript. [CI run](https://github.com/ILYUTKICK/near-intelligence/actions/runs/42594687361)
+- **Reviewer:** Codex `/root` reviewed the B implementation and verified the conversion pin rule. Codex `/root/ni047` independently reviewed the web handoff and rechecked the recovery-draft gate, stale revision recovery, removed-hypothesis notice and save-race guards.
+- **Verification limits:** Windows App Control blocked native Turbopack. Local Vitest stalled on the insight and existing autosave runs, and the isolated Webpack dev stack timed out on the existing saved-chart page before the browser handoff. Browser visual evidence is unavailable. The Linux production HTTP and web interaction checks passed.
+- **Completed at:** 2026-11-09T12:45:06+03:00
+- **Delivery:** [PR #73](https://github.com/ILYUTKICK/near-intelligence/pull/73) targets `main` and awaits owner merge.
 
 ### NI-048 — Implement hypothesis blocks and assessments
 

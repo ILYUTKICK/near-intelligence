@@ -184,7 +184,7 @@ def require_approved_dataset(connection: Connection, dataset_version_id: UUID,
             [(path, "dangling_dataset_reference")])
 
 
-def _same_pins(observed: ResolvedContext, expected: ResolvedContext) -> bool:
+def same_chart_pins(observed: ResolvedContext, expected: ResolvedContext) -> bool:
     # resolved_at records a server decision. Ordering metric IDs does not
     # change the selection or canonical context hash.
     return (
@@ -195,6 +195,27 @@ def _same_pins(observed: ResolvedContext, expected: ResolvedContext) -> bool:
         and observed.renderer_version == expected.renderer_version
         and sorted(observed.metric_definition_versions) == sorted(expected.metric_definition_versions)
     )
+
+
+def verify_chart_context(connection: Connection, observed: ResolvedContext,
+                         *, resolved_at: datetime) -> ResolvedContext:
+    """Verify a submitted inspection against the exact immutable chart inputs."""
+    definition = load_chart_definition(connection, observed.chart_definition_version_id,
+                                       error_path="context.chart_definition_version_id")
+    selection = observed.selection
+    validate_selection_against_definition(definition, selection.start, selection.end,
+                                          selection.filters)
+    require_approved_dataset(connection, observed.dataset_version_id,
+                             "context.dataset_version_id")
+    require_metric_coverage(connection, definition, observed.dataset_version_id,
+                            error_path="context.dataset_version_id")
+    expected = build_resolved_context(definition, observed.dataset_version_id,
+                                      selection, resolved_at=resolved_at)
+    if not same_chart_pins(observed, expected):
+        raise ReferenceInvalid(
+            "The inspected context disagrees with its immutable chart pins",
+            [("context", "chart_context_mismatch")])
+    return expected
 
 
 def resolve_revision_contexts(connection: Connection, canonical: CanonicalDocument,
@@ -251,7 +272,7 @@ def resolve_revision_contexts(connection: Connection, canonical: CanonicalDocume
         if previous_charts.get(chart.block_id) == chart and block_id in previous_contexts:
             prior = previous_contexts[block_id]
             try:
-                compatible = _same_pins(ResolvedContext.model_validate(prior), expected)
+                compatible = same_chart_pins(ResolvedContext.model_validate(prior), expected)
             except ValidationError:
                 compatible = False
             if not compatible:
@@ -270,7 +291,7 @@ def resolve_revision_contexts(connection: Connection, canonical: CanonicalDocume
             raise DocumentSchemaError("Invalid observed chart context",
                                       [(path, "invalid_context")]) from None
         expected = expected_by_hash.get(observed.context_hash)
-        if expected is None or not _same_pins(observed, expected):
+        if expected is None or not same_chart_pins(observed, expected):
             raise ReferenceInvalid(
                 "The observed context does not match a chart's immutable definition, "
                 "dataset, selection and version pins in this revision",
@@ -320,7 +341,7 @@ def reconstruct_revision_chart(connection: Connection, version: DocumentVersionR
                                           selection, resolved_at=context.resolved_at)
     except (DocumentSchemaError, DeliveryInvalidFilter, ValidationError):
         raise ReconstructionError("pinned_definition_unavailable") from None
-    if not _same_pins(context, expected):
+    if not same_chart_pins(context, expected):
         raise ReconstructionError("chart_context_mismatch")
     try:
         view = delivery.build_chart_view(

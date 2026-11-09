@@ -42,7 +42,8 @@ export interface DocumentSaveController {
   /** Explicit conflict resolution (dialog action) against the server revision. */
   overwriteConflict(revision: number): void;
   /** Adopts the editor content as the acknowledged server state. */
-  adoptServerState(revision: number): void;
+  adoptServerState(revision: number, savedAt?: string): void;
+  isClean(expectedRevision: number): boolean;
   /** Captures the current editor content for download / new-copy actions. */
   captureLocal(): SaveRequestBody;
   draft: DraftOffer | null;
@@ -215,12 +216,16 @@ export function useDocumentSave(options: UseDocumentSaveOptions): DocumentSaveCo
   );
 
   const adoptServerState = useCallback(
-    (revision: number) => {
-      coordinator.adoptServerState(revision);
+    (revision: number, savedAt?: string) => {
+      coordinator.adoptServerState(revision, savedAt);
       setDraft(null);
     },
     [coordinator],
   );
+  const isClean = useCallback((expectedRevision: number) => {
+    const status = coordinator.getStatus();
+    return status.kind === "clean" && status.revision === expectedRevision;
+  }, [coordinator]);
 
   const captureLocal = useCallback(() => coordinator.captureLocal(), [coordinator]);
 
@@ -248,6 +253,7 @@ export function useDocumentSave(options: UseDocumentSaveOptions): DocumentSaveCo
       retry,
       overwriteConflict,
       adoptServerState,
+      isClean,
       captureLocal,
       draft,
       restoreDraft,
@@ -261,6 +267,7 @@ export function useDocumentSave(options: UseDocumentSaveOptions): DocumentSaveCo
       retry,
       overwriteConflict,
       adoptServerState,
+      isClean,
       captureLocal,
       draft,
       restoreDraft,

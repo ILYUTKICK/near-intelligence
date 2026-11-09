@@ -182,13 +182,40 @@ class ChartInsertionHTTPE2E(gateway_fixture.SavedChartsHTTPE2E):
         self.assertEqual(final["resolved_contexts"][block["attrs"]["block_id"]], refreshed_context)
         self.assertEqual(client.get(path + "/versions/" + revision_two_id).json()["resolved_contexts"][block["attrs"]["block_id"]], context)
         self.assertEqual(client.get("/workspace/research/" + document["id"]).status_code, 200)
+
+        # NI-047 uses the same verified gateway and exact saved chart context.
+        insights = path + "/insights"
+        note_id = str(uuid4())
+        headers.update({"If-Match": '"6"', "Idempotency-Key": str(uuid4())})
+        note = {"block_id": note_id, "after_block_id": block["attrs"]["block_id"],
+                "type": "observation", "classification": "uncertain", "context": refreshed_context,
+                "body": [{"type": "paragraph", "content": [{"type": "text", "text": "Synthetic gateway insight"}]}]}
+        written = client.post(insights, json=note, headers=headers)
+        self.assertEqual(written.status_code, 201, written.text)
+        acknowledged = written.json()
+        saved_note = acknowledged["value"]
+        self.assertEqual(saved_note["context"]["context_hash"], refreshed_context["context_hash"])
+        self.assertEqual(saved_note["context"]["dataset_version_id"], refreshed_context["dataset_version_id"])
+        self.assertEqual(acknowledged["version"]["content"]["content"][1]["attrs"]["block_id"], note_id)
+        self.assertEqual(client.get(insights).json(), [saved_note])
+        self.assertEqual(client.get(insights, params={"version_id": revision_two_id}).json(), [])
+        note_path = f"{insights}/{saved_note['id']}"
+        headers.update({"If-Match": '"7"', "Idempotency-Key": str(uuid4())})
+        amended = client.patch(note_path, json={"classification": "contradicting"}, headers=headers)
+        self.assertEqual(amended.status_code, 200, amended.text)
+        self.assertEqual(amended.json()["value"]["context"], saved_note["context"])
+        self.assertEqual(amended.json()["value"]["classification"], "contradicting")
+
         client.cookies.set("ni_session", session_cookie("bob"))
         self.assertEqual(client.get(path).status_code, 404)
         self.assertEqual(client.post(path + "/chart-blocks", json=payload, headers=headers).status_code, 404)
         self.assertEqual(client.get(chart_path, params=query).status_code, 404)
         self.assertEqual(client.get(historical + "/view").status_code, 404)
         self.assertEqual(client.get(historical + "/csv").status_code, 404)
+        self.assertEqual(client.get(insights).status_code, 404)
+        self.assertEqual(client.patch(note_path, json={"classification": "supporting"}, headers=headers).status_code, 404)
         denied_save = client.post(path + "/versions", json=edit_body, headers=headers)
         self.assertEqual(denied_save.status_code, 404, denied_save.text)
-        print("NI-041/042/043 gateway E2E: insert/retry, observed save after publication, "
-              "identical old view/CSV, explicit refresh, chart outage + prose save, Bob denied", flush=True)
+        print("NI-041/042/043/047 gateway E2E: insert/retry, observed save after publication, "
+              "identical old view/CSV, pinned insight create/edit/history, explicit refresh, "
+              "chart outage + prose save, Bob denied", flush=True)

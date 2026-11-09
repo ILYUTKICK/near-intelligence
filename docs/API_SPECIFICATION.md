@@ -233,16 +233,16 @@ headers and a `content_sha256` ETag; latest pointers with `max-age=60`.
 
 ## Insights, hypotheses and evidence
 
-Implemented contracts (NI-046, routes pending): `apps/api/src/near_api/insights/schemas.py` implements the `InsightInput`/`Insight`, `HypothesisInput`/`Hypothesis`, `EvidenceInput`/`Evidence` and `RiskInput` models below (plus frozen `ResolvedContext`/`ModelContext` and the typed rich-text shapes) and publishes them in the OpenAPI `components` so the generated TypeScript client already carries the validation types; the convenience routes themselves arrive with NI-047/NI-048/NI-049 and must reuse these models. Fixed rules already enforced at the contract boundary: input models carry no `authored_at`/`modified_at` (server authors timestamps; unknown fields — including client timestamps and `owner_id`/`user_id` — are rejected 422), response models add `id`/`document_id` plus UTC-normalized server timestamps, insight/hypothesis bodies are bounded sanitized rich text (max 10k plain-text-equivalent characters, canonical editor grammar via `documents/schema`), and contexts are the frozen inspection records with selected range/filters/dataset pin/stable ids exactly as the reusable schemas table defines.
+NI-046 defines the annotation contracts in `apps/api/src/near_api/insights/schemas.py`. NI-047 implements the insight routes and generates their TypeScript contracts from OpenAPI. NI-048 and NI-049 cover hypothesis and evidence mutations. Inputs reject owner fields and author timestamps. Responses add stable IDs and server-authored UTC timestamps. The canonical editor grammar validates rich-text bodies up to 10,000 plain-text characters.
 
 These are convenience operations on the current document JSON; all writes require If-Match and return a new document revision. Stable IDs persist across versions; GET can take `version_id` for historical views. PATCH schemas are partial corresponding Input schemas, with required final-state validation.
 
 | Method/path | Request → response | Auth / authorization | Errors |
 | --- | --- | --- | --- |
 | GET `/documents/{id}/insights` | `version_id?` → Insight list | Parent owner and version parent | 404 |
-| POST `/documents/{id}/insights` | InsightInput → 201 MutationResult<Insight> | Parent owner, block and context permitted | 404/409/422/428 |
-| PATCH `/documents/{id}/insights/{insightId}` | partial InsightInput → MutationResult<Insight> | Same doc current projection; preserve original authored_at | 404/409/422/428 |
-| DELETE `/documents/{id}/insights/{insightId}` | `{remove_evidence_links:boolean}` → MutationResult<`{deleted_id}`> | Parent owner; false with references→409 | 404/409/428 |
+| POST `/documents/{id}/insights` | `InsightCreateRequest` → 201 `InsightMutationResponse` | Owner, verified chart pin and optional same-revision insertion anchor | 404/409/422/428 |
+| PATCH `/documents/{id}/insights/{insightId}` | `InsightPatchRequest` → 200 `InsightMutationResponse` | Current owned insight and revision | 404/409/422/428 |
+| DELETE `/documents/{id}/insights/{insightId}` | `{remove_evidence_links:boolean}` → 200 `InsightDeleteResponse` | Owner and revision. Linked removal requires true | 404/409/422/428 |
 | GET `/documents/{id}/hypotheses` | `version_id?` → Hypothesis list | Parent owner | 404 |
 | POST `/documents/{id}/hypotheses` | HypothesisInput → 201 MutationResult<Hypothesis> | Parent owner, valid node | 404/409/422/428 |
 | PATCH `/documents/{id}/hypotheses/{hypothesisId}` | partial HypothesisInput → MutationResult<Hypothesis> | Parent owner | 404/409/422/428 |
@@ -253,6 +253,8 @@ These are convenience operations on the current document JSON; all writes requir
 | DELETE `/documents/{id}/evidence/{evidenceId}` | no body → MutationResult<`{deleted_id}`> | Parent owner | 404/409/428 |
 
 Hypothesis/Evidence responses add stable id, document_id, authored_at and modified_at to their Input schema. Create with an existing block ID converts/updates the selected node after explicit client confirmation; otherwise client supplies a new UUID and the service inserts a block. Rich text body cannot contain arbitrary HTML/scripts. Insight context is immutable unless an explicit replacement context is submitted and displayed as a new revision.
+
+NI-047 insight writes use the quoted `If-Match` revision and accept an `Idempotency-Key` scoped to the verified owner, operation and concrete document path. The response returns the acknowledged `document`, immutable `version` and `value`. A chart anchor must match the saved chart's definition, dataset and selection. A public inspection can append to an owned document without an anchor. The server verifies the exact approved context and records its own timestamp. PATCH preserves the original context unless it supplies an explicit verified replacement. DELETE with linked evidence returns `409 REFERENCE_IN_USE` until cleanup is confirmed. All reads use `no-store` and return the same 404 for missing and foreign nested IDs.
 
 ## Snapshots, models and public research
 

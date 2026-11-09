@@ -10,6 +10,7 @@ import type { ChartDefinitionResponse, ChartViewResponse } from "@/features/char
 
 import { filterEnumOptions, filterLabel } from "./filter-controls";
 import { ChartAuthActions } from "./ChartAuthActions";
+import { chartObservation } from "../renderer/observation-context";
 import {
   detailHrefFor,
   isIsoCalendarDate,
@@ -178,6 +179,7 @@ export function ChartDetailClient({
               chartTitle={definition.title}
               saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
                 selection: { ...view.selection, filters: selection.filters }, dataset_version_id: view.dataset.id, mode: "live" } : undefined}
+              insightContext={view ? chartObservation(view) : undefined}
               basePath={`${basePath}/`}
             />
           </div>
