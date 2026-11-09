@@ -60,6 +60,23 @@ Tests run in isolated temp DB/storage/auth accounts. No tests mutate legacy rese
 
 NI-042 extends the existing `--chart-insertion-http` production integration with the owner-scoped chart-view query, exact old-pin values/hash, explicit range/filter save/reopen and replay, latest preview/adoption, old revision invariance, stale CAS, chart-delivery outage with successful prose save, and Bob denial. Web regressions exercise the actual Tiptap node, local drafts versus committed attrs, source-dialog focus return, a touch-pointer press/release activating Apply on the actual node, chart undo/redo with prose retained, late results after account/attribute changes, restored local chart drafts, and localized synchronous ECharts factory/setOption failures with table retention/retry. The node interaction test supplies only jsdom's missing Range geometry methods; it does not suppress thrown errors or claim real layout. [360px page-only Chrome evidence](qa/ni042-editor-chart-360.png) is synthetic and emulated, not a physical-phone release check.
 
+The "Full E2E" row is implemented (NI-063): `pnpm --filter web build` then
+`pnpm --filter web exec playwright test --config e2e/playwright.config.ts`
+(after `playwright install chromium`) runs `apps/web/e2e/research-workflow.spec.ts`
+at the documented 1440×900 desktop viewport. Its global setup boots the real
+stack from `apps/web/e2e/harness/` — a disposable loopback PostgreSQL 18 with
+the production roles, the real FastAPI gateway under the synthetic-ES256
+provider transport used by every production HTTP suite here, the production
+`next start` bundle, the real NI-058 export worker, and one approved synthetic
+dataset staged through the real NI-028 pipeline — and its teardown removes the
+cluster. The journey drives the actual browser through anonymous traces,
+sign-in continuation, save chart, document authoring, the source-outage branch
+and the export, verifies the downloaded ZIP (manifest hashes, research.md
+links, exact decimal CSV) against the `app.document_versions` row read from
+the disposable cluster, and repeats the private-resource denial for a second
+user. Only the provider JWKS transport is synthetic; the primary API is never
+mocked. CI runs the same journey in the `e2e` job of `.github/workflows/checks.yml`.
+
 ## Current user scope override — 8 November 2026
 
 Remaining QA targets desktop. The user excluded mobile development/adaptation and mobile, touch, phone and tablet QA to reduce execution cost. Do not repeat mobile viewport/device screenshots or checks mentioned in historical task evidence; existing tests/code remain intact. Desktop keyboard/accessibility, exact data, two-user isolation, persistence, frozen revisions and export verification remain required. Run focused checks for changes and required integration gates; repeat broad suites only after relevant source changes, failures or unresolved concerns.

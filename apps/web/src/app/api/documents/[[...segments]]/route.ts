@@ -7,6 +7,10 @@ async function handle(request: NextRequest, context: Context) {
   let allowed: string[] = [];
   const uuid = (value: string | undefined) => z.uuid().safeParse(value).success;
   const annotation = segments[1] === "insights" || segments[1] === "hypotheses" || segments[1] === "evidence";
+  // NI-058 export jobs: create (POST), owner poll (GET) and the ZIP download
+  // (GET .../download) — the same document-nested implemented paths the API
+  // serves; the download itself carries no query string.
+  const exportJob = segments[1] === "exports" && segments.length >= 3 && uuid(segments[2]);
   if (!segments.length) allowed = ["GET", "POST"];
   else if (uuid(segments[0])) {
     if (segments.length === 1) allowed = ["GET", "PATCH", "DELETE"];
@@ -17,6 +21,9 @@ async function handle(request: NextRequest, context: Context) {
     if (segments.length === 3 && annotation && uuid(segments[2])) allowed = ["PATCH", "DELETE"];
     if (segments.length === 2 && segments[1] === "evidence-targets") allowed = ["GET"];
     if (segments.length === 3 && segments[1] === "versions" && uuid(segments[2])) allowed = ["GET"];
+    if (segments.length === 2 && segments[1] === "exports") allowed = ["POST"];
+    if (exportJob && segments.length === 3) allowed = ["GET"];
+    if (exportJob && segments.length === 4 && segments[3] === "download") allowed = ["GET"];
     if (segments.length === 6 && segments[1] === "versions" && uuid(segments[2])
       && segments[3] === "chart-blocks" && uuid(segments[4])
       && (segments[5] === "view" || segments[5] === "csv")) {
