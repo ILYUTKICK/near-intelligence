@@ -1928,7 +1928,12 @@ Specification: [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 - **Priority:** P0
 - **Dependencies:** NI-058, NI-054, NI-015, NI-024
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-A coordinator (ZCode session, ILYUTKICK operator), NI-063 parallel dispatch — one subagent covers the A e2e zone and the required B API harness points per the 9 November 2026 parallel-dispatch/no-review instruction
+- **Execution role:** A + B in a single dispatch
+- **Started at:** 2026-11-10T00:16:38+03:00
+- **Branch/worktree:** feat/ni-063-research-workflow-e2e; /Users/ilyutkinn/Desktop/near-intelligence-b12 (worktree from origin/main 6c0aa2e)
+- **Dependency verification:** NI-058 DONE on main (merged PR #80, 6c0aa2e, tree verified); NI-054 DONE on main (PR #57); NI-015 DONE on main; NI-024 DONE on main (PR #70). No competing NI-063 claim and no open PR at session start.
 
 **Description:** Test the actual product outcome across browser, API, data and persistence.
 
