@@ -109,6 +109,9 @@ class ContractTests(TestCase):
                 "/api/model-definitions/{model_id}/readiness",
                 "/api/model-runs", "/api/model-runs/{run_id}",
                 "/api/model-runs/{run_id}/manifest",
+                "/api/documents/{document_id}/exports",
+                "/api/documents/{document_id}/exports/{job_id}",
+                "/api/documents/{document_id}/exports/{job_id}/download",
             })
             self.assertIn("DecimalString", schema["components"]["schemas"])
             self.assertFalse(schema["components"]["schemas"]["Selection"]["additionalProperties"])

@@ -130,7 +130,10 @@ class HomeContractTests(unittest.TestCase):
                                                 "/api/model-definitions/{model_id}/readiness",
                                                 "/api/model-runs",
                                                 "/api/model-runs/{run_id}",
-                                                "/api/model-runs/{run_id}/manifest"})
+                                                "/api/model-runs/{run_id}/manifest",
+                                                "/api/documents/{document_id}/exports",
+                                                "/api/documents/{document_id}/exports/{job_id}",
+                                                "/api/documents/{document_id}/exports/{job_id}/download"})
         self.assertEqual(schema["paths"]["/api/home"]["get"]["operationId"], "getWorkspaceHome")
         response_schema = schema["components"]["schemas"]["HomeResponse"]
         # Every documented field is always present: empty arrays stay explicit

@@ -26,7 +26,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 type LoadState =
   | { kind: "loading" }
-  | { kind: "ready"; title: string; revision: number; updatedAt: string; content: ReturnType<typeof validateCanonicalDocument> }
+  | { kind: "ready"; title: string; revision: number; updatedAt: string; currentVersionId: string | null; content: ReturnType<typeof validateCanonicalDocument> }
   | { kind: "not-found" }
   | { kind: "unauthorized" }
   | { kind: "error"; message: string }
@@ -105,6 +105,7 @@ export function ResearchDocumentEditor({ documentId }: { documentId: string }) {
             title: document.title,
             revision: document.revision,
             updatedAt: document.updated_at,
+            currentVersionId: document.current_version_id,
             content: validated,
           });
         } catch (error) {
@@ -222,6 +223,7 @@ export function ResearchDocumentEditor({ documentId }: { documentId: string }) {
       title={state.title}
       revision={state.revision}
       updatedAt={state.updatedAt}
+      currentVersionId={state.currentVersionId}
       content={state.content}
     />
   );

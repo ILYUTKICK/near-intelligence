@@ -522,9 +522,23 @@ def build_export_ir(engine: Engine, principal: Principal, document_id: UUID,
     raises :class:`ExportIrError` with details.
     """
     with principal_transaction(engine, principal) as connection:
-        document = get_document(connection, principal, document_id)
-        version = get_version(connection, principal, document_id, version_id)
-        return _build_ir(connection, document, version)
+        return build_export_ir_in_transaction(connection, principal, document_id,
+                                              version_id)
+
+
+def build_export_ir_in_transaction(connection: Connection, principal: Principal,
+                                   document_id: UUID, version_id: UUID) -> ExportIr:
+    """Build the frozen plan on the CALLER's open principal transaction.
+
+    The export-job creation (NI-058) runs inside one transaction that also
+    inserts the job row, so the plan, the ownership checks and the job are
+    atomic: a job never exists without its complete frozen plan. The
+    acknowledged-revision rule and the fail-closed semantics are the
+    :func:`build_export_ir` ones.
+    """
+    document = get_document(connection, principal, document_id)
+    version = get_version(connection, principal, document_id, version_id)
+    return _build_ir(connection, document, version)
 
 
 def _build_ir(connection: Connection, document: DocumentRow,
