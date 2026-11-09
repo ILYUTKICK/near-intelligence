@@ -31,12 +31,6 @@ from uuid import UUID
 
 from pydantic import Field, StringConstraints, model_validator
 
-from near_api.documents.schema import (
-    ASSESSMENTS,
-    CLASSIFICATIONS,
-    INSIGHT_TYPES,
-    TARGET_KINDS,
-)
 from near_api.insights.schemas import (
     EvidenceClassification,
     EvidenceTargetKind,

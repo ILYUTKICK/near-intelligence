@@ -45,9 +45,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import NamedTuple
 from uuid import UUID
 
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import Connection, Engine, select
 
 from near_api.auth.principal import Principal
@@ -115,6 +116,14 @@ from near_api.schemas.export import (
 
 _MAX_ERROR_DETAILS = 20
 """Error detail lists stay bounded, like every document service error."""
+
+
+class _RunIdentity(NamedTuple):
+    """The immutable published-run identity the plan's references record."""
+
+    run_id: UUID
+    spec_id: str
+    spec_version: int
 
 
 class ExportIrError(ValueError):
@@ -185,12 +194,17 @@ def _list_items(block_type: str, content: list[dict]) -> tuple[RichTextListItem,
             "The stored revision contains a list block the frozen export "
             "contract cannot represent",
             [("list_items", "invalid_rich_list")]) from error
-    return validated.items
+    return validated.content
+
+
+_RICH_TEXT_BODY = TypeAdapter(RichTextBody)
+"""RichTextBody is an Annotated tuple alias, not a model — one shared
+adapter validates canonical body fragments into it."""
 
 
 def _body(fragment: list[dict]) -> RichTextBody:
     try:
-        return RichTextBody.model_validate(fragment)
+        return _RICH_TEXT_BODY.validate_python(fragment)
     except ValidationError as error:
         raise ExportIrError(
             "The stored revision contains an annotation body the frozen "
@@ -340,7 +354,7 @@ def _verify_insight_context(mapping: _Mapping, block_id: UUID,
         raise ExportIrError(
             f"Insight block {block_id} pins chart evidence that is missing "
             "or inconsistent",
-            [(f"blocks.{block.block_id}", "insight_context_mismatch")])
+            [(f"blocks.{block_id}", "insight_context_mismatch")])
     return parsed
 
 
@@ -442,12 +456,14 @@ def _verify_public_references(connection: Connection, canonical: CanonicalDocume
                if item.target_kind == "model_run"}
     run_ids |= {context.model_run_id for context in contexts
                 if isinstance(context, ModelContext)}
-    runs: dict[UUID, ModelRun] = {}
+    runs: dict[UUID, _RunIdentity] = {}
     if run_ids:
         rows = connection.execute(
-            select(ModelRun).where(ModelRun.run_id.in_(run_ids),
-                                   ModelRun.status == "published")).scalars().all()
-        runs = {row.run_id: row for row in rows}
+            select(ModelRun.run_id, ModelRun.spec_id, ModelRun.spec_version)
+            .where(ModelRun.run_id.in_(run_ids),
+                   ModelRun.status == "published")).all()
+        runs = {row.run_id: _RunIdentity(row.run_id, row.spec_id, row.spec_version)
+                for row in rows}
         if len(runs) != len(run_ids):
             raise ExportIrError(
                 "The stored revision references a model run that is not a "
@@ -469,7 +485,7 @@ def _source_references(blocks: tuple[ExportBlock, ...]) -> tuple[ExportSourceRef
 
 
 def _model_run_references(blocks: tuple[ExportBlock, ...],
-                          runs: dict[UUID, ModelRun]) -> tuple[ExportModelRunReference, ...]:
+                          runs: dict[UUID, _RunIdentity]) -> tuple[ExportModelRunReference, ...]:
     referenced: set[UUID] = set()
     for block in blocks:
         if isinstance(block, ExportInsightBlock) and isinstance(block.context, ModelContext):
