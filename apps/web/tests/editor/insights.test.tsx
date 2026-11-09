@@ -26,7 +26,7 @@ const chart = view(definition({ metric_definition_ids: [metricDefinition.id] }),
   series(metricDefinition, [observation("2026-11-01", "12.000000000000000001")]),
 ]);
 const context = chartObservation(chart);
-const chartBlock = { type: "liveChart", attrs: { block_id: chartId, mode: "live", observed_dataset_version_id: context.dataset_version_id,
+const chartBlock = { type: "liveChart", attrs: { block_id: chartId, mode: "live", snapshot_id: null, observed_dataset_version_id: context.dataset_version_id,
   chart_definition_version_id: context.chart_definition_version_id, selection: context.selection } };
 const hypothesis = { type: "hypothesis", attrs: { block_id: "22222222-2222-4222-8222-222222222222",
   hypothesis_id: hypothesisId, statement: "Synthetic hypothesis", assessment: "untested", authored_at: time, modified_at: time } };
@@ -42,7 +42,7 @@ const saved = (content: unknown[], revision = 4) => Response.json({
 
 function fixture(content: unknown[], write: (request: Request) => Promise<Response>,
   current: () => { revision: number; content: unknown[] } = () => ({ revision: doc.revision, content })) {
-  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(input instanceof Request ? input.url : String(input), location.origin).pathname;
     if (path === "/api/auth/session") return Response.json({ subject: "synthetic-alice" });
     if (path === "/api/auth/csrf") return Response.json({ token: "synthetic-csrf" });
@@ -51,7 +51,7 @@ function fixture(content: unknown[], write: (request: Request) => Promise<Respon
       const currentDoc = current();
       return Response.json({ ...doc, revision: currentDoc.revision, content: paper(currentDoc.content), resolved_contexts: {} });
     }
-    if (input instanceof Request && path.startsWith(`${researchPath}/insights`)) return write(input);
+    if (input instanceof Request && path.startsWith(`${researchPath}/insights`)) return write(new Request(input, init));
     throw new Error(`Unexpected synthetic request ${path}`);
   }));
 }
@@ -183,6 +183,6 @@ it("requires explicit evidence cleanup and keeps text on a stale revision", asyn
   await user.click(remove);
   await waitFor(() => expect(screen.queryByText("Synthetic draft kept after conflict")).toBeNull());
   expect(screen.queryByText("Synthetic evidence link")).toBeNull();
-  expect(screen.getByText("Synthetic hypothesis")).toBeInTheDocument();
+  expect(within(screen.getByLabelText("Hypothesis block")).getByText("Synthetic hypothesis")).toBeInTheDocument();
   expect(requests[2]).toEqual({ remove_evidence_links: true });
 });
