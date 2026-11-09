@@ -1451,7 +1451,12 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-046, NI-040, NI-043
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex `/root`, chat `01a1bd1f-f988-7c82-9339-80fb05e336c0`
+- **Execution role:** B with A editor handoff
+- **Started at:** 2026-11-09T11:47:38+03:00
+- **Branch/worktree:** `feat/ni-047-chart-insights`, `D:/хахатон/near-intelligence`
+- **Dependency verification:** NI-046, NI-040 and NI-043 are DONE on `origin/main` (`a7fa401`). No open PR or active NI-047 claim at selection.
 
 **Description:** Allow observations/risks/conclusions to survive chart refresh and document reopen.
 
