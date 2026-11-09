@@ -51,6 +51,8 @@ P0 start empty. P1 template headings: Executive Summary, Investment Hypothesis, 
 
 P0 export uses the exact acknowledged document revision; renders all block types to Markdown with static chart files, CSV and evidence/model citations. Unknown/unrenderable nodes fail explicitly. P1 PDF uses the same frozen intermediate representation; no screenshot of the live editor. [Export tasks](TASKS.md) define verification, and [chart system](CHART_SYSTEM.md) defines static rendering.
 
+**Implemented frozen representation (NI-056):** `apps/api/src/near_api/exports/ir.py` builds the deterministic export IR (`apps/api/src/near_api/schemas/export.py`, `ExportIr`) of one owned, acknowledged immutable revision: revision metadata, a typed mapping of every P0 block (rich text runs, headings, lists, frozen chart views resolved through the NI-043 historical resolver, data-table specs with exact decimal-string cells, insight/hypothesis/evidence/risk cards) and the deduplicated source/model-run/citation references. All pins are re-verified fail-closed at build time — a missing pinned artifact, an unresolvable reference or a block type outside the export contract raises a typed error with details, never a substitution or a silent skip. No latest-data lookup happens on the path, no wall-clock field is added (building twice yields identical canonical bytes), and the plan is produced only while the revision is the document's acknowledged current version, so title and content always correspond to the same revision (a rename creates the next revision). Rendering stays with NI-057/NI-058.
+
 ## Implemented editor state (NI-039, 2026-11-08)
 
 The three-pane research editor lives at `apps/web/src/features/editor/` and serves
