@@ -1906,7 +1906,12 @@ Specification: [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 - **Priority:** P0
 - **Dependencies:** NI-020, NI-058, NI-061
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-A coordinator (ZCode session, ILYUTKICK operator), NI-062 parallel dispatch — one subagent covers the B API-security zone and the A web-e2e zone per the 9 November 2026 parallel-dispatch/no-review instruction
+- **Execution role:** A + B in a single dispatch
+- **Started at:** 2026-11-10T00:16:38+03:00
+- **Branch/worktree:** feat/ni-062-security-audit; /Users/ilyutkinn/Desktop/near-intelligence-a16 (worktree from origin/main 6c0aa2e)
+- **Dependency verification:** NI-020 DONE on main; NI-058 DONE on main (merged PR #80, 6c0aa2e, tree verified); NI-061 DONE on main (merged PR #78). No competing NI-062 claim and no open PR at session start.
 
 **Description:** Prove that users and untrusted content cannot cross private resource boundaries.
 
