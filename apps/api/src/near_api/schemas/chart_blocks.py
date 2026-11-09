@@ -23,6 +23,7 @@ from pydantic import model_validator
 
 from near_api.schemas.common import ContractModel
 from near_api.schemas.chart_selection import ChartSelection
+from near_api.schemas.delivery import ChartViewResponse
 from near_api.schemas.home import DocumentSummary
 
 
@@ -73,3 +74,9 @@ class ChartBlockMutationResponse(ContractModel):
 
     document: DocumentSummary
     value: ChartBlockValue
+
+
+class DocumentChartViewResponse(ChartViewResponse):
+    """Working-view data plus the current compatible approved dataset pointer."""
+
+    latest_approved_dataset_version_id: UUID | None

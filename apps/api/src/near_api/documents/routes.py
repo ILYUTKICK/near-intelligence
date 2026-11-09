@@ -24,6 +24,8 @@ IDEMPOTENCY_CONFLICT. Failures are never stored, so they stay retryable.
 from __future__ import annotations
 
 import base64
+import csv
+from io import StringIO
 from typing import Annotated
 from uuid import UUID
 
@@ -33,15 +35,19 @@ from sqlalchemy.engine import Engine
 
 from near_api.auth.principal import Principal, get_principal, get_runtime_engine
 from near_api.contracts import error_response
+from near_api.datasets.canonical import canonical_timestamp, dump_canonical
+from near_api.db.security import principal_transaction
 from near_api.documents import idempotency, service
+from near_api.documents.context_resolver import ReconstructionError, reconstruct_revision_chart
 from near_api.documents.schema import (
     SCHEMA_VERSION,
     DocumentSchemaError,
     DocumentTooLarge,
     ReferenceInvalid,
 )
-from near_api.repositories.documents import DocumentRow
+from near_api.repositories.documents import DocumentRow, get_version
 from near_api.schemas.common import ErrorDetail, ErrorResponse
+from near_api.schemas.delivery import ChartViewResponse
 from near_api.schemas.documents import (
     DocumentCreateRequest,
     DocumentListResponse,
@@ -73,6 +79,11 @@ _PRIVATE_ERROR_RESPONSES = {
         (428, "If-Match precondition is required"),
     )
 }
+
+_HISTORICAL_CHART_PATH = "/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}"
+_HISTORICAL_CHART_ERRORS = {
+    status: _PRIVATE_ERROR_RESPONSES[status] for status in (401, 403, 404, 422)
+} | {409: {"model": ErrorResponse, "description": "Frozen chart evidence could not be reconstructed"}}
 
 
 def _etag(revision: int) -> str:
@@ -347,6 +358,81 @@ def get_document_version(principal: PrincipalDependency, engine: RuntimeEngineDe
         schema_version=row.schema_version, content_sha256=row.content_sha256,
         created_at=row.created_at, content=row.content,
         resolved_contexts=row.resolved_contexts or {})
+
+
+def _read_historical_chart(request: Request, engine: Engine, principal: Principal,
+                           document_id: UUID, version_id: UUID, block_id: UUID,
+                           ) -> ChartViewResponse | JSONResponse:
+    try:
+        with principal_transaction(engine, principal) as connection:
+            version = get_version(connection, principal, document_id, version_id)
+            if request.query_params:
+                raise HTTPException(422, "Historical chart reads take no query parameters")
+            return reconstruct_revision_chart(connection, version, block_id)
+    except ReconstructionError as error:
+        return error_response(
+            request, 409, "RECONSTRUCTION_ERROR", str(error),
+            details=(ErrorDetail(path="chart_block", reason=error.reason),))
+
+
+@router.get(_HISTORICAL_CHART_PATH + "/view",
+            response_model=ChartViewResponse, operation_id="getDocumentVersionChartView",
+            summary="Reconstruct one chart from an owned immutable revision",
+            responses=_HISTORICAL_CHART_ERRORS)
+def get_document_version_chart_view(
+    request: Request, principal: PrincipalDependency, engine: RuntimeEngineDependency,
+    response: Response, document_id: UUID, version_id: UUID, block_id: UUID,
+) -> ChartViewResponse | JSONResponse:
+    view = _read_historical_chart(request, engine, principal, document_id, version_id, block_id)
+    response.headers["Cache-Control"] = "no-store"
+    return view
+
+
+def _chart_csv(view: ChartViewResponse) -> str:
+    """Serialize the exact resolved points in canonical series/period order."""
+    output = StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow((
+        "chart_definition_version_id", "dataset_version_id", "dataset_content_sha256",
+        "renderer_version", "context_hash", "selection_start", "selection_end",
+        "frequency", "filters", "metric_id", "metric_definition_version_id", "unit",
+        "period_start", "period_end", "value", "quality_status", "bound_kind", "reasons",
+        "coverage_observed", "coverage_expected",
+    ))
+    context = (
+        view.definition.id, view.dataset.id, view.dataset.content_sha256,
+        view.definition.renderer_version, view.context_hash, view.selection.start,
+        view.selection.end, view.selection.frequency,
+        dump_canonical(view.selection.filters.model_dump()).decode("utf-8"),
+    )
+    for series in view.series:
+        metric = (series.metric.metric_id, series.metric.id, series.metric.unit)
+        for point in series.points:
+            writer.writerow((
+                *context, *metric, canonical_timestamp(point.start), canonical_timestamp(point.end),
+                point.value, point.quality.status, point.quality.bound_kind,
+                dump_canonical(point.quality.reasons).decode("utf-8"),
+                point.quality.coverage.observed, point.quality.coverage.expected,
+            ))
+    return output.getvalue()
+
+
+@router.get(_HISTORICAL_CHART_PATH + "/csv", response_class=Response,
+            operation_id="getDocumentVersionChartCsv",
+            summary="Download exact chart data from an owned immutable revision",
+            responses={**_HISTORICAL_CHART_ERRORS,
+                       200: {"content": {"text/csv": {"schema": {"type": "string"}}}}})
+def get_document_version_chart_csv(
+    request: Request, principal: PrincipalDependency, engine: RuntimeEngineDependency,
+    document_id: UUID, version_id: UUID, block_id: UUID,
+) -> Response:
+    view = _read_historical_chart(request, engine, principal, document_id, version_id, block_id)
+    if isinstance(view, JSONResponse):
+        return view
+    return Response(_chart_csv(view), media_type="text/csv", headers={
+        "Cache-Control": "no-store",
+        "Content-Disposition": f'attachment; filename="chart-{version_id}-{block_id}.csv"',
+    })
 
 
 @router.post("/documents/{document_id}/versions", response_model=DocumentSaveResponse,

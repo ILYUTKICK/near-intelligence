@@ -4,7 +4,10 @@
  * — the honest recovery path that never depends on the API being reachable.
  */
 export function downloadJson(rawContent: unknown, filename: string): void {
-  const blob = new Blob([JSON.stringify(rawContent, null, 2)], { type: "application/json" });
+  downloadBlob(new Blob([JSON.stringify(rawContent, null, 2)], { type: "application/json" }), filename);
+}
+
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

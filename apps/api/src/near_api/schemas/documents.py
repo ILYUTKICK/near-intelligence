@@ -15,6 +15,8 @@ from uuid import UUID
 
 from pydantic import Field
 
+from near_api.documents.schema import MAX_CONTEXTS
+from near_api.insights.schemas import ResolvedContext
 from near_api.schemas.common import ContractModel
 from near_api.schemas.home import DocumentSummary
 
@@ -45,7 +47,7 @@ class DocumentSaveRequest(ContractModel):
 
     schema_version: int = Field(strict=True, ge=1)
     content: dict
-    observed_contexts: tuple[dict, ...] = ()
+    observed_contexts: tuple[ResolvedContext, ...] = Field(default=(), max_length=MAX_CONTEXTS)
 
 
 class DocumentRenameRequest(ContractModel):

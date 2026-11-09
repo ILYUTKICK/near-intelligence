@@ -5,6 +5,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/data-state/Skeleton";
@@ -12,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { canonicalToTiptapDoc } from "./serialize";
-import { ChartEditorProvider } from "./blocks/chart-context";
+import { ChartEditorProvider, type ChartObservation } from "./blocks/chart-context";
+import { inspectionKey } from "./blocks/live-chart";
 import { EDITOR_EXTENSIONS } from "./extensions";
 import { deriveOutline, type OutlineEntry } from "./outline";
 import {
@@ -110,6 +112,10 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   const [conflictActionError, setConflictActionError] = useState<string | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const paperRef = useRef<HTMLDivElement>(null);
+  const observations = useRef(new Map<string, ChartObservation>());
+  const recordObservation = useCallback((blockId: string, observation: ChartObservation) => {
+    observations.current.set(blockId, observation);
+  }, []);
 
   /** Captures the editor state as a save request body (canonical, validated). */
   const capture = useCallback((): SaveRequestBody => {
@@ -118,10 +124,25 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
       throw new Error("The editor is not ready");
     }
     const snapshot = canonicalSnapshot(current);
+    const claims = new Map<string, ChartObservation>();
+    const chartIds = new Set<string>();
+    for (const block of snapshot.content) {
+      if (block.type !== "liveChart") continue;
+      const { block_id, chart_definition_version_id, observed_dataset_version_id, selection } = block.attrs;
+      chartIds.add(block_id);
+      const claim = observations.current.get(block_id);
+      if (claim && inspectionKey(claim.chart_definition_version_id, claim.selection, claim.dataset_version_id)
+        === inspectionKey(chart_definition_version_id, selection, observed_dataset_version_id)) {
+        claims.set(claim.context_hash, claim);
+      }
+    }
+    for (const blockId of observations.current.keys()) {
+      if (!chartIds.has(blockId)) observations.current.delete(blockId);
+    }
     return {
       schema_version: CANONICAL_SCHEMA_VERSION,
       content: snapshot as unknown as Record<string, unknown>,
-      observed_contexts: [],
+      observed_contexts: [...claims.values()],
     };
   }, []);
 
@@ -547,6 +568,12 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
           Updated <time dateTime={displayedUpdatedAt}>{displayedUpdatedAt}</time> · Revision{" "}
           {controller.revision} · Schema version 1
         </p>
+        {controller.status.kind === "clean" ? (
+          <Link href={`/workspace/research/${documentId}/versions`} prefetch={false}
+            className="mt-2 inline-block text-ui underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+            Revision history
+          </Link>
+        ) : <p className="mt-2 text-metadata text-text-secondary">Save your edits to open revision history.</p>}
         <div className="mt-2">
           <SaveStatusBar
             status={controller.status}
@@ -683,7 +710,8 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
         <section data-pane="paper" className="min-w-0">
           <div ref={paperRef} className="relative rounded-surface border border-border bg-surface p-6">
             {editor ? (
-              <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasCharts} saved={controller.status.kind === "clean"}>
+              <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasCharts} saved={controller.status.kind === "clean"}
+                revision={controller.revision} onObserve={recordObservation}>
                 <EditorContent editor={editor} />
               </ChartEditorProvider>
             ) : (

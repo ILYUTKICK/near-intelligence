@@ -23,8 +23,11 @@ provider access.
 """
 
 import copy
+import csv
 import datetime as dt
+import json
 import os
+import tempfile
 import threading
 import unittest
 from contextlib import ExitStack
@@ -43,10 +46,11 @@ from near_api.auth import principal as principal_module
 from near_api.auth.principal import Principal
 from near_api.auth.verification import VerifiedToken
 from near_api.charts.registry import chart_by_chart_id
+from near_api.datasets import delivery
 from near_api.datasets.delivery import _context_hash
 from near_api.db.session import create_runtime_engine, user_transaction
 from near_api.documents import service
-from near_api.documents.chart_blocks import (
+from near_api.documents.context_resolver import (
     ChartDefinitionRow,
     validate_selection_against_definition,
 )
@@ -57,6 +61,7 @@ from near_api.metrics.registry import definition_by_metric_id
 from near_api.schemas.chart_blocks import ChartBlockInsertRequest
 from near_api.schemas.common import ErrorResponse
 from near_api.schemas.delivery import ResolvedSelection
+import test_delivery_apis as data_fixture
 
 CHART = chart_by_chart_id("intents-volume")
 CHART_ID = CHART.id
@@ -79,6 +84,18 @@ def insert_payload(**changes) -> dict:
     }
     payload.update(changes)
     return payload
+
+
+def observed_context(view: dict) -> dict:
+    return {
+        "chart_definition_version_id": view["definition"]["id"],
+        "dataset_version_id": view["dataset"]["id"],
+        "selection": view["selection"],
+        "context_hash": view["context_hash"],
+        "renderer_version": view["definition"]["renderer_version"],
+        "metric_definition_versions": view["definition"]["metric_definition_ids"],
+        "resolved_at": view["resolved_at"],
+    }
 
 
 def text_paragraph(text: str) -> dict:
@@ -152,6 +169,24 @@ class ChartBlockContractTests(unittest.TestCase):
         failure = ErrorResponse.model_validate(response.json())
         self.assertEqual(failure.error.code, "AUTHENTICATION_REQUIRED")
         self.assertEqual(response.headers["Cache-Control"], "no-store")
+
+    def test_historical_contract_has_no_selection_parameters(self):
+        prefix = "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}"
+        routes = app.openapi()["paths"]
+        for suffix in ("view", "csv"):
+            path = f"{prefix}/{suffix}"
+            operation = routes[path]["get"]
+            self.assertEqual(
+                {(p["name"], p["in"]) for p in operation["parameters"]},
+                {("document_id", "path"), ("version_id", "path"), ("block_id", "path"),
+                 ("authorization", "header")})
+            self.assertIn("409", operation["responses"])
+            response = self.client.get(
+                f"/api/documents/{uuid4()}/versions/{uuid4()}/chart-blocks/{uuid4()}/{suffix}")
+            self.assertEqual(response.status_code, 401)
+            self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertEqual(set(routes[prefix + "/csv"]["get"]["responses"]["200"]["content"]),
+                         {"text/csv"})
 
 
 @unittest.skipUnless(os.environ.get("NI_ISOLATED_PG_TEST") == "1",
@@ -799,6 +834,208 @@ class ChartBlockServiceDatabaseTests(unittest.TestCase):
                                            headers={"Authorization": "Bearer t.alice"})
                 self.assertEqual(response.status_code, 422, response.text)
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
+
+    def publish_volume(self, key, value):
+        if not hasattr(self, "directory"):
+            tmp = tempfile.TemporaryDirectory(prefix="ni043-", dir=os.environ["NI_TEST_TMP_DIR"])
+            self.addCleanup(tmp.cleanup)
+            self.directory = Path(tmp.name)
+            self.storage_root = self.directory / "storage"
+        dimensions = {"source": "SRC-LLAMA"}
+        return data_fixture.DeliveryDatabaseTests.stage_fixture(
+            self, key,
+            [data_fixture.observation(METRIC_ID, dt.date(2026, 1, 1), value=value,
+                                      bound_kind="lower", dimensions=dimensions),
+             data_fixture.observation(METRIC_ID, dt.date(2026, 1, 2), value=None,
+                                      dimensions=dimensions)],
+            [METRIC_ID], window=("2026-01-01", "2026-01-03"))
+
+    def preview_volume(self, document_id, *, dataset_version="latest", start="2026-01-01",
+                       end="2026-01-04"):
+        with self.as_session(self.alice_id):
+            response = self.client.get(
+                f"/api/documents/{document_id}/chart-view",
+                params={"chart_definition_version_id": str(CHART_ID), "start": start,
+                        "end": end, "dataset_version": str(dataset_version),
+                        "filters": json.dumps({"source": "SRC-LLAMA"})},
+                headers={"Authorization": "Bearer t.alice"})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def historical_chart(self, document_id, version_id, block_id, suffix="view", *,
+                         subject=None, params=None):
+        with self.as_session(subject or self.alice_id):
+            return self.client.get(
+                f"/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/{suffix}",
+                params=params, headers={"Authorization": "Bearer synthetic"})
+
+    def chart_document(self, preview):
+        block_id = str(uuid4())
+        return block_id, {"type": "doc", "schema_version": 1, "content": [
+            {"type": "liveChart", "attrs": {
+                "block_id": block_id, "mode": "live", "selection": preview["selection"],
+                "chart_definition_version_id": preview["definition"]["id"],
+                "observed_dataset_version_id": preview["dataset"]["id"],
+            }},
+        ]}
+
+    def test_frozen_chart_survives_publication_before_and_after_save(self):
+        document_id = self.create_document(self.alice).document.id
+        key = self.dataset_key("preview-save")
+        value = "12.123456789012345678901234"
+        first = self.publish_volume(key, value)
+        inspected = self.preview_volume(document_id)
+        self.assertEqual(inspected["dataset"]["id"], str(first.dataset_version_id))
+        self.assertEqual(inspected["latest_approved_dataset_version_id"], inspected["dataset"]["id"])
+        block_id, content = self.chart_document(inspected)
+
+        # Re-publication between inspection and the CAS must not change the
+        # selected evidence, but the working reader can surface the new pointer.
+        second = self.publish_volume(key, "222")
+        claim = {**observed_context(inspected), "resolved_at": "2000-01-01T00:00:00Z"}
+        saved = self.save_document(document_id, content, revision=1, observed_contexts=[claim])
+        self.assertEqual(saved.status_code, 201, saved.text)
+        version = saved.json()["version"]
+        frozen = version["resolved_contexts"][block_id]
+        self.assertEqual({**frozen, "resolved_at": claim["resolved_at"]}, claim)
+        self.assertNotEqual(frozen["resolved_at"], claim["resolved_at"])
+        pinned = self.preview_volume(document_id, dataset_version=first.dataset_version_id)
+        self.assertEqual(pinned["context_hash"], frozen["context_hash"])
+        self.assertEqual(pinned["latest_approved_dataset_version_id"], str(second.dataset_version_id))
+        self.assertEqual(pinned["dataset"]["id"], str(first.dataset_version_id))
+
+        # Assert explicitly that the historical resolver never looks at the pointer.
+        with patch.object(delivery, "resolve_latest_version", side_effect=AssertionError("latest queried")):
+            before = self.historical_chart(document_id, version["id"], block_id)
+            csv_before = self.historical_chart(document_id, version["id"], block_id, "csv")
+        self.assertEqual(before.status_code, 200, before.text)
+        self.assertEqual(csv_before.status_code, 200, csv_before.text)
+        self.assertEqual(before.headers["Cache-Control"], "no-store")
+        self.assertEqual(csv_before.headers["Cache-Control"], "no-store")
+        self.assertTrue(csv_before.headers["Content-Type"].startswith("text/csv"))
+        self.assertTrue(csv_before.headers["Content-Disposition"].startswith("attachment;"))
+        self.assertEqual(before.json()["context_hash"], frozen["context_hash"])
+        self.assertEqual(before.json()["resolved_at"], frozen["resolved_at"])
+        rows = list(csv.DictReader(csv_before.text.splitlines()))
+        self.assertEqual([row["value"] for row in rows], [value, "", ""])
+        self.assertEqual([row["quality_status"] for row in rows], ["ok", "missing", "missing"])
+        self.assertEqual([row["bound_kind"] for row in rows], ["lower", "", ""])
+        self.assertEqual(rows[0]["metric_definition_version_id"], str(METRIC_ID))
+        self.assertEqual(rows[0]["dataset_content_sha256"], first.content_sha256)
+        self.assertEqual(json.loads(rows[0]["filters"]), inspected["selection"]["filters"])
+
+        self.publish_volume(key, "333")
+        removed = self.save_document(document_id, document_with(1), revision=2)
+        self.assertEqual(removed.status_code, 201, removed.text)
+        self.assertEqual(removed.json()["version"]["resolved_contexts"], {})
+        with self.as_session(self.alice_id):
+            saved_again = self.client.get(
+                f"/api/documents/{document_id}/versions/{version['id']}",
+                headers={"Authorization": "Bearer t.alice"})
+        self.assertEqual(saved_again.json(), version)
+        self.assertEqual(self.historical_chart(document_id, version["id"], block_id).json(),
+                         before.json())
+        self.assertEqual(self.historical_chart(document_id, version["id"], block_id, "csv").content,
+                         csv_before.content)
+        self.assertEqual(self.historical_chart(
+            document_id, version["id"], block_id, params={"dataset_version": "latest"}
+        ).status_code, 422)
+        alice_other = self.create_document(self.alice).document.id
+        for suffix in ("view", "csv"):
+            for target, revision, block, subject in (
+                (document_id, version["id"], block_id, self.bob_id),
+                (alice_other, version["id"], block_id, self.alice_id),
+                (document_id, version["id"], uuid4(), self.alice_id),
+                (document_id, removed.json()["version"]["id"], block_id, self.alice_id),
+            ):
+                denied = self.historical_chart(target, revision, block, suffix, subject=subject)
+                self.assertEqual(denied.status_code, 404, denied.text)
+                self.assertEqual(denied.json()["error"]["code"], "NOT_FOUND")
+                self.assertEqual(denied.headers["Cache-Control"], "no-store")
+
+    def test_observed_context_version_mismatch_leaves_no_revision(self):
+        detail = self.create_document(self.alice)
+        dataset = self.publish_volume(self.dataset_key("observation-mismatch"), "15")
+        inspected = self.preview_volume(detail.document.id, dataset_version=dataset.dataset_version_id)
+        _, content = self.chart_document(inspected)
+        claim = observed_context(inspected)
+        for changes in (
+            {"chart_definition_version_id": str(uuid4())},
+            {"dataset_version_id": str(uuid4())},
+            {"selection": selection("2026-01-02", "2026-01-04")},
+            {"renderer_version": "synthetic-other-renderer"},
+            {"metric_definition_versions": [str(uuid4())]},
+            {"context_hash": "f" * 64},
+        ):
+            with self.subTest(changes=changes):
+                response = self.save_document(
+                    detail.document.id, content, revision=1, observed_contexts=[{**claim, **changes}])
+                self.assertEqual(response.status_code, 422, response.text)
+                self.assertEqual(response.json()["error"]["code"], "REFERENCE_INVALID")
+        self.assertEqual(self.table_counts(detail.document.id),
+                         {"document_versions": 1, "document_blocks": 0})
+
+    def test_missing_or_inconsistent_historical_artifacts_fail_explicitly(self):
+        document_id = self.create_document(self.alice).document.id
+        dataset = self.publish_volume(self.dataset_key("lost-artifacts"), "5")
+        # No observations fall in the selected range, a legitimate empty
+        # result. The prepared artifact as a whole is still present.
+        inspected = self.preview_volume(document_id, dataset_version=dataset.dataset_version_id,
+                                        start="2026-01-07", end="2026-01-09")
+        block_id, content = self.chart_document(inspected)
+        saved = self.save_document(document_id, content, revision=1)
+        self.assertEqual(saved.status_code, 201, saved.text)
+        version = saved.json()["version"]
+        version_id = version["id"]
+        view = self.historical_chart(document_id, version_id, block_id)
+        self.assertEqual(view.status_code, 200, view.text)
+        self.assertEqual([point["value"] for point in view.json()["series"][0]["points"]],
+                         [None, None])
+
+        # Exercise the explicit error surface after a simulated damaged restore.
+        for contexts, reason in (
+            ({}, "missing_chart_context"),
+            ({block_id: {**version["resolved_contexts"][block_id],
+                         "renderer_version": "unavailable-renderer"}}, "chart_context_mismatch"),
+        ):
+            with self.admin.begin() as connection:
+                connection.execute(text("""
+                    UPDATE app.document_versions SET resolved_contexts = CAST(:contexts AS jsonb)
+                    WHERE id = :id
+                """), {"contexts": json.dumps(contexts), "id": version_id})
+            self.assert_reconstruction_error(document_id, version_id, block_id, reason)
+
+        with self.admin.begin() as connection:
+            connection.execute(text("""
+                UPDATE app.document_versions
+                SET resolved_contexts = CAST(:contexts AS jsonb),
+                    content = jsonb_set(content, '{content,0,attrs,selection,end}', '"2026-01-10"')
+                WHERE id = :id
+            """), {"contexts": json.dumps(version["resolved_contexts"]), "id": version_id})
+        self.assert_reconstruction_error(
+            document_id, version_id, block_id, "revision_content_hash_mismatch")
+
+        with self.admin.begin() as connection:
+            connection.execute(text("""
+                UPDATE app.document_versions SET content = CAST(:content AS jsonb) WHERE id = :id
+            """), {"content": json.dumps(version["content"]), "id": version_id})
+            # One observation survives and the working read already warmed
+            # the public version cache. Only digest verification catches this.
+            connection.execute(text("""
+                DELETE FROM app.metric_observations WHERE dataset_version_id = :id AND value IS NULL
+            """), {"id": dataset.dataset_version_id})
+        self.assert_reconstruction_error(
+            document_id, version_id, block_id, "pinned_artifact_unavailable")
+        self.assertEqual(self.historical_chart(
+            document_id, version_id, block_id, subject=self.bob_id).status_code, 404)
+
+    def assert_reconstruction_error(self, document_id, version_id, block_id, reason):
+        for suffix in ("view", "csv"):
+            response = self.historical_chart(document_id, version_id, block_id, suffix)
+            self.assertEqual(response.status_code, 409, response.text)
+            self.assertEqual(response.json()["error"]["code"], "RECONSTRUCTION_ERROR")
+            self.assertEqual(response.json()["error"]["details"][0]["reason"], reason)
+            self.assertEqual(response.headers["Cache-Control"], "no-store")
 
     def test_09_insertion_position_control(self):
         detail = self.create_document(self.alice)

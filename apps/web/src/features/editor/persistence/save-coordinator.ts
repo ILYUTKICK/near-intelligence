@@ -555,13 +555,10 @@ function describeSaveError(status: number, serverMessage?: string): string {
 }
 
 /**
- * Deterministic string form of a request body for equality checks. The
- * canonical transform produces a stable key order for the same logical
- * content, so plain JSON.stringify is injective on the values produced here.
- * A false "different" (key-order change only) merely schedules one extra
- * save — the safe direction; a false "equal" is impossible for distinct
- * JSON values without cycles.
+ * Canonical editor identity for dirty/acknowledgement checks. Inspection
+ * claims validate the existing chart attrs and can change after Undo without
+ * changing document content. Each retry retains its full original body.
  */
 export function stableBody(body: SaveRequestBody): string {
-  return JSON.stringify(body);
+  return JSON.stringify({ schema_version: body.schema_version, content: body.content });
 }

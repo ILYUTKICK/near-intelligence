@@ -114,6 +114,7 @@ class ResolvedSelectionContractTests(unittest.TestCase):
                                       frequency="day", filters={"source": "SRC-LLAMA"})
         self.assertEqual(selection.filters.model_dump(), {"source": "SRC-LLAMA"})
         for changes in ({"end": "2024-01-01"}, {"end": "2026-01-01"},
+                        {"filters": {"source": 123}},
                         {"frequency": "week"}, {"owner_id": "synthetic"},
                         {"start": "2025-01-01", "end": "2027-01-01"}):
             with self.subTest(changes=changes):

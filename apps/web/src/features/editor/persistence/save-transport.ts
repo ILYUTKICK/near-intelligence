@@ -1,4 +1,5 @@
 import { privateFetch } from "@/lib/auth/private-fetch";
+import type { components } from "@near-intelligence/shared-types";
 import { z } from "zod";
 
 import { DocumentApiError } from "@/features/documents/list/documents-api";
@@ -15,7 +16,8 @@ import {
  * `current_revision:<n>` for the owned document), an `Idempotency-Key: UUID`
  * (a retried identical request replays the original 201 instead of creating
  * a second revision — the timeout-after-commit guarantee), and the canonical
- * document as `{schema_version, content, observed_contexts}` (empty; the server carries unchanged inserted chart pins forward).
+ * document as `{schema_version, content, observed_contexts}`. The server
+ * verifies submitted observations and carries unchanged pins forward.
  *
  * The client follows the NI-023 render-boundary pattern: responses are
  * validated against zod mirrors of the generated contracts before use, and
@@ -26,13 +28,7 @@ import {
  * the payload and retry with the SAME idempotency key (see save-coordinator).
  */
 
-export interface SaveRequestBody {
-  schema_version: number;
-  /** The full canonical EditorDocument (`{schema_version, type, content}`). */
-  content: Record<string, unknown>;
-  /** ResolvedContext pins; stay empty until NI-043; NI-041 carries unchanged stored pins server-side. */
-  observed_contexts: Record<string, unknown>[];
-}
+export type SaveRequestBody = Required<components["schemas"]["DocumentSaveRequest"]>;
 
 export interface SaveAttempt {
   documentId: string;

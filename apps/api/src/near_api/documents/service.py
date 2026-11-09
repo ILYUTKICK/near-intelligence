@@ -41,24 +41,19 @@ with a typed reason, never a silent substitution):
   yet (NI-035 research snapshots, NI-054 model runs) and are rejected until
   those tasks land — an unverifiable reference is invalid, not tolerated;
 - evidence ``citation`` targets must reference a public immutable artifact;
-- insight ``context`` and top-level ``observed_contexts`` are frozen
-  inspection records: their shape is validated by the schema module, while
-  client-submitted top-level contexts are server-resolved with NI-043. A
-  save carrying chart blocks carries their frozen NI-041 contexts forward
-  verbatim (immutably). NI-042 explicit new/changed blocks resolve from the
-  validated inspected dataset pin; general submitted contexts remain NI-043.
+- Top-level ``observed_contexts`` are compared with server-resolved pins.
+  Unchanged chart contexts carry forward verbatim after verification.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import Connection, Engine, insert, select, update
 
 from near_api.auth.principal import Principal
-from near_api.db.models import Artifact, DatasetVersion, Document, DocumentVersion
+from near_api.db.models import Artifact, Document, DocumentVersion
 from near_api.db.security import (
     Page,
     ResourceNotFound,
@@ -66,6 +61,7 @@ from near_api.db.security import (
     principal_transaction,
     scoped_page,
 )
+from near_api.documents.context_resolver import require_approved_dataset, resolve_revision_contexts
 from near_api.documents.projections import build_projections, write_projections
 from near_api.documents.schema import (
     MAX_TITLE_CHARS,
@@ -76,7 +72,7 @@ from near_api.documents.schema import (
     empty_document,
     parse_document,
 )
-from near_api.schemas.chart_selection import ChartSelection
+from near_api.insights.schemas import ResolvedContext
 from near_api.repositories.documents import (
     DocumentRow,
     DocumentVersionRow,
@@ -168,7 +164,7 @@ def list_document_details(engine: Engine, principal: Principal, *, search: str |
 
 def save_revision(engine: Engine, principal: Principal, document_id: UUID, *,
                   expected_revision: int, document_payload: dict,
-                  observed_contexts: list | None = None) -> DocumentDetail:
+                  observed_contexts: list[ResolvedContext | dict] | None = None) -> DocumentDetail:
     """Append one immutable revision with compare-and-set and full projections.
 
     The whole operation is one transaction: row lock -> CAS -> pure schema
@@ -186,7 +182,8 @@ def save_revision(engine: Engine, principal: Principal, document_id: UUID, *,
 def save_revision_in_transaction(connection: Connection, principal: Principal,
                                  document_id: UUID, *, expected_revision: int,
                                  document_payload: dict,
-                                 observed_contexts: list | None = None) -> DocumentDetail:
+                                 observed_contexts: list[ResolvedContext | dict] | None = None,
+                                 ) -> DocumentDetail:
     """Transaction-scoped :func:`save_revision` (used by the idempotent save)."""
     if isinstance(expected_revision, bool) or not isinstance(expected_revision, int) \
             or expected_revision < 1:
@@ -200,10 +197,13 @@ def save_revision_in_transaction(connection: Connection, principal: Principal,
     document = _locked_document(connection, principal, document_id)
     if document.revision != expected_revision:
         raise RevisionConflict(document.revision)
+    if document.current_version_id is None:
+        raise ValueError(f"Document {document.id} has no current revision")
     canonical = parse_document(document_payload)
     _validate_database_references(connection, canonical)
-    resolved_contexts = _resolve_observed_contexts(connection, canonical,
-                                                   observed_contexts, document)
+    previous = _version_row(connection, document.current_version_id)
+    resolved_contexts = resolve_revision_contexts(
+        connection, canonical, previous, observed_contexts=observed_contexts)
     return _commit_new_revision(connection, principal, document, canonical=canonical,
                                 resolved_contexts=resolved_contexts)
 
@@ -367,12 +367,13 @@ def _append_identical_revision(connection: Connection, principal: Principal,
     previous = _version_row(connection, document.current_version_id)
     canonical = parse_document(previous.content)
     _validate_database_references(connection, canonical)
+    resolved_contexts = resolve_revision_contexts(connection, canonical, previous)
     new_revision = document.revision + 1
     version_id = uuid4()
     connection.execute(_insert_version().values(
         id=version_id, document_id=document.id, owner_id=principal.id,
         revision=new_revision, schema_version=SCHEMA_VERSION,
-        content=canonical.canonical, resolved_contexts=previous.resolved_contexts or {},
+        content=canonical.canonical, resolved_contexts=resolved_contexts,
         content_sha256=canonical.content_sha256))
     write_projections(connection, principal, document_id=document.id,
                       version_id=version_id,
@@ -427,68 +428,9 @@ def _version_row(connection: Connection, version_id: UUID) -> DocumentVersionRow
     return DocumentVersionRow(**row)
 
 
-def _resolve_observed_contexts(connection: Connection, canonical: CanonicalDocument,
-                               observed_contexts: list,
-                               document: DocumentRow) -> dict:
-    """Carry unchanged pins, or freeze an explicit NI-042 chart-context edit.
-
-    The canonical node attrs are the inspected definition/dataset/selection.
-    They have already passed the same registry/approved dataset/reference
-    rules as insertion in ``_validate_database_references``. New/changed attrs
-    build a fresh server context through the NI-041 canonical hash helper;
-    no latest pointer is queried. Ordinary prose edits carry the old context
-    VERBATIM, including its original resolved_at, even during source outages.
-    General submitted-context/race validation remains NI-043. Removed blocks
-    lose their current context; old revision rows remain immutable.
-    """
-    if observed_contexts:
-        raise ReferenceInvalid(
-            "observed_contexts are resolved server-side: a chart block's frozen "
-            "context is created by the chart-blocks insertion endpoint, and "
-            "submitted context validation arrives with NI-043",
-            [("observed_contexts", "reference_unavailable")])
-    if not canonical.live_charts:
-        # No chart block of this revision can carry a chart context; contexts
-        # are only ever keyed by (existing) chart block ids in P0.
-        return {}
-    from near_api.documents import chart_blocks  # deferred: chart_blocks imports this module's service internals
-
-    if document.current_version_id is None:
-        raise ValueError(f"Document {document.id} has no current revision")
-    previous = _version_row(connection, document.current_version_id)
-    previous_contexts = previous.resolved_contexts or {}
-    previous_charts = {chart.block_id: chart
-                       for chart in parse_document(previous.content).live_charts}
-    contexts = {}
-    for chart in canonical.live_charts:
-        block_id = str(chart.block_id)
-        previous_chart = previous_charts.get(chart.block_id)
-        if previous_chart is not None \
-                and chart_blocks.chart_inspection_state(previous_chart) \
-                == chart_blocks.chart_inspection_state(chart) \
-                and block_id in previous_contexts:
-            contexts[block_id] = previous_contexts[block_id]
-            continue
-        definition = chart_blocks.load_chart_definition(
-            connection, chart.chart_definition_version_id, error_path="content")
-        contexts[block_id] = chart_blocks.build_resolved_context(
-            definition, chart.observed_dataset_version_id,
-            ChartSelection.model_validate(chart.selection), resolved_at=datetime.now(UTC))
-    return contexts
-
-
 def _validate_database_references(connection: Connection,
                                   canonical: CanonicalDocument) -> None:
-    """Validate every database-backed reference; runs inside the save transaction."""
-    if canonical.live_charts:
-        # NI-041 lifted the NI-031 gate: a liveChart block is verified against
-        # the chart registry (registered available definition, allowed
-        # selection, approved pinned dataset covering the required metrics)
-        # with the same shared rules the insertion endpoint enforces.
-        from near_api.documents import chart_blocks  # deferred: chart_blocks imports this module's service internals
-
-        for chart in canonical.live_charts:
-            chart_blocks.validate_document_chart(connection, chart)
+    """Validate table and evidence references inside the save transaction."""
     for table in canonical.data_tables:
         if table.dataset_version_id is not None:
             require_approved_dataset(connection, table.dataset_version_id,
@@ -509,25 +451,6 @@ def _validate_database_references(connection: Connection,
                     "Evidence citation target does not reference a public immutable "
                     "artifact",
                     [("content", "dangling_citation_target")])
-
-
-def require_approved_dataset(connection: Connection, dataset_version_id: UUID,
-                             path: str) -> None:
-    """A pinned dataset must be an approved (public) immutable version.
-
-    Shared reference rule (NI-036 dataTable pins, NI-041 liveChart pins):
-    staged/validated/rejected versions never leak existence and are never
-    substituted with a latest pointer — the pinned id is the evidence.
-    """
-    exists = connection.execute(
-        select(DatasetVersion.id).where(DatasetVersion.id == dataset_version_id,
-                                        DatasetVersion.status == "approved")
-    ).first()
-    if exists is None:
-        raise ReferenceInvalid(
-            "Referenced dataset version does not exist or is not an approved "
-            "public dataset",
-            [(path, "dangling_dataset_reference")])
 
 
 __all__ = [

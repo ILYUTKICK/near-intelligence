@@ -429,6 +429,8 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/documents", "/api/documents/{document_id}",
             "/api/documents/{document_id}/versions",
             "/api/documents/{document_id}/versions/{version_id}",
+            "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/view",
+            "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/csv",
             "/api/documents/{document_id}/chart-blocks",
             "/api/documents/{document_id}/chart-view",
             "/api/metrics", "/api/metrics/{metric_id}",
@@ -467,7 +469,7 @@ class DocumentRouteContractTests(unittest.TestCase):
         self.assertTrue(all(query[key]["required"] for key in
                             ("chart_definition_version_id", "start", "end")))
         self.assertEqual(inspection["responses"]["200"]["content"]["application/json"]
-                         ["schema"]["$ref"], "#/components/schemas/ChartViewResponse")
+                         ["schema"]["$ref"], "#/components/schemas/DocumentChartViewResponse")
         chart_blocks_path = schema["paths"]["/api/documents/{document_id}/chart-blocks"]
         self.assertEqual(set(chart_blocks_path), {"post"})
         self.assertEqual(chart_blocks_path["post"]["operationId"], "addChartBlock")
@@ -1008,7 +1010,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
                 json={"schema_version": SCHEMA_VERSION, "content": oversize},
                 headers={"If-Match": '"2"', **alice_headers})
             self.assertEqual(oversized.status_code, 413)
-            # Gated observed_contexts are a typed reference failure.
+            # An observation with no matching chart is a typed reference failure.
             contexts = self.client.post(
                 f"/api/documents/{document_id}/versions",
                 json={"schema_version": SCHEMA_VERSION,
