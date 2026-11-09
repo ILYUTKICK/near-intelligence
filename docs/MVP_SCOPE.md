@@ -4,6 +4,8 @@ The application has not been built. P0 is the minimum hackathon product; P1 enha
 
 ## P0 commitments
 
+**User scope update — 8 November 2026:** remaining implementation and release verification target desktop. Mobile development/adaptation and mobile, touch, phone and tablet QA are excluded from the current authorized scope to limit execution cost. Existing responsive code and historical verification evidence are preserved; no new mobile viewport/device passes or screenshots are required. Desktop keyboard/accessibility, ownership, persistence and reproducibility requirements remain in force.
+
 Public landing, full original thesis, methodology and public data explorer; shared source/metric/chart registries; daily historical analytics from saved real data; scheduled refresh for at least one approved reliable source; visibly historical fallback for any failed source. Working Supabase login, private workspace/home, saved charts, document CRUD, Tiptap editor, text/heading/chart/table/insight/hypothesis/evidence/risk/divider blocks, Add Chart, Add Insight, typed context, server ownership, autosave/reopen and reproducible published quantitative analysis. Markdown bundle export is the single reliable MVP export.
 
 P0 live charts use canonical versioned definitions and mutable “latest approved dataset” resolution, with explicit observation/retrieval timestamps. Every document revision freezes the exact dataset resolved at save; reopening the working document in live mode may show newer data with a change badge, but historical revision/export uses the pin. This minimum pin is P0 integrity infrastructure, despite the original priority list placing advanced chart snapshots at P1. An explicit snapshot creation/browsing UX is P1.
@@ -35,6 +37,6 @@ Read-only public sharing, collaboration/CRDT, LLM assistant, interpretive integr
 3. One approved real refresh demonstrably publishes atomically; outages retain last good data.
 4. One published deterministic empirical model reproduces offline, with inference limits and source definitions.
 5. Two users can independently save/reopen research; cross-user CRUD, references and export fail safely.
-6. Complete keyboard/touch research workflow works on phone/tablet/desktop.
+6. Complete research workflow works on desktop with keyboard access and accessible chart data. Mobile/tablet/touch development and verification are excluded by the 8 November 2026 user scope update.
 7. Markdown bundle includes rendered chart assets, data, notes and a manifest, pinned to one document revision.
 8. Production health, TLS, restore rehearsal and judge walkthrough pass. P0 tasks complete; remaining P1/P2 is labeled.
