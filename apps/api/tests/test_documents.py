@@ -439,6 +439,9 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/documents/{document_id}/insights/{insight_id}",
             "/api/documents/{document_id}/hypotheses",
             "/api/documents/{document_id}/hypotheses/{hypothesis_id}",
+            "/api/documents/{document_id}/evidence",
+            "/api/documents/{document_id}/evidence/{evidence_id}",
+            "/api/documents/{document_id}/evidence-targets",
             "/api/metrics", "/api/metrics/{metric_id}",
             "/api/metrics/{metric_id}/series",
             "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",
@@ -516,6 +519,11 @@ class DocumentRouteContractTests(unittest.TestCase):
              {"block_id": str(uuid4()), "statement": "Synthetic question", "assessment": "untested"}),
             ("patch", f"/api/documents/{uuid4()}/hypotheses/{uuid4()}", {"assessment": "mixed"}),
             ("delete", f"/api/documents/{uuid4()}/hypotheses/{uuid4()}", {"remove_evidence_links": True}),
+            ("get", f"/api/documents/{uuid4()}/evidence", None),
+            ("get", f"/api/documents/{uuid4()}/evidence-targets?target_kind=citation", None),
+            ("post", f"/api/documents/{uuid4()}/evidence", {}),
+            ("patch", f"/api/documents/{uuid4()}/evidence/{uuid4()}", {"classification": "uncertain"}),
+            ("delete", f"/api/documents/{uuid4()}/evidence/{uuid4()}", None),
         ):
             with self.subTest(method=method):
                 response = self.client.request(method, path, json=payload) \
@@ -895,7 +903,7 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
         saved = service.save_revision(self.engine, self.alice, detail.document.id,
                                       expected_revision=2, document_payload=document)
         self.assertEqual(saved.document.revision, 3)
-        # Model-run targets are gated until the model run registry lands.
+        # A model run absent from the published registry is not referenceable.
         model_run_evidence = evidence_attrs(hypothesis_id, "model_run", str(uuid4()))
         document["content"].append(model_run_evidence)
         with self.assertRaises(ReferenceInvalid):

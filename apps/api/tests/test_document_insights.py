@@ -1,4 +1,4 @@
-"""NI-047 and NI-048 annotation HTTP checks on disposable PostgreSQL."""
+"""NI-047 through NI-049 annotation HTTP checks on disposable PostgreSQL."""
 
 import copy
 import os
@@ -28,6 +28,12 @@ def insight_payload(context, **changes):
 def hypothesis_payload(**changes):
     return {"block_id": str(uuid4()), "statement": "Synthetic research question",
             "assessment": "untested", **changes}
+
+
+def evidence_payload(hypothesis_id, target_kind, target_id, **changes):
+    return {"block_id": str(uuid4()), "hypothesis_id": hypothesis_id,
+            "classification": "uncertain", "target_kind": target_kind, "target_id": target_id,
+            "explanation": "Synthetic evidence note", **changes}
 
 
 def document_with(*nodes):
@@ -592,3 +598,268 @@ class DocumentAnnotationDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture, 
         followup["content"][0]["attrs"]["block_id"] = str(uuid4())
         rejected = self.failure(self.save(path, 3, followup), 422, "REFERENCE_INVALID")
         self.assertEqual(rejected["details"], [{"path": "block_id", "reason": "hypothesis_block_mismatch"}])
+
+    def test_evidence_crud_coexistence_and_revision_history(self):
+        document_id = self.create_document(self.alice).document.id
+        path = f"/api/documents/{document_id}"
+        collection = path + "/evidence"
+        hypothesis = document_fixtures.hypothesis_attrs()
+        hypothesis_id = hypothesis["attrs"]["hypothesis_id"]
+        paragraph = chart_fixtures.text_paragraph("Synthetic paragraph to convert")
+        dataset = self.publish_volume(self.dataset_key("evidence-lifecycle"), "21")
+        preview = self.preview_volume(document_id, dataset_version=dataset.dataset_version_id)
+        chart_id, chart = self.chart_document(preview)
+        self.success(self.save(path, 1, document_with(hypothesis, *chart["content"], paragraph)), 201)
+        self.assertEqual(self.success(self.request("GET", collection,
+                                                  params={"hypothesis_id": hypothesis_id}), 200), [])
+        insight = self.success(self.request("POST", path + "/insights", revision=2,
+                               body=insight_payload(chart_fixtures.observed_context(preview),
+                                                    after_block_id=chart_id)), 201)
+        insight_id = insight["value"]["id"]
+
+        body = evidence_payload(hypothesis_id, "chart_block", chart_id,
+                                classification="supporting", after_block_id=chart_id)
+        self.failure(self.request("POST", collection, body=body), 428, "PRECONDITION_REQUIRED")
+        key = uuid4()
+        response = self.request("POST", collection, body=body, revision=3, key=key)
+        first = self.success(response, 201)
+        self.assertEqual(response.headers["ETag"], '"4"')
+        self.assertEqual(first["version"]["id"], first["document"]["current_version_id"])
+        value = first["value"]
+        self.assertEqual(value["authored_at"], first["version"]["created_at"])
+        self.assertEqual(value["modified_at"], value["authored_at"])
+        self.assertEqual(value["block_id"], body["block_id"])
+        self.assertEqual(first["version"]["resolved_contexts"], insight["version"]["resolved_contexts"])
+
+        counter = evidence_payload(hypothesis_id, "insight", insight_id, classification="contradicting",
+                                   block_id=paragraph["attrs"]["block_id"])
+        second = self.success(self.request("POST", collection, body=counter, revision=4), 201)
+        nodes = second["version"]["content"]["content"]
+        self.assertEqual([node["type"] for node in nodes],
+                         ["hypothesis", "liveChart", "evidence", "insight", "evidence"])
+        self.assertEqual(nodes[0]["attrs"]["assessment"], "untested")
+        self.assertEqual(nodes[2]["attrs"]["evidence_id"], value["id"])
+        self.assertEqual(nodes[-1]["attrs"]["block_id"], counter["block_id"])
+        self.assertEqual(self.success(self.request("GET", collection,
+                                                  params={"hypothesis_id": hypothesis_id}), 200),
+                         [value, second["value"]])
+        self.assertEqual(self.success(self.request("POST", collection, body=body, revision=3, key=key), 201), first)
+        self.failure(self.request("POST", collection, body=counter, revision=5, key=key),
+                     409, "IDEMPOTENCY_CONFLICT")
+
+        item = f"{collection}/{value['id']}"
+        edit = {"target_kind": "insight", "target_id": insight_id, "explanation": "Synthetic remap rationale"}
+        self.failure(self.request("PATCH", item, body=edit, revision=4), 409, "REVISION_CONFLICT")
+        edit_key = uuid4()
+        self.failure(self.request("PATCH", item, body={"target_kind": "insight"}, revision=5, key=edit_key),
+                     422, "REFERENCE_INVALID")
+        edited = self.success(self.request("PATCH", item, body=edit, revision=5, key=edit_key), 200)
+        self.assertEqual(edited["value"], {**value, **edit, "modified_at": edited["version"]["created_at"]})
+        self.assertNotEqual(edited["value"]["modified_at"], value["modified_at"])
+        self.assertEqual(self.success(self.request("PATCH", item, body=edit, revision=5, key=edit_key), 200), edited)
+        with principal_transaction(self.engine, self.alice) as connection:
+            row = connection.execute(text("""
+                SELECT block_id, hypothesis_id, classification, target_kind, target_id, explanation
+                FROM app.evidence_links WHERE document_version_id = :version AND evidence_id = :evidence
+            """), {"version": edited["version"]["id"], "evidence": value["id"]}).one()
+        self.assertEqual(row, (UUID(value["block_id"]), UUID(hypothesis_id), "supporting",
+                               "insight", UUID(insight_id), edit["explanation"]))
+
+        self.success(self.request("PATCH", path, revision=6, body={"title": "Synthetic renamed thesis"}), 200)
+        self.assertEqual(self.success(self.request("GET", collection), 200), [edited["value"], second["value"]])
+        delete_key = uuid4()
+        deleted = self.success(self.request("DELETE", item, revision=7, key=delete_key), 200)
+        self.assertEqual(deleted["value"], {"deleted_id": value["id"]})
+        self.assertEqual(self.success(self.request("DELETE", item, revision=7, key=delete_key), 200), deleted)
+        self.failure(self.request("DELETE", item, revision=8), 404, "NOT_FOUND")
+        self.assertEqual(self.success(self.request("GET", collection), 200), [second["value"]])
+        self.assertEqual(self.success(self.request("GET", collection,
+                                                  params={"version_id": first["version"]["id"]}), 200), [value])
+        self.assertEqual(self.counts(document_id, deleted["version"]["id"]), (8, 4, 1, 1))
+
+    def test_evidence_rejects_cross_document_and_foreign_references(self):
+        dataset = self.insert_dataset_version(self.dataset_key("evidence-ownership"))
+        context = chart_fixtures.volume_context(self.operator, dataset)
+
+        def seed_document(principal):
+            detail = self.create_document(principal)
+            chart = document_fixtures.block(
+                "liveChart", chart_definition_version_id=str(chart_fixtures.CHART_ID), mode="live",
+                observed_dataset_version_id=str(dataset), selection=context["selection"])
+            hypothesis = document_fixtures.hypothesis_attrs()
+            insight = document_fixtures.insight_attrs(context=context)
+            link = document_fixtures.evidence_attrs(hypothesis["attrs"]["hypothesis_id"],
+                                                   "insight", insight["attrs"]["insight_id"])
+            saved = documents.save_revision(self.engine, principal, detail.document.id,
+                                             expected_revision=1,
+                                             document_payload=document_with(chart, hypothesis, insight, link))
+            return saved, chart["attrs"], hypothesis["attrs"], insight["attrs"], link["attrs"]
+
+        own, own_chart, own_hypothesis, _, own_link = seed_document(self.alice)
+        path = f"/api/documents/{own.document.id}"
+        collection = path + "/evidence"
+        for principal in (self.alice, self.bob):
+            foreign, foreign_chart, foreign_hypothesis, foreign_insight, foreign_link = seed_document(principal)
+            for kind, target_id, reason in (
+                ("chart_block", foreign_chart["block_id"], "dangling_chart_block_reference"),
+                ("insight", foreign_insight["insight_id"], "dangling_insight_reference"),
+            ):
+                body = evidence_payload(own_hypothesis["hypothesis_id"], kind, target_id)
+                error = self.failure(self.request("POST", collection, body=body, revision=2),
+                                     422, "REFERENCE_INVALID")
+                self.assertEqual(error["details"], [{"path": "content", "reason": reason}])
+            wrong_hypothesis = evidence_payload(foreign_hypothesis["hypothesis_id"],
+                                                "chart_block", own_chart["block_id"])
+            error = self.failure(self.request("POST", collection, body=wrong_hypothesis, revision=2),
+                                 422, "REFERENCE_INVALID")
+            self.assertEqual(error["details"], [{"path": "content", "reason": "dangling_hypothesis_reference"}])
+            for filter_ in ({"version_id": foreign.version.id}, {"hypothesis_id": foreign_hypothesis["hypothesis_id"]}):
+                self.failure(self.request("GET", collection, params=filter_), 404, "NOT_FOUND")
+            nested = f"{collection}/{foreign_link['evidence_id']}"
+            self.failure(self.request("PATCH", nested, revision=2, body={"classification": "supporting"}),
+                         404, "NOT_FOUND")
+            self.failure(self.request("DELETE", nested, revision=2), 404, "NOT_FOUND")
+        for method, endpoint, body in (
+            ("GET", collection, None),
+            ("GET", path + "/evidence-targets?target_kind=citation", None),
+            ("POST", collection, wrong_hypothesis),
+            ("PATCH", f"{collection}/{own_link['evidence_id']}", {"classification": "supporting"}),
+            ("DELETE", f"{collection}/{own_link['evidence_id']}", None),
+        ):
+            self.failure(self.request(method, endpoint, revision=2, body=body, subject=self.bob_id),
+                         404, "NOT_FOUND")
+        self.assertEqual(self.counts(own.document.id, own.version.id), (2, 4, 1, 1))
+
+    def test_evidence_duplication_remaps_only_copied_targets(self):
+        detail = self.create_document(self.alice)
+        path = f"/api/documents/{detail.document.id}"
+        collection = path + "/evidence"
+        dataset = self.insert_dataset_version(self.dataset_key("evidence-duplicate"))
+        chart = document_fixtures.block(
+            "liveChart", chart_definition_version_id=str(chart_fixtures.CHART_ID), mode="live",
+            observed_dataset_version_id=str(dataset), selection=chart_fixtures.selection())
+        chart_id = chart["attrs"]["block_id"]
+        hypothesis = document_fixtures.hypothesis_attrs()
+        hypothesis_id = hypothesis["attrs"]["hypothesis_id"]
+        original_link = document_fixtures.evidence_attrs(hypothesis_id, "chart_block", chart_id)
+        first = self.success(self.save(path, 1, document_with(hypothesis, chart, original_link)), 201)["version"]
+        original = self.success(self.request("GET", collection), 200)[0]
+
+        copied_link = copy.deepcopy(original_link)
+        copied_link["attrs"]["block_id"] = str(uuid4())
+        duplicate = self.failure(self.save(path, 2, document_with(hypothesis, chart, original_link, copied_link)),
+                                 422, "VALIDATION_ERROR")
+        self.assertEqual(duplicate["details"], [{"path": "content", "reason": "duplicate_evidence_id"}])
+        for field in ("evidence_id", "block_id"):
+            changed = copy.deepcopy(original_link)
+            changed["attrs"][field] = str(uuid4())
+            invalid = self.failure(self.save(path, 2, document_with(hypothesis, chart, changed)),
+                                   422, "REFERENCE_INVALID")
+            self.assertEqual(invalid["details"], [{"path": "content", "reason": "evidence_identity_mismatch"}])
+
+        copied_link["attrs"]["evidence_id"] = str(uuid4())
+        new_hypothesis = document_fixtures.hypothesis_attrs()
+        new_hypothesis_id = new_hypothesis["attrs"]["hypothesis_id"]
+        new_chart = copy.deepcopy(chart)
+        new_chart_id = new_chart["attrs"]["block_id"] = str(uuid4())
+        remapped = document_fixtures.evidence_attrs(new_hypothesis_id, "chart_block", new_chart_id)
+        copied = document_with(hypothesis, chart, original_link, copied_link, new_hypothesis, new_chart, remapped)
+        copied_version = self.success(self.save(path, 2, copied), 201)["version"]
+        original_values = self.success(self.request("GET", collection,
+                                       params={"hypothesis_id": hypothesis_id}), 200)
+        self.assertEqual(original_values[0], original)
+        self.assertEqual(original_values[1]["id"], copied_link["attrs"]["evidence_id"])
+        self.assertEqual(original_values[1]["target_id"], chart_id)
+        self.assertEqual(original_values[1]["authored_at"], copied_version["created_at"])
+        other_values = self.success(self.request("GET", collection,
+                                    params={"hypothesis_id": new_hypothesis_id}), 200)
+        self.assertEqual([value["target_id"] for value in other_values], [new_chart_id])
+
+        dangling = document_with(hypothesis, original_link, copied_link, new_hypothesis, new_chart, remapped)
+        self.failure(self.save(path, 3, dangling), 422, "REFERENCE_INVALID")
+        cleaned = document_with(hypothesis, new_hypothesis, new_chart, remapped)
+        self.success(self.save(path, 3, cleaned), 201)
+        self.assertEqual(self.success(self.request("GET", collection), 200), other_values)
+        restored = self.success(self.save(path, 4, copied), 201)["version"]
+        after_restore = self.success(self.request("GET", collection), 200)
+        self.assertEqual(after_restore[0], {**original, "modified_at": restored["created_at"]})
+        self.assertEqual(after_restore[2:], other_values)
+        self.assertEqual(self.success(self.request("GET", collection,
+                                                  params={"version_id": first["id"]}), 200), [original])
+
+    def test_evidence_public_target_catalog_and_typed_validation(self):
+        from near_api.research.publication import verify_bundle
+        from near_api.research.publish_store import publish_run
+        from test_models_publication import MANIFEST_KEYS, canonical_artifact_hash, derive_run_id, valid_bundle
+
+        bundle = valid_bundle()
+        verified = verify_bundle(bundle)
+        self.assertTrue(verified.passed, verified)
+        run_id = derive_run_id({key: canonical_artifact_hash(bundle[key]) for key in MANIFEST_KEYS})
+        model = publish_run(os.environ["NI_TEST_OPERATOR_URL"], bundle, run_id)
+        if not model.already_published:
+            def remove_model_fixture():
+                with self.admin.begin() as connection:
+                    connection.execute(text("DELETE FROM app.model_runs WHERE run_id = :id"), {"id": model.run_id})
+            self.addCleanup(remove_model_fixture)
+
+        scopes = (("public", None), ("public", None), ("internal", None),
+                  ("private", self.alice_id), ("private", self.bob_id))
+        artifact_ids = [uuid4() for _ in scopes]
+
+        def remove_artifact_fixtures():
+            with self.admin.begin() as connection:
+                connection.execute(text("DELETE FROM app.artifacts WHERE id = ANY(:ids)"), {"ids": artifact_ids})
+
+        self.addCleanup(remove_artifact_fixtures)
+        with self.operator.begin() as connection:
+            connection.execute(text("""
+                INSERT INTO app.artifacts(id, relative_storage_key, sha256, byte_size, media_type, scope, owner_id)
+                VALUES (:id, :key, :sha, 10, 'application/pdf', :scope, :owner)
+            """), [{"id": artifact_id, "key": f"synthetic/operator-only/{artifact_id}.pdf",
+                     "sha": "1" * 64, "scope": scope, "owner": owner}
+                    for artifact_id, (scope, owner) in zip(artifact_ids, scopes, strict=True)])
+
+        detail = self.create_document(self.alice)
+        path = f"/api/documents/{detail.document.id}"
+        collection = path + "/evidence"
+        targets = path + "/evidence-targets"
+        hypothesis = document_fixtures.hypothesis_attrs()
+        hypothesis_id = hypothesis["attrs"]["hypothesis_id"]
+        self.success(self.save(path, 1, document_with(hypothesis)), 201)
+        model_page = self.success(self.request("GET", targets, params={"target_kind": "model_run"}), 200)
+        model_item = next(item for item in model_page["items"] if item["id"] == str(model.run_id))
+        self.assertEqual(set(model_item), {"id", "label"})
+        self.assertIn("gross_fee_activity_v1", model_item["label"])
+        self.assertNotIn(model.published_by, model_item["label"])
+        citation_params = {"target_kind": "citation", "limit": 1}
+        first_page = self.success(self.request("GET", targets, params=citation_params), 200)
+        self.assertIsInstance(first_page["next_cursor"], str)
+        second_page = self.success(self.request("GET", targets,
+                                               params={**citation_params, "cursor": first_page["next_cursor"]}), 200)
+        cited_items = first_page["items"] + second_page["items"]
+        self.assertEqual({item["id"] for item in cited_items}, {str(id_) for id_ in artifact_ids[:2]})
+        self.assertTrue(all(item == {"id": item["id"], "label": f"Public citation · {item['id']}"}
+                            for item in cited_items))
+        for params in ({"target_kind": "insight"}, {**citation_params, "cursor": "!!!"},
+                       {**citation_params, "limit": 101}):
+            self.failure(self.request("GET", targets, params=params), 422, "VALIDATION_ERROR")
+
+        for kind, unknown in (("model_run", uuid4()), ("model_run", artifact_ids[0]),
+                              ("citation", model.run_id), ("citation", uuid4()),
+                              *(("citation", artifact_id) for artifact_id in artifact_ids[2:])):
+            with self.subTest(kind=kind, unknown=unknown):
+                error = self.failure(self.request("POST", collection, revision=2,
+                                     body=evidence_payload(hypothesis_id, kind, str(unknown))),
+                                     422, "REFERENCE_INVALID")
+                self.assertEqual(error["details"], [{"path": "content", "reason": f"dangling_{kind}_target"}])
+        unknown_link = document_fixtures.evidence_attrs(hypothesis_id, "model_run", str(uuid4()))
+        self.failure(self.save(path, 2, document_with(hypothesis, unknown_link)), 422, "REFERENCE_INVALID")
+        model_link = document_fixtures.evidence_attrs(hypothesis_id, "model_run", str(model.run_id))
+        saved = self.success(self.save(path, 2, document_with(hypothesis, model_link)), 201)["version"]
+        self.assertEqual(self.counts(detail.document.id, saved["id"]), (3, 2, 0, 1))
+        citation = self.success(self.request("POST", collection, revision=3,
+                                body=evidence_payload(hypothesis_id, "citation", str(artifact_ids[0]))), 201)
+        self.assertEqual(citation["value"]["target_id"], str(artifact_ids[0]))
+        values = self.success(self.request("GET", collection), 200)
+        self.assertEqual([value["target_kind"] for value in values], ["model_run", "citation"])

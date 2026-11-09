@@ -36,6 +36,7 @@ from near_api.insights.schemas import (
     RiskInput,
 )
 from near_api.main import app
+from near_api.schemas.document_evidence import EvidenceCreateRequest, EvidencePatchRequest
 
 TS = "2026-11-06T12:00:00Z"
 OFFSET_TS = "2026-11-06T15:00:00+03:00"  # same instant, +03:00 spelling
@@ -540,7 +541,37 @@ class OpenAPIPublicationTests(unittest.TestCase):
                          {"patch": "updateDocumentHypothesis", "delete": "deleteDocumentHypothesis"})
         self.assertEqual(set(components["HypothesisPatchRequest"]["properties"]), {"statement", "assessment"})
         self.assertEqual(components["HypothesisDeleteRequest"]["required"], ["remove_evidence_links"])
-        self.assertNotIn("/api/documents/{document_id}/evidence", schema["paths"])
+
+        evidence = schema["paths"]["/api/documents/{document_id}/evidence"]
+        item = schema["paths"]["/api/documents/{document_id}/evidence/{evidence_id}"]
+        picker = schema["paths"]["/api/documents/{document_id}/evidence-targets"]["get"]
+        self.assertEqual({method: route["operationId"] for method, route in evidence.items()},
+                         {"get": "listDocumentEvidence", "post": "createDocumentEvidence"})
+        self.assertEqual({method: route["operationId"] for method, route in item.items()},
+                         {"patch": "updateDocumentEvidence", "delete": "deleteDocumentEvidence"})
+        self.assertNotIn("requestBody", item["delete"])
+        self.assertEqual(picker["operationId"], "listDocumentEvidenceTargets")
+        self.assertEqual({field["name"]: field["schema"]["enum"]
+                          for field in picker["parameters"] if field["name"] == "target_kind"},
+                         {"target_kind": ["model_run", "citation"]})
+        self.assertEqual(set(components["EvidenceTargetListResponse"]["required"]), {"items", "next_cursor"})
+
+    def test_evidence_mutation_inputs_forbid_trusted_fields_and_null_patches(self):
+        create = EvidenceCreateRequest.model_validate(evidence_payload(after_block_id=str(uuid4())))
+        self.assertIsInstance(create.after_block_id, UUID)
+        patch = EvidencePatchRequest.model_validate({"target_kind": "citation"})
+        self.assertEqual(patch.model_dump(exclude_unset=True), {"target_kind": "citation"})
+        for field in ("block_id", "evidence_id", "owner_id", "authored_at", "modified_at"):
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                EvidencePatchRequest.model_validate({field: str(uuid4())})
+        for field in ("hypothesis_id", "classification", "target_kind", "target_id", "explanation"):
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                EvidencePatchRequest.model_validate({field: None})
+        with self.assertRaises(ValidationError):
+            EvidencePatchRequest.model_validate({})
+        for field in ("evidence_id", "owner_id", "authored_at", "modified_at"):
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                EvidenceCreateRequest.model_validate(evidence_payload(**{field: str(uuid4())}))
 
     def test_02_openapi_builds_repeatably_without_schema_conflicts(self):
         first = self.client.get("/openapi.json").json()

@@ -166,3 +166,11 @@ Add hypothesis inserts a new card after the selected saved block, or starts an e
 Edits keep the original IDs and author time, including when evidence already links to the hypothesis. Delete hypothesis, the block toolbar and keyboard deletion of a selected hypothesis use the same confirmation. Cleanup removes linked evidence blocks and clears hypothesis links from insights and risks while keeping their authored content. A stale revision keeps the draft and requires review before retrying. If the same hypothesis has changed, reopen its current revision before editing it.
 
 The synthetic desktop smoke test created a card with Insufficient data, changed the statement and assessment to Mixed, and reopened revision 3 with the same hypothesis ID. [Desktop evidence](qa/ni048-hypothesis-desktop.jpg)
+
+## Evidence links (NI-049)
+
+Add evidence on a saved hypothesis opens the picker. The editor offers saved insight and chart targets from this research and paged public model runs or citations. The author selects Supporting, Contradicting or Uncertain and records an explanation. Different classifications can coexist on the same hypothesis. Counts describe linked evidence separately from the authored assessment.
+
+Edit evidence link preserves its IDs while letting the author change the relationship. A stale save retains the explanation and requires review of the refreshed revision. If a private target changed or disappeared, the author explicitly selects a target again. Delete evidence link, the toolbar and keyboard deletion of a selected evidence block open the same confirmation. Removing the link leaves the hypothesis and target intact. Deleting a selected chart or insight with dependent evidence previews the affected links. Duplicating one evidence block allocates new IDs and keeps references to its existing targets. Reopening a historical revision retains its original links.
+
+The synthetic desktop smoke test added a contradicting citation beside an existing supporting citation and reopened revision 4 with both links and the original Untested assessment. [Desktop evidence](qa/ni049-evidence-desktop.jpg)

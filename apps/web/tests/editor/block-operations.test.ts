@@ -55,7 +55,7 @@ const RESOLVED_CONTEXT: CanonicalResolvedContext = {
 
 /** Synthetic linked research document (fixture): hypothesis <- evidence,
  * insight (links hypothesis, pinned context), chart targeted by evidence. */
-function linkedFixtureBlocks(): CanonicalBlock[] {
+function linkedFixtureBlocks(targetKind: "chart_block" | "insight" = "chart_block"): CanonicalBlock[] {
   return [
     {
       type: "heading",
@@ -80,8 +80,8 @@ function linkedFixtureBlocks(): CanonicalBlock[] {
         evidence_id: EVIDENCE_ID,
         hypothesis_id: HYPOTHESIS_ID,
         classification: "supporting",
-        target_kind: "chart_block",
-        target_id: CHART_BLOCK_ID,
+        target_kind: targetKind,
+        target_id: targetKind === "insight" ? INSIGHT_ID : CHART_BLOCK_ID,
         explanation: "Chart matches the hypothesis (fixture)",
       },
     },
@@ -321,17 +321,23 @@ describe("keyboard shortcuts", () => {
     editor.destroy();
   });
 
-  it.each(["Backspace", "Delete", "Mod-Shift-Backspace"])("routes %s on a selected hypothesis through confirmation", (key) => {
-    const editor = editorWith(linkedFixtureBlocks());
-    const requestSpy = vi.fn();
-    editor.view.dom.addEventListener(EDITOR_REQUEST_BLOCK_DELETE, requestSpy);
-    editor.commands.setNodeSelection(positionOf(editor, 1)); // hypothesis with dependents
-    // The shortcut must NOT delete: it requests the confirmation dialog.
-    expect(pressShortcut(editor, key)).toBe(true);
-    expect(requestSpy).toHaveBeenCalledTimes(1);
-    expect(editor.state.doc.childCount).toBe(5);
-    expectValidSnapshot(editor);
-    editor.destroy();
+  describe.each([
+    { type: "hypothesis", index: 1, target: "chart_block" },
+    { type: "evidence", index: 2, target: "chart_block" },
+    { type: "linked chart", index: 3, target: "chart_block" },
+    { type: "linked insight", index: 4, target: "insight" },
+  ] as const)("selected $type", ({ index, target }) => {
+    it.each(["Backspace", "Delete", "Mod-Shift-Backspace"])("routes %s through confirmation", key => {
+      const editor = editorWith(linkedFixtureBlocks(target));
+      const requestSpy = vi.fn();
+      editor.view.dom.addEventListener(EDITOR_REQUEST_BLOCK_DELETE, requestSpy);
+      editor.commands.setNodeSelection(positionOf(editor, index));
+      expect(pressShortcut(editor, key)).toBe(true);
+      expect(requestSpy).toHaveBeenCalledWith(expect.objectContaining({ detail: { index } }));
+      expect(editor.state.doc.childCount).toBe(5);
+      expectValidSnapshot(editor);
+      editor.destroy();
+    });
   });
 
   it("deletes an unlinked block directly via Mod-Shift-Backspace", () => {

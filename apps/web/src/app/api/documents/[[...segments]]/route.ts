@@ -6,7 +6,7 @@ async function handle(request: NextRequest, context: Context) {
   const { segments = [] } = await context.params;
   let allowed: string[] = [];
   const uuid = (value: string | undefined) => z.uuid().safeParse(value).success;
-  const annotation = segments[1] === "insights" || segments[1] === "hypotheses";
+  const annotation = segments[1] === "insights" || segments[1] === "hypotheses" || segments[1] === "evidence";
   if (!segments.length) allowed = ["GET", "POST"];
   else if (uuid(segments[0])) {
     if (segments.length === 1) allowed = ["GET", "PATCH", "DELETE"];
@@ -15,6 +15,7 @@ async function handle(request: NextRequest, context: Context) {
     if (segments.length === 2 && segments[1] === "chart-view") allowed = ["GET"];
     if (segments.length === 2 && annotation) allowed = ["GET", "POST"];
     if (segments.length === 3 && annotation && uuid(segments[2])) allowed = ["PATCH", "DELETE"];
+    if (segments.length === 2 && segments[1] === "evidence-targets") allowed = ["GET"];
     if (segments.length === 3 && segments[1] === "versions" && uuid(segments[2])) allowed = ["GET"];
     if (segments.length === 6 && segments[1] === "versions" && uuid(segments[2])
       && segments[3] === "chart-blocks" && uuid(segments[4])
@@ -36,9 +37,20 @@ async function handle(request: NextRequest, context: Context) {
     headers: { allow: allowed.join(", "), "cache-control": "no-store" } });
   if (annotation && request.nextUrl.search) {
     const entries = [...request.nextUrl.searchParams];
-    if (request.method !== "GET" || entries.length !== 1 || entries[0][0] !== "version_id" || !uuid(entries[0][1])) {
-      const label = segments[1] === "insights" ? "insight" : "hypothesis";
+    const keys = segments[1] === "evidence" ? ["version_id", "hypothesis_id"] : ["version_id"];
+    if (request.method !== "GET" || entries.some(([key, value]) =>
+      !keys.includes(key) || !uuid(value) || request.nextUrl.searchParams.getAll(key).length !== 1)) {
+      const label = segments[1] === "insights" ? "insight" : segments[1] === "hypotheses" ? "hypothesis" : "evidence";
       return NextResponse.json({ error: `Unsupported ${label} query.` }, { status: 422, headers: { "cache-control": "no-store" } });
+    }
+  }
+  if (segments[1] === "evidence-targets") {
+    const query = request.nextUrl.searchParams;
+    const kind = query.get("target_kind");
+    const keys = ["target_kind", "cursor", "limit"];
+    if ((kind !== "model_run" && kind !== "citation") || request.nextUrl.search.length > 1000
+      || [...query.keys()].some(key => !keys.includes(key) || query.getAll(key).length !== 1)) {
+      return NextResponse.json({ error: "Unsupported evidence target query." }, { status: 422, headers: { "cache-control": "no-store" } });
     }
   }
   return forwardPrivate(request, `/api/documents${segments.length ? `/${segments.join("/")}` : ""}`);

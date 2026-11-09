@@ -36,11 +36,9 @@ with a typed reason, never a silent substitution):
 - liveChart blocks are verified against the NI-031 chart registry (NI-041:
   registered ``available`` definition, allowed selection, pinned dataset
   covering the required metrics — the shared rules of
-  :mod:`near_api.documents.chart_blocks`); snapshot chart mode and
-  ``model_run`` evidence targets still require registries that do not exist
-  yet (NI-035 research snapshots, NI-054 model runs) and are rejected until
-  those tasks land — an unverifiable reference is invalid, not tolerated;
-- evidence ``citation`` targets must reference a public immutable artifact;
+  :mod:`near_api.documents.chart_blocks`); snapshot chart mode is gated;
+- public evidence targets must reference a published model run or a public
+  immutable citation artifact;
 - Top-level ``observed_contexts`` are compared with server-resolved pins.
   Unchanged chart contexts carry forward verbatim after verification.
 - new insight pins are verified against immutable chart inputs, and existing
@@ -56,7 +54,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import Connection, Engine, insert, select, update
 
 from near_api.auth.principal import Principal
-from near_api.db.models import Artifact, Document, DocumentVersion
+from near_api.db.models import Document, DocumentVersion
 from near_api.db.security import (
     Page,
     ResourceNotFound,
@@ -81,6 +79,7 @@ from near_api.documents.schema import (
     empty_document,
     parse_document,
 )
+from near_api.evidence.targets import validate_public_targets
 from near_api.insights.schemas import ResolvedContext
 from near_api.repositories.documents import (
     DocumentRow,
@@ -240,7 +239,8 @@ def save_locked_revision(connection: Connection, principal: Principal, document:
                                       replace_context_id=replace_insight_context_id)
     if canonical.hypotheses:
         canonical = _prepare_hypotheses(canonical, previous)
-    _validate_database_references(connection, canonical)
+    if canonical.evidence:
+        _validate_evidence_identities(canonical, previous)
     resolved_contexts = resolve_revision_contexts(
         connection, canonical, previous, observed_contexts=observed_contexts)
     return _commit_new_revision(connection, principal, document, canonical=canonical,
@@ -258,6 +258,7 @@ def _commit_new_revision(connection: Connection, principal: Principal,
     so both write the immutable version, its projections and the advanced
     pointer identically inside their transaction.
     """
+    _validate_database_references(connection, canonical)
     new_revision = document.revision + 1
     version_id = uuid4()
     connection.execute(_insert_version().values(
@@ -474,22 +475,22 @@ def _validate_database_references(connection: Connection,
         if table.dataset_version_id is not None:
             require_approved_dataset(connection, table.dataset_version_id,
                                      "dataTable.dataset_version_id")
+    validate_public_targets(connection, canonical)
+
+
+def _validate_evidence_identities(canonical: CanonicalDocument,
+                                  previous: DocumentVersionRow) -> None:
+    """A retained evidence block and relationship keep their paired IDs."""
+    prior = [node["attrs"] for node in previous.content["content"]
+             if node["type"] == "evidence"]
+    block_by_evidence = {attrs["evidence_id"]: attrs["block_id"] for attrs in prior}
+    evidence_by_block = {attrs["block_id"]: attrs["evidence_id"] for attrs in prior}
     for item in canonical.evidence:
-        if item.target_kind == "model_run":
-            raise ReferenceInvalid(
-                "Evidence targets of kind model_run require the model run registry, "
-                "which is not available yet (arrives with NI-052/NI-054)",
-                [("content", "reference_unavailable")])
-        if item.target_kind == "citation":
-            exists = connection.execute(
-                select(Artifact.id).where(Artifact.id == item.target_id,
-                                          Artifact.scope == "public")
-            ).first()
-            if exists is None:
-                raise ReferenceInvalid(
-                    "Evidence citation target does not reference a public immutable "
-                    "artifact",
-                    [("content", "dangling_citation_target")])
+        block_id, evidence_id = str(item.block_id), str(item.evidence_id)
+        if (block_by_evidence.get(evidence_id, block_id) != block_id
+                or evidence_by_block.get(block_id, evidence_id) != evidence_id):
+            raise ReferenceInvalid("Existing evidence keeps its block_id and evidence_id",
+                                   [("content", "evidence_identity_mismatch")])
 
 
 def _prepare_insights(connection: Connection, canonical: CanonicalDocument,

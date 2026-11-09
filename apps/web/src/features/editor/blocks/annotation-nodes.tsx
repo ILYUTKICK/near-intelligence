@@ -11,6 +11,8 @@ import { emitOpenBlockProperties } from "../ui-bridge";
 import type {
   CanonicalContext,
   CanonicalRiskBlock,
+  Classification,
+  EvidenceTargetKind,
   RichFragment,
 } from "../canonical";
 import { fieldPair, formatTimestamp, shortId } from "./display";
@@ -18,6 +20,7 @@ import { RichFragmentView } from "./rich-fragment";
 import { Button } from "@/components/ui/button";
 import { useChartEditorContext } from "./chart-context";
 import { assessmentLabel } from "../hypotheses/assessment";
+import { classificationLabels, targetKindLabels } from "../evidence/options";
 
 /**
  * Canonical typed research annotation blocks (P0): `insight`, `hypothesis`,
@@ -225,13 +228,17 @@ function HypothesisBlockView({ node, editor, getPos }: NodeViewProps) {
     authored_at: string | null;
     modified_at: string | null;
   };
-  const linkedEvidence = useEditorState({ editor, selector: ({ editor }) => {
-    let count = 0;
+  const counts = useEditorState({ editor, selector: ({ editor }) => {
+    const linked = { supporting: 0, contradicting: 0, uncertain: 0 };
     editor.state.doc.forEach(block => {
-      if (block.type.name === "evidence" && block.attrs.hypothesis_id === attrs.hypothesis_id) count++;
+      const classification = block.attrs.classification as Classification;
+      if (block.type.name === "evidence" && block.attrs.hypothesis_id === attrs.hypothesis_id && Object.hasOwn(linked, classification)) {
+        linked[classification]++;
+      }
     });
-    return count;
+    return linked;
   } });
+  const linkedEvidence = counts.supporting + counts.contradicting + counts.uncertain;
   const blockId = attrs.block_id;
   return (
     <NodeViewWrapper
@@ -253,6 +260,9 @@ function HypothesisBlockView({ node, editor, getPos }: NodeViewProps) {
         <p className="mt-1 text-metadata leading-metadata text-text-secondary">
           {linkedEvidence} linked evidence {linkedEvidence === 1 ? "block" : "blocks"}
         </p>
+        {linkedEvidence > 0 ? <p className="text-metadata leading-metadata text-text-secondary">
+          Supporting {counts.supporting} · Contradicting {counts.contradicting} · Uncertain {counts.uncertain}
+        </p> : null}
         <div className="flex flex-wrap items-baseline gap-2">
           <EditPropertiesButton editor={editor} getPos={getPos} blockId={blockId} />
           {editor.isEditable && account?.onHypothesisAction && blockId ? <>
@@ -261,6 +271,8 @@ function HypothesisBlockView({ node, editor, getPos }: NodeViewProps) {
             <Button variant="quiet" disabled={!account.ready || !account.saved}
               onClick={() => account.onHypothesisAction?.({ kind: "delete", blockId })}>Delete hypothesis</Button>
           </> : null}
+          {editor.isEditable && account?.onEvidenceAction && blockId ? <Button variant="quiet" disabled={!account.ready || !account.saved}
+            onClick={() => account.onEvidenceAction?.({ kind: "create", blockId })}>Add evidence</Button> : null}
         </div>
       </div>
     </NodeViewWrapper>
@@ -304,15 +316,18 @@ export const Evidence = Node.create({
 });
 
 function EvidenceBlockView({ node, editor, getPos }: NodeViewProps) {
+  const account = useChartEditorContext();
   const attrs = node.attrs as {
     block_id: string | null;
     evidence_id: string | null;
     hypothesis_id: string | null;
-    classification: string | null;
-    target_kind: string | null;
+    classification: Classification | null;
+    target_kind: EvidenceTargetKind | null;
     target_id: string | null;
     explanation: string | null;
   };
+  const blockId = attrs.block_id;
+  const targetLabel = attrs.target_kind ? targetKindLabels[attrs.target_kind] : "—";
   return (
     <NodeViewWrapper
       data-evidence-block-view
@@ -323,19 +338,23 @@ function EvidenceBlockView({ node, editor, getPos }: NodeViewProps) {
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-ui text-ui leading-ui font-medium text-text">Evidence</p>
           <span className="rounded-control border border-control-border px-1.5 py-0.5 text-metadata leading-metadata text-text-secondary">
-            {attrs.classification ?? "—"} · {attrs.target_kind ?? "—"}
+            {attrs.classification ? classificationLabels[attrs.classification] : "—"} · {targetLabel}
           </span>
         </div>
         <p className="mt-2 text-body leading-body text-text">{attrs.explanation ?? ""}</p>
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-metadata leading-metadata text-text-secondary">
           {fieldPair("Hypothesis", shortId(attrs.hypothesis_id), "eh")}
-          {fieldPair("Target", `${attrs.target_kind ?? "—"} ${shortId(attrs.target_id)}`, "et")}
+          {fieldPair("Target ID", shortId(attrs.target_id), "et")}
         </dl>
-        <p className="mt-1 text-metadata leading-metadata text-text-secondary italic">
-          Evidence link editing arrives with NI-049; the block and its structural operations are
-          active now.
-        </p>
-        <EditPropertiesButton editor={editor} getPos={getPos} blockId={attrs.block_id} />
+        <div className="flex flex-wrap items-baseline gap-2">
+          <EditPropertiesButton editor={editor} getPos={getPos} blockId={blockId} />
+          {editor.isEditable && account?.onEvidenceAction && blockId ? <>
+            <Button variant="quiet" disabled={!account.ready || !account.saved}
+              onClick={() => account.onEvidenceAction?.({ kind: "edit", blockId })}>Edit evidence link</Button>
+            <Button variant="quiet" disabled={!account.ready || !account.saved}
+              onClick={() => account.onEvidenceAction?.({ kind: "delete", blockId })}>Delete evidence link</Button>
+          </> : null}
+        </div>
       </div>
     </NodeViewWrapper>
   );
