@@ -63,6 +63,7 @@ import type { AnnotationSave } from "./annotation-mutation";
 import { EditorInsightDialog, type InsightAction } from "./insights/editor-dialog";
 import { EditorHypothesisDialog, type HypothesisAction } from "./hypotheses/editor-dialog";
 import { EditorEvidenceDialog, type EvidenceAction } from "./evidence/editor-dialog";
+import { EvidenceNavigationPanel } from "./evidence/evidence-panel";
 
 /**
  * The three-pane research editor workbench (NI-039):
@@ -850,6 +851,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
             {editor ? (
               <ContextPane editor={editor} currentBlock={currentBlock} onTableChange={handleTableChange} />
             ) : null}
+            {editor ? <EvidenceNavigationPanel editor={editor} onAnnounce={announce} /> : null}
           </div>
         </aside>
       </div>
@@ -885,6 +887,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
                 onTableChange={handleTableChange}
               />
             ) : null}
+            {editor ? <EvidenceNavigationPanel editor={editor} onAnnounce={announce} /> : null}
           </div>
         </DrawerContent>
       </Drawer>
