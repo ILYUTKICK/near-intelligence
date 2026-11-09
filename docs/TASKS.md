@@ -1547,7 +1547,12 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-049, NI-042
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-A coordinator (ZCode session, ILYUTKICK operator), NI-050 dispatch
+- **Execution role:** A
+- **Started at:** 2026-11-09T18:45:25+03:00
+- **Branch/worktree:** feat/ni-050-evidence-navigation; /Users/ilyutkinn/Desktop/near-intelligence-a13 (worktree from origin/main 410ecad)
+- **Dependency verification:** NI-049 DONE on origin/main (410ecad, merged PR #75); NI-042 DONE on origin/main (aa63bed, merged PR #71). No competing NI-050 claim and no open PR at session start.
 
 **Description:** Make the connected argument inspectable in the editor instead of scattered notes.
 
@@ -1890,15 +1895,17 @@ Specification: [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 - **Complexity:** M
 - **Status:** TODO
 
-**Description:** Validate usability of the core research flow across input devices and document sizes.
+**Description:** Validate desktop usability of the core research flow, keyboard accessibility and document-size performance.
 
-**Implementation steps:** Run axe/keyboard/screen-reader/touch checks at360/768/1440; inspect chart table and editor IME/reorder; measure PRD budgets with200 blocks/20 refs/366 points; fix bottlenecks.
+**User scope update — 8 November 2026:** mobile development/adaptation and mobile/touch/phone/tablet QA are excluded. This supersedes earlier 360/768 viewport and physical-phone handoff requirements; preserve existing responsive code and past evidence without repeating mobile checks.
+
+**Implementation steps:** Run desktop axe/keyboard/screen-reader checks at a documented desktop viewport (1440px baseline); inspect chart table and editor IME/reorder; measure PRD budgets with200 blocks/20 refs/366 points; fix bottlenecks.
 
 **Expected files/modules:** apps/web/e2e/accessibility/; performance fixtures; QA report
 
 **Acceptance criteria:** No core-flow accessibility blocker or page overflow; chart data accessible without hover; measured budgets pass or documented limits revised with justification.
 
-**Testing requirements:** Real-device mobile pass when available; keyboard/screen reader review; documented staging performance run and lazy-chart mount checks.
+**Testing requirements:** Desktop keyboard/screen reader review; documented staging performance run and lazy-chart mount checks. No mobile viewport/device/touch pass is required or authorized in this scope.
 
 **Known UI regression inputs from NI-024 browser review (8 November 2026):** sidebar `/workspace/data/*` and `/workspace/models` aliases prefetch 404 while actual implemented public routes are `/data/*` and `/models`; reconcile the canonical navigation/route aliases during full-flow QA. The unused `Button asChild` path supplies Radix Slot multiple children (spinner/null plus child), producing a runtime Children.only error; add a real slotted-link regression before claiming that primitive supported. Global unlayered anchor color can override layered primary-link foreground utilities; NI-024's Continue uses the existing on-accent token explicitly, and the shared color layering should be covered by the full accessibility/contrast pass.
 
