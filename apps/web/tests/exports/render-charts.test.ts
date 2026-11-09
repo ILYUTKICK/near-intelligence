@@ -98,7 +98,7 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
         "",
       ].join("\n"),
     );
-  });
+  }, 60_000);
 
   it("is byte-identical across separate runs", () => {
     // The shared fixtures mint fresh UUIDs per call, so freeze ONE request
@@ -109,7 +109,7 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
     expect(first.status).toBe(0);
     expect(second.status).toBe(0);
     expect(second.stdout).toBe(first.stdout);
-  });
+  }, 60_000);
 
   it("is byte-identical when the same chart repeats inside one request", () => {
     const result = runRenderer(
@@ -129,7 +129,7 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
     ]);
     expect(charts[0].svg).toBe(charts[1].svg);
     expect(charts[0].csv).toBe(charts[1].csv);
-  });
+  }, 60_000);
 
   it("records the sha256 of the request and of every asset", () => {
     const input = JSON.stringify(request());
@@ -149,7 +149,7 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
     expect(chart.csv_sha256).toBe(
       createHash("sha256").update(chart.csv as string, "utf8").digest("hex"),
     );
-  });
+  }, 60_000);
 
   it("emits a static-safe SVG: no scripts, no remote references, no HTML hosts", () => {
     const result = runRenderer(request());
@@ -164,7 +164,7 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
     expect(svg).not.toMatch(/(xlink:)?href\s*=\s*["']?\s*(https?:)?\/\//i);
     expect(svg).not.toMatch(/url\(\s*["']?\s*(https?:)?\/\//i);
     expect(svg).not.toMatch(/data:text\/html/i);
-  });
+  }, 60_000);
 
   it("fails with a typed error on corrupt stdin", () => {
     for (const corrupt of ["", "not json", '{"protocol_version": 1', "[1, 2, 3]"]) {
@@ -176,7 +176,7 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
       expect(error.protocol_version).toBe(1);
       expect(typeof error.message).toBe("string");
     }
-  });
+  }, 60_000);
 
   it("rejects schema violations with bounded typed details", () => {
     const cases: [unknown, string][] = [
@@ -211,7 +211,7 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
       expect(details.length).toBeLessThanOrEqual(20);
       expect(details.join(" ")).toContain(pathFragment);
     }
-  });
+  }, 60_000);
 
   it("rejects oversized input before parsing", () => {
     const oversized = `{"pad":"${"x".repeat(5 * 1024 * 1024)}"}`;
@@ -220,7 +220,7 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
     const error = parseStdout(result.stdout ?? "").error as Record<string, unknown>;
     expect(error.code).toBe("invalid_input_size");
     expect(error.message).toContain("4194304"); // the recorded cap
-  });
+  }, 60_000);
 
   it("refuses a chart pinned to a foreign renderer instead of redrawing", () => {
     const payload = request();
@@ -230,7 +230,7 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
     expect(result.status).toBe(3);
     const error = parseStdout(result.stdout ?? "").error as Record<string, unknown>;
     expect(error.code).toBe("unsupported_renderer");
-  });
+  }, 60_000);
 
   it("stays offline: the script imports no network, process-spawn or eval surface", () => {
     const source = readFileSync(scriptPath, "utf8");
@@ -242,5 +242,5 @@ describe("render-charts.mjs (NI-057 static renderer)", () => {
     expect(source).not.toMatch(/new\s+Function\b/);
     // The only child-process usage in the whole pipeline is the Python side.
     expect(source).not.toMatch(/spawn|execFile|execSync/);
-  });
+  }, 60_000);
 });

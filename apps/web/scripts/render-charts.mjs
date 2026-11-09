@@ -186,10 +186,6 @@ const INPUT_EXIT_CODE = 2;
 const RENDER_EXIT_CODE = 3;
 const INTERNAL_EXIT_CODE = 4;
 
-function invalidInput(code, message, details = []) {
-  return () => fail(new RenderError(code, message, details), INPUT_EXIT_CODE);
-}
-
 // ---------------------------------------------------------------------------
 // SVG post-processing: canonical identifiers + static-safety assertions
 // ---------------------------------------------------------------------------
@@ -247,6 +243,7 @@ const UNSAFE_SVG_PATTERNS = [
   [/href\s*=\s*["']?\s*(?:https?:)?\/\//i, "remote reference"],
   [/url\(\s*["']?\s*(?:https?:)?\/\//i, "remote reference"],
   [/data:text\/html/i, "HTML data URL"],
+  [/\son[a-z]+\s*=\s*["']/i, "event handler attribute"],
 ];
 
 function assertSvgStaticSafety(svg, chartId) {
