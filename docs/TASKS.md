@@ -1483,7 +1483,13 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-047
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex `/root`, chat `01a1bd1f-f988-7c82-9339-80fb05e336c0`
+- **Execution role:** B with A editor handoff
+- **Started at:** 2026-11-09T13:12:22+03:00
+- **Branch/worktree:** `feat/ni-048-hypotheses`, `D:/хахатон/near-intelligence`
+- **Dependency verification:** NI-047 is DONE on `origin/main` (`597cd85`, merged PR #73). No other open PR or active NI-048 claim.
+- **Handoff:** The B work owns hypothesis revision endpoints and database tests. The A work owns editor forms, generated client integration and user acceptance.
 
 **Description:** Let researchers state an independent question and record an authored evidence assessment.
 
