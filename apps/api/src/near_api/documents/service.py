@@ -101,6 +101,14 @@ class RevisionConflict(Exception):
         self.current_revision = current_revision
 
 
+class ReferenceInUse(Exception):
+    """The mutation needs consent to clean up references in this revision."""
+
+    def __init__(self, message: str, details: tuple[tuple[str, str], ...]):
+        super().__init__(message)
+        self.details = details
+
+
 @dataclass(frozen=True)
 class DocumentDetail:
     """An owned document plus its current (or newly created) revision."""
@@ -230,6 +238,8 @@ def save_locked_revision(connection: Connection, principal: Principal, document:
     if canonical.insights:
         canonical = _prepare_insights(connection, canonical, previous,
                                       replace_context_id=replace_insight_context_id)
+    if canonical.hypotheses:
+        canonical = _prepare_hypotheses(canonical, previous)
     _validate_database_references(connection, canonical)
     resolved_contexts = resolve_revision_contexts(
         connection, canonical, previous, observed_contexts=observed_contexts)
@@ -521,20 +531,50 @@ def _prepare_insights(connection: Connection, canonical: CanonicalDocument,
             verified = verify_chart_context(
                 connection, ResolvedContext.model_validate(attrs["context"]), resolved_at=now)
             attrs["context"] = canonical_context_json(verified.model_dump(mode="json"))
-        if prior is None:
-            attrs.update(authored_at=timestamp, modified_at=timestamp)
-        else:
-            attrs.update(authored_at=prior["authored_at"], modified_at=prior["modified_at"])
-            if attrs != prior:
-                attrs["modified_at"] = timestamp
+        _author_annotation(attrs, prior, timestamp)
         content[position] = {**node, "attrs": attrs}
     if content == canonical.canonical["content"]:
         return canonical
     return parse_document({**canonical.canonical, "content": content})
 
 
+def _prepare_hypotheses(canonical: CanonicalDocument,
+                        previous: DocumentVersionRow) -> CanonicalDocument:
+    """Keep hypothesis identity and authorship consistent on full-document saves too."""
+    prior_by_id = {
+        node["attrs"]["hypothesis_id"]: node["attrs"]
+        for node in previous.content.get("content", ())
+        if node["type"] == "hypothesis"
+    }
+    timestamp = datetime.now(UTC).isoformat()
+    content = list(canonical.canonical["content"])
+    for position, node in enumerate(content):
+        if node["type"] != "hypothesis":
+            continue
+        attrs = dict(node["attrs"])
+        prior = prior_by_id.get(attrs["hypothesis_id"])
+        if prior is not None and prior["block_id"] != attrs["block_id"]:
+            raise ReferenceInvalid("An existing hypothesis keeps its block_id",
+                                   [("block_id", "hypothesis_block_mismatch")])
+        _author_annotation(attrs, prior, timestamp)
+        content[position] = {**node, "attrs": attrs}
+    if content == canonical.canonical["content"]:
+        return canonical
+    return parse_document({**canonical.canonical, "content": content})
+
+
+def _author_annotation(attrs: dict, prior: dict | None, timestamp: str) -> None:
+    if prior is None:
+        attrs.update(authored_at=timestamp, modified_at=timestamp)
+        return
+    attrs.update(authored_at=prior["authored_at"], modified_at=prior["modified_at"])
+    if attrs != prior:
+        attrs["modified_at"] = timestamp
+
+
 __all__ = [
     "DocumentDetail",
+    "ReferenceInUse",
     "RevisionConflict",
     "create_document",
     "create_document_in_transaction",

@@ -321,13 +321,13 @@ describe("keyboard shortcuts", () => {
     editor.destroy();
   });
 
-  it("routes a keyboard delete of a linked target through the confirmation bridge", () => {
+  it.each(["Backspace", "Delete", "Mod-Shift-Backspace"])("routes %s on a selected hypothesis through confirmation", (key) => {
     const editor = editorWith(linkedFixtureBlocks());
     const requestSpy = vi.fn();
     editor.view.dom.addEventListener(EDITOR_REQUEST_BLOCK_DELETE, requestSpy);
     editor.commands.setNodeSelection(positionOf(editor, 1)); // hypothesis with dependents
     // The shortcut must NOT delete: it requests the confirmation dialog.
-    expect(pressShortcut(editor, "Mod-Shift-Backspace")).toBe(false);
+    expect(pressShortcut(editor, key)).toBe(true);
     expect(requestSpy).toHaveBeenCalledTimes(1);
     expect(editor.state.doc.childCount).toBe(5);
     expectValidSnapshot(editor);

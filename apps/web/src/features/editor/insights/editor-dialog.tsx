@@ -8,7 +8,8 @@ import { useChartEditorContext } from "../blocks/chart-context";
 import { findDependentBlocks } from "../commands";
 import { validateCanonicalDocument, type CanonicalDocument } from "../canonical";
 import { newIdempotencyKey } from "../persistence/save-transport";
-import { createInsight, deleteInsight, editInsight, type InsightSave } from "./api";
+import type { AnnotationSave } from "../annotation-mutation";
+import { createInsight, deleteInsight, editInsight } from "./api";
 import { emptyInsight, hypothesisOptions, InsightFields, InsightPin, insightBody, insightText, type InsightDraft } from "./fields";
 
 export type InsightAction = { kind: "create"; blockId: string; context: components["schemas"]["ResolvedContext"] }
@@ -23,7 +24,7 @@ export interface InsightIntent {
 export function EditorInsightDialog({ intent, onClose, onSaved, onReload, restoreFocus }: {
   intent: InsightIntent;
   onClose: () => void;
-  onSaved: (result: InsightSave) => void;
+  onSaved: (result: AnnotationSave) => void;
   onReload: (content: CanonicalDocument, revision: number, savedAt: string) => void;
   restoreFocus: () => void;
 }) {
@@ -63,7 +64,7 @@ export function EditorInsightDialog({ intent, onClose, onSaved, onReload, restor
     const { key, blockId } = attempt.current;
     try {
       const fields = { type: draft.type, classification: draft.classification, hypothesis_id: draft.hypothesisId || null };
-      let result: InsightSave;
+      let result: AnnotationSave;
       if (action.kind === "create") {
         result = await createInsight(account.documentId, revision, { ...fields, block_id: blockId,
           after_block_id: action.blockId, body: insightBody(draft.text), context: action.context }, key, signal);

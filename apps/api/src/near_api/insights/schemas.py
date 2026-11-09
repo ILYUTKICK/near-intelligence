@@ -395,7 +395,7 @@ INSIGHT_CONTRACT_MODELS = (
     ResolvedContext, ModelContext,
     RichTextLinkAttrs, RichTextBoldMark, RichTextItalicMark, RichTextLinkMark,
     RichTextRun, RichTextParagraph, RichTextListItem, RichTextList,
-    InsightInput, HypothesisInput, Hypothesis,
+    InsightInput, HypothesisInput,
     EvidenceInput, Evidence, RiskInput,
 )
 """Contracts published in the OpenAPI ``components`` (NI-004 mechanism) so the

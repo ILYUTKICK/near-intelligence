@@ -134,7 +134,7 @@ function errorResponse(status: number, code: string, message: string): Response 
 function mockApi(handlers: Array<(url: string) => Response | undefined>) {
   const requests: Array<{ url: string; init: RequestInit }> = [];
   const fetchMock = vi.fn((input: RequestInfo | URL, init: RequestInit = {}) => {
-    const url = String(input);
+    const url = input instanceof Request ? new URL(input.url).pathname : String(input);
     requests.push({ url, init });
     for (const handler of handlers) {
       const response = handler(url);
@@ -155,8 +155,9 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-async function renderReady(content: CanonicalDocument = PLAIN_DOC) {
+async function renderReady(content: CanonicalDocument = PLAIN_DOC, handlers: Array<(url: string) => Response | undefined> = []) {
   const requests = mockApi([
+    ...handlers,
     (url) => (url === `/api/documents/${DOC_ID}` ? jsonResponse(documentResponse(content)) : undefined),
   ]);
   render(<ResearchDocumentEditor documentId={DOC_ID} />);
@@ -334,21 +335,32 @@ describe("block operations through the UI", () => {
 
   it("previews dependent evidence links before deleting a linked target", async () => {
     const user = userEvent.setup();
-    await renderReady(LINKED_DOC);
+    const versionId = "88888888-8888-4888-8888-888888888888";
+    const remaining = { ...LINKED_DOC, content: LINKED_DOC.content.slice(2) };
+    await renderReady(LINKED_DOC, [
+      url => url === "/api/auth/session" ? jsonResponse({ subject: "synthetic-alice" }) : undefined,
+      url => url === "/api/auth/csrf" ? jsonResponse({ token: "synthetic-csrf" }) : undefined,
+      url => url === `/api/documents/${DOC_ID}/hypotheses/${HYPOTHESIS_ID}` ? jsonResponse({
+        document: documentResponse(remaining, { revision: 8, current_version_id: versionId }),
+        version: { id: versionId, document_id: DOC_ID, revision: 8, schema_version: 1, content: remaining },
+        value: { deleted_id: HYPOTHESIS_ID },
+      }) : undefined,
+    ]);
     // The fixture puts the linked hypothesis first — the default selection.
     expect(screen.getByTestId("current-block-label")).toHaveTextContent(/Hypothesis/);
     await user.click(screen.getByRole("button", { name: "Delete block" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/referenced by 1 other block/i)).toBeInTheDocument();
-    const list = within(dialog).getByTestId("dependent-links-list");
-    expect(list).toHaveTextContent("Evidence links this hypothesis");
-    await user.click(within(dialog).getByTestId("confirm-delete"));
+    expect(await within(dialog).findByText("Remove 1 linked evidence block.")).toBeInTheDocument();
+    const confirm = within(dialog).getByRole("button", { name: "Confirm deletion" });
+    expect(confirm).toBeDisabled();
+    await user.click(within(dialog).getByRole("checkbox", { name: "Confirm linked cleanup" }));
+    await user.click(confirm);
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
-    expect(screen.getByTestId("editor-announcement")).toHaveTextContent(/including 1 dependent link/);
-    // The outline no longer lists the heading (it was not removed), the
-    // hypothesis and its evidence are gone.
+    expect(screen.getByTestId("editor-announcement")).toHaveTextContent("Hypothesis deleted from this revision.");
+    // The heading remains and the deleted hypothesis no longer has an outline entry.
+    expect(screen.queryByRole("button", { name: /Hypothesis · Adoption/ })).toBeNull();
     expect(screen.getByTestId("current-block-label")).toHaveTextContent(/Heading/);
     expect(await axe(document.body, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });

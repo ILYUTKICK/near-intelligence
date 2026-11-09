@@ -5,9 +5,7 @@ import { cn } from "@/lib/utils";
 import type { OutlineEntry } from "./outline";
 
 /**
- * Outline pane (NI-039): the heading structure of the paper, anchored to the
- * headings' stable block_ids (EDITOR_SPECIFICATION "Outline follows heading
- * IDs"). Activating an entry selects and focuses that heading in the editor.
+ * The outline selects headings and hypotheses by their stable block IDs.
  * The same component renders in the desktop aside, the tablet collapsible
  * section and the mobile drawer.
  */
@@ -26,7 +24,7 @@ export function OutlinePane({
     return (
       <nav aria-label="Document outline" className={cn("px-1", className)}>
         <p className="text-metadata leading-metadata text-text-secondary px-2 py-1">
-          No headings yet. Add a heading block to build the outline.
+          Add a heading or hypothesis to build the outline.
         </p>
       </nav>
     );
@@ -38,6 +36,7 @@ export function OutlinePane({
           <li key={entry.blockId}>
             <button
               type="button"
+              data-hypothesis-id={entry.hypothesisId}
               aria-current={entry.blockId === activeBlockId ? "true" : undefined}
               onClick={() => onNavigate(entry.blockId)}
               style={{ paddingInlineStart: `${(entry.level - 1) * 16 + 8}px` }}
@@ -48,9 +47,9 @@ export function OutlinePane({
               )}
             >
               <span className="truncate">
-                {entry.text || "(empty heading)"}
+                {entry.hypothesisId ? `Hypothesis · ${entry.text}` : entry.text || "(empty heading)"}
               </span>
-              <span className="sr-only">, level {entry.level}</span>
+              {!entry.hypothesisId ? <span className="sr-only">, level {entry.level}</span> : null}
             </button>
           </li>
         ))}

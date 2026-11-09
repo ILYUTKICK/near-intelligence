@@ -416,9 +416,20 @@ export function duplicateTopLevelBlock(editor: Editor, index: number): boolean {
  */
 export const BlockOperationShortcuts = Extension.create({
   name: "blockOperationShortcuts",
+  // A selected hypothesis needs confirmation before the default keymap deletes it.
+  priority: 110,
 
   addKeyboardShortcuts() {
+    const deleteSelectedHypothesis = () => {
+      const editor = this.editor;
+      const { selection } = editor.state;
+      if (!(selection instanceof NodeSelection) || selection.node.type.name !== "hypothesis") return false;
+      emitRequestBlockDelete(editor, currentTopLevelIndex(editor));
+      return true;
+    };
     return {
+      Backspace: deleteSelectedHypothesis,
+      Delete: deleteSelectedHypothesis,
       "Mod-Alt-ArrowUp": () => moveTopLevelBlock(this.editor, currentTopLevelIndex(this.editor), -1),
       "Mod-Alt-ArrowDown": () => moveTopLevelBlock(this.editor, currentTopLevelIndex(this.editor), 1),
       "Mod-Shift-d": () => duplicateTopLevelBlock(this.editor, currentTopLevelIndex(this.editor)),
@@ -429,6 +440,10 @@ export const BlockOperationShortcuts = Extension.create({
         const block = snapshot.content[index];
         if (!block) {
           return false;
+        }
+        if (block.type === "hypothesis") {
+          emitRequestBlockDelete(editor, index);
+          return true;
         }
         if (findDependentBlocks(snapshot.content, block.attrs.block_id).length > 0) {
           // Route through the confirmation flow; the shell previews the

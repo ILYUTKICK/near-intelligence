@@ -437,6 +437,8 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/documents/{document_id}/chart-view",
             "/api/documents/{document_id}/insights",
             "/api/documents/{document_id}/insights/{insight_id}",
+            "/api/documents/{document_id}/hypotheses",
+            "/api/documents/{document_id}/hypotheses/{hypothesis_id}",
             "/api/metrics", "/api/metrics/{metric_id}",
             "/api/metrics/{metric_id}/series",
             "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",
@@ -509,6 +511,11 @@ class DocumentRouteContractTests(unittest.TestCase):
               "selection": {"start": "2025-01-01", "end": "2025-01-08",
                             "frequency": "day", "filters": {}},
               "mode": "live", "dataset_version_id": str(uuid4())}),
+            ("get", f"/api/documents/{uuid4()}/hypotheses", None),
+            ("post", f"/api/documents/{uuid4()}/hypotheses",
+             {"block_id": str(uuid4()), "statement": "Synthetic question", "assessment": "untested"}),
+            ("patch", f"/api/documents/{uuid4()}/hypotheses/{uuid4()}", {"assessment": "mixed"}),
+            ("delete", f"/api/documents/{uuid4()}/hypotheses/{uuid4()}", {"remove_evidence_links": True}),
         ):
             with self.subTest(method=method):
                 response = self.client.request(method, path, json=payload) \

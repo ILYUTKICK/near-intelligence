@@ -25,13 +25,14 @@ from __future__ import annotations
 
 import base64
 import csv
+from collections.abc import Callable
 from io import StringIO
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 
 from near_api.auth.principal import Principal, get_principal, get_runtime_engine
 from near_api.contracts import error_response
@@ -46,7 +47,7 @@ from near_api.documents.schema import (
     ReferenceInvalid,
 )
 from near_api.repositories.documents import DocumentRow, get_version
-from near_api.schemas.common import ErrorDetail, ErrorResponse
+from near_api.schemas.common import ContractModel, ErrorDetail, ErrorResponse
 from near_api.schemas.delivery import ChartViewResponse
 from near_api.schemas.documents import (
     DocumentCreateRequest,
@@ -186,6 +187,55 @@ def _replay_response(outcome: idempotency.IdempotentOutcome, *,
         headers["ETag"] = _etag(revision)
     return JSONResponse(status_code=outcome.status, content=outcome.body,
                         headers=headers)
+
+
+def mutate_document_annotation(
+    request: Request, engine: Engine, principal: Principal, *,
+    route: str, status: int, if_match: str | None, idempotency_key: str | None,
+    payload: ContractModel, response_model: type[DocumentSaveResponse],
+    operation: Callable[[Connection, int], tuple[service.DocumentDetail, ContractModel]],
+) -> JSONResponse:
+    """Apply a revision mutation and record the same response used on replay."""
+    expected = _parse_if_match(if_match)
+    if expected is None:
+        return error_response(request, 428, "PRECONDITION_REQUIRED",
+                              "If-Match with the current document revision is required")
+
+    def execute(connection: Connection) -> tuple[int, dict]:
+        detail, value = operation(connection, expected)
+        saved = _document_save_response(detail)
+        result = response_model.model_validate({
+            "document": saved.document, "version": saved.version, "value": value,
+        })
+        return status, result.model_dump(mode="json")
+
+    try:
+        key = idempotency.parse_idempotency_key(idempotency_key)
+        if key is None:
+            with principal_transaction(engine, principal) as connection:
+                response_status, body = execute(connection)
+            outcome = idempotency.IdempotentOutcome(False, response_status, body)
+        else:
+            route_key = f"{request.method} /api{route}"
+            outcome = idempotency.execute_idempotent(
+                engine, principal, route_key=route_key, idempotency_key=key,
+                request_hash=idempotency.request_fingerprint(
+                    route_key, principal.id, payload.model_dump(mode="json", exclude_unset=True)),
+                operation=execute)
+    except idempotency.IdempotencyConflict as error:
+        return error_response(request, 409, "IDEMPOTENCY_CONFLICT", str(error))
+    except service.RevisionConflict as conflict:
+        return error_response(
+            request, 409, "REVISION_CONFLICT", str(conflict),
+            details=(ErrorDetail(path="If-Match",
+                                 reason=f"current_revision:{conflict.current_revision}"),))
+    except service.ReferenceInUse as error:
+        return error_response(
+            request, 409, "REFERENCE_IN_USE", str(error),
+            details=tuple(ErrorDetail(path=path, reason=reason) for path, reason in error.details))
+    except DocumentSchemaError as error:
+        return _schema_error(request, error)
+    return _replay_response(outcome, etag_revision_path=("document", "revision"))
 
 
 @router.get("/documents", response_model=DocumentListResponse, operation_id="listDocuments",

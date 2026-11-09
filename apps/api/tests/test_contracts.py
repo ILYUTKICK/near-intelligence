@@ -95,6 +95,8 @@ class ContractTests(TestCase):
                 "/api/documents/{document_id}/chart-view",
                 "/api/documents/{document_id}/insights",
                 "/api/documents/{document_id}/insights/{insight_id}",
+                "/api/documents/{document_id}/hypotheses",
+                "/api/documents/{document_id}/hypotheses/{hypothesis_id}",
                 "/api/metrics", "/api/metrics/{metric_id}",
                 "/api/metrics/{metric_id}/series",
                 "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",

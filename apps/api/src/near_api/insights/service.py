@@ -14,12 +14,6 @@ from near_api.schemas.chart_selection import ChartSelection
 from near_api.schemas.document_insights import InsightCreateRequest, InsightPatchRequest
 
 
-class EvidenceLinksExist(Exception):
-    def __init__(self, count: int):
-        super().__init__("Confirm removal of the evidence links that target this insight")
-        self.count = count
-
-
 def _insight_response(document_id: UUID, node: dict) -> Insight:
     attrs = dict(node["attrs"])
     return Insight.model_validate({
@@ -125,6 +119,8 @@ def delete_insight(connection: Connection, principal: Principal, document_id: UU
         and node["attrs"]["target_id"] == str(insight_id))]
     linked_count = len(content) - len(kept)
     if linked_count and not remove_evidence_links:
-        raise EvidenceLinksExist(linked_count)
+        raise documents.ReferenceInUse(
+            "Confirm removal of the evidence links that target this insight",
+            (("remove_evidence_links", f"linked_evidence:{linked_count}"),))
     return documents.save_locked_revision(
         connection, principal, document, previous, {**previous.content, "content": kept})
