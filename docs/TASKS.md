@@ -1515,7 +1515,7 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 - **Priority:** P0
 - **Dependencies:** NI-048
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** Codex `/root`, chat `01a1bd1f-f988-7c82-9339-80fb05e336c0`
 - **Execution role:** B with A editor handoff
 - **Started at:** 2026-11-09T17:17:01+03:00
@@ -1534,8 +1534,12 @@ Specification: [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md).
 **Testing requirements:** Dangling/cross-owner/cross-doc target tests; duplicate/remap; historical revision preserves prior relationship; unknown model/citation.
 
 - **Result:** Supporting, contradicting and uncertain evidence can coexist on a saved hypothesis. The picker offers same-revision charts and insights or paged public model runs and citations. Mutations preserve stable IDs and write canonical content and projections together. Explicit cleanup protects linked targets. An old revision keeps its original links. A conflict involving a changed private pin retains the explanation and requires the author to choose the target again.
-- **Verification:** Disposable PostgreSQL 18.6 passed 76 focused tests (13 Home, 29 documents, 20 annotation contracts and 14 annotation DB tests) and all 6 API contract tests. Cases cover both owners, foreign and missing targets, actual synthetic model publication, public versus private/internal citation scope, duplicate/remap, history and projections. Thirty-four targeted web tests passed for authoring, public paging, stale-pin reselection, linked deletion and editor lifecycle. The generated contracts, strict source types and affected lint checks passed. CI is pending.
+- **Verification:** Disposable PostgreSQL 18.6 passed 76 focused tests (13 Home, 29 documents, 20 annotation contracts and 14 annotation DB tests) and all 6 API contract tests. Cases cover both owners, foreign and missing targets, actual synthetic model publication, public versus private/internal citation scope, duplicate/remap, history and projections. Thirty-four targeted web tests passed for authoring, public paging, stale-pin reselection, linked deletion and editor lifecycle. The generated contracts, strict source types and affected lint checks passed.
+- **CI verification:** All three jobs passed on `3a8c55a`. Web ran 452 tests across 41 files and passed strict types, lint and production build. The database job ran 432 checks across the full, Landing and chart-insertion suites. Its production gateway scenario verified both classifications, target catalog routing, replay, retarget, historical reads, delete and Bob denial. [CI run](https://github.com/ILYUTKICK/near-intelligence/actions/runs/42636215007)
+- **Desktop evidence:** The isolated Next.js dev, FastAPI and PostgreSQL stack reopened a synthetic hypothesis at revision 4 with Supporting 1, Contradicting 1 and its original Untested assessment. The Windows copy used the named `@next/env` import for Webpack compatibility. Citations use public artifact UUIDs as labels because the artifact registry has no public title. [Screenshot](qa/ni049-evidence-desktop.jpg)
 - **Reviewer:** Codex `/root` reviewed the B owner, stable identity and target validation rules. Codex `/root/ni049` independently reviewed the editor and approved follow-ups for changed pins, selected-block confirmation and safe focus restoration.
+- **Completed at:** 2026-11-09T17:39:05+03:00
+- **Delivery:** [PR #75](https://github.com/ILYUTKICK/near-intelligence/pull/75) targets `main` and awaits owner merge.
 
 ### NI-050 — Build evidence navigation and research context panels
 
