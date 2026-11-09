@@ -48,6 +48,7 @@ import {
   EDITOR_SLASH_TRIGGER,
   detailOf,
 } from "./ui-bridge";
+import { ExportDialog } from "./exports/export-dialog";
 import { ConflictRecoveryDialog } from "./persistence/conflict-dialog";
 import { SaveStatusBar, formatSavedAt } from "./persistence/save-status";
 import { useDocumentSave } from "./persistence/use-document-save";
@@ -92,6 +93,9 @@ export interface EditorShellProps {
   title: string;
   revision: number;
   updatedAt: string;
+  /** The acknowledged current revision's version id (export target; null
+   * only for a document that has no saved revision yet). */
+  currentVersionId: string | null;
   /** Already validated canonical content (the persisted revision). */
   content: CanonicalDocument;
 }
@@ -111,7 +115,8 @@ type AnnotationAction = { kind: "insight"; action: InsightAction } | { kind: "hy
   | { kind: "evidence"; action: EvidenceAction };
 type AnnotationIntent = AnnotationAction & { content: CanonicalDocument; revision: number };
 
-export function EditorShell({ documentId, title, revision, updatedAt, content }: EditorShellProps) {
+export function EditorShell({ documentId, title, revision, updatedAt,
+  currentVersionId, content }: EditorShellProps) {
   const router = useRouter();
   // The conflict dialog opens declaratively whenever a 409 state exists and
   // has not been dismissed for THIS conflict (each conflict carries a fresh
@@ -196,6 +201,7 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
   const [tabletOutlineOpen, setTabletOutlineOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
@@ -675,11 +681,18 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
           {controller.revision} · Schema version 1
         </p>
         {controller.status.kind === "clean" ? (
-          <Link href={`/workspace/research/${documentId}/versions`} prefetch={false}
-            className="mt-2 inline-block text-ui underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
-            Revision history
-          </Link>
-        ) : <p className="mt-2 text-metadata text-text-secondary">Save your edits to open revision history.</p>}
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Link href={`/workspace/research/${documentId}/versions`} prefetch={false}
+              className="inline-block text-ui underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+              Revision history
+            </Link>
+            <Button variant="secondary" data-testid="export-open"
+              disabled={!currentVersionId}
+              onClick={() => setExportOpen(true)}>
+              Export
+            </Button>
+          </div>
+        ) : <p className="mt-2 text-metadata text-text-secondary">Save your edits to open revision history and export.</p>}
         <div className="mt-2">
           <SaveStatusBar
             status={controller.status}
@@ -905,6 +918,13 @@ export function EditorShell({ documentId, title, revision, updatedAt, content }:
         }}
       />
 
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        documentId={documentId}
+        versionId={currentVersionId ?? ""}
+        onAnnounce={announce}
+      />
       <ConflictRecoveryDialog
         open={conflictDialogOpen}
         onOpenChange={(open) => {
