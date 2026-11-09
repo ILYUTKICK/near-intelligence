@@ -108,7 +108,8 @@ def main() -> int:
         # code), the NI-053 diagnostics battery (same), the NI-054
         # publication gate + public model APIs (publish flow, migration 0010,
         # RLS matrix), the NI-036 document revision suites, the NI-041
-        # chart-block insertion suites and the NI-061 integration invariant
+        # chart-block insertion suites, the NI-056 frozen export
+        # representation suite and the NI-061 integration invariant
         # suite (independent oracles across DB/API/editor boundaries).
         patterns = ["test_database.py", "test_auth_bootstrap.py", "test_ownership_rls.py",
                     "test_home_aggregation.py", "test_archive_import.py",
@@ -119,7 +120,7 @@ def main() -> int:
                     "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py",
-                    "test_invariants_db_chain.py"]
+                    "test_exports_ir.py", "test_invariants_db_chain.py"]
         if args.suite == "landing":
             patterns = ["test_landing_integration.py"]
         if args.suite == "insights":
