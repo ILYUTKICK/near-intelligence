@@ -370,7 +370,9 @@ function render() {
         "invalid_payload",
         "The request does not match the renderer schema",
         parsed.error.issues.slice(0, MAX_ERROR_DETAILS).map(
-          (issue) => `${issue.path.join(".")}: ${issue.message}`,
+          (issue) => issue.path.length === 0
+            ? issue.message
+            : `${issue.path.join(".")}: ${issue.message}`,
         ),
       ),
       INPUT_EXIT_CODE,
