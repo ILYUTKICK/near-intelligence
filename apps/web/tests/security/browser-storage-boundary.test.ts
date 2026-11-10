@@ -1,16 +1,17 @@
 /**
- * NI-062 browser-storage and public-surface audit.
+ * NI-062 browser-storage and public-surface audit (part of the standard
+ * `pnpm --filter web test` run).
  *
  * Pins the client-side privacy invariants that must hold on every browser:
  * no token or session payload ever lands in Web storage, the auth-change
  * signal carries no identity, the public surface never imports the private
  * document transport, and the public API clients send no credentials.
  *
- * Honest boundary note: the known editor workbench identity-revalidation gap
- * (features/editor/workbench.tsx keeps loaded content in MEMORY across a
- * cross-tab account switch — the NI-042 recorded audit input) is recorded in
- * docs/qa/ni062-security-review.md as HIGH; it is a memory-retention issue,
- * not a storage issue, so the storage assertions here hold today.
+ * The recorded NI-042 workbench memory-retention gap is closed by
+ * features/editor/persistence/session-owner.ts (verified-identity
+ * revalidation) and covered by tests/security/workbench-identity-guard.
+ * test.tsx; this suite keeps asserting that no private content lands in
+ * Web storage and that the auth-change consumers stay inventoried.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
@@ -159,13 +160,14 @@ describe("Public surface carries no private transport", () => {
 
   it("the auth-change signal consumers cover the workspace data surfaces", () => {
     // Recorded NI-062 inventory: WorkspaceHome, owned saved-chart data,
-    // chart library auth actions and the editor chart provider re-check on
-    // auth change. (The full editor workbench gap is reported, not asserted.)
+    // chart library auth actions, the editor chart provider re-check AND the
+    // full-workbench identity guard (the closed NI-042 gap) on auth change.
     const consumers = [
       "features/workspace/home/WorkspaceHome.tsx",
       "features/charts/saved/use-owned-data.ts",
       "features/charts/library/ChartAuthActions.tsx",
       "features/editor/blocks/chart-context.tsx",
+      "features/editor/persistence/session-owner.ts",
     ];
     for (const consumer of consumers) {
       const content = readFileSync(path.join(SRC_ROOT, consumer), "utf8");

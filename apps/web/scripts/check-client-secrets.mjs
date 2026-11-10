@@ -8,13 +8,13 @@
  * NI-062 correction (recorded NI-041 regression input): the original scanner
  * treated low-entropy JWT audience/issuer/JWKS/origin metadata as secrets.
  * The local audience `authenticated` is an ordinary word that legitimately
- * appears in UI state literals, so the honest scan never treats a bare
- * generic word as a leak: generic-word values are public metadata, while
- * URL-shaped values (issuer/JWKS/origins) and the signing secrets stay
- * scanned exactly as before. An always-on self-test proves both directions
- * on every run before the real scan: a positive leak (signing secret in a
- * fixture bundle) must FAIL, and the public-metadata false positive (the
- * audience literal in a fixture bundle) must PASS.
+ * appears in UI state literals, so the honest scan never treats THAT ONE
+ * variable's bare generic-word value as a leak; every other server value
+ * (issuer/JWKS/origin URLs and both signing secrets) stays scanned exactly
+ * as configured. An always-on self-test proves both directions on every run
+ * before the real scan: a positive leak (signing secret in a fixture bundle)
+ * must FAIL, and the public-metadata false positive (the audience literal in
+ * a fixture bundle) must PASS.
  */
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -51,10 +51,17 @@ const SERVER_AUTH_VARS = [
 
 /**
  * A bare generic word (letters/digits/dashes, no URL structure) is public
- * application vocabulary: the bundle legitimately contains such literals, so
- * scanning for them can only produce false positives. Distinctive values —
- * URLs, origins, high-entropy secrets — are always scanned.
+ * application vocabulary for the JWT AUDIENCE slot ONLY: the recorded
+ * NI-041 false positive is the local audience `authenticated`, an ordinary
+ * word that legitimately appears in UI state literals, so scanning that one
+ * variable can only produce false positives. Every other server value —
+ * issuer/JWKS/origin URLs AND BOTH SIGNING SECRETS — is always scanned
+ * exactly as configured: a low-entropy signing secret is a configuration
+ * error (the auth config guards reject it) and must never also lose its
+ * leak scan here.
  */
+const GENERIC_WORD_VARS = new Set(["SUPABASE_JWT_AUDIENCE"]);
+
 function isGenericWord(value) {
   return /^[a-z][a-z0-9_-]{2,31}$/i.test(value) && !value.includes(".")
     && !value.includes("/") && !value.includes(":");
@@ -64,7 +71,8 @@ function serverSecrets(env) {
   return SERVER_AUTH_VARS.map((name) => ({ name, value: env[name] }))
     .filter(({ value }) => value && !/^REPLACE/i.test(value))
     .filter(({ value }) => value.length >= 8) // tiny placeholders can't leak meaningfully
-    .map(({ name, value }) => ({ name, value, generic: isGenericWord(value) }));
+    .map(({ name, value }) => ({ name, value,
+      generic: GENERIC_WORD_VARS.has(name) && isGenericWord(value) }));
 }
 
 function* walkFiles(dir) {

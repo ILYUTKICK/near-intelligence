@@ -1,5 +1,6 @@
 /**
- * NI-062 gateway session-boundary audit (jsdom-free route-handler checks).
+ * NI-062 gateway session-boundary audit (part of the standard
+ * `pnpm --filter web test` run; jsdom-free route-handler checks).
  *
  * Exercises the REAL Next.js gateway handlers with a mocked provider (no
  * network): CSRF/Origin enforcement before any provider call, cookie flag
