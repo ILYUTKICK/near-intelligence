@@ -2086,7 +2086,12 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0
 - **Dependencies:** NI-014, NI-054, NI-013, NI-061
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-A coordinator (ZCode session, ILYUTKICK operator), NI-070 dispatch — content/publication task, single subagent
+- **Execution role:** A with recorded operator-evidence citations
+- **Started at:** 2026-11-10T21:26:29+03:00
+- **Branch/worktree:** feat/ni-070-research-release; /Users/ilyutkinn/Desktop/near-intelligence-a18 (worktree from origin/main db0ec6a)
+- **Dependency verification:** NI-014 DONE on main (PR #52); NI-054 DONE on main (PR #57); NI-013 DONE on main (PR #43); NI-061 DONE on main (PR #40). No competing NI-070 claim and no open PR at session start. Operator decision (2026-11-10, this session): publish with ACTUAL verified outputs that exist today (NI-051 readiness-gate verdict, NI-029 reconciliation numbers, implemented+synthetic-verified NI-052 estimator) plus an explicit "real-archive fit run pending operator execution" status and the reproducible recipe — no fitted coefficients may be invented under any circumstances.
 
 **Description:** Replace pending model sections with actual verified findings and a reviewed complete investment thesis.
 
