@@ -17,10 +17,11 @@ export const metadata: Metadata = { title: "Research — NEAR Intelligence" };
  * the stable anchors required by the IA (/research#h1 … #h4) plus the fifteen
  * section anchors. Sections carry explicit status and rationale, the claim
  * registry CL-001–CL-009 binds every quantity to a recorded source, contrary
- * findings sit next to supporting ones, and the model section is explicitly
- * pending until NI-070. The content carries no private editor metadata and no
- * live data fetching; internal links stay on implemented routes and verified
- * methodology anchors.
+ * findings sit next to supporting ones, and the model section carries the
+ * honest NI-070 release status: no fitted values anywhere, the real-archive
+ * fit run pending operator execution, and the model catalog honestly empty.
+ * The content carries no private editor metadata and no live data fetching;
+ * internal links stay on implemented routes and verified methodology anchors.
  */
 
 const sectionClasses = "mt-12 max-w-(--width-prose)";
@@ -236,13 +237,13 @@ export default function ResearchPage() {
         </ol>
       </section>
 
-      {/* 9. Econometric evidence — explicitly pending until NI-070 */}
+      {/* 9. Econometric evidence — NI-070 release status (no fitted values) */}
       <section id={econometrics.id} aria-labelledby={`${econometrics.id}-heading`} className={sectionClasses}>
         <h2 id={`${econometrics.id}-heading`} className={h2Classes}>
           {econometrics.title}
         </h2>
         <p className="rounded-surface border border-border bg-sage p-4 text-body leading-body text-text mt-3">
-          {econometrics.pending}
+          {econometrics.releaseStatus}
         </p>
         {econometrics.paragraphs.map((paragraph) => (
           <p key={paragraph.slice(0, 64)} className={bodyClasses}>

@@ -10,7 +10,9 @@
  *   contract-invalid payloads render typed fallback states — never zeros;
  * - stale data keeps the values and shows the stale notice;
  * - claim citations trace into the thesis anchors and the claim registry;
- * - CTAs reach /research, /methodology and /workspace; no live badge exists;
+ * - CTAs reach /research, /methodology, /data and /workspace; no live badge
+ *   exists; the NI-070 release-status section states the honest fit-pending
+ *   state;
  * - content-width discipline, DOM order, axe and private-metadata checks.
  *
  * Fixtures are synthetic and visibly labeled (ni012-fixture dataset keys);
@@ -22,7 +24,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import HomePage from "@/app/(public)/page";
-import { claimRegistry, thesisToc } from "@/features/public-research/content";
+import { claimRegistry, releaseStatus, thesisToc } from "@/features/public-research/content";
 import {
   getLandingClaim,
   landingFindings,
@@ -423,11 +425,14 @@ describe("For/against findings cite the claim registry", () => {
       ).toBeDefined();
     }
     // Every internal href on the landing resolves to an implemented route,
-    // a recorded methodology anchor or a thesis section anchor.
+    // a recorded methodology anchor, a thesis section anchor or the NI-070
+    // release-status links.
     const allowed = new Set<string>([
       "/research",
       "/methodology",
       "/workspace",
+      "/data",
+      ...releaseStatus.links.map((link) => link.href),
       landingDefinitionHref,
       landingDatasetHref,
       landingFindings.forSide.thesisAnchor,
@@ -467,6 +472,35 @@ describe("CTAs reach the correct destinations", () => {
     const workspace = screen.getAllByRole("link", { name: "Open the workspace" });
     expect(workspace).toHaveLength(2);
     workspace.forEach((link) => expect(link.getAttribute("href")).toBe("/workspace"));
+  });
+
+  it("offers the implemented public data explorer instead of a promise", async () => {
+    stubSeriesFetch(approvedResponder());
+    await renderLanding();
+    expect(screen.getByRole("link", { name: "Open the data explorer" }).getAttribute("href")).toBe("/data");
+    // The stale "arrives with" announcement is gone (the explorer shipped).
+    expect(document.body.textContent).not.toMatch(/arrives with the analytics explorer/);
+  });
+});
+
+describe("NI-070 release status section", () => {
+  it("states the honest fit-pending status and links the honest empty catalog", async () => {
+    stubSeriesFetch(approvedResponder());
+    await renderLanding();
+    expect(
+      screen.getByRole("heading", { level: 2, name: releaseStatus.heading }),
+    ).toBeInTheDocument();
+    const section = document.getElementById(releaseStatus.id);
+    expect(section).not.toBeNull();
+    const text = section!.textContent as string;
+    expect(text).toMatch(/real-archive fit run is pending operator execution/);
+    expect(text).toMatch(/no fitted coefficient, interval or diagnostic exists anywhere/);
+    expect(text).toMatch(/public model catalog stays empty until a reviewed run is published/);
+    expect(text).toMatch(/never as protocol revenue/);
+    // All four status links resolve to implemented routes/anchors.
+    for (const link of releaseStatus.links) {
+      expect(screen.getByRole("link", { name: link.label }).getAttribute("href")).toBe(link.href);
+    }
   });
 });
 

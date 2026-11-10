@@ -60,7 +60,7 @@ Accounting identity for total supply: ΔS = gross issuance − actual burns (plu
 
 ## 9. Econometric evidence
 
-No fitted model, coefficient, confidence interval or causal conclusion is asserted here. [Methodology](ECONOMETRIC_METHODOLOGY.md) specifies data readiness, exploratory proxy alternatives, stationarity/autocorrelation checks and reproducible reporting. Public research implementation must replace this status with an actually executed defensible model or clearly report an unmet release gate. Statistical nonsignificance is a valid finding.
+No fitted model, coefficient, confidence interval or causal conclusion is asserted here. [Methodology](ECONOMETRIC_METHODOLOGY.md) specifies data readiness, exploratory proxy alternatives, stationarity/autocorrelation checks and reproducible reporting. Release status (NI-070, November 2026): the preregistered readiness gate recorded overall `PROXY_ONLY_READY_WITH_LIMITS` with `gross_fee_activity_v1` admitted with limits, `true_revenue_daily_v1` NOT_READY (OQ-01) and `supply_bounds_activity_v1` REJECTED; the fixed deterministic estimator and diagnostics battery are implemented and synthetic-verified, and the real-archive fit run is pending operator execution under the published recipe — the release reports the unmet publication gate honestly instead of results. Statistical nonsignificance is a valid finding.
 
 ## 10. Alternative explanations
 
@@ -84,4 +84,4 @@ Cohort selection excludes converters without selected treasury payouts; index co
 
 ## 15. Sources and reproducibility
 
-Primary local findings and artifacts are linked per claim. [Metric catalog](METRIC_CATALOG.md), [source register](SOURCE_VERIFICATION.md) and [reproduction instructions](REPRODUCIBILITY.md) define exact scope. Official source code [DefiLlama adapter](https://github.com/DefiLlama/dimension-adapters/blob/master/fees/near-intents/index.ts) describes its own accounting; it is not proof of independent attribution. Future published claims must bind CL IDs to dataset/definition versions, code/lock/config hashes and an approved public evidence manifest.
+Primary local findings and artifacts are linked per claim. [Metric catalog](METRIC_CATALOG.md), [source register](SOURCE_VERIFICATION.md) and [reproduction instructions](REPRODUCIBILITY.md) define exact scope. Official source code [DefiLlama adapter](https://github.com/DefiLlama/dimension-adapters/blob/master/fees/near-intents/index.ts) describes its own accounting; it is not proof of independent attribution. Future published claims must bind CL IDs to dataset/definition versions, code/lock/config hashes and an approved public evidence manifest. The original research release (NI-070, November 2026) documents the publication state, thesis audit and evidence manifest in [the release report](../research/reports/original-research-release-2026-11.md).

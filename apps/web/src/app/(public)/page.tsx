@@ -12,14 +12,18 @@ import {
 } from "@/features/public-research/landing-metrics";
 import { fetchLandingMetrics, type LandingMetricState } from "@/features/public-research/landing-metrics";
 import { getLandingClaim, landingFindings } from "@/features/public-research/landing-findings";
-import { landing } from "@/features/public-research/content";
+import { landing, releaseStatus } from "@/features/public-research/content";
 
 /**
  * Landing (NI-012): an evidence-bearing introduction. The shell and editorial
  * copy come from NI-011; the metric strip is fetched server-side from the
  * NI-032 delivery APIs (latest approved dataset semantics), the for/against
  * findings reuse the NI-014 claim registry through the shared ClaimCard, and
- * every quantitative value links its definition/dataset references.
+ * every quantitative value links its definition/dataset references. The
+ * NI-070 release-status section states the honest model-research state: no
+ * fitted values anywhere, the real-archive fit run pending operator execution,
+ * and the public model catalog honestly empty until a reviewed run is
+ * published.
  *
  * force-dynamic: approved-dataset resolution is a live read through the API's
  * own 60s latest-pointer cache; a statically prerendered landing could show
@@ -345,7 +349,34 @@ export default async function HomePage() {
 
       <MechanismFlow />
 
-      {/* Closing CTAs: the two documented destinations, honestly labeled. */}
+      {/* NI-070 release status: the honest model-research state. No numbers
+          beyond the recorded verdict strings; the model catalog stays empty
+          until a reviewed run is published. */}
+      <section
+        id={releaseStatus.id}
+        aria-labelledby={`${releaseStatus.id}-heading`}
+        className={sectionClasses}
+      >
+        <h2 id={`${releaseStatus.id}-heading`} className="font-serif text-title leading-title">
+          {releaseStatus.heading}
+        </h2>
+        {releaseStatus.paragraphs.map((paragraph) => (
+          <p key={paragraph.slice(0, 64)} className="text-body leading-body text-text-secondary max-w-(--width-prose) mt-2">
+            {paragraph}
+          </p>
+        ))}
+        <ul aria-label="Release status links" className="mt-3 flex flex-col gap-1 max-w-(--width-prose) list-disc pl-5">
+          {releaseStatus.links.map((link) => (
+            <li key={link.href}>
+              <a href={link.href} className={textLinkClasses}>
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Closing CTAs: the documented destinations, honestly labeled. */}
       <section aria-labelledby="continue-heading" className={sectionClasses}>
         <h2 id="continue-heading" className="font-serif text-title leading-title">
           Continue
@@ -362,6 +393,11 @@ export default async function HomePage() {
             </Link>
           </li>
           <li>
+            <Link href="/data" className={linkClasses}>
+              Open the data explorer
+            </Link>
+          </li>
+          <li>
             <Link href="/workspace" className={linkClasses}>
               Open the workspace
             </Link>
@@ -369,7 +405,8 @@ export default async function HomePage() {
         </ul>
         <p className="text-ui leading-ui text-text-secondary max-w-(--width-prose) mt-3">
           The workspace requires signing in; unauthenticated visits are redirected to the login
-          route. Public data exploration arrives with the analytics explorer.
+          route. The public data explorer renders the registered charts from approved datasets,
+          with explicit unavailability when a source cannot be resolved.
         </p>
       </section>
     </div>

@@ -166,6 +166,9 @@ export default function MethodologyPage() {
           {readiness.title}
         </h2>
         <p className={bodyClasses}>{readiness.body}</p>
+        <p className="rounded-surface border border-border bg-surface p-4 text-body leading-body text-text mt-4">
+          {readiness.estimatorStatus}
+        </p>
         <p className="rounded-surface border border-border bg-sage p-4 text-body leading-body text-text mt-4">
           {readiness.overall}
         </p>
