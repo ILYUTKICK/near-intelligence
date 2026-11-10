@@ -58,6 +58,12 @@ export interface ExportDialogProps {
   /** The acknowledged revision to export (the server validates it is current). */
   versionId: string;
   onAnnounce?: (message: string) => void;
+  /**
+   * The opener control (the workbench Export button). The dialog is opened
+   * from a plain controlled button rather than a Radix DialogTrigger, so
+   * Escape/close must restore focus to it explicitly (NI-064 keyboard QA).
+   */
+  returnFocusRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 function describeError(error: unknown): string {
@@ -82,6 +88,7 @@ export function ExportDialog({
   documentId,
   versionId,
   onAnnounce,
+  returnFocusRef,
 }: ExportDialogProps) {
   const [phase, setPhase] = useState<Phase>("starting");
   const [job, setJob] = useState<ExportJob | null>(null);
@@ -220,7 +227,16 @@ export function ExportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent data-testid="export-dialog" aria-describedby="export-dialog-description">
+      <DialogContent
+        data-testid="export-dialog"
+        aria-describedby="export-dialog-description"
+        onCloseAutoFocus={(event) => {
+          if (returnFocusRef?.current) {
+            event.preventDefault();
+            returnFocusRef.current.focus();
+          }
+        }}
+      >
         <DialogTitle>Export this revision as Markdown bundle</DialogTitle>
         <DialogDescription id="export-dialog-description">
           The export is the frozen ZIP of the saved revision {versionId ? `(revision currently on the server)` : ""}:

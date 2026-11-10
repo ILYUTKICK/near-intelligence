@@ -135,9 +135,13 @@ export default async function DataExplorerPage({
                     </p>
                   )}
                   <div>
+                    {/* The accessible name must contain the visible text
+                        ("Open category") — axe label-content-name-mismatch
+                        (NI-064 desktop QA) — so speech-input users can say
+                        what they see. */}
                     <Link
                       href={`/data/${category.slug}`}
-                      aria-label={`Open data category: ${category.label}`}
+                      aria-label={`Open category: ${category.label}`}
                       className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                     >
                       Open category

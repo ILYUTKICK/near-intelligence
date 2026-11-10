@@ -44,6 +44,7 @@ import { ContextPane } from "./context-pane";
 import { DeleteConfirmationDialog } from "./delete-confirmation";
 import {
   EDITOR_OPEN_BLOCK_PROPERTIES,
+  EDITOR_OPERATION_ANNOUNCE,
   EDITOR_REQUEST_BLOCK_DELETE,
   EDITOR_SLASH_TRIGGER,
   detailOf,
@@ -207,6 +208,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
   const [tabletOutlineOpen, setTabletOutlineOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const exportReturnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
@@ -532,15 +534,23 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         coordinates: computeSlashCoordinates(editor, position, container),
       });
     };
+    const onOperationAnnounce = (event: Event) => {
+      const { message } = detailOf<{ message: string }>(event, { message: "" });
+      if (message) {
+        announce(message);
+      }
+    };
     container.addEventListener(EDITOR_OPEN_BLOCK_PROPERTIES, onOpenProperties);
     container.addEventListener(EDITOR_REQUEST_BLOCK_DELETE, onRequestDelete);
     container.addEventListener(EDITOR_SLASH_TRIGGER, onSlashTrigger);
+    container.addEventListener(EDITOR_OPERATION_ANNOUNCE, onOperationAnnounce);
     return () => {
       container.removeEventListener(EDITOR_OPEN_BLOCK_PROPERTIES, onOpenProperties);
       container.removeEventListener(EDITOR_REQUEST_BLOCK_DELETE, onRequestDelete);
       container.removeEventListener(EDITOR_SLASH_TRIGGER, onSlashTrigger);
+      container.removeEventListener(EDITOR_OPERATION_ANNOUNCE, onOperationAnnounce);
     };
-  }, [editor, openHypothesis, openEvidence]);
+  }, [editor, openHypothesis, openEvidence, announce]);
 
   // -- operations ------------------------------------------------------------ //
 
@@ -704,7 +714,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
               className="inline-block text-ui underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
               Revision history
             </Link>
-            <Button variant="secondary" data-testid="export-open"
+            <Button ref={exportReturnFocusRef} variant="secondary" data-testid="export-open"
               disabled={!currentVersionId}
               onClick={() => setExportOpen(true)}>
               Export
@@ -942,6 +952,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         documentId={documentId}
         versionId={currentVersionId ?? ""}
         onAnnounce={announce}
+        returnFocusRef={exportReturnFocusRef}
       />
       <ConflictRecoveryDialog
         open={conflictDialogOpen}

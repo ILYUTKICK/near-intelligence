@@ -65,6 +65,26 @@ describe("Route registry", () => {
       expect(item.label).not.toMatch(/strategy|portfolio/i);
     }
   });
+
+  it("never points the workspace sidebar at unimplemented route aliases", () => {
+    // NI-024 regression: `/workspace/data/*` and `/workspace/models` had no
+    // implemented pages, so the sidebar prefetched 404s. The Data Explorer and
+    // Analytics entries must target the implemented public routes.
+    for (const item of workspaceNav) {
+      expect(item.href, `${item.label} href`).not.toMatch(/^\/workspace\/(data|models)/);
+    }
+    const explorerHrefs = workspaceNav
+      .filter((item) => item.group === "Data Explorer")
+      .map((item) => item.href);
+    expect(explorerHrefs).toEqual([
+      "/data/network",
+      "/data/intents",
+      "/data/revenue",
+      "/data/token-economics",
+      "/data/ecosystem",
+    ]);
+    expect(workspaceNav.find((item) => item.label === "Econometric Models")?.href).toBe("/models");
+  });
 });
 
 describe("Skip link", () => {

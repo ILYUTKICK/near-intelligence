@@ -23,31 +23,39 @@ export const publicNav: NavItem[] = [
   { label: "Methodology", href: "/methodology", group: "public", priority: "P0", enabled: true },
 ];
 
-/** Workspace sidebar, grouped per INFORMATION_ARCHITECTURE.md. */
+/**
+ * Workspace sidebar, grouped per INFORMATION_ARCHITECTURE.md. The Data
+ * Explorer and Analytics entries target the IMPLEMENTED public routes
+ * (`/data/*`, `/models` — NI-015/NI-054): the former `/workspace/data/*` and
+ * `/workspace/models` aliases had no implemented pages, so the sidebar
+ * prefetched 404s (NI-024 regression, reconciled in NI-064). There is exactly
+ * one data explorer and one model catalog implementation; the workspace never
+ * mounts a second one.
+ */
 export const workspaceNav: NavItem[] = [
   { label: "Home", href: "/workspace", group: "Workspace", priority: "P0", enabled: true },
   { label: "My Research", href: "/workspace/research", group: "Workspace", priority: "P0", enabled: true },
   { label: "Saved Charts", href: "/workspace/saved-charts", group: "Workspace", priority: "P0", enabled: true },
   {
     label: "Network Activity",
-    href: "/workspace/data/network",
+    href: "/data/network",
     group: "Data Explorer",
     priority: "P0",
     enabled: true,
     availabilityNote: "availability varies by source",
   },
-  { label: "Intents & Adoption", href: "/workspace/data/intents", group: "Data Explorer", priority: "P0", enabled: true },
-  { label: "Revenue & Fees", href: "/workspace/data/revenue", group: "Data Explorer", priority: "P0", enabled: true },
-  { label: "Token Economics", href: "/workspace/data/token-economics", group: "Data Explorer", priority: "P0", enabled: true },
+  { label: "Intents & Adoption", href: "/data/intents", group: "Data Explorer", priority: "P0", enabled: true },
+  { label: "Revenue & Fees", href: "/data/revenue", group: "Data Explorer", priority: "P0", enabled: true },
+  { label: "Token Economics", href: "/data/token-economics", group: "Data Explorer", priority: "P0", enabled: true },
   {
     label: "Ecosystem",
-    href: "/workspace/data/ecosystem",
+    href: "/data/ecosystem",
     group: "Data Explorer",
     priority: "P0",
     enabled: true,
     availabilityNote: "empty until source validation",
   },
-  { label: "Econometric Models", href: "/workspace/models", group: "Analytics", priority: "P0", enabled: true },
+  { label: "Econometric Models", href: "/models", group: "Analytics", priority: "P0", enabled: true },
   { label: "Profile", href: "/workspace/profile", group: "Account", priority: "P0", enabled: true },
   { label: "Settings", href: "/workspace/settings", group: "Account", priority: "P0", enabled: true },
 ];

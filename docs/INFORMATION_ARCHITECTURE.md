@@ -28,14 +28,16 @@ Use `/research#h1` through `#h4`, `/methodology#sources` and `#reproduce` as sta
 | Workspace | Home | `/workspace` | P0 |
 | Workspace | My Research | `/workspace/research` | P0 |
 | Workspace | Saved Charts | `/workspace/saved-charts` | P0 |
-| Data Explorer | Network Activity | `/workspace/data/network` | P0, show availability |
-| Data Explorer | Intents & Adoption | `/workspace/data/intents` | P0 |
-| Data Explorer | Revenue & Fees | `/workspace/data/revenue` | P0 |
-| Data Explorer | Token Economics | `/workspace/data/token-economics` | P0 |
-| Data Explorer | Ecosystem | `/workspace/data/ecosystem` | P0 shell with honest gaps |
-| Analytics | Econometric Models | `/workspace/models` | P0 published runs; P1 embedding |
+| Data Explorer | Network Activity | `/data/network` | P0, show availability |
+| Data Explorer | Intents & Adoption | `/data/intents` | P0 |
+| Data Explorer | Revenue & Fees | `/data/revenue` | P0 |
+| Data Explorer | Token Economics | `/data/token-economics` | P0 |
+| Data Explorer | Ecosystem | `/data/ecosystem` | P0 shell with honest gaps |
+| Analytics | Econometric Models | `/models` | P0 published runs; P1 embedding |
 | Account | Profile | `/workspace/profile` | P0 |
 | Account | Settings | `/workspace/settings` | P0 |
+
+Reconciled in NI-064 (8 November 2026 NI-024 review input): the Data Explorer and Analytics sidebar entries previously carried the never-implemented aliases `/workspace/data/*` and `/workspace/models`, so the workspace sidebar prefetched 404s. They now target the implemented public routes (`/data/*`, `/models`); there is exactly one data explorer and one model catalog implementation.
 
 The research editor opens at `/workspace/research/[documentId]`. Its Revision history link opens `/workspace/research/[documentId]/versions`. The optional `version` UUID selects a saved read-only revision with its pinned charts and CSV. Model detail links to the public read-only model; private arbitrary execution is excluded. No dead chart entries for unverified metrics; an empty category explains why and links to definitions.
 

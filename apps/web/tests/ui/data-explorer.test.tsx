@@ -421,7 +421,7 @@ describe("Data explorer overview — live availability or honest explanations", 
       "/charts?category=model",
     );
     // Category cards link into the explorer.
-    expect(screen.getByRole("link", { name: "Open data category: Revenue & Fees" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open category: Revenue & Fees" })).toHaveAttribute(
       "href",
       "/data/revenue",
     );
