@@ -93,8 +93,9 @@ function HomeContent({ suspended }: { suspended: boolean }) {
       <h1>{home && !home.counts.documents ? "Your research starts here" : "Welcome back"}</h1>
       <p className="mt-3 text-body leading-body text-text-secondary">Keep the question, evidence and limitations together. Pick up your work or start a new research document.</p>
       <div className="mt-4 flex flex-wrap gap-2" aria-label="Research actions">
-        {/* The global unlayered anchor color overrides utility-layer colors. */}
-        {latest ? <Link className={buttonVariants()} style={{ color: "var(--color-on-accent)" }} href={`/workspace/research/${latest.id}`}>Continue research<span className="sr-only">: {latest.title}</span></Link> : null}
+        {/* The primary-variant utility color applies directly since the global
+            anchor rule moved into the base cascade layer (NI-064). */}
+        {latest ? <Link className={buttonVariants()} href={`/workspace/research/${latest.id}`}>Continue research<span className="sr-only">: {latest.title}</span></Link> : null}
         <Button variant={latest ? "secondary" : "primary"} pending={creating} onClick={create}>Create document</Button>
         <Link className={buttonVariants({ variant: "quiet" })} href="/workspace/research">My Research</Link>
       </div>

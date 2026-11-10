@@ -65,14 +65,30 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
-  const Component = asChild ? Slot : "button";
+  // Radix Slot requires exactly ONE child: the slotted element is cloned with
+  // the merged props, so a spinner sibling (or a null placeholder next to the
+  // child) crashes with React's Children.only error (NI-024 regression,
+  // regression-tested in tests/ui/form.test.tsx). Slotted links announce the
+  // pending state through aria-busy on the anchor instead of a spinner.
+  if (asChild) {
+    return (
+      <Slot
+        data-variant={variant}
+        className={cn(buttonVariants({ variant, block }), className)}
+        aria-busy={pending || undefined}
+        {...props}
+      >
+        {children}
+      </Slot>
+    );
+  }
   return (
-    <Component
+    <button
       data-variant={variant}
       className={cn(buttonVariants({ variant, block }), className)}
       aria-busy={pending || undefined}
       disabled={disabled || pending}
-      type={asChild ? undefined : (type ?? "button")}
+      type={type ?? "button"}
       {...props}
     >
       {pending ? (
@@ -82,7 +98,7 @@ export function Button({
         />
       ) : null}
       {children}
-    </Component>
+    </button>
   );
 }
 
