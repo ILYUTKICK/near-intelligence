@@ -119,7 +119,7 @@ describe("Claim registry structure (source/version/scope)", () => {
     for (const claim of claimRegistry) {
       expect(claim.assessment.length).toBeGreaterThan(0);
       expect(claim.observation.length).toBeGreaterThan(0);
-      expect(claim.datasetVersionReference).toMatch(/not publicly listed yet/);
+      expect(claim.datasetVersionReference).toMatch(/no public dataset catalog/);
       expect(claim.evidence.length).toBeGreaterThan(0);
     }
   });
@@ -245,15 +245,29 @@ describe("Honest statuses and pending markers", () => {
     }
   });
 
-  it("keeps the model section explicitly pending until NI-070", () => {
+  it("keeps the model section on the honest NI-070 release status", () => {
     renderedPage();
-    const pending = screen.getByText(/Explicitly pending/);
-    expect(pending.textContent).toMatch(/NI-070/);
-    expect(pending.textContent).toMatch(/no fitted model, coefficient, confidence interval or causal conclusion/);
+    // The release status block: implemented + synthetic-verified estimator,
+    // real-archive fit pending operator execution, no fitted values anywhere.
+    const status = screen.getByText(/Release status \(original research release/);
+    expect(status.textContent).toMatch(/implemented and reviewed/);
+    expect(status.textContent).toMatch(/synthetic known-behavior fixtures only/);
+    expect(status.textContent).toMatch(/real-archive fit run is pending operator execution/);
+    expect(status.textContent).toMatch(/No fitted model, coefficient, standard error, confidence interval or causal conclusion/);
+    expect(status.textContent).toMatch(/public model catalog stays empty/);
+    // The preregistered estimator description carries the prohibited labels,
+    // never an interpretation.
+    expect(document.body.textContent).toMatch(/Newey–West HAC covariance/);
+    expect(document.body.textContent).toMatch(/prohibited labels protocol_revenue/);
+    expect(document.body.textContent).not.toMatch(/coefficient of|β\s*=/);
     // The insufficient-data assessment cases are visible, not hidden.
     expect(document.body.textContent).toMatch(/PROXY_ONLY_READY_WITH_LIMITS/);
     expect(document.body.textContent).toMatch(/NOT_READY/);
-    expect(document.body.textContent).toMatch(/zero observations/);
+    // The model catalog link is honest about emptiness and targets /models.
+    const modelsLink = screen.getByRole("link", {
+      name: "Published model runs (empty until a reviewed run is published)",
+    });
+    expect(modelsLink.getAttribute("href")).toBe("/models");
   });
 
   it("marks the recorded evidence as historical and never live", () => {
@@ -272,8 +286,53 @@ describe("Honest statuses and pending markers", () => {
     expect(screen.getByText("Supply growth scale comparison")).toBeInTheDocument();
     expect(screen.getByText("Issuance and burn lower bounds")).toBeInTheDocument();
     expect(screen.getByText("USD valuation and the price effect")).toBeInTheDocument();
-    expect(screen.getByText(/mechanical fee–volume construction/)).toBeInTheDocument();
+    // The mechanical construction is disclosed in several sections (revenue
+    // generation, econometrics, alternative explanations).
+    expect(screen.getAllByText(/mechanical fee–volume construction/).length).toBeGreaterThan(0);
     expect(screen.getByText(/concentration of collectors is not concentration of customers/)).toBeInTheDocument();
+  });
+});
+
+describe("NI-070 release facts vs preregistered configs", () => {
+  /** Tracked preregistered estimator settings (NI-052). */
+  const fitConfig = JSON.parse(readRepo("research/models/fit_configs/gross_fee_activity_v1_fit.json")) as {
+    covariance: { kernel: string; maxlags: number; maxlags_rule: string; use_correction: boolean; use_t: boolean };
+    reproduction: { coefficient_rtol: string; coefficient_atol: string };
+  };
+  /** Tracked preregistered specification (NI-051): the admitted proxy design. */
+  const specConfig = JSON.parse(readRepo("research/models/configs/gross_fee_activity_v1.json")) as {
+    transformations: { baseline: string; difference_adjacency: string; strictly_positive_required: boolean };
+  };
+
+  it("describes the estimator exactly as the tracked configs declare it", () => {
+    // The tracked config is the source of truth for every estimator fact.
+    expect(fitConfig.covariance.kernel).toBe("bartlett");
+    expect(fitConfig.covariance.maxlags_rule).toBe("fixed");
+    expect(fitConfig.covariance.use_correction).toBe(true);
+    expect(fitConfig.covariance.use_t).toBe(true);
+    expect(specConfig.transformations.baseline).toBe("difference_log");
+    expect(specConfig.transformations.difference_adjacency).toBe("calendar_adjacent_only");
+    expect(specConfig.transformations.strictly_positive_required).toBe(true);
+
+    renderedPage();
+    const text = document.body.textContent as string;
+    expect(text).toMatch(/Newey–West HAC covariance/);
+    expect(text).toMatch(/Bartlett kernel/);
+    expect(text).toMatch(/fixed lag count from the config — never data-selected/);
+    expect(text).toMatch(/Δlog fee-on-volume association/);
+    // No fitted value can exist: no coefficient notation, no interval, no
+    // p-value is rendered anywhere on the thesis page.
+    expect(text).not.toMatch(/β\s*=|p\s*[=<]\s*0\.|\b95% CI\b/);
+  });
+
+  it("names the release documents as checkout paths, never as downloads", () => {
+    renderedPage();
+    const text = document.body.textContent as string;
+    expect(text).toMatch(/research\/reports\/ — the release report and its content\/evidence manifest/);
+    expect(text).toMatch(/checkout paths, never as downloads/);
+    for (const anchor of Array.from(document.querySelectorAll("a"))) {
+      expect(anchor.getAttribute("download")).toBeNull();
+    }
   });
 });
 
@@ -291,9 +350,11 @@ describe("Public projection allowlists", () => {
     for (const href of hrefs) {
       expect(allowed.has(href as string), `unexpected public link ${href}`).toBe(true);
     }
-    // Unimplemented routes are never advertised.
+    // Unimplemented routes are never advertised. /models is the implemented
+    // model catalog (NI-054) and is allowlisted; /data, /charts and /workspace
+    // stay unlinked from the thesis page.
     for (const href of hrefs) {
-      expect(href).not.toMatch(/^\/(data|charts|models|workspace)/);
+      expect(href).not.toMatch(/^\/(data|charts|workspace)/);
     }
   });
 

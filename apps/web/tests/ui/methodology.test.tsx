@@ -168,18 +168,106 @@ describe("Methodology command labels vs available tooling", () => {
       expect(readinessCli).toContain(flag);
       expect(readinessCommand).toContain(flag);
     }
+
+    // NI-052/NI-053/NI-054 research CLI: the verbs exist in the dispatcher and
+    // every flag shown exists in the owning module.
+    const researchCli = readRepo("apps/api/src/near_api/research/__main__.py");
+    const fitCli = readRepo("research/models/fit.py");
+    const diagnosticsCli = readRepo("research/models/diagnostics.py");
+    const publicationCli = readRepo("apps/api/src/near_api/research/publication.py");
+    for (const verb of ["fit", "diagnostics", "verify", "publish"]) {
+      expect(researchCli).toMatch(new RegExp(`"${verb}"`));
+    }
+    const fitCommand = commands.find((command) => command.includes("near_api.research fit"));
+    expect(fitCommand).toBeDefined();
+    for (const flag of ["--archive-root", "--out-dir", "--code-commit"]) {
+      expect(fitCli).toContain(flag);
+      expect(fitCommand).toContain(flag);
+    }
+    const diagnosticsCommand = commands.find((command) =>
+      command.includes("near_api.research diagnostics"),
+    );
+    expect(diagnosticsCommand).toBeDefined();
+    for (const flag of ["--archive-root", "--out-dir", "--code-commit"]) {
+      expect(diagnosticsCli).toContain(flag);
+      expect(diagnosticsCommand).toContain(flag);
+    }
+    const verifyCommand = commands.find((command) => command.includes("near_api.research verify"));
+    expect(verifyCommand).toBeDefined();
+    for (const flag of ["--bundle", "--offline"]) {
+      expect(researchCli).toContain(flag);
+      expect(verifyCommand).toContain(flag);
+    }
+    const publishCommand = commands.find((command) => command.includes("near_api.research publish"));
+    expect(publishCommand).toBeDefined();
+    for (const flag of ["--bundle", "--database-url"]) {
+      expect(researchCli).toContain(flag);
+      expect(publishCommand).toContain(flag);
+    }
+    // The bundle files the verify command points at are the tracked gate
+    // artifacts (fit manifest, diagnostics report, readiness report names).
+    expect(publicationCli).toContain("fit_manifest.json");
+    expect(publicationCli).toContain("diagnostics_report.json");
+    expect(publicationCli).toContain("readiness_report.json");
+
+    // NI-030 refresh adapter: the single-shot flags exist in the CLI.
+    const refreshCli = readRepo("apps/api/src/near_api/ingestion/refresh.py");
+    const refreshCommand = commands.find((command) =>
+      command.includes("near_api.ingestion.refresh"),
+    );
+    expect(refreshCommand).toBeDefined();
+    for (const flag of ["--once", "--database-url", "--storage-root", "--repo-root", "--source"]) {
+      expect(refreshCli).toContain(flag);
+      expect(refreshCommand).toContain(flag);
+    }
   });
 
   it("keeps unimplemented CLI verbs out of the implemented list", () => {
     render(<MethodologyPage />);
     const implementedText = listByName("Implemented commands").textContent as string;
-    // These belong to NI-030 and NI-052–NI-054; they must not read as runnable.
+    // The unified near_api.cli module does not exist; the refresh and research
+    // commands run through their own modules (listed above as implemented).
     expect(implementedText).not.toContain("near_api.cli");
     expect(implementedText).not.toContain("research run");
     expect(implementedText).not.toContain("download");
     const unavailableText = listByName("Commands not implemented yet").textContent as string;
-    expect(unavailableText).toContain("near_api.cli ingest refresh");
-    expect(unavailableText).toMatch(/not implemented/i);
+    expect(unavailableText).toContain("python -m near_api.cli …");
+    expect(unavailableText).toContain("near_api.cli module does not exist");
+    expect(unavailableText).toContain("dataset download endpoints");
+  });
+
+  it("states the honest NI-070 estimator status with no fitted values", () => {
+    const { container } = renderedPage();
+    const text = container.textContent as string;
+    expect(text).toMatch(/no real-archive fit has been executed, so no fitted results exist anywhere/);
+    expect(text).toMatch(/real-archive fit run is pending operator execution/);
+    expect(text).toMatch(/public model catalog stays honestly empty/);
+    // The synthetic verification is recorded, never a real-data claim.
+    expect(text).toMatch(/synthetic-verified/);
+    expect(text).toMatch(/intercept 0, slope 1/);
+    expect(text).toMatch(/atol 1e-10/);
+    // No fitted statistic can exist on the page.
+    expect(text).not.toMatch(/β\s*=|p\s*[=<]\s*0\.|\bR2?\s*=/);
+  });
+
+  it("renders gate thresholds exactly as the preregistered policy config declares", () => {
+    const gatePolicy = JSON.parse(
+      readRepo("research/models/configs/readiness_gate_policy_v1.json"),
+    ) as {
+      min_complete_daily_observations: number;
+      min_observations_per_parameter: number;
+      max_substantive_slopes: number;
+      long_run_min_days: number;
+      window: { start: string; end_exclusive: string };
+    };
+    const { container } = renderedPage();
+    const text = container.textContent as string;
+    expect(text).toContain(`At least ${gatePolicy.min_complete_daily_observations} complete daily observations`);
+    expect(text).toContain(`at least ${gatePolicy.min_observations_per_parameter} per estimated parameter`);
+    expect(text).toContain(`At most ${gatePolicy.max_substantive_slopes} substantive slopes`);
+    expect(text).toContain(`A minimum of ${gatePolicy.long_run_min_days} days`);
+    expect(text).toContain(gatePolicy.window.start);
+    expect(text).toContain(gatePolicy.window.end_exclusive);
   });
 });
 

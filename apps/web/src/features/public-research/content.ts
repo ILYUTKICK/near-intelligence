@@ -61,6 +61,28 @@ export const mechanism = {
 } as const;
 
 /**
+ * NI-070 landing release-status block: the honest state of the model research
+ * after the original research release. No new numbers — the recorded facts are
+ * the published verdict strings and the implementation status recorded in the
+ * merged NI-051/NI-052/NI-054 cards and the release report
+ * (research/reports/, referenced from the thesis page as checkout paths).
+ */
+export const releaseStatus = {
+  id: "release-status",
+  heading: "Original research release status",
+  paragraphs: [
+    "The recorded findings, methodology and readiness verdicts are published: the saved 90-day cohort is reconciled exactly, and the preregistered readiness gate admits only the explicitly named fee-versus-volume proxy — with limits, never as protocol revenue.",
+    "The deterministic estimator is implemented and verified on synthetic known-behavior fixtures; the real-archive fit run is pending operator execution, so no fitted coefficient, interval or diagnostic exists anywhere. The public model catalog stays empty until a reviewed run is published.",
+  ],
+  links: [
+    { label: "Econometric evidence status", href: "/research#econometrics" },
+    { label: "Readiness verdicts", href: "/methodology#readiness" },
+    { label: "Reproduction recipe", href: "/methodology#reproduce" },
+    { label: "Published model runs (empty until a run is published)", href: "/models" },
+  ],
+} as const;
+
+/**
  * NI-014 public thesis: the complete original conditional thesis with its
  * claim registry (CL-001–CL-009), mirroring docs/INVESTMENT_THESIS.md and the
  * recorded FINDINGS.md documents in the research directories.
@@ -70,9 +92,11 @@ export const mechanism = {
  * metric definition version (apps/api/src/near_api/metrics/registry.py).
  * Nothing is computed, re-rounded or fetched at render time; bounds stay
  * bounds ("lower bound"/"upper bound"), USD marks stay approximations, and the
- * model section stays explicitly pending until the NI-070 finalization.
- * The content carries no private editor metadata (no document, revision or
- * user identifiers). English-only per the recorded OQ-06 decision.
+ * model section carries the honest NI-070 release status (implemented and
+ * synthetic-verified estimator; real-archive fit run pending operator
+ * execution; no fitted values anywhere). The content carries no private editor
+ * metadata (no document, revision or user identifiers). English-only per the
+ * recorded OQ-06 decision.
  */
 
 export interface ClaimEvidenceLink {
@@ -130,18 +154,21 @@ export const verifiedExternalLinks = [
 /**
  * Internal routes/anchors the thesis page may link to. Only implemented routes
  * and the stable methodology anchors (IA: /methodology#sources, #reproduce,
- * plus #definitions, #collection, #readiness) are allowed; /data and /charts
- * routes do not exist yet and are never linked.
+ * plus #definitions, #collection, #readiness) are allowed; /models is the
+ * implemented public model catalog (honest empty state until a reviewed run is
+ * published); /data and /charts stay unlinked from the thesis page.
  */
 export const internalHrefAllowlist = [
   "/",
   "/research",
   "/methodology",
+  "/models",
   "/methodology#sources",
   "/methodology#definitions",
   "/methodology#collection",
   "/methodology#readiness",
   "/methodology#reproduce",
+  "/research#econometrics",
 ] as const;
 
 export const thesisToc: readonly { readonly id: string; readonly title: string }[] = [
@@ -167,7 +194,7 @@ export const hypothesisIds = ["h1", "h2", "h3", "h4"] as const;
 export const thesis = {
   title: "Research",
   standfirst:
-    "The complete original conditional thesis, with supporting and contrary evidence side by side. Every number carries its source, scope and definition version, bounds stay bounds, and the model section is explicitly pending.",
+    "The complete original conditional thesis, with supporting and contrary evidence side by side. Every number carries its source, scope and definition version, bounds stay bounds, and the model section states its honest release status.",
   evidenceStatus:
     "Recorded evidence basis: the saved 90-day cohort 2026-08-06 through 2026-11-04 (UTC, end exclusive) verified on 4 November 2026, plus the provider register reviewed 5 November 2026. No live values are published on this page; archival collection stays stopped, and a missing or unavailable value is never shown as zero.",
   tocLabel: "Thesis sections",
@@ -320,15 +347,17 @@ export const thesis = {
   econometrics: {
     id: "econometrics",
     title: "Econometric evidence",
-    pending:
-      "Explicitly pending: no fitted model, coefficient, confidence interval or causal conclusion is published here yet. This section is finalized only with the original research release (NI-070); until then it reports an unmet release gate rather than results.",
+    releaseStatus:
+      "Release status (original research release, November 2026): the preregistered readiness gate, the fixed deterministic estimator and the diagnostics battery are implemented and reviewed, and the estimator is verified on synthetic known-behavior fixtures only. The real-archive fit run is pending operator execution; its reproducible recipe is published on the methodology page. No fitted model, coefficient, standard error, confidence interval or causal conclusion from the real archive is published anywhere, and the public model catalog stays empty until a reviewed run is published. Until then this section reports an unmet release gate rather than results.",
     paragraphs: [
-      "The preregistered readiness gate has already decided what the saved archive may support: the overall verdict for the 90-day window is PROXY_ONLY_READY_WITH_LIMITS, with gross_fee_activity_v1 the only admitted specification — always with limits, never labeled protocol revenue. The preferred true-revenue specification is NOT_READY, and lower-bound supply series are REJECTED as regression outcomes.",
-      "Statistical nonsignificance is a valid finding. Any future published result must carry its dataset and definition versions, code, lock and config hashes, and must be reproducible offline.",
+      "The preregistered readiness gate has decided what the saved archive may support: the overall verdict for the 90-day window is PROXY_ONLY_READY_WITH_LIMITS, with gross_fee_activity_v1 the only admitted specification — always with limits, never labeled protocol revenue. The preferred true-revenue specification is NOT_READY, and lower-bound supply series are REJECTED as regression outcomes.",
+      "The admitted specification is a Δlog fee-on-volume association estimated by ordinary least squares with a preregistered Newey–West HAC covariance (Bartlett kernel, fixed lag count from the config — never data-selected). Its limitations are attached by the specification itself, not by this page: a largely mechanical fee–volume construction, a single provider lineage, a short sample with no long-run claim, no causal identification, and the prohibited labels protocol_revenue, token_valuation, causal_effect, demand_elasticity and sustainable_revenue.",
+      "Statistical nonsignificance is a valid finding. When an operator run is verified and published through the release gate, its exact recorded values render verbatim on the model pages with the limits and prohibited labels displayed before any coefficient; nothing here is rounded, refitted or re-selected.",
     ],
     links: [
       { label: "Model data readiness verdicts", href: "/methodology#readiness" },
-      { label: "Reproduction path", href: "/methodology#reproduce" },
+      { label: "Reproduction path and commands", href: "/methodology#reproduce" },
+      { label: "Published model runs (empty until a reviewed run is published)", href: "/models" },
     ],
   },
 
@@ -403,7 +432,7 @@ export const thesis = {
       "Daily protocol revenue is missing; gross issuance and burn exist only as incomplete lower bounds (CL-008).",
       "The provenance period is much shorter than the 90-day cohort (CL-005, CL-006).",
       "The treasury index cannot establish all possible disposal or lock paths (CL-009).",
-      "No out-of-sample long-term validation or econometric run exists yet — see the explicitly pending section.",
+      "No real-archive econometric fit exists yet — the estimator is implemented and synthetic-verified, and the real-archive fit run is pending operator execution (see the econometric evidence section).",
     ],
     staleness:
       "All recorded evidence is historical: the cohort was verified on 4 November 2026 and the provider register on 5 November 2026, and the archival mint-header audit stopped incomplete (CL-008). Values on this page are never refreshed in place — a provider revision becomes a new dataset version that supersedes the old one, and a fresh retrieval does not make an old observation fresh.",
@@ -415,10 +444,11 @@ export const thesis = {
     paragraphs: [
       "Primary recorded findings and artifacts are cited per claim in the registry above, with the repository documents named as the source of every value. The metric catalog, source register and reproduction instructions define exact scope.",
       "The official DefiLlama adapter describes its own accounting; it is not proof of independent attribution.",
+      "The original research release (November 2026) is documented in the repository at research/reports/ — the release report and its content/evidence manifest, referenced as checkout paths, never as downloads. The manifest pins the SHA-256 of every published release document and the versioned metric definitions behind every published claim.",
       "Future published claims must bind CL ids to dataset and definition versions, code, lock and config hashes, and an approved public evidence manifest.",
     ],
     datasetNote:
-      "The recorded analysis artifacts (manifests and summaries) live in the operator's local research archive and are shared only through verified, hash-checked handoffs; a fresh clone of this repository intentionally does not contain them. Staged application dataset versions are not publicly listed yet, so public dataset-version references arrive with the delivery APIs. Until then, every quantity on this page carries its document-level source and registered definition version instead of implying a live link.",
+      "The recorded analysis artifacts (manifests and summaries) live in the operator's local research archive and are shared only through verified, hash-checked handoffs; a fresh clone of this repository intentionally does not contain them. Approved application dataset versions are delivered read-only through the delivery APIs — the landing metric cards render the approved dataset key, version, status and coverage — but there is no public dataset catalog, so every quantity on this page carries its document-level source and registered definition version instead of implying a live link.",
     links: [
       { label: "Provider register and rights", href: "/methodology#sources" },
       { label: "Versioned metric registry", href: "/methodology#definitions" },
@@ -430,13 +460,15 @@ export const thesis = {
 
 /**
  * Where the recorded dataset versions live today, shared by all claims: the
- * NI-028 staging holds dataset versions in the operator database and the raw
- * recorded artifacts stay in the local research archive; neither is publicly
- * listed yet. This is the honest dataset-version reference until the delivery
- * APIs publish immutable public references.
+ * raw recorded artifacts stay in the local research archive, and approved
+ * application dataset versions are delivered read-only through the delivery
+ * APIs (the landing metric cards render the approved dataset key, version,
+ * status and coverage) — but there is no public dataset catalog, so every
+ * quantity carries its document-level source and registered definition
+ * version instead of implying a live link.
  */
 const datasetVersionReference =
-  "Recorded analysis artifacts and manifests in the local research archive; application dataset versions staged by NI-028 are held in the operator database and are not publicly listed yet — public dataset-version references arrive with the delivery APIs.";
+  "Recorded analysis artifacts and manifests in the local research archive; approved application dataset versions staged by NI-028 are delivered read-only through the delivery APIs (the landing metric cards render the approved dataset key, version and coverage), but there is no public dataset catalog.";
 
 /**
  * The claim registry CL-001–CL-009, copied from docs/INVESTMENT_THESIS.md
@@ -1150,7 +1182,9 @@ export const methodology = {
   readiness: {
     id: "readiness",
     title: "Model data readiness",
-    body: "Before any model is fitted, a preregistered readiness gate decides which empirical question the saved archive can support. The gate fits nothing; the estimator itself is a later task, so no fitted results exist yet.",
+    body: "Before any model is fitted, a preregistered readiness gate decides which empirical question the saved archive can support. The gate fits nothing. The fixed deterministic estimator (NI-052) and the diagnostics battery (NI-053) are implemented and reviewed, and the estimator is verified on synthetic known-behavior fixtures only; no real-archive fit has been executed, so no fitted results exist anywhere. The publication gate (NI-054) serves only reviewed published runs, and the public model catalog stays honestly empty until an operator publishes one.",
+    estimatorStatus:
+      "Estimator status: the preregistered design (Δlog over calendar-adjacent complete pairs, strict positivity on the exact decimal sources, explicit intercept, rank and condition checks before estimation) is implemented and synthetic-verified — a known-construction archive recovers the planted coefficients (intercept 0, slope 1) within the declared atol 1e-10 tolerance. The real-archive fit run is pending operator execution; the exact recipe is in the reproduction section below. No coefficient, standard error, interval or p-value from the real archive exists in this release.",
     overall:
       "Overall verdict for the 90-day window 2026-08-06 through 2026-11-04: PROXY_ONLY_READY_WITH_LIMITS, with gross_fee_activity_v1 the selected specification. That verdict limits what any published model may claim — it does not license revenue or value-capture conclusions.",
     specs: [
@@ -1199,13 +1233,14 @@ export const methodology = {
       "Across the 90-day window, both provider series show zero missing, zero-valued and negative days in the prepared table, and all four report invariants held.",
       "The two provider sources disagree on all 90 overlapping days; they are kept unsummed and the reconciliation stays unresolved (OQ-11).",
       "Readiness reports are generated locally from hash-pinned inputs and render byte-identically for identical inputs; they are not committed to the repository.",
+      "The estimator and diagnostics battery are implemented and reviewed (NI-052/NI-053); their real-archive runs are operator steps recorded as evidence, and no fitted real-data result exists in this repository.",
     ],
   },
 
   reproduce: {
     id: "reproduce",
     title: "Reproduction",
-    body: "Published analyses ship their inputs' provenance, code and locks so a reader can rerun them offline. The exact reproduction recipe is published together with the first quantitative release.",
+    body: "Published analyses ship their inputs' provenance, code and locks so a reader can rerun them offline. The deterministic model commands are implemented and listed below; the real-archive fit run is an operator step recorded as evidence, and the published recipe is the path any reviewer can follow once a run is released.",
     implementedIntro:
       "Commands that exist in the repository today (labels verified against the repository's own scripts):",
     implemented: [
@@ -1241,24 +1276,45 @@ export const methodology = {
           "uv run --project apps/api python research/models/readiness.py --archive-root DIR --configs-dir research/models/configs --out-dir DIR",
         note: "NI-051 readiness gate over the local research archive; the report prints or writes locally and is not committed.",
       },
-    ],
-    unavailableIntro:
-      "Deliberately not listed as runnable — these are future tasks, not implemented commands:",
-    unavailable: [
       {
-        command: "python -m near_api.cli ingest refresh …",
-        note: "The scheduled refresh adapter (NI-030) is not implemented; polling stays disabled.",
+        command:
+          "uv run --project apps/api python -m near_api.research fit --archive-root DIR --out-dir research/models/reports --code-commit <git sha>",
+        note: "NI-052 fixed deterministic estimator. Refuses to fit unless the readiness gate admits the specification; renders byte-identical manifests locally. The real-archive run is operator evidence — no fitted result is published yet.",
       },
       {
-        command: "python -m near_api.cli research run / verify …",
-        note: "The estimator and publication CLI (NI-052–NI-054) is not implemented; the commands sketched in the reproducibility document's “planned” section do not exist yet.",
+        command:
+          "uv run --project apps/api python -m near_api.research diagnostics --archive-root DIR --out-dir research/reports/<run> --code-commit <git sha>",
+        note: "NI-053 diagnostics/robustness/interpretation battery over the same fit; every defined diagnostic is present exactly once, or undefined/failed with a recorded reason.",
+      },
+      {
+        command:
+          "uv run --project apps/api python -m near_api.research verify --bundle research/reports/<run> --offline",
+        note: "NI-054 offline bundle verification: recomputes every hash and identity check without network, database or re-fit, and prints the canonical artifact hashes for the operator approval.",
+      },
+      {
+        command:
+          "uv run --project apps/api python -m near_api.research publish --bundle research/reports/<run> --database-url URL",
+        note: "NI-054 operator publication gate: verifies exactly like verify and writes the reviewed run once into the published-only model-run store. Rejected, failed or unreviewed runs never reach the database.",
+      },
+      {
+        command:
+          "uv run --project apps/api python -m near_api.ingestion.refresh --once --database-url URL --storage-root DIR [--repo-root] [--source NAME]",
+        note: "NI-030 single-shot refresh adapter. Scheduled collection stays disabled by default with an empty source allowlist and zero request budgets; no scheduled collection is enabled today.",
+      },
+    ],
+    unavailableIntro:
+      "Deliberately not listed as runnable — these do not exist as commands today:",
+    unavailable: [
+      {
+        command: "python -m near_api.cli …",
+        note: "The unified near_api.cli module does not exist; the archive import, staging, refresh and research commands run through their own modules, as listed above.",
       },
       {
         command: "dataset download endpoints",
-        note: "No public download API for datasets or raw inputs exists; delivery runs through the typed API of a later task, and raw archive access stays restricted regardless.",
+        note: "No public download API for datasets or raw inputs exists; delivery runs through the read-only metric, chart and model APIs, and raw archive access stays restricted regardless.",
       },
     ],
     environmentNote:
-      "Install the frozen dependencies first: corepack pnpm install --frozen-lockfile and uv sync --project apps/api --frozen. The repository artifacts referenced above (the registry at apps/api/src/near_api/metrics/registry.py, the datasets CLI at apps/api/src/near_api/datasets/cli.py, the archive importer at apps/api/src/near_api/ingestion/archive.py, and the readiness gate at research/models/readiness.py with its configs) are inspectable in the repository checkout; this page does not serve or link them as downloads.",
+      "Install the frozen dependencies first: corepack pnpm install --frozen-lockfile and uv sync --project apps/api --frozen. The repository artifacts referenced above (the registry at apps/api/src/near_api/metrics/registry.py, the datasets CLI at apps/api/src/near_api/datasets/cli.py, the archive importer at apps/api/src/near_api/ingestion/archive.py, the readiness gate at research/models/readiness.py with its configs, and the estimator at research/models/fit.py and diagnostics battery at research/models/diagnostics.py with their preregistered configs) are inspectable in the repository checkout; this page does not serve or link them as downloads.",
   },
 } as const;
