@@ -30,6 +30,11 @@ const ENV = {
   AUTH_ALLOWED_REDIRECT_ORIGINS: "http://localhost:3000",
   AUTH_COOKIE_SIGNING_SECRET: "c".repeat(40),
   CSRF_SIGNING_SECRET: "d".repeat(40),
+  // Required server config: the gateway route validates the config once at
+  // first import, so this must be present BEFORE the route module loads (CI
+  // has no root .env to fall back on).
+  APP_ORIGIN: "http://localhost:3000",
+  API_INTERNAL_URL: "http://internal-api.test",
 };
 
 const providerFetchMock = vi.fn();
