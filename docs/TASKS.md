@@ -2086,7 +2086,7 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0
 - **Dependencies:** NI-014, NI-054, NI-013, NI-061
 - **Complexity:** L
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** Claude role-A coordinator (ZCode session, ILYUTKICK operator), NI-070 dispatch — content/publication task, single subagent
 - **Execution role:** A with recorded operator-evidence citations
 - **Started at:** 2026-11-10T21:26:29+03:00
@@ -2118,4 +2118,6 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
   - Methodology provider register/periods (unchanged): docs/SOURCE_VERIFICATION.md — register reviewed 5 Nov 2026; probe 2026-11-06T19:13:45Z, 18,496 bytes at the 65,536 cap, final height 223357966 (SRC-NEAR-RPC row + verification/ni-026 evidence); SRC-INTENTS 21,361 records / 23 pages; refresh budgets 1 request/minute, ≤1,440/day (OQ-03 resolution + NI-030 card). "19 definitions registered, three gated" (NI-029 card + `registry.py`).
   - Release report/manifest: every figure carries an inline citation to the cards above or the tracked files; hashes recomputed by test.
   - **No claim of true protocol revenue exists anywhere** (OQ-01 open; `PROXY_CANNOT_PASS_AS_PROTOCOL_REVENUE` gate invariant; the gated definitions render null with reasons). **No private content or restricted raw artifact leakage** (tests above). **Model run reproducibility**: the published recipe is the recorded NI-052/NI-053/NI-054 command set, bound to the tracked tooling by test; the actual real-archive run remains the operator step recorded in those cards.
-- **CI verification:** pending coordinator
+- **CI verification:** pending coordinator.
+- **Coordinator acceptance (2026-11-10, independent):** reconciliation numbers in the release report verified character-exact against the NI-029 card decimal tails (135989071036891726256814 / 127692882832410490617319 — both present in report and card); leakage scan over research/reports/*.md clean (no /Users/ paths, no credentials, no Supabase references); offline discovery OK (skipped=215 baseline), web 493/493 across 46 files, lint 0/0, typecheck clean, doc-links 669; the honest fit-pending wording confirmed verbatim in the thesis econometrics section; `/models` catalog left honestly empty. Review skipped by user instruction 2026-11-09 (PLAN.md «Последнее указание пользователя — 9 ноября 2026»); the release report's claim→source table plus this coordinator audit stand in its place. When the operator executes the real-archive fit, the release status updates via a follow-up PR — the published report already documents the recipe.
+- **Completed at:** 2026-11-10T21:57:40+03:00
