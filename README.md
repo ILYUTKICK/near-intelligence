@@ -4,9 +4,9 @@ Evidence-first blockchain investment research: **Read Research → Explore Data 
 
 The investment question is whether cross-chain adoption translates into sustainable revenue and measurable NEAR token value capture. The product must show contrary evidence and distinguish activity, fees, attributable revenue, observed purchases, treasury transfers and supply changes.
 
-## Current state — 6 November 2026
+## Current state — 10 November 2026
 
-The repository is published privately at [ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence). **GitHub sharing covers documentation, visual mockups, dependency manifests and new application source/tests/configuration created by authorized NI-tasks.** Participant A authorized role A on 5 November and participant B authorized role B on 6 November; claims and actual acceptance are recorded in [TASKS.md](docs/TASKS.md) through [PLAN.md](PLAN.md). Web/API runtime skeletons and frozen pnpm/uv locks exist. NI-003 adds the identity-only PostgreSQL/Alembic foundation with native migration/RLS checks and a DB-only Compose definition; Docker execution remains unverified. NI-004 adds strict API schemas and a generated TypeScript client. Node 24 LTS / pnpm 12.16.1 are pinned in [.node-version](.node-version) and [package.json](package.json). The full product/data workflow remains incomplete. Raw historical research inputs, SQL and legacy scripts stay outside GitHub and are absent from this fresh clone; linked offline evidence needs a separately authorized file/hash handoff. Historical findings principally cover 6 August–3 November 2026 UTC and must retain their actual dates.
+The repository is published privately at [ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence). **GitHub sharing covers documentation, visual mockups, dependency manifests and new application source/tests/configuration created by authorized NI-tasks.** Participant A authorized role A on 5 November and participant B authorized role B on 6 November; claims and actual acceptance are recorded in [TASKS.md](docs/TASKS.md) through [PLAN.md](PLAN.md). The P0 application is implemented through the research workflow (public data → auth → saved charts → documents → export); the P0 runtime is packaged: NI-066 adds production web/API images (digest-pinned bases, Node renderer included), the Compose deployment with explicit one-shot migrate/worker/refresh actions, and the tested clean-clone sequence in [JUDGE_SETUP.md](docs/JUDGE_SETUP.md). Docker execution was verified locally on macOS ARM64 (Linux container runtime stays a release-rehearsal gate, NI-069). Raw historical research inputs, SQL and legacy scripts stay outside GitHub and are absent from a fresh clone; linked offline evidence needs a separately authorized file/hash handoff. Historical findings principally cover 6 August–3 November 2026 UTC and must retain their actual dates.
 
 - **[Mandatory agent execution plan](PLAN.md)** — read before selecting or implementing any task.
 - [Collaboration and repository setup](docs/COLLABORATION.md)
@@ -61,31 +61,53 @@ NI-004 API contract checks (after frozen Python/pnpm install): `pnpm api:generat
 Pydantic/FastAPI source without starting data collection. See the
 [API contract workflow](docs/API_CONTRACT.md).
 
-## Planned onboarding contract — unavailable until foundation tasks finish
+## Run the application
 
-Future prerequisites: Node 24 LTS (pinned in [.node-version](.node-version)), pnpm pinned through `packageManager` (12.16.1), CPython 3.13, uv, Docker Compose, Supabase development auth project. Python packages are resolved and hash-pinned now, Node/pnpm tool versions are pinned and pnpm-lock.yaml is committed; the API uv.lock is completed in NI-002's API part.
+Full prerequisites, configuration (four DB role secrets, a Supabase dev
+project for auth) and the tested clean-clone sequence — including images,
+migrations, and one real export through the worker — live in
+[JUDGE_SETUP.md](docs/JUDGE_SETUP.md). The short forms:
 
-Tested runtime commands (NI-002; nothing else starts on boot):
+**Compose mode** (images built from [Dockerfile.web](Dockerfile.web) and
+[Dockerfile.api](Dockerfile.api); base images are digest-pinned — see
+[deployment/README.md](deployment/README.md)):
+
+```sh
+cp .env.example .env             # then set the secrets per JUDGE_SETUP section 4
+docker compose build             # web + api images
+docker compose up -d             # db + api + web; nothing else starts, ever
+docker compose run --rm migrate  # explicit Alembic upgrade head (near_migrator)
+docker compose ps                # all three services healthy
+```
+
+One-shot operator actions, all explicit and never auto-started:
+`docker compose run --rm worker` (process queued exports once) and
+`docker compose --profile refresh run --rm refresh` (ONE guarded refresh
+attempt; refuses before any request while the source allowlist is empty, as
+it is in every fresh environment).
+
+**Native mode** (alternative; same database, host processes):
 
 ```sh
 cp .env.example .env
+docker compose up -d db          # or your own PostgreSQL 18 via scripts/db/010-roles.sql
 pnpm install --frozen-lockfile
-pnpm --filter web dev            # boots apps/web on :3000; /health validates required config
-pnpm --filter web build && pnpm --filter web start
 uv sync --project apps/api --frozen
-uv run --project apps/api uvicorn near_api.main:app --reload --port 8000   # boots apps/api on :8000
-```
-
-NI-003 defines a DB-only Compose service and explicit identity migrations. Native
-PostgreSQL migration/RLS checks are tested; Docker execution is unverified in the
-role-B Windows session. Configure distinct credentials using the
-[database setup runbook](docs/DATABASE_SETUP.md) first:
-
-```sh
-# Defined DB-only Compose path; API/web packaging belongs to NI-066.
-docker compose up -d db
+export MIGRATION_DATABASE_URL="postgresql+psycopg://near_migrator:<DB_MIGRATION_PASSWORD>@localhost:5432/near_intelligence"
 uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
+export DATABASE_URL="postgresql+psycopg://near_app:<DB_RUNTIME_PASSWORD>@localhost:5432/near_intelligence"
+uv run --project apps/api uvicorn near_api.main:app --port 8000
+API_INTERNAL_URL=http://localhost:8000 pnpm --filter web start   # or: pnpm --filter web dev
 ```
+
+Configure distinct credentials using the [database setup
+runbook](docs/DATABASE_SETUP.md). Both services expose `/health`, which
+returns 200 when configured and a readable 503 naming the missing required
+variables otherwise. Missing research data renders as explicit unavailable
+states — nothing is fabricated; see [JUDGE_SETUP.md](docs/JUDGE_SETUP.md)
+section 5 for the input-bundle boundary. Development hot-reload:
+`pnpm --filter web dev` and `uv run --project apps/api uvicorn
+near_api.main:app --reload --port 8000`.
 
 Developer checks (NI-005; CI runs them on every pull request — web, API and a disposable PostgreSQL 18 database job):
 
@@ -115,7 +137,7 @@ checks both source files remain byte-identical. Neither mode contacts providers
 or supplies production seed data. The test checks visible metric cards against
 the real API response, explicit unavailable data, and API outage recovery.
 
-Compose mode and native development mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Web `.env` loading is implemented explicitly in [apps/web/src/lib/env.ts](apps/web/src/lib/env.ts) and API loading in [apps/api/src/near_api/settings.py](apps/api/src/near_api/settings.py); missing required configuration makes `/health` return a readable 503 on both services. Production settings and health gates: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example).
+Compose mode and native mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Web `.env` loading is implemented explicitly in [apps/web/src/lib/env.ts](apps/web/src/lib/env.ts) and API loading in [apps/api/src/near_api/settings.py](apps/api/src/near_api/settings.py); missing required configuration makes `/health` return a readable 503 on both services. Production settings, health gates and the scheduler opt-in contract: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example); the image digest pins and packaging decisions are recorded in [deployment/README.md](deployment/README.md).
 
 ## Delivery gates
 

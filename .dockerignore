@@ -1,0 +1,82 @@
+# NI-066 build-context boundary. Everything the images do not need is excluded
+# here so it never reaches the daemon: credentials, raw research data, local
+# state and developer tooling are outside every build stage (verified in
+# deployment/README.md and docs/JUDGE_SETUP.md).
+
+# Credentials and local configuration — must never enter an image or context.
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.gitattributes
+.codex/
+.aws/
+.idea/
+.vscode/
+*.pem
+*.key
+*.p12
+*.pfx
+.envrc
+
+# Preserved research archives and the superseded product plan stay local.
+research/
+product-plan/
+
+# Local process state, private exports and disposable artifacts.
+.local/
+artifacts/
+private-exports/
+coverage/
+playwright-report/
+test-results/
+*.log
+*.pid
+qa/
+
+# Repository meta and documentation are not needed to build the images.
+docs/
+.github/
+AGENTS.md
+PLAN.md
+CONTRIBUTING.md
+LICENSE
+README.md
+scripts/
+deployment/
+**/*.md
+!apps/api/README.md
+
+# Dependency trees, caches and build outputs are created inside the builds.
+node_modules/
+**/node_modules/
+.venv/
+**/.venv/
+venv/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.next/
+**/.next/
+.turbo/
+.vercel/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Test suites never ship and do not belong in the build context.
+apps/api/tests/
+apps/web/tests/
+apps/web/e2e/
+apps/web/test-results/
+apps/web/playwright-report/
+
+# Operating-system noise.
+.DS_Store
+._*
+*.swp
+*.swo
