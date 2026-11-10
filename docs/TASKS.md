@@ -1970,7 +1970,12 @@ Specification: [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 - **Priority:** P0
 - **Dependencies:** NI-009, NI-039, NI-063
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Claude role-A coordinator (ZCode session, ILYUTKICK operator), NI-064 dispatch
+- **Execution role:** A
+- **Started at:** 2026-11-10T23:07:25+03:00
+- **Branch/worktree:** feat/ni-064-desktop-qa; /Users/ilyutkinn/Desktop/near-intelligence-a19 (worktree stacked on feat/ni-062-security-audit head a15f41b so the desktop QA covers the workbench identity-guard fix)
+- **Dependency verification:** NI-009 DONE on main; NI-039 DONE on main; NI-063 DONE on main (PR #81). NI-062 is implemented, coordinator-accepted and CI-green (4/4) on OPEN PR #84 awaiting owner merge — claim basis per the NI-037/NI-036 open-PR precedent; PR to be retargeted to main after #84 merges. No competing NI-064 claim and no open PR conflict at session start.
 
 **Description:** Validate desktop usability of the core research flow, keyboard accessibility and document-size performance.
 
