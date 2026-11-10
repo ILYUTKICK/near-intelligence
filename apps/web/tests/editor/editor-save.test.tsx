@@ -34,6 +34,9 @@ const DOC_ID = "22222222-2222-4222-8222-222222222222";
 const NEW_DOC_ID = "99999999-9999-4999-8999-999999999999";
 const VERSION_ID = "88888888-8888-4888-8888-888888888888";
 
+/** The verified session subject the identity guard answers with (mutable). */
+let sessionSubject = "synthetic-owner";
+
 const DOC: CanonicalDocument = {
   schema_version: 1,
   type: "doc",
@@ -140,6 +143,11 @@ function mockApi(handlers: Handler[]): CapturedRequest[] {
   const requests: CapturedRequest[] = [];
   const fetchMock = vi.fn((input: RequestInfo | URL, init: RequestInit = {}) => {
     if (String(input) === "/api/auth/csrf") return Promise.resolve(new Response(JSON.stringify({ token: "synthetic-csrf" }), { headers: { "content-type": "application/json" } }));
+    // NI-062: the workbench identity guard verifies the session on mount.
+    // Early-return (uncaptured) so request-count assertions stay about the
+    // document API; the mutable subject lets the cross-principal test flip
+    // the verified answer between actions.
+    if (String(input) === "/api/auth/session") return Promise.resolve(Response.json({ status: "ok", subject: sessionSubject, expiresAt: "2026-12-01T00:00:00Z" }, { headers: { "cache-control": "no-store" } }));
     const headers = (init.headers ?? {}) as Record<string, string>;
     let body: unknown = null;
     if (typeof init.body === "string") {
@@ -168,6 +176,7 @@ afterEach(() => {
   // The recovery draft lives in sessionStorage; tests must not leak one.
   sessionStorage.clear();
   vi.restoreAllMocks();
+  sessionSubject = "synthetic-owner";
 });
 
 async function renderReady(handlers: Handler[]): Promise<CapturedRequest[]> {
@@ -448,6 +457,36 @@ describe("409 conflict recovery (no silent last-write-wins)", () => {
     const copySave = requests.find((r) => r.url === `/api/documents/${NEW_DOC_ID}/versions`);
     expect(copySave).toBeDefined();
     expect(copySave?.headers["if-match"]).toBe('"1"');
+  });
+
+  it("refuses to carry the local content into another principal's new document (NI-062)", async () => {
+    const requests = await renderReady([
+      (r) => {
+        if (r.method === "POST" && r.url.endsWith("/versions")) {
+          return errorResponse(409, "REVISION_CONFLICT", "Document revision moved", [
+            { path: "If-Match", reason: "current_revision:9" },
+          ]);
+        }
+        return undefined;
+      },
+    ]);
+    await insertDivider();
+    await userEvent.click(screen.getByTestId("save-now"));
+    const dialog = await screen.findByTestId("conflict-dialog");
+    // Between the conflict and the click, another principal signs in on
+    // another tab: the fresh re-verification at click time returns Bob.
+    sessionSubject = "synthetic-bob";
+    await userEvent.click(within(dialog).getByTestId("conflict-new-copy"));
+    // NO document is created — Alice's content can never be written into
+    // Bob's new document. The verified different subject also clears the
+    // workbench, so the end state is the honest session boundary (the
+    // dialog's transient refusal may already be unmounted with it).
+    await screen.findByText(/session has ended or changed/i);
+    expect(requests.filter((r) => r.method === "POST" && r.url === "/api/documents")).toHaveLength(0);
+    await waitFor(() => {
+      expect(screen.queryByRole("textbox")).toBeNull();
+    });
+    sessionSubject = "synthetic-owner";
   });
 
   it("keeps editing (dismiss) and reopens through the review button", async () => {
