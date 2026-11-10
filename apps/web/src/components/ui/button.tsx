@@ -23,7 +23,12 @@ const buttonVariants = cva(
     "h-11 min-w-11 px-4",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
     "disabled:pointer-events-none disabled:opacity-60",
-    "aria-busy:pointer-events-none aria-busy:opacity-80",
+    // Pending blocks duplicate submits via aria-busy without dimming: opacity
+    // < 1 blends the button colors with whatever is behind it and the blended
+    // pair fails the WCAG contrast rule while the request is in flight (axe
+    // caught exactly that on workspace home in CI). Contrast must hold in
+    // every reachable state, pending included.
+    "aria-busy:pointer-events-none",
     "transition-colors duration-(--transition-fast) motion-reduce:transition-none",
   ),
   {
