@@ -132,11 +132,14 @@ export function runSelfTest() {
     { name: "SUPABASE_JWT_ISSUER", value: "https://self-test.supabase.co/auth/v1", generic: false },
   ];
   try {
-    // Positive control: a signing secret in the bundle MUST fail.
+    // Positive control: a signing secret in the fixture bundle MUST be
+    // detected (checked directly — the printed FAIL line must only ever
+    // come from the real scan).
     writeFileSync(path.join(directory, "leak.js"),
       "const leaked = 'self-test-signing-secret-0123456789';\n");
     const positive = scanBundle(directory, secrets);
-    if (report(positive.leaks)) {
+    if (positive.leaks.length !== 1
+        || !positive.leaks[0].startsWith("CSRF_SIGNING_SECRET")) {
       console.error("SELF-TEST FAILURE: the positive leak control was not detected");
       return false;
     }

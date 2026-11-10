@@ -381,7 +381,14 @@ class SecurityOwnershipMatrixTests(chart_fixtures.ChartBlockDatabaseFixture,
     def test_06_public_endpoints_keep_recorded_caching_and_private_never_caches(self):
         with self.as_alice():
             detail = self.client.get("/api/documents", headers=self.bearer_alice)
-        self.assertEqual(detail.headers["Cache-Control"], "no-store")
+            self.assertEqual(detail.headers["Cache-Control"], "no-store")
+            # NI-062 hardening: the private profile mutations are no-store too
+            # (the API does not rely on the same-origin gateway overriding it).
+            profile = self.client.patch("/api/me", json={"display_name": "Synthetic Alice",
+                                                          "display_timezone": "UTC"},
+                                        headers=self.bearer_alice)
+            self.assertEqual(profile.status_code, 200, profile.text)
+            self.assertEqual(profile.headers["Cache-Control"], "no-store")
         # Public catalog responses stay cacheable by design (recorded NI-032
         # semantics); they carry no private identity.
         catalog = self.client.get("/api/charts")
