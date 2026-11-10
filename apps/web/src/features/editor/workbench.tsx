@@ -8,6 +8,8 @@ import { Skeleton } from "@/components/data-state/Skeleton";
 import { DocumentApiError, getDocument } from "@/features/documents/list/documents-api";
 import { CanonicalDocumentError, validateCanonicalDocument, CANONICAL_SCHEMA_VERSION } from "./canonical";
 import { downloadJson } from "./persistence/download";
+import { clearStoredDraft } from "./persistence/draft";
+import { useSessionOwnerGuard } from "./persistence/session-owner";
 import { EditorShell } from "./editor-shell";
 
 /**
@@ -75,6 +77,14 @@ export function ResearchDocumentEditor({ documentId }: { documentId: string }) {
     UUID_PATTERN.test(documentId) ? { kind: "loading" } : { kind: "not-found" },
   );
   const [reloadKey, setReloadKey] = useState(0);
+  // NI-062: the loaded content belongs to the first verified session subject.
+  // A cross-tab account switch (a verified DIFFERENT subject) must not leave
+  // the previous principal's document in any buffer of this tab.
+  const guard = useSessionOwnerGuard();
+  useEffect(() => guard.onChanged(() => {
+    clearStoredDraft(documentId);
+    setState({ kind: "unauthorized" });
+  }), [guard, documentId]);
 
   useEffect(() => {
     if (!UUID_PATTERN.test(documentId)) {
@@ -174,7 +184,7 @@ export function ResearchDocumentEditor({ documentId }: { documentId: string }) {
     return (
       <div className="mt-6">
         <p role="alert" className="text-ui leading-ui text-danger font-medium">
-          Your session has expired. Sign in again to open your documents.
+          Your session has ended or changed. Sign in again to open your documents.
         </p>
         <p className="text-body leading-body text-text-secondary mt-2">
           <Link
@@ -225,6 +235,8 @@ export function ResearchDocumentEditor({ documentId }: { documentId: string }) {
       updatedAt={state.updatedAt}
       currentVersionId={state.currentVersionId}
       content={state.content}
+      sessionOwner={guard.owner}
+      verifySessionOwner={guard.verify}
     />
   );
 }

@@ -209,6 +209,28 @@ describe("ExportDialog lifecycle", () => {
     expect(alert).toHaveTextContent(/does not exist for your account/);
     await expectAccessible(screen.getByRole("dialog"));
   });
+
+  it("maps the stale-revision 409 to the specific REVISION_NOT_ACKNOWLEDGED copy (NI-063 finding)", async () => {
+    // NI-063 recorded: exporting right after in-session saves targets the
+    // stale acknowledged revision and the API refuses with typed 409. The
+    // regression pins that the dialog maps that code to the specific
+    // guidance (never the generic transport fallback).
+    mockFetch([
+      CSRF_ROUTE,
+      {
+        match: (m, p) => m === "POST" && p === EXPORT_PATH,
+        respond: () => Response.json(
+          { error: { code: "REVISION_NOT_ACKNOWLEDGED", message: "The acknowledged revision is stale",
+                     request_id: "fixture", retryable: false } },
+          { status: 409 }),
+      },
+    ]);
+    render(<ExportDialog open onOpenChange={() => {}} documentId={DOC_ID} versionId={VERSION_ID} />);
+    const alert = await screen.findByTestId("export-error");
+    expect(alert).toHaveTextContent(/no longer the document's current revision/);
+    expect(alert).toHaveTextContent(/export the current revision/);
+    await expectAccessible(screen.getByRole("dialog"));
+  });
 });
 
 // --------------------------------------------------------------------------- //

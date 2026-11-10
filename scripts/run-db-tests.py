@@ -111,9 +111,10 @@ def main() -> int:
         # publication gate + public model APIs (publish flow, migration 0010,
         # RLS matrix), the NI-036 document revision suites, the NI-041
         # chart-block insertion suites, the NI-056 frozen export
-        # representation suite, the NI-058 export job lifecycle suite and the
+        # representation suite, the NI-058 export job lifecycle suite, the
         # NI-061 integration invariant suite (independent oracles across
-        # DB/API/editor boundaries).
+        # DB/API/editor boundaries) and the NI-062 security audit suites
+        # (HTTP ownership matrix, direct RLS probes).
         patterns = ["test_database.py", "test_auth_bootstrap.py", "test_ownership_rls.py",
                     "test_home_aggregation.py", "test_archive_import.py",
                     "test_dataset_staging.py", "test_metrics.py",
@@ -124,7 +125,8 @@ def main() -> int:
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py",
                     "test_exports_ir.py", "test_exports_jobs.py",
-                    "test_invariants_db_chain.py"]
+                    "test_invariants_db_chain.py",
+                    "test_security_http_ownership.py", "test_security_rls_probes.py"]
         if args.suite == "landing":
             patterns = ["test_landing_integration.py"]
         if args.suite == "insights":

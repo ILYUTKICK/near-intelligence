@@ -135,6 +135,13 @@ function mockApi(handlers: Array<(url: string) => Response | undefined>) {
   const requests: Array<{ url: string; init: RequestInit }> = [];
   const fetchMock = vi.fn((input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = input instanceof Request ? new URL(input.url).pathname : String(input);
+    // NI-062: the workbench identity guard verifies the session on mount.
+    // Early-return (uncaptured) so request-count assertions stay about the
+    // document API; the identity-change specs stub /api/auth/session
+    // explicitly with their own subjects.
+    if (url === "/api/auth/session") {
+      return Promise.resolve(Response.json({ status: "ok", subject: "synthetic-owner", expiresAt: "2026-12-01T00:00:00Z" }, { headers: { "cache-control": "no-store" } }));
+    }
     requests.push({ url, init });
     for (const handler of handlers) {
       const response = handler(url);
@@ -206,7 +213,7 @@ describe("honest load states", () => {
       (url) => (url === `/api/documents/${DOC_ID}` ? errorResponse(401, "UNAUTHORIZED", "Unauthorized") : undefined),
     ]);
     render(<ResearchDocumentEditor documentId={DOC_ID} />);
-    expect(await screen.findByRole("alert")).toHaveTextContent(/session has expired/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/session has ended or changed/i);
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 

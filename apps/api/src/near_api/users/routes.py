@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -64,7 +64,12 @@ class ProfileUpdateRequest(BaseModel):
 
 @router.get("", response_model=ProfileResponse, operation_id="getMe",
             summary="The verified principal's own profile")
-def read_me(principal: PrincipalDependency) -> ProfileResponse:
+def read_me(principal: PrincipalDependency, response: Response) -> ProfileResponse:
+    # NI-062 audit hardening: private profile responses are never cacheable
+    # (AUTHENTICATION_SECURITY "Private responses ... no-store"). The
+    # same-origin gateway overrides cache headers, but the API must not rely
+    # on that for its own contract.
+    response.headers["Cache-Control"] = "no-store"
     return ProfileResponse(
         subject=str(principal.id),
         display_name=principal.display_name,
@@ -78,6 +83,7 @@ def update_me(
     update: ProfileUpdateRequest,
     principal: PrincipalDependency,
     engine: RuntimeEngineDependency,
+    response: Response,
 ) -> ProfileResponse:
     """Update the verified subject's own profile row via the near_app role.
 
@@ -85,6 +91,7 @@ def update_me(
     subject, so a foreign or disabled profile is unreachable; an empty update
     result is a fail-closed bootstrap error, never a cross-owner write.
     """
+    response.headers["Cache-Control"] = "no-store"
     with principal_transaction(engine, principal) as connection:
         updated = connection.execute(
             text(

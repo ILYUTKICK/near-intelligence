@@ -98,6 +98,11 @@ export interface EditorShellProps {
   currentVersionId: string | null;
   /** Already validated canonical content (the persisted revision). */
   content: CanonicalDocument;
+  /** NI-062 identity guard: the verified subject the loaded content belongs
+   * to (null until one verification succeeded), and a fresh re-verification
+   * used by the paths that carry content into another document. */
+  sessionOwner: string | null;
+  verifySessionOwner: () => Promise<string | null>;
 }
 
 interface SlashMenuState {
@@ -116,7 +121,7 @@ type AnnotationAction = { kind: "insight"; action: InsightAction } | { kind: "hy
 type AnnotationIntent = AnnotationAction & { content: CanonicalDocument; revision: number };
 
 export function EditorShell({ documentId, title, revision, updatedAt,
-  currentVersionId, content }: EditorShellProps) {
+  currentVersionId, content, sessionOwner, verifySessionOwner }: EditorShellProps) {
   const router = useRouter();
   // The conflict dialog opens declaratively whenever a 409 state exists and
   // has not been dismissed for THIS conflict (each conflict carries a fresh
@@ -328,6 +333,19 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const handleConflictNewCopy = useCallback(async () => {
     setConflictBusy(true);
     setConflictActionError(null);
+    // NI-062 identity gate: the local content belongs to the verified owner
+    // recorded at load. A copy may only be created while a FRESH verified
+    // session subject still matches that owner — otherwise the content
+    // would be carried into a different principal's new document (the
+    // server-side RLS backstop cannot see this client-only attribution).
+    const verified = await verifySessionOwner();
+    if (sessionOwner === null || verified !== sessionOwner) {
+      setConflictActionError(
+        "Your session changed or could not be verified. Sign in again — the copy was not created and nothing was sent.",
+      );
+      setConflictBusy(false);
+      return;
+    }
     try {
       const body = controller.captureLocal();
       // POST /documents (owner-checked, client Idempotency-Key) then the
@@ -352,7 +370,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
       return;
     }
     setConflictBusy(false);
-  }, [controller, title, router]);
+  }, [controller, title, router, sessionOwner, verifySessionOwner]);
 
   const handleDraftRestore = useCallback(() => {
     const offer = controller.draft;
