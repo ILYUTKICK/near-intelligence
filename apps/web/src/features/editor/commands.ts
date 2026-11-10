@@ -10,7 +10,7 @@ import {
   type CanonicalDocument,
 } from "./canonical";
 import { canonicalBlockToTiptap, tiptapToCanonicalDocument } from "./serialize";
-import { emitRequestBlockDelete } from "./ui-bridge";
+import { emitOperationAnnounce, emitRequestBlockDelete } from "./ui-bridge";
 
 /**
  * P0 structural block operations (NI-039, EDITOR_SPECIFICATION "Block
@@ -55,6 +55,16 @@ const BLOCK_LABELS: Record<CanonicalBlock["type"], string> = {
   risk: "Risk",
   divider: "Divider",
 };
+
+const PM_TO_CANONICAL_LIST: Record<string, string> = {
+  bulletList: "bullet_list",
+  orderedList: "ordered_list",
+};
+
+/** Canonical block type for a ProseMirror top-level node (list-name mapping). */
+function canonicalBlockType(node: ProseMirrorNode): CanonicalBlock["type"] {
+  return (PM_TO_CANONICAL_LIST[node.type.name] ?? node.type.name) as CanonicalBlock["type"];
+}
 
 export function blockLabel(type: CanonicalBlock["type"]): string {
   return BLOCK_LABELS[type];
@@ -292,8 +302,15 @@ export function insertBlock(
 ): boolean {
   const json = initialBlock(type, options.headingLevel ?? null);
   const doc = editor.state.doc;
-  const freshDocument =
-    doc.childCount === 1 && doc.child(0).type.name === "paragraph" && doc.child(0).content.size === 0;
+  // A "fresh" first block is REPLACED by the inserted block: the canonical
+  // empty document (one empty paragraph — or the loaded `content: []` state
+  // Tiptap renders as one) and the slash-menu trigger block (the single
+  // paragraph holding the typed "/" — EDITOR_SPECIFICATION: choosing an item
+  // replaces that block, so the "/" never stays behind).
+  const first = doc.childCount === 1 ? doc.child(0) : null;
+  const freshDocument = first !== null
+    && first.type.name === "paragraph"
+    && (first.content.size === 0 || first.textContent === "/");
   const { from, to } = topLevelRange(doc, freshDocument ? 0 : currentTopLevelIndex(editor));
   const insertPos = freshDocument ? from : to;
 
@@ -434,17 +451,44 @@ export const BlockOperationShortcuts = Extension.create({
       return selection instanceof NodeSelection && confirmationTypes.has(selection.node.type.name)
         && requestConfirmation(this.editor, currentTopLevelIndex(this.editor));
     };
+    // NI-064: the keyboard alternatives must announce their outcome through
+    // the shell's polite live region exactly like the toolbar buttons do —
+    // a silent keyboard move is a screen-reader blocker, not a nicety.
+    const announceMove = (delta: -1 | 1) => {
+      const editor = this.editor;
+      const index = currentTopLevelIndex(editor);
+      const node = editor.state.doc.child(index);
+      const label = blockLabel(canonicalBlockType(node));
+      const ok = moveTopLevelBlock(editor, index, delta);
+      emitOperationAnnounce(editor, ok
+        ? `${label} moved ${delta === -1 ? "up" : "down"}. Its id and links are unchanged.`
+        : `The ${label.toLowerCase()} is already at this end of the document.`);
+      return ok;
+    };
     return {
       Backspace: guardNodeDeletion,
       Delete: guardNodeDeletion,
-      "Mod-Alt-ArrowUp": () => moveTopLevelBlock(this.editor, currentTopLevelIndex(this.editor), -1),
-      "Mod-Alt-ArrowDown": () => moveTopLevelBlock(this.editor, currentTopLevelIndex(this.editor), 1),
-      "Mod-Shift-d": () => duplicateTopLevelBlock(this.editor, currentTopLevelIndex(this.editor)),
+      "Mod-Alt-ArrowUp": () => announceMove(-1),
+      "Mod-Alt-ArrowDown": () => announceMove(1),
+      "Mod-Shift-d": () => {
+        const editor = this.editor;
+        const ok = duplicateTopLevelBlock(editor, currentTopLevelIndex(editor));
+        emitOperationAnnounce(editor, ok
+          ? "Block duplicated. The copy has new ids; references to other blocks are unchanged."
+          : "The block could not be duplicated.");
+        return ok;
+      },
       "Mod-Shift-Backspace": () => {
         const editor = this.editor;
         const index = currentTopLevelIndex(editor);
-        return requestConfirmation(editor, index)
-          || (index < editor.state.doc.childCount && removeTopLevelBlocks(editor, [index]));
+        const confirmed = requestConfirmation(editor, index);
+        if (confirmed) return true;
+        const removed = index < editor.state.doc.childCount
+          && removeTopLevelBlocks(editor, [index]);
+        emitOperationAnnounce(editor, removed
+          ? "Block deleted. You can undo this."
+          : "The block could not be deleted.");
+        return removed;
       },
     };
   },
