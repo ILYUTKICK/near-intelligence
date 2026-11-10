@@ -55,10 +55,24 @@ export interface ViolationSummary {
  * returned so the QA report can record each one with its justification
  * instead of silently passing.
  */
+/** Duration of `--transition-fast` (tokens.css); used to outlast color transitions. */
+const TRANSITION_FAST_MS = 200;
+
 export async function expectNoSeriousViolations(
   page: Page,
   surface: string,
 ): Promise<ViolationSummary[]> {
+  // Color-contrast scans must see a STATIC frame: controls animate their
+  // colors (`transition-colors`, --transition-fast) and variant swaps
+  // interpolate between token pairs mid-flight — an animation frame can
+  // blend two individually-passing pairs into a failing one (observed in CI
+  // on workspace home, where the Create button flips primary→secondary when
+  // the data arrives). Wait for the network to settle plus one transition
+  // window, then double-rAF so the last painted frame is committed.
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForTimeout(TRANSITION_FAST_MS);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(
+    () => requestAnimationFrame(resolve))));
   const results = await new AxeBuilder({ page }).analyze();
   const blocking = results.violations
     .filter((violation) => violation.impact === "serious" || violation.impact === "critical");
