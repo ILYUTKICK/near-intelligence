@@ -43,13 +43,18 @@ class ResolvedSelectionFilters(ContractModel):
     Request filters arrive as the urlencoded ``filters`` query parameter and
     are validated server-side against the resolved chart definition version's
     closed ``filter_schema`` (the NI-031 versioned allowlist: string enums
-    from approved source/recipient/price-basis mappings only). Unknown keys
-    and unlisted values are rejected before any resolution happens, so this
-    permissive container never serializes an unapproved filter value.
+    from approved source/recipient/price-basis mappings only; NI-071 adds
+    list-valued multi-selections whose values fan out into one compared
+    series per selected value). Unknown keys and unlisted values are rejected
+    before any resolution happens, so this permissive container never
+    serializes an unapproved filter value. The canonical serialized form of
+    every value is a non-empty list of approved strings.
     """
 
     model_config = ContractModel.model_config | {"extra": "allow"}
-    __pydantic_extra__: dict[str, str] = Field(init=False)
+    __pydantic_extra__: dict[str, Annotated[list[str], Field(min_length=1,
+                                                             max_length=32)]] = \
+        Field(init=False)
 
 
 class ResolvedSelection(Selection):

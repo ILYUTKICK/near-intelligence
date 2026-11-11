@@ -154,7 +154,13 @@ class ChartBlockContractTests(unittest.TestCase):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(selection={"start": "2026-01-01", "end": "2026-01-08",
                                           "frequency": "day",
-                                          "filters": {"source": ["SRC-LLAMA"]}}))
+                                          "filters": {"source": []}}))
+        # a single selected value may arrive in the NI-071 list canonical form
+        listed = ChartBlockInsertRequest.model_validate(
+            insert_payload(selection={"start": "2026-01-01", "end": "2026-01-08",
+                                      "frequency": "day",
+                                      "filters": {"source": ["SRC-LLAMA"]}}))
+        self.assertEqual(listed.selection.filters, {"source": ["SRC-LLAMA"]})
         with self.assertRaises(ValidationError):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(block_id=str(uuid4()), owner_id=str(uuid4())))

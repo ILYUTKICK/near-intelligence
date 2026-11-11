@@ -261,18 +261,22 @@ class MetricRegistryTests(unittest.TestCase):
             self.assertTrue(metric_registry.METRIC_ID_PATTERN.match(definition.metric_id))
             self.assertTrue(definition.name and definition.unit and definition.economic_scope)
             self.assertIn(definition.definition["availability"], metric_registry.AVAILABILITY_CODES)
-        # the P0 catalog set named by the task card is registered
-        for metric_id in ("observed_near_purchases", "conversion_count", "treasury_payouts_near",
-                          "treasury_payout_count", "near_price_usd", "estimated_purchase_usd",
-                          "provider_intents_volume_usd", "provider_gross_fees_usd",
-                          "effective_gross_fee_bps", "total_supply_near",
-                          "net_supply_change_near", "issuance_lower_bound_near",
-                          "burns_lower_bound_near", "purchases_to_net_supply_pct",
-                          "purchases_to_issuance_upper_pct", "treasury_balance_near",
-                          "protocol_revenue_usd", "protocol_capture_rate",
-                          "fee_funded_buybacks_near"):
+        # the P0 catalog set named by the task card is registered (NI-071
+        # supersedes treasury_payouts_near with the per-recipient v2, so its
+        # latest registered version is 2)
+        for metric_id, latest_version in (
+                ("observed_near_purchases", 1), ("conversion_count", 1),
+                ("treasury_payouts_near", 2), ("treasury_payout_count", 1),
+                ("near_price_usd", 1), ("estimated_purchase_usd", 1),
+                ("provider_intents_volume_usd", 1), ("provider_gross_fees_usd", 1),
+                ("effective_gross_fee_bps", 1), ("total_supply_near", 1),
+                ("net_supply_change_near", 1), ("issuance_lower_bound_near", 1),
+                ("burns_lower_bound_near", 1), ("purchases_to_net_supply_pct", 1),
+                ("purchases_to_issuance_upper_pct", 1), ("treasury_balance_near", 1),
+                ("protocol_revenue_usd", 1), ("protocol_capture_rate", 1),
+                ("fee_funded_buybacks_near", 1)):
             definition = metric_registry.definition_by_metric_id(metric_id)
-            self.assertEqual(definition.version, 1)
+            self.assertEqual(definition.version, latest_version)
 
     def test_unimplemented_formula_is_rejected(self):
         with self.assertRaises(metric_registry.MetricRegistryError):
@@ -698,8 +702,8 @@ class SyntheticEmissionTests(unittest.TestCase):
         flows = manifests["metrics.flows.daily"]
         windows = manifests["metrics.windows.snapshot"]
 
-        def values(document, metric_id):
-            definition = metric_registry.definition_by_metric_id(metric_id)
+        def values(document, metric_id, version=1):
+            definition = metric_registry.definition_by_metric_id_version(metric_id, version)
             return [record for record in document["observations"]
                     if UUID(record["metric_definition_id"]) == definition.id]
 

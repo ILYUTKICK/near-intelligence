@@ -111,10 +111,13 @@ class ResolvedSelectionContractTests(unittest.TestCase):
 
     def test_resolved_selection_carries_validated_filters(self):
         selection = ResolvedSelection(start="2026-01-01", end="2026-01-31",
-                                      frequency="day", filters={"source": "SRC-LLAMA"})
-        self.assertEqual(selection.filters.model_dump(), {"source": "SRC-LLAMA"})
+                                      frequency="day", filters={"source": ["SRC-LLAMA"]})
+        self.assertEqual(selection.filters.model_dump(), {"source": ["SRC-LLAMA"]})
         for changes in ({"end": "2024-01-01"}, {"end": "2026-01-01"},
                         {"filters": {"source": 123}},
+                        {"filters": {"source": ["SRC-LLAMA", 4]}},
+                        {"filters": {"source": []}},
+                        {"filters": {"source": "SRC-LLAMA"}},
                         {"frequency": "week"}, {"owner_id": "synthetic"},
                         {"start": "2025-01-01", "end": "2027-01-01"}):
             with self.subTest(changes=changes):
@@ -123,6 +126,21 @@ class ResolvedSelectionContractTests(unittest.TestCase):
                                                       "end": "2026-01-31",
                                                       "frequency": "day", "filters": {},
                                                       **changes})
+
+    def test_chart_selection_normalizes_legacy_string_values(self):
+        from near_api.schemas.chart_selection import ChartSelection
+        legacy = ChartSelection(start="2026-01-01", end="2026-01-31",
+                                frequency="day", filters={"source": "SRC-LLAMA"})
+        self.assertEqual(legacy.filters, {"source": ["SRC-LLAMA"]})
+        multi = ChartSelection(start="2026-01-01", end="2026-01-31", frequency="day",
+                               filters={"recipient": ["buybacks.multisignature.near"]})
+        self.assertEqual(multi.filters, {"recipient": ["buybacks.multisignature.near"]})
+        with self.assertRaises(Exception):
+            ChartSelection(start="2026-01-01", end="2026-01-31", frequency="day",
+                           filters={"wallet": ["x"]})
+        with self.assertRaises(Exception):
+            ChartSelection(start="2026-01-01", end="2026-01-31", frequency="day",
+                           filters={"recipient": []})
 
     def test_unavailable_chart_responses_carry_reason_and_available_do_not(self):
         from near_api.schemas.delivery import AvailableRanges
@@ -155,22 +173,45 @@ class FilterAndQualityUnitTests(unittest.TestCase):
     def test_filter_parsing_canonicalizes_and_rejects_fuzz(self):
         self.assertEqual(parse_filters_document(None), {})
         self.assertEqual(parse_filters_document(""), {})
-        self.assertEqual(parse_filters_document('{"b":"2","a":"1"}'), {"a": "1", "b": "2"})
+        self.assertEqual(parse_filters_document('{"b":"2","a":"1"}'),
+                         {"a": ["1"], "b": ["2"]})
+        self.assertEqual(parse_filters_document('{"recipient":["b","a","b"]}'),
+                         {"recipient": ["b", "a", "b"]})
         for raw in ("{", "[1,2]", '"x"', "null", '{"a": 1}', '{"a": {"b": "c"}}',
-                    '{"": "x"}', '{"a": null}', '{"k%s": "v"}' .replace("%s", "e" * 200)):
+                    '{"": "x"}', '{"a": null}', '{"a": []}', '{"a": [1]}',
+                    '{"k%s": "v"}' .replace("%s", "e" * 200)):
             with self.subTest(raw=raw[:20]), self.assertRaises(delivery.DeliveryInvalidFilter):
                 parse_filters_document(raw)
 
     def test_chart_filter_schema_validation_is_closed(self):
         schema = chart_by_chart_id("intents-volume").filter_schema
         self.assertEqual(validate_filters_against_schema(
-            {"source": "SRC-LLAMA"}, schema), {"source": "SRC-LLAMA"})
-        for filters in ({"wallet": "x"}, {"source": "SRC-NOPE"}, {"source": 1}):
+            {"source": "SRC-LLAMA"}, schema), {"source": ("SRC-LLAMA",)})
+        # a single-value dimension rejects list selections beyond one value
+        for filters in ({"wallet": "x"}, {"source": "SRC-NOPE"}, {"source": 1},
+                        {"source": ["SRC-LLAMA", "SRC-DASHBOARD"]}):
             with self.subTest(filters=filters), \
                     self.assertRaises(delivery.DeliveryInvalidFilter):
                 validate_filters_against_schema(filters, schema)
         with self.assertRaises(delivery.DeliveryInvalidFilter):
             validate_filters_against_schema({}, {"type": "object"})
+
+    def test_multi_value_validation_canonicalizes_to_enum_order(self):
+        schema = chart_by_chart_id("treasury-payouts", ).filter_schema
+        resolved = validate_filters_against_schema(
+            {"recipient": ["fefundsadmin.sputnik-dao.near",
+                           "buybacks.multisignature.near",
+                           "fefundsadmin.sputnik-dao.near"]}, schema)
+        self.assertEqual(resolved, {"recipient": (
+            "buybacks.multisignature.near", "fefundsadmin.sputnik-dao.near")})
+        # duplicates collapse once; unknown values are rejected, never dropped
+        for filters in ({"recipient": ["nope"]}, {"recipient": []},
+                        {"recipient": ["buybacks.multisignature.near", 3]},
+                        {"recipient": "buybacks.multisignature.near,"
+                                      "fefundsadmin.sputnik-dao.near"}):
+            with self.subTest(filters=filters), \
+                    self.assertRaises(delivery.DeliveryInvalidFilter):
+                validate_filters_against_schema(filters, schema)
 
     def test_row_quality_maps_verified_missing_and_unavailable(self):
         verified = delivery._row_quality({"quality_status": "verified",
