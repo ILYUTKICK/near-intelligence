@@ -2132,3 +2132,21 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **CI verification:** pending coordinator.
 - **Coordinator acceptance (2026-11-10, independent):** reconciliation numbers in the release report verified character-exact against the NI-029 card decimal tails (135989071036891726256814 / 127692882832410490617319 — both present in report and card); leakage scan over research/reports/*.md clean (no /Users/ paths, no credentials, no Supabase references); offline discovery OK (skipped=215 baseline), web 493/493 across 46 files, lint 0/0, typecheck clean, doc-links 669; the honest fit-pending wording confirmed verbatim in the thesis econometrics section; `/models` catalog left honestly empty. Review skipped by user instruction 2026-11-09 (PLAN.md «Последнее указание пользователя — 9 ноября 2026»); the release report's claim→source table plus this coordinator audit stand in its place. When the operator executes the real-archive fit, the release status updates via a follow-up PR — the published report already documents the recipe.
 - **Completed at:** 2026-11-10T21:57:40+03:00
+### NI-075 — Integrate the NI-074 desktop design into the working application
+
+- **Epic:** 2 — Design System and Shell
+- **Priority:** P0, explicitly commissioned desktop redesign
+- **Dependencies:** NI-006, NI-008, NI-009, NI-010, NI-015, NI-017, NI-024, NI-025, NI-034, NI-035, NI-041, NI-043, NI-050, NI-054, NI-058, NI-062, NI-063, NI-070
+- **Complexity:** L
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex chat `01a1cb7a-2069-7291-bf14-941f53886671`
+- **Execution role:** A
+- **Started at:** 2026-11-11T19:48:26+03:00
+- **Branch/worktree:** `feat/ni-075-desktop-redesign` in the Windows project checkout
+- **Dependency verification:** The listed cards are DONE on `origin/main` at `630b4ed`. NI-074 is the completed design-pack handoff supplied by the owner. NI-064 PR #85 was merged into its stacked base after the base reached main. Its verified source commits are included on the integration branch to preserve the keyboard, dialog and workspace fixes.
+
+**Implementation steps:** Reconcile the shared tokens, typography and controls. Apply the NI-074 compositions to public navigation, Overview, the full Research thesis, Methodology, Models, sign-in and registration, Data and its five categories, chart library and detail, and all owned workspace surfaces. Adapt source, range, chart destination, revision and export states around the existing actions and data.
+
+**Acceptance criteria:** The desktop routes use the NI-074 visual hierarchy and preserve the existing English UI, fifteen thesis sections and H1–H4 anchors. Chart rendering, provenance, exact values, historical/estimate/unavailable/stale states, workspace ownership, autosave/reopen, pinned revisions and acknowledged-version export continue through their existing contracts. Keyboard focus, dialog dismissal and focus return work. Record changed surfaces, screenshots and remaining limitations for owner review.
+
+**Testing requirements:** Lint, strict TypeScript, relevant web tests, production build, real-stack research workflow and desktop browser checks. Use isolated fixtures for private actions and retain honest unavailable states for missing approved data.
