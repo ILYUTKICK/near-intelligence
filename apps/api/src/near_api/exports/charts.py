@@ -291,13 +291,12 @@ def render_chart_assets(request: ChartRenderRequest, *,
     node, script, script_bytes = _renderer_invocation(node_bin, renderer_script)
     payload = _renderer_payload(request)
     script_sha256 = _sha256_hex(script_bytes)
-    # windowsHide is a Windows-only Popen kwarg; POSIX builds reject it.
-    windows_options = {"windowsHide": True} if os.name == "nt" else {}
     try:
         completed = subprocess.run(
             [node, "--no-warnings", str(script)],
             input=payload, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            timeout=timeout, check=False, **windows_options)
+            timeout=timeout, check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     except subprocess.TimeoutExpired as error:
         raise ChartRendererError(
             f"The chart renderer did not finish within {timeout} seconds and "
