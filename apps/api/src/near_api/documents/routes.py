@@ -32,13 +32,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import StringConstraints
 from sqlalchemy.engine import Connection, Engine
 
 from near_api.auth.principal import Principal, get_principal, get_runtime_engine
 from near_api.contracts import error_response
 from near_api.datasets.canonical import canonical_timestamp, dump_canonical
 from near_api.db.security import principal_transaction
-from near_api.documents import idempotency, service
+from near_api.documents import idempotency, organization, service
 from near_api.documents.context_resolver import ReconstructionError, reconstruct_revision_chart
 from near_api.documents.schema import (
     SCHEMA_VERSION,
@@ -52,6 +53,8 @@ from near_api.schemas.delivery import ChartViewResponse
 from near_api.schemas.documents import (
     DocumentCreateRequest,
     DocumentListResponse,
+    DocumentOrganizationResponse,
+    DocumentOrganizationUpdateRequest,
     DocumentRenameRequest,
     DocumentResponse,
     DocumentSaveRequest,
@@ -96,6 +99,9 @@ def _document_summary(row: DocumentRow) -> DocumentSummary:
         id=row.id, title=row.title, revision=row.revision,
         schema_version=row.schema_version, current_version_id=row.current_version_id,
         created_at=row.created_at, updated_at=row.updated_at,
+        # NI-072 private organization metadata (empty defaults when the row
+        # carries none); editing it never changes revision or updated_at.
+        tags=row.tags, favorite=row.favorite,
         # Work-completion counters stay the documented zero until the home/list
         # wiring consumes the NI-036 projections (NI-024/NI-037 scope).
         progress=DocumentProgress(headings=0, charts=0, insights=0),
@@ -240,14 +246,35 @@ def mutate_document_annotation(
 
 @router.get("/documents", response_model=DocumentListResponse, operation_id="listDocuments",
             summary="Owner-scoped document list", responses=_PRIVATE_ERROR_RESPONSES)
-def list_documents(principal: PrincipalDependency, engine: RuntimeEngineDependency,
-                   response: Response, q: Annotated[str | None, Query(max_length=200)] = None,
+def list_documents(request: Request, principal: PrincipalDependency,
+                   engine: RuntimeEngineDependency, response: Response,
+                   q: Annotated[str | None, Query(max_length=200)] = None,
+                   tag: Annotated[list[Annotated[str, StringConstraints(max_length=40)]] | None,
+                                  Query()] = None,
+                   favorite: Annotated[bool | None, Query()] = None,
                    cursor: Annotated[str | None, Query(max_length=64)] = None,
                    limit: Annotated[int | None, Query(ge=1, le=100)] = None,
-                   ) -> DocumentListResponse:
-    """List the verified principal's documents, newest first, owner-scoped."""
+                   ) -> DocumentListResponse | JSONResponse:
+    """List the verified principal's documents, newest first, owner-scoped.
+
+    Optional private organization filters (NI-072): ``tag`` may repeat (AND
+    semantics — a document matches when it carries EVERY listed normalized
+    tag; at most :data:`MAX_FILTER_TAGS` values), ``favorite`` filters to
+    favorited (``true``) or non-favorited (``false``) documents. Filters
+    compose with ``q`` and pagination inside one owner-scoped query; a tag
+    no document carries is an honest empty page, never an error.
+    """
+    filter_tags: list[str] | None = None
+    if tag:
+        if len(tag) > organization.MAX_FILTER_TAGS:
+            return error_response(
+                request, 422, "VALIDATION_ERROR",
+                f"At most {organization.MAX_FILTER_TAGS} tags may be combined in one filter",
+                details=(ErrorDetail(path="tag", reason="too_many_filter_tags"),))
+        filter_tags = [value.strip().lower() for value in tag]
     offset = _decode_cursor(cursor)
     page = service.list_document_details(engine, principal, search=q,
+                                         tags=filter_tags, favorite=favorite,
                                          limit=limit, offset=offset)
     response.headers["Cache-Control"] = "no-store"
     next_cursor = _encode_cursor(page.offset + page.limit) \
@@ -377,6 +404,39 @@ def delete_document(request: Request, principal: PrincipalDependency,
             details=(ErrorDetail(path="If-Match",
                                  reason=f"current_revision:{conflict.current_revision}"),))
     return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+
+@router.patch("/documents/{document_id}/organization",
+              response_model=DocumentOrganizationResponse,
+              operation_id="updateDocumentOrganization",
+              summary="Update an owned document's private tags and favorite flag",
+              responses=_PRIVATE_ERROR_RESPONSES)
+def update_document_organization(request: Request, principal: PrincipalDependency,
+                                 engine: RuntimeEngineDependency, response: Response,
+                                 document_id: UUID,
+                                 payload: DocumentOrganizationUpdateRequest,
+                                 ) -> DocumentOrganizationResponse | JSONResponse:
+    """Merge private organization metadata on the owned document (NI-072).
+
+    PATCH semantics: absent fields stay unchanged; ``tags`` normalizes
+    server-side (trim + lower + dedupe) and ``tags: []`` clears them. This is
+    metadata-only — no revision is created, no content hash changes and
+    ``documents.updated_at`` (the list order) is untouched, so no If-Match
+    precondition applies. The document must exist and be owned (one generic
+    404 otherwise).
+    """
+    with principal_transaction(engine, principal) as connection:
+        try:
+            state = organization.update_organization(
+                connection, principal, document_id,
+                tags=list(payload.tags) if payload.tags is not None else None,
+                favorite=payload.favorite)
+        except organization.OrganizationValidationError as error:
+            return _schema_error(request, error)
+    response.headers["Cache-Control"] = "no-store"
+    return DocumentOrganizationResponse(
+        document_id=state.document_id, tags=state.tags, favorite=state.favorite,
+        updated_at=state.updated_at)
 
 
 @router.get("/documents/{document_id}/versions", response_model=VersionListResponse,

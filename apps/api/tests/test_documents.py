@@ -429,6 +429,7 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
             "/api/documents", "/api/documents/{document_id}",
+            "/api/documents/{document_id}/organization",
             "/api/documents/{document_id}/versions",
             "/api/documents/{document_id}/versions/{version_id}",
             "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/view",
@@ -493,6 +494,27 @@ class DocumentRouteContractTests(unittest.TestCase):
             chart_blocks_path["post"]["responses"]["201"]["content"]["application/json"]
             ["schema"],
             {"$ref": "#/components/schemas/ChartBlockMutationResponse"})
+        # NI-072 organization row: metadata-only PATCH, no If-Match (never a
+        # revision), response is the bounded organization state.
+        organization_path = schema["paths"]["/api/documents/{document_id}/organization"]
+        self.assertEqual(set(organization_path), {"patch"})
+        self.assertEqual(organization_path["patch"]["operationId"],
+                         "updateDocumentOrganization")
+        self.assertEqual(
+            organization_path["patch"]["requestBody"]["content"]["application/json"]
+            ["schema"],
+            {"$ref": "#/components/schemas/DocumentOrganizationUpdateRequest"})
+        self.assertEqual(
+            organization_path["patch"]["responses"]["200"]["content"]["application/json"]
+            ["schema"],
+            {"$ref": "#/components/schemas/DocumentOrganizationResponse"})
+        list_parameters = {item["name"]: item for item
+                           in schema["paths"]["/api/documents"]["get"]["parameters"]
+                           if item["in"] == "query"}
+        self.assertEqual(set(list_parameters),
+                         {"q", "tag", "favorite", "cursor", "limit"})
+        self.assertTrue(all(not item.get("required")
+                            for item in list_parameters.values()))
         # NI-058 export rows: create/poll/download live inside the document's
         # owned namespace so ownership resolves through ONE compositional chain.
         exports_path = schema["paths"]["/api/documents/{document_id}/exports"]
@@ -525,6 +547,7 @@ class DocumentRouteContractTests(unittest.TestCase):
             ("post", "/api/documents", {"title": "Synthetic"}),
             ("get", f"/api/documents/{uuid4()}", None),
             ("patch", f"/api/documents/{uuid4()}", {"title": "Synthetic"}),
+            ("patch", f"/api/documents/{uuid4()}/organization", {"favorite": True}),
             ("delete", f"/api/documents/{uuid4()}", None),
             ("get", f"/api/documents/{uuid4()}/versions", None),
             ("get", f"/api/documents/{uuid4()}/versions/{uuid4()}", None),
