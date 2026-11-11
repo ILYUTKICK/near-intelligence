@@ -18,7 +18,7 @@ users cascade.
 from alembic import op
 
 revision = "0013_chart_snapshots"
-down_revision = "0012_export_jobs"
+down_revision = "0014_document_organization"
 branch_labels = None
 depends_on = None
 
