@@ -344,6 +344,7 @@ describe("Public projection allowlists", () => {
       ...verifiedExternalLinks,
       ...thesisToc.map((entry) => `#${entry.id}`),
       ...hypothesisIds.map((id) => `#${id}`),
+      "#CL-002-heading",
     ]);
     const hrefs = Array.from(container.querySelectorAll("a")).map((anchor) => anchor.getAttribute("href"));
     expect(hrefs.length).toBeGreaterThan(0);

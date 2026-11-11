@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState, type MouseEventHandler } from "react";
 
 import { Skeleton } from "@/components/data-state/Skeleton";
+import { PageIntro } from "@/components/layout/PageIntro";
+import { ProductIcon } from "@/components/layout/ProductIcon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +39,19 @@ const REVISION_CONFLICT_MESSAGE =
   "This document changed elsewhere while you were working. The list has been refreshed with the current revisions — try again.";
 
 export function DocumentList() {
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const newButton = useRef<HTMLButtonElement | null>(null);
+  function restoreDialogFocus(event: Event) {
+    event.preventDefault();
+    const target = returnFocus.current;
+    if (target?.isConnected) target.focus();
+    else newButton.current?.focus();
+  }
+
+  const openCreate: MouseEventHandler<HTMLButtonElement> = (event) => {
+    returnFocus.current = event.currentTarget;
+    setCreateOpen(true);
+  };
   const list = useDocumentList();
   const [searchInput, setSearchInput] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -87,19 +102,18 @@ export function DocumentList() {
   const hasQuery = list.activeQuery.length > 0;
 
   return (
-    <section aria-labelledby="documents-heading" className="mt-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="documents-heading" className="font-serif text-title leading-title">
-          Documents
-        </h2>
-        <p className="text-metadata leading-metadata text-text-secondary" aria-label="Sort order">
-          Sorted by last update, newest first
-        </p>
-      </div>
+    <div>
+      <PageIntro
+        compact
+        eyebrow="My Research"
+        title="Your research, connected."
+        description="A place for questions, evidence and the conclusions you are still testing."
+        action={<Button ref={newButton} onClick={openCreate}>New document <ProductIcon name="arrow" /></Button>}
+      />
 
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-end gap-2 flex-1 min-w-64" noValidate>
-          <div className="flex flex-col gap-1.5 flex-1 min-w-48">
+      <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
+        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-end gap-2" noValidate>
+          <div className="flex min-w-48 flex-col gap-1.5">
             <Label htmlFor="document-search">Search by title</Label>
             <Input
               id="document-search"
@@ -107,6 +121,7 @@ export function DocumentList() {
               value={searchInput}
               maxLength={200}
               placeholder="Title contains…"
+              className="rounded-full text-ui"
               autoComplete="off"
               onChange={(event) => setSearchInput(event.target.value)}
             />
@@ -122,9 +137,7 @@ export function DocumentList() {
             ) : null}
           </div>
         </form>
-        <Button type="button" onClick={() => setCreateOpen(true)}>
-          New document
-        </Button>
+        <p className="text-metadata text-text-secondary" aria-label="Sort order">Sorted by last update, newest first</p>
       </div>
 
       {list.status === "loading" ? (
@@ -166,12 +179,13 @@ export function DocumentList() {
           ) : null}
 
           {list.items.length === 0 && !hasQuery ? (
-            <FirstUseExplanation onCreate={() => setCreateOpen(true)} />
+            <FirstUseExplanation onCreate={openCreate} />
           ) : null}
 
           {list.items.length === 0 && hasQuery ? (
-            <div className="mt-6">
-              <p role="status" className="text-ui leading-ui font-medium text-text">
+            <div className="paper-panel mt-6 p-8 text-center">
+              <ProductIcon name="search" className="mx-auto mb-4 size-7 text-accent" />
+              <p role="status" className="font-serif text-heading font-medium text-text">
                 No documents match your search.
               </p>
               <p className="text-body leading-body text-text-secondary mt-2">
@@ -185,14 +199,20 @@ export function DocumentList() {
           ) : null}
 
           {list.items.length > 0 ? (
-            <ul className="mt-6 flex flex-col gap-3" aria-busy={list.refreshing || undefined}>
+            <ul className="paper-panel mt-6 divide-y divide-border" aria-busy={list.refreshing || undefined}>
               {list.items.map((item) => (
                 <DocumentListItem
                   key={item.id}
                   item={item}
                   error={itemError?.id === item.id ? itemError.message : null}
-                  onRename={() => setRenameTarget(item)}
-                  onDelete={() => setDeleteTarget(item)}
+                  onRename={(event) => {
+                    returnFocus.current = event.currentTarget;
+                    setRenameTarget(item);
+                  }}
+                  onDelete={(event) => {
+                    returnFocus.current = event.currentTarget;
+                    setDeleteTarget(item);
+                  }}
                 />
               ))}
             </ul>
@@ -214,7 +234,7 @@ export function DocumentList() {
       ) : null}
 
       {createOpen ? (
-        <CreateDocumentDialog onOpenChange={setCreateOpen} onCreated={handleCreated} />
+        <CreateDocumentDialog onOpenChange={setCreateOpen} onCreated={handleCreated} onCloseAutoFocus={restoreDialogFocus} />
       ) : null}
       {renameTarget ? (
         <RenameDocumentDialog
@@ -227,6 +247,7 @@ export function DocumentList() {
           }}
           onRenamed={handleRenamed}
           onRevisionConflict={handleRevisionConflict}
+          onCloseAutoFocus={restoreDialogFocus}
         />
       ) : null}
       {deleteTarget ? (
@@ -240,9 +261,10 @@ export function DocumentList() {
           }}
           onDeleted={handleDeleted}
           onRevisionConflict={handleRevisionConflict}
+          onCloseAutoFocus={restoreDialogFocus}
         />
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -254,16 +276,19 @@ function DocumentListItem({
 }: {
   item: DocumentSummary;
   error: string | null;
-  onRename: () => void;
-  onDelete: () => void;
+  onRename: MouseEventHandler<HTMLButtonElement>;
+  onDelete: MouseEventHandler<HTMLButtonElement>;
 }) {
   return (
-    <li className="rounded-surface border border-border bg-surface p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
+    <li className="px-5 py-3.5">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-control bg-sage text-accent">
+          <ProductIcon name="document" className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1 basis-48">
           <Link
             href={`/workspace/research/${item.id}`}
-            className="font-ui text-ui leading-ui font-medium text-text underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="text-ui font-semibold text-text underline-offset-2 hover:underline [overflow-wrap:anywhere]"
           >
             {item.title}
           </Link>
@@ -299,25 +324,20 @@ function DocumentListItem({
  * create action instead of fake docs"). Shown only for a genuinely empty
  * owner-scoped list; no sample documents are ever injected.
  */
-export function FirstUseExplanation({ onCreate }: { onCreate: () => void }) {
+export function FirstUseExplanation({ onCreate }: { onCreate: MouseEventHandler<HTMLButtonElement> }) {
   return (
     <div
       role="note"
       aria-label="About research documents"
-      className="mt-6 rounded-surface border border-border bg-surface-muted p-6"
+      className="paper-panel mt-6 p-9 text-center"
     >
-      <p className="font-ui text-ui leading-ui font-medium text-text">Starting your research</p>
-      <div className="text-body leading-body text-text-secondary mt-2 flex flex-col gap-2">
+      <ProductIcon name="document" className="mx-auto mb-3 size-7 text-accent" />
+      <p className="font-serif text-heading font-medium text-text">Starting your research</p>
+      <div className="mx-auto mt-2 flex max-w-[55ch] flex-col gap-2 text-ui text-text-secondary">
         <p>
           A research document is your private analysis notebook: you write the question, collect
           charts, insights and evidence for one hypothesis, and every save creates an immutable,
           server-side revision you can look back at.
-        </p>
-        <p>
-          Documents are visible only to your signed-in account and are stored on the server —
-          nothing here is a demo or a sample. The writing editor itself arrives with the next
-          workspace tasks (NI-039/NI-040); until then a created document shows its persisted
-          metadata.
         </p>
       </div>
       <Button type="button" className="mt-4" onClick={onCreate}>

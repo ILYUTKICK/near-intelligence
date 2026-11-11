@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { ChartView } from "@/features/charts/renderer/ChartView";
 import type { ChartDefinitionResponse, ChartViewResponse } from "@/features/charts/renderer/view-types";
@@ -65,6 +66,7 @@ export function ChartDetailClient({
   // syncing effects.
   const [draft, setDraft] = useState<{ start: string; end: string } | null>(null);
   const [rangeError, setRangeError] = useState<string | null>(null);
+  const [rangeOpen, setRangeOpen] = useState(false);
   const customStart = draft?.start ?? selection.start;
   const customEnd = draft?.end ?? selection.end;
 
@@ -98,6 +100,7 @@ export function ChartDetailClient({
       return;
     }
     applySelection({ start: startValue, end: endValue });
+    setRangeOpen(false);
   }
 
   function setFilter(key: string, value: string): void {
@@ -133,11 +136,7 @@ export function ChartDetailClient({
         </div>
       ) : null}
 
-      {filterKeys.length === 0 ? (
-        <p className="text-ui leading-ui text-text-secondary">
-          No filters are registered for this chart version; every observation is shown unfiltered.
-        </p>
-      ) : (
+      {filterKeys.length > 0 ? (
         <div role="group" aria-label="Chart filters" className="flex flex-wrap gap-4">
           {filterKeys.map((key) => {
             const options = filterEnumOptions(properties, key);
@@ -159,7 +158,7 @@ export function ChartDetailClient({
             );
           })}
         </div>
-      )}
+      ) : <p className="text-metadata text-text-secondary">No filters are registered for this chart version.</p>}
 
       <ChartView
         definition={definition}
@@ -169,6 +168,47 @@ export function ChartDetailClient({
         onSelectionChange={handleSelectionChange}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Dialog open={rangeOpen} onOpenChange={(open) => {
+              setRangeOpen(open);
+              if (!open) {
+                setDraft(null);
+                setRangeError(null);
+              }
+            }}>
+              <DialogTrigger asChild><Button variant="secondary">Custom range</Button></DialogTrigger>
+              <DialogContent>
+                <DialogTitle>Custom range</DialogTitle>
+                <DialogDescription>
+                  Dates use UTC and exclude the end date. This chart version allows up to {definition.available_ranges.max_days} days.
+                </DialogDescription>
+                <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); applyCustomRange(); }}>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="chart-range-start">Start date</Label>
+                      <input
+                        id="chart-range-start"
+                        type="date"
+                        value={customStart}
+                        onChange={(event) => setDraft({ start: event.target.value, end: customEnd })}
+                        className="h-11 min-w-0 rounded-control border border-control-border bg-surface px-3 text-ui"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="chart-range-end">End date</Label>
+                      <input
+                        id="chart-range-end"
+                        type="date"
+                        value={customEnd}
+                        onChange={(event) => setDraft({ start: customStart, end: event.target.value })}
+                        className="h-11 min-w-0 rounded-control border border-control-border bg-surface px-3 text-ui"
+                      />
+                    </div>
+                  </div>
+                  {rangeError ? <p role="alert" className="text-ui font-medium text-danger">{rangeError}</p> : null}
+                  <Button type="submit">Apply range</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
             {live ? (
               <Button variant="quiet" onClick={() => router.refresh()}>
                 Refresh to latest
@@ -185,40 +225,6 @@ export function ChartDetailClient({
           </div>
         }
       />
-
-      <div className="flex flex-col gap-2 max-w-prose">
-        <p className="font-ui text-ui leading-ui font-medium">Custom range (UTC, end exclusive)</p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="chart-range-start">Start date</Label>
-            <input
-              id="chart-range-start"
-              type="date"
-              value={customStart}
-              onChange={(event) => setDraft({ start: event.target.value, end: customEnd })}
-              className="h-11 rounded-control border border-control-border bg-surface px-3 font-ui text-ui leading-ui text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="chart-range-end">End date</Label>
-            <input
-              id="chart-range-end"
-              type="date"
-              value={customEnd}
-              onChange={(event) => setDraft({ start: customStart, end: event.target.value })}
-              className="h-11 rounded-control border border-control-border bg-surface px-3 font-ui text-ui leading-ui text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            />
-          </div>
-          <Button variant="secondary" onClick={applyCustomRange}>Apply range</Button>
-        </div>
-        {rangeError ? (
-          <p role="alert" className="text-ui leading-ui text-danger font-medium">{rangeError}</p>
-        ) : (
-          <p className="text-ui leading-ui text-text-secondary">
-            The range is limited to {definition.available_ranges.max_days} days for this chart version.
-          </p>
-        )}
-      </div>
     </div>
   );
 }

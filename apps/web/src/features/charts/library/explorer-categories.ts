@@ -35,6 +35,8 @@ export interface ExplorerCategory {
    * are listed here; empty means "no registered chart yet".
    */
   registryCategories: readonly string[];
+  /** Chart definitions to feature above the catalog, when registered. */
+  featuredChartIds?: readonly string[];
   /** The analytical question headline (UI_SCREEN_SPECIFICATIONS.md rows). */
   question: string;
   /** What this category covers, stated before any chart is shown. */
@@ -74,6 +76,7 @@ export const EXPLORER_CATEGORIES: readonly ExplorerCategory[] = [
     slug: "intents",
     label: "Intents & Adoption",
     registryCategories: ["activity"],
+    featuredChartIds: ["observed-conversions"],
     question:
       "Is observed Intents activity growing, and how much NEAR is the observed cohort acquiring?",
     scopeNote:
@@ -92,6 +95,7 @@ export const EXPLORER_CATEGORIES: readonly ExplorerCategory[] = [
     slug: "revenue",
     label: "Revenue & Fees",
     registryCategories: ["fees", "treasury"],
+    featuredChartIds: ["gross-fees", "treasury-payouts"],
     question:
       "What gross fees are reported, and what cash payouts reached the selected wallets?",
     scopeNote:
@@ -111,6 +115,7 @@ export const EXPLORER_CATEGORIES: readonly ExplorerCategory[] = [
     slug: "token-economics",
     label: "Token Economics",
     registryCategories: ["supply"],
+    featuredChartIds: ["supply-context"],
     question: "How large are observed purchases relative to net supply growth?",
     scopeNote:
       "Charts from the registry supply category: purchases in the context of net "

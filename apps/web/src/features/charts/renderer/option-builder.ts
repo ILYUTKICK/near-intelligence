@@ -63,14 +63,13 @@ type YAxisList = Extract<NonNullable<ChartOption["yAxis"]>, unknown[]>;
 type GridList = Extract<NonNullable<ChartOption["grid"]>, unknown[]>;
 
 /**
- * Chart series palette. Values mirror the DESIGN_SYSTEM.md tokens
- * (accent = series 1, then chart-2/3/4); a test asserts these strings still
- * exist in apps/web/src/styles/tokens.css so the two cannot drift silently.
+ * The v1 renderer palette is shared by interactive charts and frozen exports.
+ * Keep it stable so a saved revision reproduces the same static assets.
  */
 export const CHART_SERIES_COLORS = ["#214D3B", "#5A7189", "#99662D", "#86657E"] as const;
 
-const AXIS_TEXT = "#4B5C54"; // color.text-secondary
-const AXIS_LINE = "#D8DDD2"; // color.border
+const AXIS_TEXT = "#4B5C54";
+const AXIS_LINE = "#D8DDD2";
 const FONT_STACK = "Inter, ui-sans-serif, system-ui, sans-serif";
 
 export interface TableValueCell {

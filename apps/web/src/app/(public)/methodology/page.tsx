@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { PageIntro } from "@/components/layout/PageIntro";
+import { ProductIcon } from "@/components/layout/ProductIcon";
 import { methodology } from "@/features/public-research/content";
 
 export const metadata: Metadata = { title: "Methodology — NEAR Intelligence" };
@@ -25,14 +27,49 @@ export default function MethodologyPage() {
   const { sources, definitions, collection, readiness, reproduce } = methodology;
 
   return (
-    <article className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-      <div className="max-w-(--width-prose)">
-        <h1>{methodology.title}</h1>
-        <p className="text-body leading-body text-text-secondary mt-4">{methodology.standfirst}</p>
+    <article className="page-container">
+      <PageIntro
+        eyebrow="Methodology / Sources / Reproduction"
+        title={<>{methodology.title}<br /><em className="text-accent">{methodology.emphasis}</em></>}
+        description={methodology.standfirst}
+      />
+      <div className="mt-8 grid gap-5 lg:grid-cols-2">
+        <section className="paper-panel p-6">
+          <h2 className="text-heading">From source to claim</h2>
+          <ol className="mt-4 list-decimal space-y-3 pl-5 text-ui marker:font-semibold marker:text-accent">
+            {collection.stages.map((stage) => (
+              <li key={stage.id} className="pl-1">
+                <a href="#collection" className="font-medium hover:underline">{stage.title}</a>
+                <p className="mt-0.5 text-text-secondary">{stage.body}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <section className="paper-panel p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="text-heading">The source register</h2>
+            <a href="#sources" className="flex items-center gap-1.5 text-ui font-medium hover:underline">
+              View all sources <ProductIcon name="arrow" />
+            </a>
+          </div>
+          <ul className="mt-3 divide-y divide-border">
+            {sources.providers.slice(0, 4).map((provider) => (
+              <li key={provider.id} className="flex gap-3 py-3 text-ui">
+                <span className="grid size-8 shrink-0 place-items-center rounded-control bg-surface-muted text-accent">
+                  <ProductIcon name="document" />
+                </span>
+                <div>
+                  <p className="font-medium">{provider.id}</p>
+                  <p className="mt-0.5 text-text-secondary">{provider.provides}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
 
       {/* Sources and rights */}
-      <section id={sources.id} aria-labelledby={`${sources.id}-title`} className={sectionClasses}>
+      <section id={sources.id} aria-labelledby={`${sources.id}-title`} className="mt-12">
         <h2 id={`${sources.id}-title`} className={h2Classes}>
           {sources.title}
         </h2>

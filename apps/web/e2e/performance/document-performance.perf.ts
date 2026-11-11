@@ -32,13 +32,6 @@ function perfEditorPath(): string {
   return `/workspace/research/${state.perf_document_id}`;
 }
 
-/** Chart-view URL for 366 daily points of the performance dataset. */
-function perfChartViewUrl(): string {
-  return `${state.web_url}/api/charts/intents-volume/view?definition_version=1`
-    + `&start=${state.perf_window.start}&end=${state.perf_window.end_exclusive}`
-    + `&dataset_version=${state.perf_dataset_version_id}`;
-}
-
 function percentile(values: number[], fraction: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   const index = Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1);

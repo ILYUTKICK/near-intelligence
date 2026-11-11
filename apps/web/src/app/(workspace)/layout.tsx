@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { AccountMenu } from "@/components/layout/AccountMenu";
+import { WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
 import { WorkspaceSidebar } from "@/components/layout/WorkspaceSidebar";
 import { SkipLink } from "@/components/layout/SkipLink";
 import { SESSION_COOKIE, decodeSessionCookie } from "@/lib/auth/session";
@@ -29,22 +29,15 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
   return (
     <div className="flex min-h-dvh flex-col">
       <SkipLink />
-      <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-(--width-content-max) items-center justify-between gap-2 px-4 py-2">
-          <p className="font-serif text-title leading-title text-text">NEAR Intelligence</p>
-          <p className="text-metadata leading-metadata text-text-secondary">
-            Signed in · private workspace
-          </p>
-          <AccountMenu />
-        </div>
-      </header>
-      <div className="mx-auto flex w-full max-w-(--width-content-max) flex-1 gap-0 px-0 md:px-4">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col md:flex-row">
         <WorkspaceSidebar />
-        <main id="main-content" className="min-w-0 flex-1 p-4">
-          {children}
-        </main>
+        <div className="min-w-0 flex-1">
+          <WorkspaceHeader />
+          <main id="main-content" className="px-(--page-gutter) py-8">
+            {children}
+          </main>
+        </div>
       </div>
-      <p className="sr-only">Private workspace. All content is owner-scoped.</p>
     </div>
   );
 }

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { EmptyState, StaleNotice, UnavailableState } from "@/components/data-state/DataState";
 import { QualityBadge } from "@/components/data-state/QualityBadge";
 import type { DataMetadata } from "@/components/data-state/quality";
+import { ProductIcon } from "@/components/layout/ProductIcon";
+import { Button } from "@/components/ui/button";
 import { MechanismFlow } from "@/features/public-research/MechanismFlow";
 import { ClaimCard } from "@/features/public-research/ClaimCard";
 import {
@@ -13,6 +15,8 @@ import {
 import { fetchLandingMetrics, type LandingMetricState } from "@/features/public-research/landing-metrics";
 import { getLandingClaim, landingFindings } from "@/features/public-research/landing-findings";
 import { landing, releaseStatus } from "@/features/public-research/content";
+import { RecordedPurchases } from "@/features/public-research/RecordedPurchases";
+import { ResearchIllustration } from "@/features/public-research/ResearchIllustration";
 
 /**
  * Landing (NI-012): an evidence-bearing introduction. The shell and editorial
@@ -33,12 +37,12 @@ import { landing, releaseStatus } from "@/features/public-research/content";
 export const dynamic = "force-dynamic";
 
 const linkClasses =
-  "inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
+  "press-feedback inline-flex h-11 items-center rounded-full border border-control-border bg-surface px-4 text-ui leading-ui text-text hover:bg-surface-muted";
 const textLinkClasses =
   "text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 const sectionClasses = "mt-12";
 const cardWrapperClasses =
-  "mt-4 rounded-surface border border-border bg-surface p-4";
+  "paper-panel h-full min-w-0 p-5";
 const metaLabelClasses = "font-medium text-text";
 
 function DefinitionDatasetLinks() {
@@ -240,28 +244,60 @@ export default async function HomePage() {
   const metricStates = await fetchLandingMetrics();
 
   return (
-    <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-      <h1>{landing.title}</h1>
-      <p className="text-body leading-body text-text-secondary max-w-(--width-prose) mt-4">
-        {landing.standfirst}
-      </p>
-      <p className="text-body leading-body max-w-(--width-prose) mt-4">{landing.whatYouCanDo}</p>
-      <ul className="mt-6 flex flex-wrap gap-2">
-        {landing.links.map((link) => (
-          <li key={link.href}>
-            <Link href={link.href} className={linkClasses}>
-              {link.label}
-            </Link>
-          </li>
-        ))}
-        <li>
-          {/* Workspace CTA: /workspace is the gated shell; unauthenticated
-              visitors are redirected to /login by the workspace layout. */}
-          <Link href="/workspace" className={linkClasses}>
-            Open the workspace
-          </Link>
-        </li>
-      </ul>
+    <div className="page-container">
+      <section className="grid items-center gap-10 lg:grid-cols-[1fr_1.06fr]">
+        <div>
+          <p className="eyebrow flex items-center gap-2.5">
+            <span aria-hidden="true" className="size-2.5 rounded-full bg-accent" />
+            Independent research · NEAR ecosystem
+          </p>
+          <h1 className="overview-title mt-5 font-medium">
+            {landing.title}<br /><em className="text-accent">{landing.emphasis}</em>
+          </h1>
+          <p className="mt-6 max-w-[45ch] text-text-secondary lg:mt-8">
+            {landing.standfirst}
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Button asChild>
+              <Link href="/research">Read the research <ProductIcon name="arrow" /></Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/data">Explore the data</Link>
+            </Button>
+          </div>
+          <p className="mt-6 flex items-center gap-2.5 text-metadata text-text-secondary">
+            <ProductIcon name="shield" /> Sources first. Assumptions visible.
+          </p>
+        </div>
+        <div className="editorial-art relative grid min-h-[29rem] items-end overflow-hidden rounded-[2.25rem] border border-border p-5 lg:p-6">
+          <ResearchIllustration eager className="pointer-events-none absolute inset-x-0 bottom-0 h-full w-full object-cover object-bottom" />
+          <div className="paper-panel relative max-w-[13rem] self-start p-4 lg:p-5">
+            <p className="eyebrow">The research question</p>
+            <p className="mt-2 font-serif text-heading text-text">Can activity create durable value?</p>
+          </div>
+          <div className="relative mt-12 w-full max-w-[21rem] justify-self-end">
+            <RecordedPurchases compact />
+          </div>
+        </div>
+      </section>
+
+      <aside aria-label="Recorded evidence period" className="paper-panel mt-8 grid items-center gap-5 p-5 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_auto] lg:px-7">
+        <div>
+          <p className="eyebrow">The recorded evidence</p>
+          <p className="mt-1 text-ui text-text-secondary">6 Aug–3 Nov 2026 UTC · Treasury-linked cohort</p>
+        </div>
+        <div>
+          <p className="font-serif text-heading">90 days</p>
+          <p className="text-metadata text-text-secondary">Historical observation window</p>
+        </div>
+        <div>
+          <p className="font-serif text-heading">3 windows</p>
+          <p className="text-metadata text-text-secondary">Separate 30-day comparisons</p>
+        </div>
+        <Link href="/methodology" className="flex items-center gap-2 text-ui font-medium hover:underline">
+          Read the methodology <ProductIcon name="arrow" />
+        </Link>
+      </aside>
 
       {/* Evidence metric strip: at most three approved delivery-API metrics. */}
       <section id="evidence" aria-labelledby="evidence-heading" className={sectionClasses}>
@@ -280,7 +316,7 @@ export default async function HomePage() {
           covers it; unavailable sources show explicit states, not zeros. No live badge is shown —
           the recorded evidence carries no freshness guarantee, only archive dates.
         </p>
-        <ul className="mt-4 flex flex-col gap-4 max-w-(--width-prose) list-none pl-0">
+        <ul className="mt-6 grid gap-4 lg:grid-cols-3">
           {metricStates.map((state) => (
             <li key={state.metricId}>
               <MetricCard state={state} />

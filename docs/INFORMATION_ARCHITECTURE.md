@@ -21,6 +21,8 @@ Canonical product name: NEAR Intelligence. Labels and routes below override the 
 
 Use `/research#h1` through `#h4`, `/methodology#sources` and `#reproduce` as stable editorial anchors. The research route (NI-014) additionally exposes fifteen thesis-section anchors (`#executive-summary`, `#question`, `#ecosystem`, `#intents-mechanism`, `#adoption`, `#revenue-generation`, `#revenue-capture`, `#token-economics`, `#econometrics`, `#alternative-explanations`, `#risks`, `#scenarios`, `#assessment`, `#limits`, `#sources-reproducibility`); the hypothesis anchors live inside `#question`. The landing (NI-012) exposes stable anchors `/#evidence` (selected approved metrics) and `/#findings` (supporting/contrary registry claims). Unpublished model runs never resolve publicly.
 
+The public header highlights Data on the explorer and chart library routes, and Models on the catalog and run routes. The workspace sidebar highlights the owning section on document, revision and saved-chart detail routes. Sign-in and registration share an account layout with links to each other and to Overview.
+
 ## Workspace sidebar
 
 | Group | Label | Route | Priority |

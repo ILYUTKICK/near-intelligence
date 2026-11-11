@@ -429,6 +429,7 @@ describe("For/against findings cite the claim registry", () => {
     // release-status links.
     const allowed = new Set<string>([
       "/research",
+      "/research#CL-002-heading",
       "/methodology",
       "/workspace",
       "/data",
@@ -465,13 +466,9 @@ describe("CTAs reach the correct destinations", () => {
     await renderLanding();
     const research = screen.getAllByRole("link", { name: /Read the (research|full thesis)/ });
     expect(research.map((a) => a.getAttribute("href"))).toEqual(["/research", "/research"]);
-    expect(screen.getByRole("link", { name: "How the numbers are made" }).getAttribute("href")).toBe("/methodology");
+    expect(screen.getByRole("link", { name: "Read the methodology" }).getAttribute("href")).toBe("/methodology");
     expect(screen.getByRole("link", { name: "Check the methodology" }).getAttribute("href")).toBe("/methodology");
-    // Two workspace CTAs (header list and closing section), both to /workspace,
-    // whose layout redirects unauthenticated visits to /login.
-    const workspace = screen.getAllByRole("link", { name: "Open the workspace" });
-    expect(workspace).toHaveLength(2);
-    workspace.forEach((link) => expect(link.getAttribute("href")).toBe("/workspace"));
+    expect(screen.getByRole("link", { name: "Open the workspace" })).toHaveAttribute("href", "/workspace");
   });
 
   it("offers the implemented public data explorer instead of a promise", async () => {
@@ -509,19 +506,18 @@ describe("Layout discipline and DOM order", () => {
     stubSeriesFetch(approvedResponder());
     const container = await renderLanding();
     const root = (container as HTMLElement).firstElementChild as HTMLElement;
-    expect(root.className).toMatch(/max-w-\(--width-content-max\)/);
+    expect(root).toHaveClass("page-container");
     // Prose width on the editorial blocks.
     expect(root.querySelector("p.max-w-\\(--width-prose\\)")).not.toBeNull();
-    // Single-column stacking for the metric strip (content maximum, no fixed widths).
     const strip = document.getElementById("evidence")?.querySelector("ul");
-    expect(strip?.className).toMatch(/flex-col/);
+    expect(strip).toHaveClass("lg:grid-cols-3");
 
     const order = (a: Element | null, b: Element | null) =>
       a !== null && b !== null && Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     const evidence = document.getElementById("evidence");
     const findings = document.getElementById(landingFindings.id);
     const mechanism = document.getElementById("mechanism");
-    const heading = screen.getByRole("heading", { level: 1, name: "NEAR Intelligence" });
+    const heading = screen.getByRole("heading", { level: 1, name: /Follow the evidence/ });
     expect(order(heading, evidence), "h1 before evidence").toBe(true);
     expect(order(evidence, findings), "evidence before findings").toBe(true);
     expect(order(findings, mechanism), "findings before mechanism").toBe(true);

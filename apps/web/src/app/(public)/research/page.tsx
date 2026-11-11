@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 
+import { PageIntro } from "@/components/layout/PageIntro";
 import { ClaimCard } from "@/features/public-research/ClaimCard";
 import { MechanismFlow } from "@/features/public-research/MechanismFlow";
+import { RecordedPurchases } from "@/features/public-research/RecordedPurchases";
 import {
   claimRegistry,
   thesis,
@@ -57,7 +59,7 @@ function EvidenceLinks({ links, label }: { readonly links: readonly ClaimEvidenc
   );
 }
 
-export default function ResearchPage() {
+function ThesisBody() {
   const {
     executiveSummary,
     question,
@@ -77,26 +79,11 @@ export default function ResearchPage() {
   } = thesis;
 
   return (
-    <article className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-      <div className="max-w-(--width-prose)">
-        <h1>{thesis.title}</h1>
-        <p className="text-body leading-body text-text-secondary mt-4">{thesis.standfirst}</p>
-        <p className="text-ui leading-ui text-text mt-4 rounded-surface border border-border bg-surface p-4">
-          {thesis.evidenceStatus}
-        </p>
-      </div>
-
-      <nav aria-label={thesis.tocLabel} className="mt-8 max-w-(--width-prose)">
-        <ol className="rounded-surface border border-border bg-surface p-4 list-decimal pl-9 flex flex-col gap-1 text-ui leading-ui">
-          {thesisToc.map((entry) => (
-            <li key={entry.id}>
-              <a href={`#${entry.id}`} className={linkClasses}>
-                {entry.title}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </nav>
+    <div className="min-w-0">
+      <RecordedPurchases />
+      <p className="mt-4 rounded-surface bg-sage px-5 py-4 text-ui text-text">
+        {thesis.evidenceStatus}
+      </p>
 
       <MechanismFlow />
 
@@ -339,6 +326,33 @@ export default function ResearchPage() {
         <p className={bodyClasses}>{sourcesReproducibility.datasetNote}</p>
         <EvidenceLinks links={sourcesReproducibility.links} label="Sources and reproduction references" />
       </section>
+    </div>
+  );
+}
+
+export default function ResearchPage() {
+  return (
+    <article className="page-container">
+      <PageIntro
+        eyebrow="The original research · November 2026"
+        title={<>{thesis.title}<br /><em className="text-accent">{thesis.emphasis}</em></>}
+        action={<p className="max-w-[45ch] text-ui text-text-secondary lg:pb-1">{thesis.standfirst}</p>}
+      />
+      <div className="mt-9 grid items-start gap-8 lg:grid-cols-[12.75rem_minmax(0,1fr)]">
+        <nav aria-label={thesis.tocLabel} className="lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:px-1">
+          <p aria-hidden="true" className="eyebrow mb-3">In this research</p>
+          <ol className="list-decimal space-y-0.5 pl-5 text-metadata text-text-secondary marker:font-medium marker:tabular-nums">
+            {thesisToc.map((entry) => (
+              <li key={entry.id} className="pl-1">
+                <a href={`#${entry.id}`} className="inline-flex rounded-control px-1 py-1 text-text-secondary hover:text-accent hover:underline">
+                  {entry.title}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+        <ThesisBody />
+      </div>
     </article>
   );
 }

@@ -972,6 +972,7 @@ describe("ChartDetailClient — selection survives navigation through the URL", 
     const user = userEvent.setup();
     const { unmount } = renderClient();
     await screen.findByRole("region", { name: /exact data table/ });
+    await user.click(screen.getByRole("button", { name: "Custom range" }));
 
     const startInput = screen.getByLabelText("Start date");
     const endInput = screen.getByLabelText("End date");
@@ -991,6 +992,7 @@ describe("ChartDetailClient — selection survives navigation through the URL", 
     const user = userEvent.setup();
     const { unmount } = renderClient();
     await screen.findByRole("region", { name: /exact data table/ });
+    await user.click(screen.getByRole("button", { name: "Custom range" }));
 
     const startInput = screen.getByLabelText("Start date");
     const endInput = screen.getByLabelText("End date");

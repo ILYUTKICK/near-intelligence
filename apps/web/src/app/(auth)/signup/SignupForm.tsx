@@ -72,13 +72,14 @@ export function SignupForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 max-w-sm" noValidate>
+    <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4" noValidate>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="signup-email">Email</Label>
         <Input
           id="signup-email"
           name="email"
           type="email"
+          placeholder="you@example.com"
           autoComplete="email"
           required
           value={email}

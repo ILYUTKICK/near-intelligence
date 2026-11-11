@@ -30,6 +30,7 @@ describe("Route registry", () => {
       ["Research", "/research"],
       ["Data", "/data"],
       ["Methodology", "/methodology"],
+      ["Models", "/models"],
     ]);
     expect(workspaceNavByGroup().map(({ group }) => group)).toEqual([
       "Workspace",
@@ -55,8 +56,10 @@ describe("Route registry", () => {
 
   it("has unique hrefs, only enabled P0 entries, and no excluded routes", () => {
     const all = [...publicNav, ...workspaceNav, ...authNav];
-    const hrefs = all.map((item) => item.href);
-    expect(new Set(hrefs).size).toBe(hrefs.length);
+    for (const navigation of [publicNav, workspaceNav, authNav]) {
+      const hrefs = navigation.map((item) => item.href);
+      expect(new Set(hrefs).size).toBe(hrefs.length);
+    }
     for (const item of all) {
       expect(item.enabled).toBe(true);
       expect(item.priority).toBe("P0");

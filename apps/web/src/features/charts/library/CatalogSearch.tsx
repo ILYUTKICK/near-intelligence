@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ProductIcon } from "@/components/layout/ProductIcon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,18 +33,22 @@ export function CatalogSearch({ initialQuery, category }: { initialQuery: string
   }
 
   return (
-    <form role="search" action="/charts" method="get" onSubmit={submit} className="mt-6 flex flex-col gap-2 max-w-prose">
+    <form role="search" action="/charts" method="get" onSubmit={submit} className="flex flex-col gap-1.5">
       <Label htmlFor="chart-catalog-search">Search charts</Label>
       <div className="flex gap-2">
-        <Input
-          id="chart-catalog-search"
-          name="q"
-          type="search"
-          maxLength={200}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder="Title, description or chart id"
-        />
+        <div className="relative min-w-0">
+          <ProductIcon name="search" className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-text-secondary" />
+          <Input
+            id="chart-catalog-search"
+            name="q"
+            type="search"
+            maxLength={200}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder="Title, description or chart id"
+            className="rounded-full pl-10 text-ui"
+          />
+        </div>
         {category !== null ? <input type="hidden" name="category" value={category} /> : null}
         <Button type="submit" variant="secondary">Search</Button>
       </div>

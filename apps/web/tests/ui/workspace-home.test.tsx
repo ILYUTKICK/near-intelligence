@@ -60,8 +60,9 @@ describe("Workspace Home", () => {
     setup(home); render(<WorkspaceHome />);
     const continuation = await screen.findByRole("link", { name: /Continue research/ });
     expect(continuation).toHaveAttribute("href", `/workspace/research/${DOC}`);
-    const user = userEvent.setup(); await user.tab(); expect(continuation).toHaveFocus();
+    const user = userEvent.setup();
     await user.tab(); expect(screen.getByRole("button", { name: "Create document" })).toHaveFocus();
+    await user.tab(); expect(continuation).toHaveFocus();
     const checklist = screen.getByRole("region", { name: "Research checklist" });
     expect(within(checklist).getByText("Add a chart — Complete")).toBeVisible();
     expect(within(checklist).getByText("Record an insight — To do")).toBeVisible();

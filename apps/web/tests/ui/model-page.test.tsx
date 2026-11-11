@@ -409,9 +409,8 @@ describe("Model catalog page — the honest published-runs catalog", () => {
 
     expect(screen.getByRole("heading", { name: "No published model yet" })).toBeInTheDocument();
     expect(
-      screen.getByText(/No model run has been published through the verification and review flow yet/),
+      screen.getByText(/No model run has completed the publication process/),
     ).toBeInTheDocument();
-    expect(screen.getByText(/no coefficient or statistic is invented for display/)).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "How models are verified and reproduced" }),
     ).toHaveAttribute("href", "/methodology#reproduce");
@@ -647,8 +646,8 @@ describe("Model run detail page — limits before coefficients, recorded values 
   it("renders the generic not-found boundary without an existence leak", () => {
     render(<ModelNotFound />);
     expect(screen.getByRole("heading", { name: "Model run not found" })).toBeInTheDocument();
-    expect(screen.getByText(/no such run has been published; no distinction is made/)).toBeInTheDocument();
-    expect(screen.getByText(/Nothing is shown in place of an unpublished result/)).toBeInTheDocument();
+    expect(screen.getByText(/No published model run corresponds to this address/)).toBeInTheDocument();
+    expect(screen.queryByText("Estimate")).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Open the model catalog" }),
     ).toHaveAttribute("href", "/models");

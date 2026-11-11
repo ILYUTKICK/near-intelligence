@@ -34,16 +34,17 @@ export function ModelRunDetail({
   readiness: ModelReadiness | null;
 }) {
   return (
-    <article className="max-w-prose">
+    <article className="max-w-[58rem]">
       <header>
-        <h1 className="mt-4">
+        <p className="eyebrow mt-5">Published model run</p>
+        <h1 className="mt-2 text-page">
           Model run {run.model_id} v{run.model_version}
         </h1>
         <p className="text-body leading-body text-text-secondary mt-2">
           One published run exactly as the publication gate recorded and the reviewer approved.
           Values below are recorded results, not live estimates.
         </p>
-        <dl className="mt-6 grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 text-ui leading-ui">
+        <dl className="paper-panel mt-6 grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-2 p-6 text-ui leading-ui">
           <dt className="text-text-secondary">Run id</dt>
           <dd className="font-mono break-all">{run.run_id}</dd>
           <dt className="text-text-secondary">Gate verdict</dt>

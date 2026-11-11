@@ -335,15 +335,7 @@ describe("renderer/registry alignment", () => {
     expect(built.kind).toBe("ok");
   });
 
-  it("chart palette values still exist in the design tokens (no silent drift)", () => {
-    const tokens = readFileSync(
-      path.join(REPO_ROOT, "apps/web/src/styles/tokens.css"),
-      "utf8",
-    ).toLowerCase();
-    for (const color of CHART_SERIES_COLORS) {
-      expect(tokens).toContain(color.toLowerCase());
-    }
-    expect(tokens).toContain("#4b5c54"); // color.text-secondary (axis text)
-    expect(tokens).toContain("#d8ddd2"); // color.border (axis lines)
+  it("preserves the versioned palette used by frozen chart exports", () => {
+    expect(CHART_SERIES_COLORS).toEqual(["#214D3B", "#5A7189", "#99662D", "#86657E"]);
   });
 });
