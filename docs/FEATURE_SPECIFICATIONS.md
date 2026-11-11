@@ -20,8 +20,8 @@ Common requirements: owner from verified session; data quality/source/time visib
 | F14 Snapshot UX | P1; P0 save pins | Explicit freeze/copy/browse snapshot and compare-to-live actions; immutable selection/config/hash. | NI-044 |
 | F15 Templates/duplication | P1; editor/release projection | Empty P0; default eight-section template and public copy P1; new owner/private IDs and retained attribution. | NI-045 |
 | F16 Model result block | P1; run API/editor | Immutable published run reference, coefficient table/diagnostics links plus editable interpretation. No recomputation on document load. | NI-055 |
-| F17 Sharing | P2; publication security design | Separate revocable read-only publication tokens and consent flow; no private URL acts as a share link. | NI-060 |
-| F18 Integrity/AI | P2; proven core | Metadata rules can verify missing pins/citations. Interpretive checks advisory; identify evidence/context, allow dispute, no truth score. Deterministic tools supply every number; fully optional. | NI-065 |
+| F17 Sharing | P2; frozen revision/security; required before deployment | Separate revocable read-only publication tokens and consent flow; no private URL acts as a share link. | NI-060 |
+| F18 Integrity/AI | P2; proven core; required before deployment | Metadata rules can verify missing pins/citations. Interpretive checks advisory; identify evidence/context, allow dispute, no truth score. Deterministic tools supply every number; fully optional. | NI-065 |
 
 P1 advanced supported analytical filters are implemented in NI-071; lightweight private tags/favorites in NI-072. They depend on verified source dimensions and completed P0 persistence/security, respectively. P2 scenario simulation, hypothesis monitoring, multichain expansion and collaborative editing require a separate approved design/ADR and bounded follow-on backlog after P0; they are excluded from this implementation roadmap.
 
@@ -36,3 +36,7 @@ Published thesis includes executive summary, question, ecosystem, cross-chain ex
 ## Completion evidence
 
 For each feature show acceptance in an automated domain/integration test and, when interactive, one relevant browser journey. Visual-only checks do not establish persistence or ownership. [Testing](TESTING_STRATEGY.md) specifies cross-feature failure tests; [UI screens](UI_SCREEN_SPECIFICATIONS.md) specifies all user-facing states.
+
+## Owner release extension — 12 November 2026
+
+All registered P1/P2 features are implemented and locally verified before deployment, rather than deferred behind the deployment P0 tasks. NI-060/065 must deliver actual features per TASKS; a design/ADR cannot satisfy them. Sharing creates an explicit frozen allowlisted publication with scoped assets and revocable/expiring hashed tokens; all private draft access remains owner-scoped. Integrity provides working deterministic checks without credentials, plus an optional explicitly enabled grounded adapter; external context transfer/provider spend still requires applicable permission. Interpretive output is advisory, never a numeric source or automatic research mutation. Preserve the existing design; verify plots, exact tables, pins, sources, ranges and export on all P1/P2 chart paths in NI-079. Other unregistered P2 concepts listed above remain excluded.

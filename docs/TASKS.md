@@ -1849,23 +1849,25 @@ Specification: [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
 
 **Testing requirements:** Render representative short/long report pages and visually inspect all; compare source/data references to ZIP; failure and private download checks.
 
-### NI-060 — Design revocable read-only sharing
+### NI-060 — Implement revocable read-only sharing
 
 - **Epic:** 12 — Research Export
 - **Priority:** P2
-- **Dependencies:** NI-058, NI-062
-- **Complexity:** M
+- **Dependencies:** NI-058, NI-062, NI-043
+- **Complexity:** L
 - **Status:** TODO
+- **Execution role:** B with A sharing UI handoff
+- **Scope update:** Owner 2026-11-12 requires a working feature before deployment; the former design-only card is superseded, not considered implementation evidence.
 
-**Description:** Plan later explicit publication of user research without making private UUID URLs public.
+**Description:** Implement explicit, revocable read-only publication of a chosen frozen research revision, separate from private drafts and private UUID routes.
 
-**Implementation steps:** Define consent/snapshot/revocation/expiry and access-token hashes; perform threat model; add separate publication projection only after P0 completion; update schema/API/docs before implementation.
+**Implementation steps:** Define bounded consent/snapshot/revocation/expiry design and threat model; update API/schema/ADR before code. Implement owner-managed create/list/revoke with high-entropy tokens stored only as hashes; immutable allowlisted publication projection, scoped assets and read-only desktop viewer. Preview exactly what will be exposed before explicit publication. Propagate revocation/expiry to every asset/download/cache path; exclude private editorial metadata and restricted source bytes. Local QA publishes only synthetic disposable content; actual external sharing needs user consent.
 
-**Expected files/modules:** docs/sharing design ADR; future sharing module
+**Expected files/modules:** sharing ADR; API publication/schema/migrations; generated contracts; web sharing dialog/viewer; frozen publication assets and security tests.
 
-**Acceptance criteria:** Sharing never exposes live private drafts or historical versions by default; revocation and asset permissions specified; user explicitly opts in.
+**Acceptance criteria:** Real local create→read as non-owner→revoke/expire→deny works for the same frozen revision and all assets. A share grants no private draft/history/list/search/write/export access; edits and dataset refresh never mutate the publication. No token/secret leaks to logs, referrers or unsafe caches; unsupported/restricted content fails explicitly. Consent names revision and visible scope. A design document or disabled button cannot close this card.
 
-**Testing requirements:** Threat-model review and future unauthorized/token-expiry/revocation tests; no P2 implementation before all P0 gates.
+**Testing requirements:** Owner/Alice/Bob/anonymous matrix, token guessing/invalid/expiry/revocation and asset access, frozen content/hash invariance, local browser consent/view/revoke flow, cache/header/secret checks and threat-model verification. No prerequisite on deployment or NI-079.
 
 ## EPIC 13 — Quality and Security
 
@@ -1987,7 +1989,9 @@ Specification: [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 
 **Acceptance criteria:** No core-flow accessibility blocker or page overflow; chart data accessible without hover; measured budgets pass or documented limits revised with justification.
 
-**Testing requirements:** Desktop keyboard/screen reader review; documented staging performance run and lazy-chart mount checks. No mobile viewport/device/touch pass is required or authorized in this scope.
+**Testing requirements:** Desktop keyboard/screen reader review; documented local production-mode performance run and lazy-chart mount checks before deployment (11 November owner order). Recheck actual staging-machine budgets under NI-067. No mobile viewport/device/touch pass is required or authorized in this scope.
+
+**Owner ordering update — 11 November 2026 (NI-077):** before deployment, measure the same budgets and lazy mounting in a documented local production-mode environment. This is the local NI-064 acceptance under the new finish→local→deploy order; actual staging-machine budgets are rechecked in NI-067. This does not transfer the current claim or treat local results as staging evidence; all desktop accessibility criteria remain required.
 
 **Known UI regression inputs from NI-024 browser review (8 November 2026):** sidebar `/workspace/data/*` and `/workspace/models` aliases prefetch 404 while actual implemented public routes are `/data/*` and `/models`; reconcile the canonical navigation/route aliases during full-flow QA. The unused `Button asChild` path supplies Radix Slot multiple children (spinner/null plus child), producing a runtime Children.only error; add a real slotted-link regression before claiming that primitive supported. Global unlayered anchor color can override layered primary-link foreground utilities; NI-024's Continue uses the existing on-accent token explicitly, and the shared color layering should be covered by the full accessibility/contrast pass.
 
@@ -1998,23 +2002,25 @@ Specification: [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 - **Coordinator acceptance (2026-11-11, independent):** full web suite 518/518 re-run, lint 0/0, typecheck clean, build exit 0, doc-links 671, `uv lock --check` OK; the combined real-stack e2e re-run independently — **17/17 in 32.4s** (full NI-063 journey + all 14 a11y suites, one boot); zones clean (all changes inside apps/web + docs/qa + DEPENDENCIES/IA docs); the QA report's budgets table spot-checked against PRODUCT_REQUIREMENTS.md wording; the four in-boundary product fixes and three NI-024 regression closures reviewed in the diff. Review skipped by user instruction 2026-11-09 (PLAN.md «Последнее указание пользователя — 9 ноября 2026»). Honest operator-side remainder recorded in the report: VoiceOver quality, real IME composition, physical-keyboard slash-trigger checks.
 - **Completed at:** 2026-11-11T00:50:28+0300
 
-### NI-065 — Plan advisory integrity checks and optional AI tools
+### NI-065 — Implement advisory integrity checks and optional AI tools
 
 - **Epic:** 13 — Quality and Security
 - **Priority:** P2
-- **Dependencies:** NI-062, NI-063
-- **Complexity:** M
+- **Dependencies:** NI-062, NI-063, NI-050
+- **Complexity:** L
 - **Status:** TODO
+- **Execution role:** A with B typed evidence-tool/API handoff
+- **Scope update:** Owner 2026-11-12 requires working tools before deployment; the former plan-only card is superseded. External model use remains optional and separately configured/authorized.
 
-**Description:** Add future evidence assistance without making an LLM the source of facts.
+**Description:** Deliver local evidence assistance that verifies metadata deterministically and keeps interpretive suggestions advisory.
 
-**Implementation steps:** Specify deterministic metadata checks separately from interpretive judgments; define evidence-bound tool outputs and citation rules; maintain no-LLM workflow; update feature/API/ADR before implementation.
+**Implementation steps:** Specify and implement typed checks for missing citations/pins, broken same-document evidence links and stale context. Add accessible editor findings with jump-to-source and rerun on the current acknowledged revision; do not rewrite scientific content automatically. Implement bounded evidence-tool contracts and an optional opt-in AI adapter for grounded commentary over an explicitly selected context, behind server configuration. Keep credentials server-only and external transmission off by default; no provider purchase or private document transmission without applicable permission. Record API/feature/ADR changes before implementation.
 
-**Expected files/modules:** docs/integrity design ADR; future optional assistant module
+**Expected files/modules:** integrity ADR; deterministic evidence-check module/API; generated tool contracts; editor findings panel; optional provider adapter and grounding/security tests.
 
-**Acceptance criteria:** Missing citation/pin can be verified; contradiction/causality commentary advisory; no invented data/coefficient/source; P0 works without AI credentials.
+**Acceptance criteria:** Actual local document→checks→actionable finding→fix→rerun works without any AI key, with owner isolation and exact block/revision/context references. Suggestions cannot invent numeric results or change pins/coefficients; contradictions/causality are advisory with sources and no truth score. Optional configured AI tools are implemented and contract-tested; unavailable configuration is explicit, never a fake successful response. Core checks/editing/save/export remain usable without provider credentials or during adapter failure. No unapproved context leaves the machine; real provider connectivity is not claimed from a fixture. Documentation alone cannot close this card.
 
-**Testing requirements:** Future tool-contract and prompt-injection/evidence-grounding tests; verify optional outage cannot affect research editing/export.
+**Testing requirements:** Known missing/valid metadata oracle cases; two-user/context boundary; stale revision and source-jump browser flow; untrusted document/prompt-injection/evidence-grounding/secret tests; adapter success/failure with isolated test transport; editing/export unaffected by AI outage. Real external smoke only with existing explicit destination/context/provider permission; otherwise record the optional integration limit.
 
 ## EPIC 14 — Deployment and Hackathon Demo
 
@@ -2053,7 +2059,7 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 - **Epic:** 14 — Deployment and Hackathon Demo
 - **Priority:** P0
-- **Dependencies:** NI-066, NI-062, NI-063
+- **Dependencies:** NI-066, NI-062, NI-063, NI-079
 - **Complexity:** L
 - **Status:** TODO
 
@@ -2144,6 +2150,72 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **CI verification:** pending coordinator.
 - **Coordinator acceptance (2026-11-10, independent):** reconciliation numbers in the release report verified character-exact against the NI-029 card decimal tails (135989071036891726256814 / 127692882832410490617319 — both present in report and card); leakage scan over research/reports/*.md clean (no /Users/ paths, no credentials, no Supabase references); offline discovery OK (skipped=215 baseline), web 493/493 across 46 files, lint 0/0, typecheck clean, doc-links 669; the honest fit-pending wording confirmed verbatim in the thesis econometrics section; `/models` catalog left honestly empty. Review skipped by user instruction 2026-11-09 (PLAN.md «Последнее указание пользователя — 9 ноября 2026»); the release report's claim→source table plus this coordinator audit stand in its place. When the operator executes the real-archive fit, the release status updates via a follow-up PR — the published report already documents the recipe.
 - **Completed at:** 2026-11-10T21:57:40+03:00
+## Public research presentation — explicit user request, 11 November 2026
+
+### NI-073 — Make public research visual and readable
+
+- **Epic:** 03 — Public Research
+- **Priority:** P0
+- **Dependencies:** NI-006, NI-007, NI-014
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** Codex /root/research_visuals, chat 01a1cb42-f8d9-7d20-b578-32d72bb37c13
+- **Execution role:** A
+- **Started at:** 2026-11-11T18:40:01+03:00
+- **Branch/worktree:** codex/ni-043-frozen-revisions; /Users/ilyutkinn/Desktop/Near (reuse current checkout; pre-existing documentation/output changes preserved)
+- **Authorization:** The user requested inspecting http://localhost:13000/ and editing the public research to replace the text/number-heavy presentation with charts. Workspace/cabinet changes are explicitly left for a later request. This bounded presentation correction is authorized independently of the remaining implementation queue.
+- **Dependency verification:** NI-006, NI-007 and NI-014 are DONE in this registry and their tokens, accessible primitives and typed recorded claim registry exist locally. No active claim on the public research files; existing NI claims remain untouched.
+- **Handoff:** /root/research_visuals implements web presentation and focused regressions; /root independently reviews, verifies in the desktop browser and records evidence. No data/backend/provider changes.
+
+**Description:** Put source-linked historical diagrams and short takeaways into the overview and original public thesis, retaining the complete research and its evidence.
+
+**Implementation steps:** Add one shared editorial figure renderer consuming existing typed claim quantities (no invented ChartView/dataset identifiers, no duplicated financial aggregation); visualize the recorded 30-day NEAR quantities, approximate USD values and matched-period supply scale; present clear units, zero baseline, period, estimate/bound labels and linked sources. Place figures before long prose on both public routes. Collapse long evidence tables/technical metadata behind keyboard-accessible disclosures while retaining visible conclusions and cautions. Preserve existing thesis anchors, H1–H4, all claims and explicit missing-model/revenue status.
+
+**Expected files/modules:** apps/web/src/features/public-research/; apps/web/src/app/(public)/page.tsx; apps/web/src/app/(public)/research/page.tsx; relevant web regressions; docs/CHART_SYSTEM.md.
+
+**Acceptance criteria:** Charts visibly render on overview and research without API availability or hydration; use recorded claim objects as the single quantity/source/definition source; exact values remain accessible in tables; historical/rounded/approximate/cohort limitations stay explicit; no daily interpolation from window summaries, dual-axis comparison, fake live/model results or API test data substituted for recorded research. The opening viewport leads into a clear visual finding and the full research remains accessible. API-backed landing metrics and outage states remain intact, with less prominent detail. No workspace changes.
+
+**Testing requirements:** Focused figure/route/claim regressions for quantities/units/provenance/estimate labeling and disclosure access; existing public route/landing/thesis tests; typecheck, lint, production build, documentation links and desktop browser verification of both routes and keyboard disclosures. Independent review before DONE.
+
+- **Verification:** In the actual `local/owner-review` runtime checkout, `pnpm --filter web exec vitest run tests/ui/public-routes.test.tsx tests/ui/thesis.test.tsx tests/ui/landing-metrics.test.tsx tests/ui/research-figures.test.tsx tests/release/release-manifest.test.ts --maxWorkers=1 --testTimeout=15000` — **61/61 passed, 5 files**. Serial workers avoid the initial parallel axe runs exceeding their default 5s timeout; all substantive assertions pass. `pnpm --filter web build` — successful optimized production compilation, TypeScript and static generation (`/research` static, `/` dynamic). `pnpm --filter web lint` — exit 0, zero errors, one pre-existing unused `perfChartViewUrl` warning in `e2e/performance/document-performance.perf.ts`. `pnpm check:doc-links` — 684 links pass in runtime checkout (628 in authoring checkout); `git diff --check` clean in both. Authoring checkout: 50/50 focused public tests pass; typecheck passes; after the final token-sized heading style, figure regressions 6/6 pass again. No dependency/API/financial-definition changes.
+- **Desktop/browser verification:** CUA checked the actual http://localhost:13000/ and /research at 1280×720. Both render three SVG figures and their complete historical captions; the purchase chart appears on the opening screen. Native Enter opens/closes the exact-value/source table, which has all three window rows. All 15 original sections, mechanism and H1–H4 anchors exist; /research#token-economics resolves. Page scrollWidth equals viewport width (1280) on both routes. The local API fixture warning is visibly present; fixed figures retain the recorded claim values. Screenshots saved locally in `output/ni-073/overview-desktop.jpg`, `research-desktop.jpg` and `comparisons-desktop.jpg` in the authoring checkout. No mobile checks or data collection.
+- **Result:** Shared SSR `ResearchFigure` consumes original CL-002/CL-004/CL-001/CL-007 quantity objects directly; plotted coordinates alone use Number. Three zero-based, separately unit-labeled comparisons appear on overview and thesis before long detail. Visible observations/cautions remain, while exact claim quantities, sources, definition/dataset references and hypothesis rationale use native disclosures. Full original thesis/anchors and the newer runtime NI-070 release status are preserved byte-for-byte in content.ts. The separate API section labels review.* datasets as synthetic local review data. Code is applied locally in both the current checkout and the actual served checkout; no commits, publication or merge performed.
+- **Reviewer:** Codex /root (coordinator), independent implementation review of /root/research_visuals: verified claim-object references against docs/INVESTMENT_THESIS.md and near-dollar/near-supply FINDINGS, coordinate-only Number use, estimate/cohort/supply limitations, no fake dataset identities or daily interpolation, SSR/native details and preserved NI-070 content. Browser and production verification above passed; accepted.
+- **Completed at:** 2026-11-11T18:50:45+03:00
+
+
+## Reference-led design exploration — explicit user request, 11 November 2026
+
+### NI-074 — Draw the complete desktop product and prepare a design handoff pack
+
+- **Epic:** 02 — Design System and Navigation
+- **Priority:** P0
+- **Dependencies:** NI-006, NI-007, NI-008, NI-073
+- **Complexity:** L
+- **Status:** DONE
+- **Claimed by:** Codex /root/design_atlas, chat 01a1cb42-f8d9-7d20-b578-32d72bb37c13
+- **Execution role:** A
+- **Started at:** 2026-11-11T18:58:02+03:00
+- **Branch/worktree:** codex/ni-043-frozen-revisions; /Users/ilyutkinn/Desktop/Near. Reference actual served route map from local/owner-review at /Users/ilyutkinn/Desktop/near-intelligence-review; do not overwrite its newer implementation.
+- **Authorization:** User supplied seven CRESCO references and explicitly requested drawing a similar visual treatment for each product tab, then assembling a good design pack. This is the design/mockup phase of the requested redesign; it does not claim functional application integration, fresh data, mobile work or authorization for new financial/product features.
+- **Dependency verification:** NI-006/007/008/073 are DONE and their tokens, fonts, primitives, layouts and recorded quantities exist. Existing NI-064 claim stays untouched. No existing claim on this new standalone design pack.
+- **Handoff:** /root/design_atlas creates the isolated clickable high-fidelity screen atlas; /root inventories route coverage, checks visuals/interaction, and packages tokens/components/states/specification and screenshots.
+
+**Description:** Translate the supplied references' ivory/forest/navy palette, expressive serif typography, generous spacing, soft cards and understated illustration into the existing evidence-first NEAR product, across every main desktop screen.
+
+**Implementation steps:** Inventory implemented public/workspace route templates; build a coherent standalone clickable HTML/CSS/JS design atlas using local OFL fonts; draw public overview/thesis/data/categories/charts/methodology/models/auth and private home/research/editor/saved charts/history/profile/settings; include source/evidence/export dialogs and loading/empty/error/stale/saved states; retain registered historical values and source qualifications with an always-visible design-preview label; render and inspect desktop screens; assemble screen map, tokens, component rules, state matrix, reference rationale, implementation handoff and local download bundle.
+
+**Expected files/modules:** design/ni-074/ (portable preview, local fonts, tokens and handoff documents); output/ni-074/ (desktop screenshots/contact sheet/download ZIP); docs/TASKS.md, PLAN.md, docs/TEAM_PLAN.md.
+
+**Acceptance criteria:** Every main implemented route family has an explicit screen or mapped template; navigation between screens works; references lead to a recognizable coherent visual direction without importing their family/portfolio functionality. Charts remain visually central, carry periods/units and estimate/historical labels, use recorded data or explicit unavailable states; no invented financial/model results, fake live badges or private user data. Editor design covers outline/paper/evidence and its key states. All screens share tokens/components; preview is distinguishable from a functioning authenticated product. All required screenshots and documented handoff assets exist, with desktop visual QA and no mobile QA. Application implementation remains a separate subsequent step after reviewing these drawings, as requested by the user's drawing→design-pack sequence.
+
+**Testing requirements:** Validate screen/navigation coverage and absence of external runtime dependencies; desktop browser screenshots and clipping/overflow/readability checks across all screen templates; representative keyboard navigation and dialog closure; source/period/estimate audits; file/font licenses and ZIP integrity; documentation relative links and focused diff checks. No production application tests claimed for this isolated mockup.
+
+- **Verification:** `node --check design/ni-074/app.js` passed. Static audit: 23 unique screen ids, all literal internal hashes resolve, no fetch/XMLHttpRequest/WebSocket/eval runtime calls. CUA rendered all 23 templates through the visible selector at 1280×720 desktop; every page scrollWidth=1280 and no unnamed buttons. Captured 23 default screens + 9 conditional/dialog views (32 JPGs). Verified Home→Editor, Enter→Source, Escape→close/return focus, labeled range fields, reduced-motion class/switch, three no-match search states and clear-search recovery. Inspected CL-002/004/001/007 exact quantities, estimates, definitions and per-window source scopes. All eight core palette text pairs pass 4.5:1 (5.13–14.12); fonts match original OFL bytes. `pnpm check:doc-links` — 639 links resolve; `git diff --check` clean. No mobile or production application checks claimed.
+- **Result:** `design/ni-074/` provides a portable 23-screen clickable desktop atlas, true local Newsreader/italic/Inter fonts, original editorial SVG artwork, registry-based historical figures, source/destination/export/range previews, shared tokens, component/state rules, route coverage, brief and implementation handoff. `output/ni-074/` contains per-screen screenshots, 12-screen and all23 contact sheets, browser QA evidence and `NEAR-Intelligence-Design-Pack-v1.zip` (4,145,322 bytes; 59 files, 23 templates, 32 captured views). ZIP CRC and every manifest SHA-256 were rechecked successfully. The preview is served at http://127.0.0.1:13074/ and opened for the user; app localhost:13000 remains the existing implementation pending review/integration of the drawings. No new data collection, authentication, private data access, cloud deployment, dependencies or production feature implementation.
+- **Reviewer:** Codex /root, coordinator review independent of /root/design_atlas. Reviewed all screen coverage, source-derived values, SSR-free standalone preview boundaries, font licensing and source/dialog interactions. Visual findings (navy CTA contrast, miniature-chart readability, blank no-match search, scope attribution, range labels and reduced-motion behavior) were corrected and rechecked. Application redesign/integration is explicitly subsequent to this design-preview deliverable.
+- **Completed at:** 2026-11-11T19:16:57+03:00
+
 ### NI-075 — Integrate the NI-074 desktop design into the working application
 
 - **Epic:** 2 — Design System and Shell
@@ -2166,3 +2238,105 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Result (2026-11-11):** The NI-074 desktop design is integrated across public, auth, Data, chart, editor and account routes. The original thesis, registered chart selection, exact values, owner boundaries and frozen export paths remain in use. Profile now persists through the existing private API. [Route inventory, 35 screenshots, and integration decisions](verification/ni-075/README.md)
 - **Verification (2026-11-11):** Web lint, strict TypeScript, production Webpack build, 531 web tests, 22 contrast checks, 22 Python export tests and 17 desktop Playwright scenarios passed. The disposable browser stack verified the acknowledged-revision ZIP during a dataset outage, server-side isolation and profile persistence. Axe found zero serious or critical violations and one moderate landmark finding on the synthetic 200-block editor. [PR #87 checks](https://github.com/ILYUTKICK/near-intelligence/pull/87/checks)
 - **Acceptance:** Independent review skipped by user instruction 2026-11-09. Owner review and merge are through [PR #87](https://github.com/ILYUTKICK/near-intelligence/pull/87).
+
+
+### NI-076 — Run PR 87 locally and review desktop design against NI-074
+
+- **Epic:** 13 — Quality and Security
+- **Priority:** P0, explicit owner review request
+- **Dependencies:** NI-075
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat 01a1cb42-f8d9-7d20-b578-32d72bb37c13
+- **Execution role:** A
+- **Started at:** 2026-11-11T23:46:31+03:00
+- **Branch/worktree:** detached PR head 0b80bf2; /Users/ilyutkinn/.codex/worktrees/ni-075-design-review/Near
+- **Authorization:** User requested running the newly pulled PR locally and assessing its design. PR #87 is merged (GitHub merge SHA 1176f4a); this isolated checkout reviews exact head 0b80bf2 without overwriting existing owner-review or authoring changes. No remote deployment/merge or new data collection is requested.
+- **Dependency verification:** NI-075 DONE on the PR branch; NI-074 design pack is present in the existing authoring checkout and supplied handoff. No existing NI-076 card.
+- **Handoff:** /root/design_pr_audit reviews implementation versus atlas read-only; /root builds/runs the isolated stack, inspects actual desktop UI and records screenshots/findings.
+
+**Description:** Give the owner a working local PR preview and evidence-backed assessment of design fidelity and remaining usability/presentation issues.
+
+**Acceptance criteria:** Exact PR head identified; local production build and real loopback web/API/DB review stack run; main public and private desktop routes inspected; compare actual screenshots to NI-074; report concrete actionable findings with source locations, severity and actual evidence. Keep synthetic test data explicit and do not claim production data/live refresh. Preserve existing user changes and active services. No code fixes or unrelated scope by default.
+
+**Testing requirements:** Frozen dependencies, production build, bounded desktop visual/keyboard/navigation checks, relevant contrast/type checks, source review; actual application screenshots and a local review report. No mobile checks, real auth/provider calls, stopped collectors or cloud provisioning.
+
+- **Completed at:** 2026-11-11T23:55:01+03:00
+- **Result:** Exact PR #87 head 0b80bf2 runs in the isolated production web/API/PostgreSQL review stack at http://127.0.0.1:64932/. Desktop public/private screens compared with NI-074; five P2 presentation findings recorded with source locations and actual screenshots. No application changes. [Full local review and verification limits](verification/ni-076/README.md).
+- **Verification:** Frozen offline dependency installs, production build (including TypeScript), 22 contrast pairs and diff whitespace check passed. Real local save/reopen chart flow verified with synthetic data. Custom-range Apply was not certified; explicit supported URL used for loaded-chart review. Full release/security/mobile checks were not rerun or claimed.
+
+### NI-077 — Record finish-local-verify-deploy handoff
+
+- **Epic:** 13 — Quality and Security
+- **Priority:** P0, explicit owner sequencing request
+- **Dependencies:** NI-076
+- **Complexity:** S
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat 01a1cb42-f8d9-7d20-b578-32d72bb37c13
+- **Execution role:** A
+- **Started at:** 2026-11-11T23:58:07+03:00
+- **Branch/worktree:** detached PR head 0b80bf2; /Users/ilyutkinn/.codex/worktrees/ni-075-design-review/Near
+- **Authorization:** Owner requested a written handoff: finish the agreed project, verify everything locally, deploy afterwards. Documentation only in this claim; preserve ongoing claims and no deployment execution.
+
+**Description:** Make the owner's release order enforceable and supply a portable agent prompt.
+
+**Implementation steps:** Add the current PLAN entry, bounded NI-078/079 cards, the NI-067 dependency, matching ownership and release/QA documentation; replace stale continuation guidance with the current handoff.
+
+**Expected files/modules:** PLAN.md; README.md; docs/TASKS.md; docs/TEAM_PLAN.md; docs/MVP_SCOPE.md; docs/TESTING_STRATEGY.md; docs/DEPLOYMENT.md; docs/CONTINUATION_PROMPT.md; docs/FINISH_BEFORE_DEPLOY_PROMPT.md; docs/JUDGE_SETUP.md; docs/FEATURE_SPECIFICATIONS.md; docs/DECISIONS.md; AGENTS.md.
+
+**Acceptance criteria:** One current handoff reflecting the 12 November correction: all registered P0/P1/P2 implemented before final local chart/workflow acceptance and deployment; preserve the nearly-ready design. Complete local gates separated from remote-only checks; no unrequested additional scope, fabricated readiness or transferred active claim; all dependencies acyclic. TASKS.md remains the only status registry.
+
+**Testing requirements:** Relative-link and whitespace validation; inspect dependency graph, priorities and task/plan/team coverage. Documentation checks do not certify runtime readiness.
+
+- **Result (first handoff):** Recorded mandatory finish→local acceptance→deployment sequence in PLAN and current handoff; added bounded NI-078/079, made NI-067 depend on NI-079, synchronized README/scope/team/testing/deployment/judge guidance and replaced stale continuation prompt. NI-064 claim and prior implementation evidence preserved; its local-before-staging measurement order clarified by the owner request. Application code and runtime unchanged.
+- **Verification (first handoff):** 807 relative documentation links resolve; 77 unique task cards and PLAN rows; existing dependencies, acyclic graph and topological PLAN order; new task metadata/team coverage and NI-067 gate checked; git diff --check clean. Read-only consistency audit by /root/design_pr_audit identified stale NI-064 staging and Linux rehearsal wording; coordinator corrected it in TASKS/README/JUDGE_SETUP and reran links/whitespace checks. These are documentation checks, not runtime release acceptance.
+- **Acceptance (first handoff):** Coordinator accepted documentation; independent implementation review skipped by user instruction 2026-11-09. NI-078/079 remain TODO; no deploy or readiness claim.
+- **Completed at (first handoff):** 2026-11-12T00:02:24+03:00
+
+- **Reopened at:** 2026-11-12T00:04:30+03:00
+- **Reopen reason:** Owner corrected the handoff scope: finish all registered P1/P2 before deployment, preserve the largely completed design and prioritize working local charts. The previous documentation completion remains historical evidence; update the plan, P2 implementation acceptance, integrated gate and handoff package. No feature implementation or deploy in this documentation claim.
+
+- **Result:** Updated the handoff to the owner's 12 November P0/P1/P2 scope, preserving the existing design. All six P1 and both P2 are mandatory NI-079 dependencies before NI-067. NI-060/065 now require actual implementation and tests; final local acceptance traces charts through public/private/snapshot/model/filter/sharing/Markdown/PDF paths. Synced AGENTS, PLAN, scope/feature/team/testing/deployment docs, prompt and ADR-020; no app implementation or deploy performed.
+- **Verification:** 807 relative links resolve and git diff --check passes. Structural audit: 77 unique cards and PLAN rows, existing/acyclic/topologically ordered dependencies, all eight P1/P2 directly block NI-079, NI-067 depends on NI-079, active NI-064 claim and all feature TODO states preserved. Read-only audit by /root/design_pr_audit confirmed scope/dependencies and identified stale AGENTS deferral; coordinator synchronized it. This is documentation validation only.
+- **Acceptance:** Coordinator accepted the corrected documentation; independent implementation review skipped by user instruction 2026-11-09. Previous MVP-only handoff is superseded. NI-078/079 and all eight P1/P2 remain unimplemented TODO claims, not declared complete.
+- **Completed at:** 2026-11-12T00:08:55+03:00
+
+### NI-078 — Complete desktop research and chart presentation
+
+- **Epic:** 13 — Quality and Security
+- **Priority:** P0, explicit pre-deployment completion scope
+- **Dependencies:** NI-075, NI-076, NI-077
+- **Complexity:** L
+- **Status:** TODO
+- **Execution role:** A
+
+**Description:** Preserve the largely completed NI-075 desktop design; resolve the five specific NI-076 presentation findings and investigate the unverified custom-range control. No new visual direction or wholesale redesign is commissioned.
+
+**Implementation steps:** Add compact H1–H4 assessment and the missing CL-004 USD/CL-007 supply-scale figures; retain all 15 thesis sections, definitions and limitations. Reuse canonical metric/claim data and shared chart logic. Compact chart detail, Saved Charts and editor chrome with accessible disclosures/contextual operations; retain exact table/source access, loading/empty/error/stale states, visible pins and explicit refresh. Reproduce custom-range Apply with actual UI and persistence; fix only a confirmed defect. Coordinate with the existing NI-064 owner, without taking over that claim.
+
+**Expected files/modules:** apps/web public research, shared chart presentation, Saved Charts and editor; relevant regression tests and design docs; docs/verification/ni-078/README.md.
+
+**Acceptance criteria:** D1–D5 in the NI-076 report have actual before/after desktop evidence and a recorded disposition; meaningful plots appear in the first chart viewport at the documented desktop sizes; saved cards are compact and use the shared renderer; the editor prioritizes the paper. Public figures trace to historical claim/definition/dataset/calculation and stay labeled historical/estimated where appropriate. Purchases are never subtracted from supply. Custom range is verified end to end or its reproducible blocker prevents DONE. No data/auth/version/export regression.
+
+**Testing requirements:** Focused meaningful chart/selection/editor regressions; lint/typecheck/build/contrast; real browser navigation/range/save/reopen and source/table access; desktop keyboard/accessibility; affected pin/export and two-user checks when behavior changes. No mobile pass.
+
+### NI-079 — Pass final integrated local release acceptance
+
+- **Epic:** 13 — Quality and Security
+- **Priority:** P0, mandatory before remote deployment
+- **Dependencies:** NI-078, NI-064, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063, NI-044, NI-045, NI-055, NI-059, NI-071, NI-072, NI-060, NI-065
+- **Complexity:** L
+- **Status:** TODO
+- **Execution role:** A (coordinator); B owns data/model/API acceptance contributions
+
+**Description:** Verify the integrated P0/P1/P2 release candidate locally after all eight formerly deferred features work; preserve the current design and prioritize actual charts. Earlier DONE cards or a design preview do not establish readiness.
+
+**Implementation steps:** Audit current main/PR integration and every non-deployment P0/P1/P2 criterion; resolve defects via their NI-card or a newly identified bounded task. Run the applicable full local checks from TESTING_STRATEGY and the handoff on one recorded source version. Rehearse production-mode container startup/migrations/export, local backup/restore and rollout rollback. Audit permitted real research inputs, actual refresh evidence and published model reproduction; missing permission/input/result remains an explicit blocker. Record a single final report and present the local product for owner review. Make no remote rollout here.
+
+**Expected files/modules:** docs/verification/ni-079/README.md and linked local logs/screenshots/manifests; actual defects only through identified tasks; TASKS evidence and affected runbooks.
+
+**Acceptance criteria:** All applicable non-deployment P0/P1/P2 gates and NI-078/064 pass on the release candidate; no unresolved critical/high security, core-flow, financial/pin integrity or required design defect. Real web/API/PostgreSQL/worker complete public→chart→login→saved chart→research→insight→opposing evidence→save/reopen→frozen ZIP. Alice/Bob denial and source-outage editing pass; ZIP/CSV/assets/hash pins match the stored revision. Real-data provenance/rights/quality, the permitted-source actual refresh and last-good evidence, and one published deterministic real empirical model/offline reproduction satisfy MVP_SCOPE; an honestly empty model catalog or synthetic fixtures cannot pass these gates. Container/migration/restore/rollback and desktop keyboard/accessibility/performance gates pass with documented environment. Report records commit + any diff hash, input/lock/image versions, commands, pass/fail/skips with reasons, findings and remaining remote-only checks. Any release-affecting change invalidates relevant evidence until rechecked. NI-067 cannot start remote rollout without this task DONE.
+
+**Testing requirements:** Full applicable web/API/unit/DB/contracts/security/E2E; production build, contrast and secret scans; clean local container rehearsal; manual desktop flow/keyboard and measured limits; real permitted research reproduction separated from synthetic E2E. Runtime checks actually executed, not inferred from screenshots, HTTP200, old CI or documentation. No external collection or real-auth/provider invocation beyond existing explicit authorization; otherwise record blocker. No mobile pass.
+
+**Extended local chart acceptance — owner 2026-11-12:** Verify real chart rendering and exact table/source/selection in public research/explorer, saved charts, editor, explicit snapshot freeze→latest refresh→compare, source-supported advanced comparison, model-result insertion and template/private-copy flows. Save/reopen preserves the requested context; historical pins do not refresh. Markdown and PDF include the same frozen figures/data/source references without clipped charts. Local sharing displays its frozen allowed charts and revocation removes asset access; integrity checks refer to the exact document/chart context. Trace at least one permitted real chart end to end (input→metric→API→plot→saved revision→ZIP/PDF); synthetic E2E alone cannot satisfy this requirement. Missing unsupported metrics stay explicit unavailable; never fill every category with fabricated data. Every listed P1/P2 is implemented and tested; NI-060/065 cannot pass through planning alone. The NI-079 release gate may depend on P1/P2 by the explicit 12 November scope update; priority labels are not changed.

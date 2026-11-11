@@ -1,6 +1,6 @@
 # Strict MVP scope
 
-The application has not been built. P0 is the minimum hackathon product; P1 enhances it; P2 is deferred. [Task priorities](TASKS.md) are normative. No fixed hackathon deadline or team capacity was supplied; do not promise calendar completion.
+P0 defines the minimum hackathon product. **Owner scope update — 12 November 2026:** all six registered P1 and both P2 tasks are now required before deployment; the current release extends the original MVP. Preserve the largely completed desktop design and prioritize working local charts. [Task priorities](TASKS.md) are normative. No fixed hackathon deadline or team capacity was supplied; do not promise calendar completion.
 
 ## P0 commitments
 
@@ -26,11 +26,17 @@ There are no coefficients or fitted model outputs in this documentation. NI-052�
 
 Explicit snapshot management, default investment template and public-thesis duplication, model-result blocks in private documents, PDF export, advanced supported filters, convenient document organization. Basic save-time pins and baseline range controls remain P0. Chart library, sources and public model view remain P0.
 
-## P2 and excluded scope
+## P2 included before deployment
 
-Read-only public sharing, collaboration/CRDT, LLM assistant, interpretive integrity checks, automatic hypothesis monitoring, scenario simulators, multiple chains, Strategy/Portfolio screens from the legacy plan, trading/execution, billing and teams. No AI API key is required. Stub navigation must not suggest unavailable features work.
+NI-060 implements consent-based revocable read-only sharing of one frozen revision with scoped assets, expiry and owner management. NI-065 implements deterministic metadata integrity checks and an optional grounded AI adapter with evidence references; no-key local operation remains mandatory and external calls are opt-in under actual permissions. Their earlier design-only/plan-only acceptance is replaced by implemented and tested local journeys in TASKS.
+
+## Still excluded
+
+Collaboration/CRDT, automatic hypothesis monitoring, scenario simulators, multiple chains, Strategy/Portfolio screens from the legacy plan, trading/execution, billing and teams are not registered P1/P2 implementation tasks and remain outside this release. No mandatory AI API key or paid provider is introduced. Stub navigation must not suggest unavailable features work.
 
 ## Release checklist
+
+**Owner sequencing update — 12 November 2026:** finish all registered P0/P1/P2 and targeted NI-078 fixes while preserving the design; verify the integrated release candidate locally under NI-079 before any NI-067 remote rollout. Local acceptance includes actual permitted research/model gates, not only synthetic engineering tests. Missing data/results/permission remain blockers. P1/P2 are now included; mobile scope remains excluded. Final-origin TLS/callbacks, remote operations/restore and deployed walkthrough remain NI-067/068/069 checks after placement; these tasks themselves are not prerequisites of the local gate. See [current agent handoff](FINISH_BEFORE_DEPLOY_PROMPT.md) and [PLAN section 10](../PLAN.md#10-завершение-до-размещения--обязательный-порядок).
 
 1. Original public thesis includes H1–H4, supporting and contrary evidence, assumptions and limitations.
 2. Every public number can be traced to real permitted inputs and a versioned calculation; missing values have explicit states.
@@ -39,4 +45,6 @@ Read-only public sharing, collaboration/CRDT, LLM assistant, interpretive integr
 5. Two users can independently save/reopen research; cross-user CRUD, references and export fail safely.
 6. Complete research workflow works on desktop with keyboard access and accessible chart data. Mobile/tablet/touch development and verification are excluded by the 8 November 2026 user scope update.
 7. Markdown bundle includes rendered chart assets, data, notes and a manifest, pinned to one document revision.
-8. Production health, TLS, restore rehearsal and judge walkthrough pass. P0 tasks complete; remaining P1/P2 is labeled.
+8. Production health, TLS, restore rehearsal and judge walkthrough pass. All registered P0/P1/P2 tasks complete; no required feature deferred merely because of its priority label.
+
+9. Snapshots, templates/duplication, model blocks, PDF, advanced supported filters, tags/favorites, revocable sharing and integrity tools pass actual local persistence/security/chart journeys before NI-079 DONE. Historical/live data semantics, exact values and source references survive every path. Existing visual direction is retained.

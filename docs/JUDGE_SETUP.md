@@ -231,7 +231,12 @@ the ports themselves are a configuration matter, not a code path). The
 in-image renderer check (Python boundary → packaged Node renderer → verified
 SVG/CSV/hashes, echarts 6.1.0, node 24.22.2) ran inside the API image.
 
-Not yet verified (recorded, not claimed): Linux container runtime execution
-(acceptance keeps this gate for the release rehearsal, NI-069), production
-TLS origin (NI-067), and restore drills (NI-068). Windows native remains
-untested (see [DEPENDENCIES.md](DEPENDENCIES.md)).
+Not yet verified by the packaging evidence above (recorded, not claimed):
+the final integrated Linux-container runtime rehearsal, production TLS
+origin, and restore drills. Under the owner's 11 November finish→local→deploy
+order, **NI-079 must verify the local Linux-container flow and local restore
+before any remote rollout**. NI-067 verifies the final TLS origin; NI-068
+verifies actual remote backups/restore; NI-069 verifies deployed judge
+reproduction. These are separate gates, not claims of completed checks.
+See [the current handoff](FINISH_BEFORE_DEPLOY_PROMPT.md). Windows native
+remains untested (see [DEPENDENCIES.md](DEPENDENCIES.md)).
