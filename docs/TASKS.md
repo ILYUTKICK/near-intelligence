@@ -1726,7 +1726,13 @@ Specification: [ECONOMETRIC_METHODOLOGY.md](ECONOMETRIC_METHODOLOGY.md).
 - **Priority:** P1
 - **Dependencies:** NI-054, NI-039, NI-050
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode A-role implementation subagent, dispatched by coordinator session sess_9345ee4f-f534-4698-98d2-5809986ac4c3
+- **Execution role:** A
+- **Started at:** 2026-11-11T21:26:19Z
+- **Branch/worktree:** feat/ni-055-model-block; /Users/ilyutkinn/Desktop/near-intelligence-a24
+- **Authorization:** Owner handoff v2 (docs/FINISH_BEFORE_DEPLOY_PROMPT.md, 12 November 2026) requires implementing all registered P1/P2; PR #88 carries the updated registry.
+- **Dependency verification:** NI-054, NI-039 and NI-050 are DONE in this registry; verified on docs/ni-077-handoff-v2 at commit 2787fd5.
 
 **Description:** Embed immutable statistical results with editable interpretation while keeping estimation fixed.
 
