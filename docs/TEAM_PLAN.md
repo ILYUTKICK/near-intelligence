@@ -83,15 +83,15 @@ A и B согласуют миграции/API на стыках до измен
 - Ежедневно короткая синхронизация: что интегрировано, какой контракт нужен следующим, какой blocker появился. Регулярно показывать настоящий сквозной сценарий; частота подстраивается под дедлайн.
 - Не откладывать интеграцию до финала. Не создавать две копии метрик/рендеров/редактора. Перед DONE выполнить критерии исходной NI-задачи; владельцы ниже не могут ослабить их.
 
-## 6. Что не брать в первую итерацию
+## 6. Актуальный scope перед размещением
 
-P1/P2 не стартуют, пока не готов соответствующий P0-путь. Первые версии используют несколько реальных графиков, пустой документ, базовые блоки, Markdown ZIP и опубликованный ограниченный эмпирический анализ. Шаблоны, отдельный snapshot UX, PDF, advanced filters и organization откладываются. AI, collaboration, public sharing, стратегии/портфель и multichain не входят в MVP.
+**Указание владельца — 12 ноября 2026:** все зарегистрированные P1/P2 входят в выпуск до деплоя. Соблюдать прямые prerequisites; не ждать deployment-задач или NI-079, чтобы начать P1/P2. A: NI-055/059/071 и UI handoffs NI-044/045/072/060; B: NI-044/045/072/060 и API/data/export handoffs. NI-065 координирует A с B evidence-tool/API частью. Сохранить основной дизайн NI-075, править конкретные дефекты NI-078. CRDT, portfolio, multichain и другие незарегистрированные направления не добавляются.
 
 Сокращение числа участников не снимает обязательность источников, фактического refresh, настоящего результата модели, приватности и версии данных. Если они не выполнены, этап честно остаётся незавершённым.
 
 ## 7. Ответственный по каждой задаче
 
-A/B — лид приёмки всей задачи; второй участник — reviewer и исполнитель своей технической части на стыках. P1/P2-владельцы указаны для планирования, не для раннего старта. Прямые зависимости, подробные шаги и тесты находятся в TASKS.md.
+A/B — лид приёмки всей задачи; второй участник — reviewer и исполнитель своей технической части на стыках. P1/P2-владельцы отвечают за реализацию до локального release-gate по указанию 12 ноября. Прямые зависимости, подробные шаги и тесты находятся в TASKS.md.
 
 Распределение P0: **A — 35 задач, B — 29 задач**. Эта пропорция не является оценкой часов: сложность и межкомандные части учитываются отдельно.
 
@@ -156,21 +156,32 @@ A/B — лид приёмки всей задачи; второй участни
 | NI-057 | Render static chart assets from frozen contexts | P0 | A | B |
 | NI-058 | Deliver Markdown ZIP export jobs and download | P0 | B | A |
 | NI-059 | Implement PDF export from frozen representation | P1 | A | B |
-| NI-060 | Design revocable read-only sharing | P2 | B | A |
+| NI-060 | Implement revocable read-only sharing | P2 | B | A |
 | NI-061 | Add business/data integration regression suite | P0 | B | A |
 | NI-062 | Complete adversarial ownership and security audit | P0 | B | A |
 | NI-063 | Verify complete research workflow end to end | P0 | A | B |
 | NI-064 | Verify accessibility, responsiveness and performance | P0 | A | B |
-| NI-065 | Plan advisory integrity checks and optional AI tools | P2 | A | B |
+| NI-065 | Implement advisory integrity checks and optional AI tools | P2 | A | B |
 | NI-066 | Package portable local and production runtimes | P0 | A | B |
 | NI-067 | Deploy staging and production with safe configuration | P0 | A | B |
 | NI-068 | Verify backups, restore and operational monitoring | P0 | A | B |
 | NI-069 | Run hackathon demo and reviewer reproduction | P0 | A | B |
 | NI-070 | Finalize and publish original research release | P0 | A | B |
 | NI-075 | Integrate the NI-074 desktop design into the working application | P0 | A | Owner |
+| NI-076 | Run PR 87 locally and review desktop design against NI-074 | P0 | A | Owner |
+| NI-077 | Record finish-local-verify-deploy handoff | P0 | A | Coordinator |
+| NI-078 | Complete desktop research and chart presentation | P0 | A | Coordinator |
+| NI-079 | Pass final integrated local release acceptance | P0 | A with B data/API/model contributions | Coordinator |
 | NI-071 | Add advanced supported analytical filters | P1 | A | B |
 | NI-072 | Add lightweight private research organization | P1 | B | A |
 
 ## 8. Критерий готовности команды
 
 Оба участника могут открыть публичный тезис, проследить реальное число до источника, войти под разными пользователями, создать независимые документы, добавить график/заметку/противоречащее доказательство, сохранить/переоткрыть и экспортировать закреплённую версию. Модель воспроизводится по manifest; обновление источника не переписывает старую аргументацию. Полный P0 release определяется MVP_SCOPE.md, а не только этим демонстрационным сценарием.
+
+
+NI-076 owner review: role A /root coordinates isolated local deployment and desktop browser verification; /root/design_pr_audit performs bounded read-only implementation/atlas comparison. NI-075 claim and prior acceptance history are preserved.
+
+**Owner handoff — 11 November 2026:** NI-077 documents the finish→local-acceptance→deployment order; [current executable assignment](FINISH_BEFORE_DEPLOY_PROMPT.md). A owns NI-078 desktop/UI and NI-079 integrated acceptance; B owns the latter's real data/model/API contributions through the applicable existing NI-cards. NI-064's existing claim is unchanged: agree a handoff with its executor or progress independent work. The final local gate precedes remote rollout under NI-067; NI-068/069 still verify actual remote operations/demo. Independent second review is skipped under the 9 November instruction; coordinator acceptance and original checks remain mandatory. No new execution claim or paid/cloud/data permission is created by this ownership table.
+
+**Уточнение передачи — 12 ноября 2026:** NI-079 принимает весь P0/P1/P2, включая работающие локально графики на public/private/snapshot/model/comparison/Markdown/PDF/share путях. Прежнее ограничение NI-077 только MVP заменено этой передачей; активные claims и границы прав/данных сохранены. P2 NI-060/065 теперь implement-and-test, не ADR-only. Ни состав ролей, ни optional AI adapter не разрешают внешнюю передачу приватного текста или расходы автоматически.

@@ -27,6 +27,10 @@ Model reproducibility compares canonical prepared-data bytes and manifest hashes
 
 ## Release gates
 
+**Owner order — 12 November 2026:** the final integrated local gate is NI-079, after all registered P0/P1/P2, NI-078 and NI-064 and before any NI-067 remote rollout. Execute the applicable full suites and production/container local rehearsal on the recorded release candidate; earlier green results are historical evidence. Capture exact source identity (commit and any diff hash), locks/images/inputs, environment, commands/results/skips, screenshots and defects in `docs/verification/ni-079/README.md`. A later release-affecting change requires relevant rechecks and an updated verdict. [Current handoff and command entry points](FINISH_BEFORE_DEPLOY_PROMPT.md).
+
+Local production-mode performance/container/restore rehearsals must identify machine and limits; they do not establish real staging-machine performance, final-origin TLS/callbacks or remote restore. Local NI-064 acceptance uses the same budgets on a documented production-mode local environment under the owner's ordering change; NI-067 rechecks relevant budgets on the actual staging environment. Missing local prerequisites block NI-079. Real permitted refresh/model/reproduction evidence remains distinct from synthetic E2E; unknown/skipped required gates do not pass. Remote-only acceptance stays with NI-067/068/069.
+
 NI-012 HTTP integration (`apps/api/tests/test_landing_integration.py`) runs via
 `scripts/run-db-tests.py --suite landing` after the frozen web build. It starts
 real production Next.js and FastAPI processes on loopback, uses the unprivileged
@@ -80,3 +84,7 @@ mocked. CI runs the same journey in the `e2e` job of `.github/workflows/checks.y
 ## Current user scope override — 8 November 2026
 
 Remaining QA targets desktop. The user excluded mobile development/adaptation and mobile, touch, phone and tablet QA to reduce execution cost. Do not repeat mobile viewport/device screenshots or checks mentioned in historical task evidence; existing tests/code remain intact. Desktop keyboard/accessibility, exact data, two-user isolation, persistence, frozen revisions and export verification remain required. Run focused checks for changes and required integration gates; repeat broad suites only after relevant source changes, failures or unresolved concerns.
+
+## Extended pre-deployment acceptance — 12 November 2026
+
+NI-079 includes all six P1 and both P2. Run actual snapshot freeze/compare; independent template/public duplication; published model-block insertion; frozen PDF with full visual page inspection; supported advanced filter reconciliation; private tags/favorites; local sharing consent/read/expiry/revocation plus asset denial; deterministic integrity source-jump/fix/rerun with optional AI off/outage. Preserve owner boundaries, immutable contexts and scientific hashes. Trace at least one permitted real chart input→metric→API→plot/exact table→saved revision→snapshot→Markdown/PDF. Verify the existing desktop style without starting a redesign. Missing source dimensions/results/permissions remain blockers; synthetic QA never substitutes real chart inputs. P1/P2 labels do not permit skipping a required feature before release. External provider smoke, paid tools and real private-context transmission are not authorized by this testing scope alone.
