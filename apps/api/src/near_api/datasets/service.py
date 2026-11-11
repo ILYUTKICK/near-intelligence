@@ -66,6 +66,7 @@ from near_api.datasets.storage import ArtifactStorage
 # The operator boundary is shared with the NI-027 archive import on purpose:
 # one definition of "what may write the scientific data zone".
 from near_api.ingestion.archive import _assert_operator, create_operator_engine
+from near_api.metrics.registry import DEFINITIONS as METRIC_DEFINITIONS
 
 ADVISORY_LOCK_NAMESPACE = 20036  # dataset staging/publication lock class ('ND')
 
@@ -654,9 +655,42 @@ def _stage_locked(connection: Connection, manifest: PreparedManifest,
         validation=report)
 
 
+def _reject_verified_gated_values(manifest: object) -> None:
+    """Fail closed on verified values for gated metric members.
+
+    Gated registry definitions (``availability == "G"``) promise the honest
+    unavailable state until their source/definition gate passes (OQ-01 and
+    peers, NI-051). A dataset may still declare a gated metric as a member
+    and carry its explicit missing/unavailable observations (the NI-061
+    invariant fixtures stage exactly that), but a VERIFIED value for a gated
+    member would silently overwrite the contract through the delivery APIs.
+    Zero rows are written on violation.
+    """
+    gated = {str(definition.id) for definition in METRIC_DEFINITIONS
+             if definition.definition.get("availability") == "G"}
+    if not gated:
+        return
+    offending: list[str] = []
+    for observation in manifest.observations:
+        if str(observation.metric_definition_id) in gated \
+                and observation.value is not None:
+            offending.append(
+                f"{observation.metric_definition_id} @ "
+                f"{observation.period_start.isoformat()} (value {observation.value})")
+    if offending:
+        sample = "; ".join(offending[:3]) + (f" (+{len(offending) - 3} more)"
+                                             if len(offending) > 3 else "")
+        raise DatasetContractError(
+            "gated metric definitions (availability='G') must carry only "
+            "explicit missing/unavailable observations — a verified value was "
+            f"staged for: {sample}. The honest unavailable state is delivered "
+            "until each gate passes.")
+
+
 def stage(engine: Engine, manifest_path: Path, storage_root: Path) -> StagedVersion:
     """Stage and validate one prepared manifest as an immutable dataset version."""
     manifest = load_manifest(manifest_path)
+    _reject_verified_gated_values(manifest)
     storage = ArtifactStorage(storage_root)
     with engine.connect() as connection:
         resolved = resolve_inputs(connection, manifest, storage)

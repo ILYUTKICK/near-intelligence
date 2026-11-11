@@ -33,6 +33,7 @@ from near_api.datasets.manifest import (
     parse_manifest_document,
 )
 from near_api.datasets.service import (
+    DatasetContractError,
     DatasetVerificationError,
     PublishRefused,
     _expected_periods,
@@ -352,6 +353,25 @@ class DatasetStagingDatabaseTests(unittest.TestCase):
             self.assertGreater(connection.scalar(text(
                 "SELECT count(*) FROM app.artifacts WHERE scope = 'internal'")), 0)
         self.assertEqual((row[0], row[1], observed), (self.key, "approved", DAILY_PERIODS))
+
+    def test_01b_stage_rejects_verified_values_for_gated_members(self):
+        """A gated registry definition (availability='G') may be a dataset
+        member only with explicit missing/unavailable observations (the
+        NI-061 pattern): a VERIFIED value would overwrite the honest
+        unavailable delivery contract (NI-051/OQ-01), so staging fails closed
+        before a single row is written."""
+        gated_id = definition_by_metric_id("protocol_revenue_usd").id
+        document = manifest_document("gate-rejection-check",
+                                     daily_observations(METRIC_A)
+                                     + daily_observations(gated_id),
+                                     member_metrics=[METRIC_A, gated_id])
+        before = self.counts()
+        with self.assertRaises(DatasetContractError) as raised:
+            stage(self.operator, self.write_manifest("manifest-gated.json", document),
+                  self.storage_root)
+        self.assertIn("availability='G'", str(raised.exception))
+        self.assertIn(str(gated_id), str(raised.exception))
+        self.assertEqual(self.counts(), before)
 
     def test_02_identical_semantic_input_deduplicates(self):
         first = self.stage_happy()
