@@ -775,7 +775,13 @@ Specification: [USER_JOURNEYS.md](USER_JOURNEYS.md).
 - **Priority:** P1
 - **Dependencies:** NI-023, NI-040, NI-062
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode B-role implementation subagent, dispatched by coordinator session sess_9345ee4f-f534-4698-98d2-5809986ac4c3
+- **Execution role:** B
+- **Started at:** 2026-11-11T21:26:24Z
+- **Branch/worktree:** feat/ni-072-organization; /Users/ilyutkinn/Desktop/near-intelligence-a23
+- **Authorization:** Owner handoff v2 (docs/FINISH_BEFORE_DEPLOY_PROMPT.md, 12 November 2026) requires implementing all registered P1/P2; PR #88 carries the updated registry.
+- **Dependency verification:** NI-023, NI-040 and NI-062 are DONE in this registry; verified on docs/ni-077-handoff-v2 at commit 2787fd5.
 
 **Description:** Help users organize growing document lists after the basic create/search/resume workflow is reliable.
 
