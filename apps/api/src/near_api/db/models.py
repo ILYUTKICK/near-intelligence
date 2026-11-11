@@ -336,20 +336,22 @@ class SavedChart(Base):
 
 
 class ExportJob(Base):
-    """One owner-scoped Markdown ZIP export job (NI-058).
+    """One owner-scoped export job (NI-058 Markdown ZIP, NI-059 PDF).
 
-    Mirrors migration 0012 exactly (DATABASE_SCHEMA.md "export_jobs", the
-    implemented shape): ``plan`` holds the FROZEN export IR canonical bytes
-    built at request time (the worker renders only from them, so later edits
-    never reach the bundle), ``bundle`` holds the finished ZIP bytes with
-    their SHA-256 and size, and the lifecycle columns carry the operator
-    lease, the attempt cap and the TTL. Bytes live owner-scoped inside this
-    RLS-protected row: no public artifact key and no server filesystem path.
+    Mirrors migrations 0012 + 0016 exactly (DATABASE_SCHEMA.md
+    "export_jobs", the implemented shape): ``plan`` holds the FROZEN export
+    IR canonical bytes built at request time (the worker renders only from
+    them, so later edits never reach the artifact), ``bundle`` holds the
+    finished artifact bytes (a ZIP for ``markdown_zip``, the PDF itself for
+    ``pdf``) with their SHA-256 and size, and the lifecycle columns carry the
+    operator lease, the attempt cap and the TTL. Bytes live owner-scoped
+    inside this RLS-protected row: no public artifact key and no server
+    filesystem path.
     """
 
     __tablename__ = "export_jobs"
     __table_args__ = (
-        CheckConstraint("format = 'markdown_zip'", name="format"),
+        CheckConstraint("format IN ('markdown_zip', 'pdf')", name="format"),
         CheckConstraint("status IN ('queued','running','succeeded','failed','expired')",
                         name="status"),
         CheckConstraint("revision > 0", name="revision"),

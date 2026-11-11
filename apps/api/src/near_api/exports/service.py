@@ -1,4 +1,12 @@
-"""Owner-scoped export job store: creation, polling and download (NI-058).
+"""Owner-scoped export job store: creation, polling and download.
+
+The HTTP-facing service of the export pipeline (NI-058 Markdown ZIP, NI-059
+PDF). One row of ``app.export_jobs`` is one job; every function here runs
+inside a transaction-local verified identity (:func:`near_api.db.security.
+principal_transaction` or the worker's per-job owner transaction), so RLS
+and the compositional checks make absent and not-owned ids the same generic
+404-equivalent — Bob can never create, poll, download or sweep Alice's
+export.
 
 The HTTP-facing service of the export pipeline. One row of
 ``app.export_jobs`` is one job; every function here runs inside a
@@ -79,6 +87,10 @@ class ExportJobNotFound(LookupError):
     """The job does not exist for this owner/document (one 404-equivalent)."""
 
 
+class ExportFormatInvalid(ValueError):
+    """The requested format is not a documented bundle format (typed 422)."""
+
+
 class ExportPlanTooLarge(ValueError):
     """The frozen plan exceeds the stored-plan cap (typed 422)."""
 
@@ -121,7 +133,9 @@ class ExportJobRow:
 
 @dataclass(frozen=True)
 class ExportDownload:
-    """The stored ZIP bytes of one succeeded, unexpired job."""
+    """The stored artifact bytes of one succeeded, unexpired job (a ZIP for
+    ``markdown_zip`` jobs, the PDF itself for ``pdf`` jobs — the job's
+    ``format`` records the media type the download route streams)."""
 
     job: ExportJobRow
     bundle: bytes
@@ -138,25 +152,35 @@ class CreatedExportJob:
 
 
 def create_export_job(engine: Engine, principal: Principal, document_id: UUID,
-                      version_id: UUID, *, idempotency_key: str | None = None,
+                      version_id: UUID, *, format: str = "markdown_zip",
+                      idempotency_key: str | None = None,
                       ) -> CreatedExportJob:
     """Create (or replay) the export job of the owned acknowledged revision.
 
-    One transaction: advisory serialization (key present), the replay check
-    over the job row, the frozen IR build (fail-closed on every pin) and the
-    insert. Raises :class:`IdempotencyKeyInvalid` (422) for a malformed key,
+    ``format`` is the documented bundle format (``markdown_zip`` or ``pdf``);
+    the frozen plan is built the same way for both — the renderer difference
+    belongs to the worker only. One transaction: advisory serialization (key
+    present), the replay check over the job row, the frozen IR build
+    (fail-closed on every pin) and the insert. Raises
+    :class:`IdempotencyKeyInvalid` (422) for a malformed key,
     :class:`IdempotencyConflict` (409) for a key reused with a different
     request, and :class:`ExportIrError` for a revision the export contract
     refuses (the route maps ``revision_not_acknowledged`` to 409 and every
-    other detail to 422).
+    other detail to 422). An unknown format is a typed :class:`ValueError`
+    the route refuses as a 422 before any job row exists.
     """
+    if format not in ("markdown_zip", "pdf"):
+        raise ExportFormatInvalid(
+            f"Unknown export format {format!r}; the documented formats are "
+            "markdown_zip and pdf")
     key = parse_idempotency_key(idempotency_key)
     with principal_transaction(engine, principal) as connection:
         if key is not None:
             _serialize_same_key(connection, principal.id, document_id, key)
             existing = _existing_job(connection, principal.id, document_id, key)
             if existing is not None:
-                if existing.document_version_id != version_id:
+                if existing.document_version_id != version_id \
+                        or existing.format != format:
                     raise IdempotencyConflict(
                         "This Idempotency-Key was already used for a different "
                         "export request; a new key is required for a new payload")
@@ -171,7 +195,7 @@ def create_export_job(engine: Engine, principal: Principal, document_id: UUID,
         job_id = uuid4()
         connection.execute(insert(ExportJob).values(
             id=job_id, owner_id=principal.id, document_id=document_id,
-            document_version_id=version_id, format="markdown_zip",
+            document_version_id=version_id, format=format,
             idempotency_key=key, revision=plan.document.revision,
             plan=plan_bytes,
             plan_sha256=hashlib.sha256(plan_bytes).hexdigest(),
@@ -193,7 +217,7 @@ def get_export_job(engine: Engine, principal: Principal, document_id: UUID,
 
 def get_export_download(engine: Engine, principal: Principal, document_id: UUID,
                         job_id: UUID) -> ExportDownload:
-    """Return the stored ZIP of one owned, succeeded, unexpired job.
+    """Return the stored artifact of one owned, succeeded, unexpired job.
 
     A job that is not downloadable raises a typed failure the route maps
     onto its documented status: :class:`ExportNotReady` (queued/running,

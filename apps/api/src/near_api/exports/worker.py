@@ -1,10 +1,11 @@
-"""``python -m near_api.exports.worker`` — the export worker CLI (NI-058).
+"""``python -m near_api.exports.worker`` — the export worker CLI.
 
-Processes queued Markdown ZIP export jobs using the operator and runtime
-credentials. The worker is an operator-invoked CLI, not a daemon:
-scheduling stays an explicit operational step (no scheduler exists in MVP),
-and every job passes through the same lease/retry/TTL machinery whether it
-is processed immediately or minutes later.
+Processes queued export jobs (NI-058 Markdown ZIP bundles, NI-059 PDF
+reports) using the operator and runtime credentials. The worker is an
+operator-invoked CLI, not a daemon: scheduling stays an explicit operational
+step (no scheduler exists in MVP), and every job passes through the same
+lease/retry/TTL machinery whether it is processed immediately or minutes
+later.
 
 Pipeline per job:
 
@@ -19,15 +20,19 @@ Pipeline per job:
    recorded ``plan_sha256`` before anything renders. The operator
    credential never sees plan or bundle bytes.
 3. RENDER: the NI-057 boundary renders the plan's chart blocks (subprocess
-   with a fixed ARGV list, no shell, typed failures); the bundle builder
-   renders the Markdown and packages the ZIP. A failure marks the job
-   ``failed`` with a typed ``error_code`` — the worker never substitutes,
-   retries forever or fabricates a partial bundle.
-4. COMMIT (the job owner's identity, again per-transaction): the ZIP bytes
-   are stored with their SHA-256 and size, guarded by the lease — a worker
-   that lost its lease (expired mid-render, another worker re-claimed)
-   commits nothing, and the re-claimed attempt regenerates the bundle from
-   the same frozen plan (idempotent by construction).
+   with a fixed ARGV list, no shell, typed failures); then the job's format
+   selects the renderer — ``markdown_zip`` builds research.md + assets +
+   manifest.json and packages the deterministic ZIP (NI-058), ``pdf``
+   renders the same frozen plan into the deterministic static PDF report
+   (NI-059, embedded vector charts from the same NI-057 assets). A failure
+   marks the job ``failed`` with a typed ``error_code`` — the worker never
+   substitutes, retries forever or fabricates a partial artifact.
+4. COMMIT (the job owner's identity, again per-transaction): the artifact
+   bytes (ZIP or PDF; the column is named ``bundle`` for both) are stored
+   with their SHA-256 and size, guarded by the lease — a worker that lost
+   its lease (expired mid-render, another worker re-claimed) commits
+   nothing, and the re-claimed attempt regenerates the artifact from the
+   same frozen plan (idempotent by construction).
 
 ``--sweep`` is the documented cleanup path: rows past their TTL become
 ``expired`` and their bundle bytes are cleared (per-owner transactions), so
@@ -35,7 +40,7 @@ the stored state converges with the lazily reported typed state.
 
 No shell is invoked anywhere; the only subprocess is the pinned NI-057
 renderer invocation with its fixed ARGV list. No secret, DSN or server
-filesystem path is ever written into a job row, a bundle or the manifest.
+filesystem path is ever written into a job row, an artifact or the manifest.
 Exit codes follow the research CLI convention: 0 success, 2 usage, 4
 operator failure (an invalid runtime credential; job failures are recorded
 on the job rows, not the process exit).
@@ -81,13 +86,15 @@ EXIT_USAGE = 2
 
 @dataclass(frozen=True)
 class ClaimedJob:
-    """One leased job: identity, owner (for the per-transaction identity)
-    and the lease guard the completion update is bound to."""
+    """One leased job: identity, owner (for the per-transaction identity),
+    the artifact format the completion renders, and the lease guard the
+    completion update is bound to."""
 
     job_id: UUID
     owner_id: UUID
     document_id: UUID
     document_version_id: UUID
+    format: str
     revision: int
     attempts: int
     worker_id: str
@@ -123,7 +130,8 @@ def claim_job(operator_engine: Engine, worker_id: str, *,
                     FOR UPDATE SKIP LOCKED)
         """), {"max_attempts": MAX_ATTEMPTS})
         claimed = connection.execute(text("""
-            SELECT id, owner_id, document_id, document_version_id, revision, attempts
+            SELECT id, owner_id, document_id, document_version_id, format,
+                   revision, attempts
               FROM app.export_jobs
              WHERE (status = 'queued'
                     OR (status = 'running' AND leased_until < now()))
@@ -146,6 +154,7 @@ def claim_job(operator_engine: Engine, worker_id: str, *,
             job_id=claimed["id"], owner_id=claimed["owner_id"],
             document_id=claimed["document_id"],
             document_version_id=claimed["document_version_id"],
+            format=claimed["format"],
             revision=claimed["revision"], attempts=claimed["attempts"] + 1,
             worker_id=worker_id)
 
@@ -180,10 +189,17 @@ def load_plan(runtime_engine: Engine, claimed: ClaimedJob) -> ExportIr:
                           "export contract") from error
 
 
-def render_bundle(plan: ExportIr, *, timeout: float = DEFAULT_TIMEOUT_SECONDS,
+def render_bundle(plan: ExportIr, *, format: str = "markdown_zip",
+                  timeout: float = DEFAULT_TIMEOUT_SECONDS,
                   node_bin: str | None = None,
                   renderer_script: str | None = None) -> bytes:
-    """Render the plan's bundle ZIP (charts via NI-057, then packaging)."""
+    """Render the plan's artifact (charts via NI-057, then the format's renderer).
+
+    ``format`` selects the delivery renderer only: ``markdown_zip`` packages
+    the Markdown bundle (NI-058), ``pdf`` renders the static PDF report
+    (NI-059). Both embed the SAME boundary-verified chart assets; an unknown
+    format is a typed worker failure, never a guessed renderer.
+    """
     chart_blocks = tuple(block for block in plan.blocks
                          if isinstance(block, ExportChartBlock))
     render_result = None
@@ -191,14 +207,28 @@ def render_bundle(plan: ExportIr, *, timeout: float = DEFAULT_TIMEOUT_SECONDS,
         render_result = render_chart_assets(
             chart_render_request(chart_blocks), timeout=timeout,
             node_bin=node_bin, renderer_script=renderer_script)
-    try:
-        bundle = build_bundle(plan, render_result)
-    except ValueError as error:
-        raise WorkerError("bundle_build_failed", str(error)) from error
-    if len(bundle.zip_bytes) > MAX_BUNDLE_BYTES:
-        raise WorkerError("bundle_size_exceeded",
-                          "The export bundle exceeds the bundle-size cap")
-    return bundle.zip_bytes
+    if format == "pdf":
+        from near_api.exports.pdf import PdfRenderError, render_pdf
+
+        try:
+            pdf_bytes = render_pdf(plan, render_result)
+        except (ValueError, PdfRenderError) as error:
+            raise WorkerError("pdf_render_failed", str(error)) from error
+        if len(pdf_bytes) > MAX_BUNDLE_BYTES:
+            raise WorkerError("bundle_size_exceeded",
+                              "The export artifact exceeds the artifact-size cap")
+        return pdf_bytes
+    if format == "markdown_zip":
+        try:
+            bundle = build_bundle(plan, render_result)
+        except ValueError as error:
+            raise WorkerError("bundle_build_failed", str(error)) from error
+        if len(bundle.zip_bytes) > MAX_BUNDLE_BYTES:
+            raise WorkerError("bundle_size_exceeded",
+                              "The export bundle exceeds the bundle-size cap")
+        return bundle.zip_bytes
+    raise WorkerError("unsupported_export_format",
+                      f"The job requests the undocumented format {format!r}")
 
 
 def complete_job(runtime_engine: Engine, claimed: ClaimedJob,
@@ -290,7 +320,8 @@ def process_one(runtime_engine: Engine, operator_engine: Engine, *,
         return False
     try:
         plan = load_plan(runtime_engine, claimed)
-        bundle_bytes = render_bundle(plan, timeout=timeout, node_bin=node_bin,
+        bundle_bytes = render_bundle(plan, format=claimed.format, timeout=timeout,
+                                     node_bin=node_bin,
                                      renderer_script=renderer_script)
     except (WorkerError, ChartRendererError) as error:
         code = error.code if isinstance(error, (WorkerError, ChartRendererError)) \
@@ -316,7 +347,8 @@ def process_one(runtime_engine: Engine, operator_engine: Engine, *,
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m near_api.exports.worker",
-        description="Process queued Markdown ZIP export jobs (NI-058).")
+        description="Process queued export jobs (Markdown ZIP bundles, PDF "
+                    "reports; NI-058/NI-059).")
     parser.add_argument("--database-url", required=True,
                         help="near_app runtime credential (job-owner transactions)")
     parser.add_argument("--operator-database-url", required=True,
