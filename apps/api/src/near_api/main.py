@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from near_api import __version__
 from near_api.charts.routes import router as charts_router
 from near_api.charts.saved_routes import router as saved_charts_router
+from near_api.charts.snapshot_routes import router as snapshots_router
 from near_api.contracts import error_response, install_contracts
 from near_api.datasets.delivery import DeliveryError, delivery_error_shape
 from near_api.datasets.routes import router as datasets_router
@@ -66,6 +67,7 @@ app.include_router(me_router)
 app.include_router(metrics_router)
 app.include_router(charts_router)
 app.include_router(saved_charts_router)
+app.include_router(snapshots_router)
 app.include_router(datasets_router)
 app.include_router(models_router)
 

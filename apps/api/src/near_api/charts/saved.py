@@ -12,8 +12,9 @@ from uuid import UUID, uuid4
 from sqlalchemy import Connection, delete, insert, or_, select, update
 
 from near_api.charts.registry import CATEGORIES
+from near_api.charts.snapshots import owned_snapshot_reference
 from near_api.datasets import delivery
-from near_api.db.models import ChartDefinition, SavedChart
+from near_api.db.models import ChartDefinition, ResearchSnapshot, SavedChart
 from near_api.db.security import one_or_not_found, owner_scope, scoped_page
 from near_api.schemas.saved_charts import (
     SavedChartCreateRequest, SavedChartDetailResponse, SavedChartResponse,
@@ -35,11 +36,25 @@ def _response(row: Mapping[str, Any]) -> SavedChartResponse:
     return SavedChartResponse.model_validate({key: row[key] for key in SavedChartResponse.model_fields})
 
 
-def _mode(mode: str | None, snapshot_id: UUID | None) -> None:
-    # No private snapshot table/ownership contract exists in P0. Deny it at
-    # both service and DB boundaries; NI-044 may lift this with real FKs.
-    if mode != "live" or snapshot_id is not None:
-        raise delivery.DeliveryReferenceInvalid("Explicit snapshots are unavailable in P0")
+def _mode(connection: Connection, owner_id: UUID, mode: str | None,
+          snapshot_id: UUID | None) -> Mapping[str, Any] | None:
+    """Validate the mode/snapshot pairing against the owned snapshot registry.
+
+    ``live`` requires no snapshot reference; ``snapshot`` requires exactly one
+    owned research snapshot (NI-044). A missing or foreign snapshot reference
+    is a typed 422 REFERENCE_INVALID that never leaks existence — never a
+    silently accepted dangling id.
+    """
+    if mode == "live":
+        if snapshot_id is not None:
+            raise delivery.DeliveryReferenceInvalid(
+                "A live saved chart cannot reference a snapshot")
+        return None
+    snapshot = owned_snapshot_reference(connection, owner_id, snapshot_id)
+    if snapshot is None:
+        raise delivery.DeliveryReferenceInvalid(
+            "Snapshot mode requires an existing snapshot owned by the verified session")
+    return snapshot
 
 
 def _resolve(connection: Connection, definition_id: UUID,
@@ -60,13 +75,40 @@ def _resolve(connection: Connection, definition_id: UUID,
         start=selection.start, end=selection.end, dataset_version=dataset_id, filters=filters)
 
 
+def _pin_snapshot(connection: Connection, snapshot: Mapping[str, Any],
+                  definition_version_id: UUID, selection: SavedChartSelectionInput,
+                  dataset_version_id: UUID) -> ChartViewResponse:
+    """Validate that a snapshot-mode context renders exactly the frozen snapshot.
+
+    A snapshot context is the frozen evidence, not a re-selection: the chart
+    definition version, dataset version and selection must all match the
+    referenced snapshot.
+    """
+    if snapshot["chart_definition_version_id"] != definition_version_id:
+        raise delivery.DeliveryReferenceInvalid(
+            "The referenced snapshot pins a different chart definition version")
+    if dataset_version_id != snapshot["dataset_version_id"]:
+        raise delivery.DeliveryReferenceInvalid(
+            "dataset_version_id must match the referenced snapshot's frozen dataset")
+    if selection != SavedChartSelectionInput.model_validate(snapshot["selection"]):
+        raise delivery.DeliveryReferenceInvalid(
+            "selection must match the referenced snapshot's frozen selection")
+    return _resolve(connection, definition_version_id, selection, dataset_version_id)
+
+
 def create(connection: Connection, owner_id: UUID, body: SavedChartCreateRequest) -> SavedChartResponse:
-    _mode(body.mode, body.snapshot_id)
-    view = _resolve(connection, body.chart_definition_version_id, body.selection, body.dataset_version_id)
+    snapshot = _mode(connection, owner_id, body.mode, body.snapshot_id)
+    if snapshot is None:
+        view = _resolve(connection, body.chart_definition_version_id, body.selection,
+                        body.dataset_version_id)
+    else:
+        view = _pin_snapshot(connection, snapshot, body.chart_definition_version_id,
+                             body.selection, body.dataset_version_id)
     row = connection.execute(insert(SavedChart).values(
         id=uuid4(), owner_id=owner_id, chart_definition_version_id=body.chart_definition_version_id,
         label=body.label, mode=body.mode, selection=view.selection.model_dump(mode="json"),
         last_resolved_dataset_version_id=view.dataset.id,
+        snapshot_id=body.snapshot_id if snapshot is not None else None,
     ).returning(*SavedChart.__table__.columns)).mappings().one()
     return _response(row)
 
@@ -88,11 +130,32 @@ def list_saved(connection: Connection, owner_id: UUID, *, search: str | None = N
     return tuple(_response(row) for row in page.items), page.total
 
 
+def _snapshot_dataset_version(connection: Connection, owner_id: UUID,
+                              snapshot_id: UUID | None) -> UUID:
+    """The frozen dataset version behind a snapshot-mode context.
+
+    The same-owner FK guarantees existence and ownership; a missing row here
+    is an integrity failure that fails closed as the generic 404 (NI-019
+    ResourceNotFound semantics) rather than silently resolving latest.
+    """
+    row = connection.execute(select(ResearchSnapshot.dataset_version_id).where(
+        ResearchSnapshot.id == snapshot_id,
+        owner_scope(ResearchSnapshot.owner_id, owner_id))).first()
+    return one_or_not_found(row)[0]
+
+
 def detail(connection: Connection, owner_id: UUID, instance_id: UUID) -> SavedChartDetailResponse:
     row = _owned(connection, owner_id, instance_id, lock=True)
     saved = _response(row)
-    view = _resolve(connection, saved.chart_definition_version_id, saved.selection, None)
-    changed = saved.last_resolved_dataset_version_id != view.dataset.id
+    if saved.mode == "snapshot" and saved.snapshot_id is not None:
+        # Frozen read: the pinned dataset version, never latest.
+        dataset_version_id = _snapshot_dataset_version(connection, owner_id, saved.snapshot_id)
+        view = _resolve(connection, saved.chart_definition_version_id, saved.selection,
+                        dataset_version_id)
+        changed = False
+    else:
+        view = _resolve(connection, saved.chart_definition_version_id, saved.selection, None)
+        changed = saved.last_resolved_dataset_version_id != view.dataset.id
     connection.execute(update(SavedChart).where(
         SavedChart.id == instance_id, owner_scope(SavedChart.owner_id, owner_id))
         .values(last_resolved_dataset_version_id=view.dataset.id))
@@ -106,14 +169,29 @@ def edit(connection: Connection, owner_id: UUID, instance_id: UUID, body: SavedC
     if any(changes.get(key, "absent") is None for key in ("selection", "mode", "dataset_version_id")):
         raise delivery.DeliveryReferenceInvalid("Context fields cannot be null")
     mode = body.mode if "mode" in changes else row["mode"]
-    _mode(mode, body.snapshot_id if "snapshot_id" in changes else row["snapshot_id"])
+    snapshot_id = body.snapshot_id if "snapshot_id" in changes else row["snapshot_id"]
+    snapshot = _mode(connection, owner_id, mode, snapshot_id)
     values = {key: changes[key] for key in ("label", "mode") if key in changes}
-    if any(key in changes for key in ("selection", "dataset_version_id")):
+    if snapshot is not None:
+        # A snapshot context renders exactly the frozen snapshot: its pinned
+        # dataset version and selection, whatever the request drafts say.
+        selection = body.selection or SavedChartSelectionInput.model_validate(row["selection"])
+        dataset_version_id = body.dataset_version_id or row["last_resolved_dataset_version_id"]
+        view = _pin_snapshot(connection, snapshot, row["chart_definition_version_id"],
+                             selection, dataset_version_id)
+        values.update(selection=view.selection.model_dump(mode="json"),
+                      last_resolved_dataset_version_id=view.dataset.id,
+                      snapshot_id=snapshot["id"])
+    elif any(key in changes for key in ("selection", "dataset_version_id")):
         selection = body.selection or SavedChartSelectionInput.model_validate(row["selection"])
         view = _resolve(connection, row["chart_definition_version_id"], selection,
                         body.dataset_version_id or row["last_resolved_dataset_version_id"])
         values.update(selection=view.selection.model_dump(mode="json"),
                       last_resolved_dataset_version_id=view.dataset.id)
+    if mode == "live" and "snapshot_id" in changes:
+        # An explicit un-pin must clear the column so the row satisfies the
+        # pairing CHECK; _mode already refused a live reference.
+        values["snapshot_id"] = None
     if not values:
         return _response(row)
     updated = connection.execute(update(SavedChart).where(
