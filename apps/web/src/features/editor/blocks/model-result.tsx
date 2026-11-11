@@ -123,6 +123,14 @@ function RunSummary({ run }: { run: ModelRunDetail }) {
             <li key={label}>{label}</li>
           ))}
         </ul>
+        <p className="mt-2 font-ui text-ui leading-ui font-medium text-text">
+          Recorded limitation notes (verbatim):
+        </p>
+        <ul className="mt-1 list-disc pl-5 text-metadata leading-metadata text-text">
+          {run.limitations.spec_limitation_notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
         {run.limitations.gate_limit_codes.length > 0 ? (
           <p className="mt-2 text-metadata leading-metadata text-text-secondary">
             Gate limit codes: {run.limitations.gate_limit_codes.join(", ")}
@@ -220,6 +228,7 @@ function ModelResultBlockView({ node, editor, getPos, updateAttributes }: NodeVi
   return (
     <NodeViewWrapper
       data-model-result-block-view
+      role="group"
       className={cardWrapperClass}
       aria-label="Model result block"
     >
@@ -227,9 +236,10 @@ function ModelResultBlockView({ node, editor, getPos, updateAttributes }: NodeVi
         contentEditable={false}
         className="not-prose min-w-0"
         onKeyDown={(event) => {
+          // Escape (also from the interpretation island) returns the node
+          // selection to the card; dialogs keep their own handling.
           if (event.key === "Escape" && !event.defaultPrevented
-            && !(event.target as HTMLElement).closest('[role="dialog"]')
-            && !(event.target as HTMLElement).closest("textarea, input")) {
+            && !(event.target as HTMLElement).closest('[role="dialog"]')) {
             event.preventDefault();
             event.stopPropagation();
             const pos = getPos();

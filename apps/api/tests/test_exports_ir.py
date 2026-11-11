@@ -55,7 +55,7 @@ from near_api.exports.ir import (
     export_cell,
     export_ir_canonical_bytes,
 )
-from near_api.exports.markdown import render_markdown
+from near_api.exports.markdown import escape_text, render_markdown
 from near_api.schemas.export import ExportDataTableBlock, ExportInsightBlock
 import test_chart_blocks as chart_fixtures
 import test_delivery_apis as data_fixture
@@ -185,6 +185,7 @@ class ExportIrDatabaseTests(unittest.TestCase):
             for key in MANIFEST_KEYS}
         cls.run_id = derive_run_id(hashes)
         publish_run(os.environ["NI_TEST_OPERATOR_URL"], bundle, cls.run_id)
+        cls.fit_manifest = bundle["manifests"]["fit_manifest"]
 
     @classmethod
     def insert_public_citation(cls):
@@ -703,14 +704,22 @@ class ExportIrDatabaseTests(unittest.TestCase):
         # as the public run detail), never a value from the document JSON.
         summary = model.summary
         self.assertEqual(str(summary.run_id), str(self.run_id))
-        self.assertEqual(summary.model_id, "gross_fee_activity_v1")
-        self.assertEqual(summary.model_version, 1)
-        self.assertEqual(summary.gate_verdict, "READY_WITH_LIMITS")
-        self.assertEqual(summary.sample_start, "2025-01-01")
-        self.assertEqual(summary.nobs, 60)
-        self.assertEqual(summary.coefficient_rtol, "0.00000001")
+        self.assertEqual(summary.model_id, self.fit_manifest["model"]["model_id"])
+        self.assertEqual(summary.model_version, int(self.fit_manifest["model"]["model_version"]))
+        self.assertEqual(summary.gate_verdict, self.fit_manifest["admission"]["verdict"])
+        self.assertEqual(summary.sample_start, self.fit_manifest["sample"]["window"]["start"])
+        self.assertEqual(summary.sample_end_exclusive,
+                         self.fit_manifest["sample"]["window"]["end_exclusive"])
+        self.assertEqual(summary.nobs, int(self.fit_manifest["sample"]["nobs"]))
+        self.assertEqual(summary.coefficient_rtol,
+                         self.fit_manifest["reproduction"]["coefficient_rtol"])
+        self.assertEqual(summary.coefficient_atol,
+                         self.fit_manifest["reproduction"]["coefficient_atol"])
+        self.assertEqual([entry.name for entry in summary.coefficients],
+                         [entry["name"] for entry in self.fit_manifest["coefficients"]])
+        self.assertEqual([entry.estimate for entry in summary.coefficients],
+                         [entry["estimate"] for entry in self.fit_manifest["coefficients"]])
         self.assertEqual(summary.manifest_url, f"/api/model-runs/{self.run_id}/manifest")
-        self.assertTrue(summary.coefficients)
         self.assertIn("stationarity", summary.diagnostics)
         # The run reference joins the aggregated plan registry.
         self.assertEqual([run.run_id for run in plan.model_runs], [self.run_id])
@@ -727,10 +736,14 @@ class ExportIrDatabaseTests(unittest.TestCase):
         created, saved = self.create_model_document(dataset_id)
         plan = build_export_ir(self.engine, self.alice, created.document.id,
                                saved.version.id)
-        # A newer dataset publication and a moved document (new revision)
-        # leave the already-built plan byte-identical.
+        frozen_bytes = export_ir_canonical_bytes(plan)
+        self.assertEqual(plan.blocks[0].interpretation[0].content[0].text,
+                         "Authored interpretation of the recorded run.")
+        # A newer dataset publication and a moved document (new revision,
+        # edited interpretation) never change the already-built plan and the
+        # superseded revision is refused a fresh rebuild — no silent refresh.
         self.insert_dataset_row(self.dataset_key("model-frozen-newer"))
-        saved = service.save_revision(
+        moved = service.save_revision(
             self.engine, self.alice, created.document.id,
             expected_revision=2,
             document_payload={"schema_version": 1, "type": "doc", "content": [
@@ -740,10 +753,19 @@ class ExportIrDatabaseTests(unittest.TestCase):
                     interpretation=[{"type": "paragraph", "content": [
                         {"type": "text", "text": "Edited interpretation."}]}])],
             })
-        self.assertEqual(saved.document.revision, 3)
-        self.assertEqual(export_ir_canonical_bytes(plan), export_ir_canonical_bytes(
+        self.assertEqual(moved.document.revision, 3)
+        with self.assertRaises(ExportIrError) as caught:
             build_export_ir(self.engine, self.alice, created.document.id,
-                            saved.version.id)))
+                            saved.version.id)
+        self.assertEqual(caught.exception.details,
+                         (("version_id", "revision_not_acknowledged"),))
+        self.assertEqual(frozen_bytes, export_ir_canonical_bytes(plan))
+        # The new acknowledged revision exports its own fresh plan.
+        fresh = build_export_ir(self.engine, self.alice, created.document.id,
+                                moved.version.id)
+        self.assertEqual(fresh.blocks[0].interpretation[0].content[0].text,
+                         "Edited interpretation.")
+        self.assertNotEqual(frozen_bytes, export_ir_canonical_bytes(fresh))
 
     def test_15_unpublished_run_and_unapproved_dataset_fail_closed(self):
         dataset_id = self.insert_dataset_row(self.dataset_key("model-fail"))
@@ -778,17 +800,21 @@ class ExportIrDatabaseTests(unittest.TestCase):
         plan = build_export_ir(self.engine, self.alice, created.document.id,
                                saved.version.id)
         rendered = render_markdown(plan, {})
+        spec = escape_text("gross_fee_activity_v1")
+        verdict = escape_text(plan.blocks[0].summary.gate_verdict)
+        coefficient = plan.blocks[0].summary.coefficients[0]
         self.assertIn("Model result", rendered)
         self.assertIn(f"`{self.run_id}`", rendered)
-        self.assertIn("specification `gross_fee_activity_v1` version 1", rendered)
-        self.assertIn("Gate verdict: READY_WITH_LIMITS", rendered)
+        self.assertIn(f"specification `{spec}` version 1", rendered)
+        self.assertIn(f"Gate verdict: {verdict}", rendered)
         self.assertIn("| Term | Estimate | Std. error | t | p | 95% CI |", rendered)
+        self.assertIn(f"| {escape_text(coefficient.name)} | {coefficient.estimate} | "
+                      f"{coefficient.std_error} |", rendered)
         self.assertIn("](/api/model-runs/", rendered)
         self.assertIn(f"/api/model-runs/{self.run_id}/manifest", rendered)
         self.assertIn("Authored interpretation of the recorded run.", rendered)
         self.assertIn("## Model runs", rendered)
-        self.assertIn(f"`{self.run_id}` — specification `gross_fee_activity_v1` "
-                      "version 1", rendered)
+        self.assertIn(f"`{self.run_id}` — specification `{spec}` version 1", rendered)
         # Rendering twice is byte-identical (no clock, no registry lookup).
         self.assertEqual(rendered, render_markdown(plan, {}))
 

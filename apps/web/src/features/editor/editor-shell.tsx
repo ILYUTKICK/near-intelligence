@@ -726,7 +726,9 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const displayedUpdatedAt = savedAt ?? updatedAt;
 
   return (
-    <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasEvidenceActions || annotationIntent?.kind === "hypothesis"}
+    // The identity guard powers every owner mutation surface; the NI-055
+    // Add Model dialog needs it too, even on an evidence-free document.
+    <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasEvidenceActions || modelDialogOpen || annotationIntent?.kind === "hypothesis"}
       saved={controller.status.kind === "clean"} revision={controller.revision} onObserve={recordObservation}
       onInsightAction={controller.draft ? undefined : openInsight} onHypothesisAction={controller.draft ? undefined : openHypothesis}
       onEvidenceAction={controller.draft ? undefined : openEvidence}>

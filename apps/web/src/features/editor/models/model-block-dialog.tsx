@@ -99,6 +99,7 @@ export function EditorModelBlockDialog({ documentId, revision, onClose, onInsert
         dataset_version_id: current.datasetVersionId,
         interpretation: interpretationLines(current.interpretation),
       }, current.key, signal);
+
       signal.throwIfAborted();
       const document = await getDocument(documentId, signal);
       signal.throwIfAborted();
