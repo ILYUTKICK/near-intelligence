@@ -368,7 +368,7 @@ class ModelBlockDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture,
         self.model_block(edited)["attrs"]["interpretation"] = [
             interpretation_paragraph("Edited prose; same pinned run.")]
         prose_edit = self.save_document(detail.document.id, edited, revision=2)
-        self.assertEqual(prose_edit.status_code, 200, prose_edit.text)
+        self.assertEqual(prose_edit.status_code, 201, prose_edit.text)
         after_prose = self.stored_document(self.alice, detail.document.id)
         self.assertEqual(after_prose["revision"], 3)
         self.assertEqual(after_prose["resolved_contexts"][block_id], context_v1)
@@ -382,7 +382,7 @@ class ModelBlockDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture,
         self.model_block(second_edit)["attrs"]["interpretation"] = [
             interpretation_paragraph("Edited prose again; still the same pin.")]
         untouched = self.save_document(detail.document.id, second_edit, revision=3)
-        self.assertEqual(untouched.status_code, 200, untouched.text)
+        self.assertEqual(untouched.status_code, 201, untouched.text)
         after_publication = self.stored_document(self.alice, detail.document.id)
         self.assertEqual(after_publication["resolved_contexts"][block_id], context_v1)
 
@@ -391,7 +391,7 @@ class ModelBlockDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture,
         repointed = copy.deepcopy(after_publication["content"])
         self.model_block(repointed)["attrs"]["dataset_version_id"] = str(dataset_v2)
         pointer_edit = self.save_document(detail.document.id, repointed, revision=4)
-        self.assertEqual(pointer_edit.status_code, 200, pointer_edit.text)
+        self.assertEqual(pointer_edit.status_code, 201, pointer_edit.text)
         after_pointer = self.stored_document(self.alice, detail.document.id)
         context_v2 = after_pointer["resolved_contexts"][block_id]
         self.assertNotEqual(context_v2, context_v1)
@@ -438,4 +438,6 @@ class ModelBlockDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture,
             revision=3)
         self.assertEqual(dangling.status_code, 422)
         self.assertEqual(self.table_counts(detail.document.id),
-                         {"document_versions": 3, "document_blocks": 2})
+                         # Projections are per immutable revision: rev1 empty,
+                         # rev2 the anchor paragraph, rev3 the two blocks.
+                         {"document_versions": 3, "document_blocks": 3})
