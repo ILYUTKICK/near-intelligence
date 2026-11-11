@@ -11,21 +11,29 @@ from pydantic import ValidationError
 from sqlalchemy import Connection, func, select
 
 from near_api.datasets import delivery
+from near_api.datasets.canonical import dump_canonical, sha256_hex
 from near_api.datasets.delivery import (
     DeliveryInvalidFilter,
     _context_hash,
     validate_filters_against_schema,
 )
-from near_api.db.models import ChartDefinition, ChartMetric, DatasetVersion, MetricObservation
+from near_api.db.models import (
+    ChartDefinition,
+    ChartMetric,
+    DatasetVersion,
+    MetricObservation,
+    ModelRun,
+)
 from near_api.db.security import ResourceNotFound
 from near_api.documents.schema import (
     MAX_CONTEXTS,
     CanonicalDocument,
     DocumentSchemaError,
+    ModelResultNode,
     ReferenceInvalid,
     parse_document,
 )
-from near_api.insights.schemas import ResolvedContext
+from near_api.insights.schemas import ModelContext, ResolvedContext
 from near_api.repositories.documents import DocumentVersionRow
 from near_api.schemas.chart_selection import ChartSelection
 from near_api.schemas.delivery import ChartViewResponse, ResolvedSelection
@@ -184,6 +192,88 @@ def require_approved_dataset(connection: Connection, dataset_version_id: UUID,
             [(path, "dangling_dataset_reference")])
 
 
+@dataclass(frozen=True)
+class PublishedRunRow:
+    """The immutable published-run facts document pins may reference (NI-055)."""
+
+    run_id: UUID
+    spec_id: str
+    spec_version: int
+
+    @property
+    def specification_version(self) -> str:
+        """The frozen ModelContext spelling of the run's specification identity."""
+        return f"{self.spec_id}@{self.spec_version}"
+
+
+def load_published_run(connection: Connection, run_id: UUID, *,
+                       error_path: str) -> PublishedRunRow:
+    """Load one published immutable model run; reject anything else.
+
+    An absent, malformed or non-published identity is the same typed dangling
+    reference (422 REFERENCE_INVALID): a ``modelResult`` block can only pin a
+    row written by the operator publication gate, and no latest/substitute
+    run is ever resolved in its place.
+    """
+    row = connection.execute(
+        select(ModelRun.run_id, ModelRun.spec_id, ModelRun.spec_version)
+        .where(ModelRun.run_id == run_id, ModelRun.status == "published")
+    ).first()
+    if row is None:
+        raise ReferenceInvalid(
+            "Referenced model run does not exist or is not a published "
+            "immutable artifact",
+            [(error_path, "dangling_model_run_reference")])
+    return PublishedRunRow(run_id=row.run_id, spec_id=row.spec_id,
+                           spec_version=int(row.spec_version))
+
+
+def model_context_hash(model_run_id: UUID, dataset_version_id: UUID,
+                       specification_version: str) -> str:
+    """The canonical ModelContext hash (same dump/sha256 algorithm as ChartView)."""
+    return sha256_hex(dump_canonical({
+        "model_run_id": str(model_run_id),
+        "dataset_version_id": str(dataset_version_id),
+        "specification_version": specification_version,
+    }))
+
+
+def build_model_context(run: PublishedRunRow, dataset_version_id: UUID) -> ModelContext:
+    """Freeze the NI-055 model context: run identity + dataset pin + hash."""
+    return ModelContext(
+        model_run_id=run.run_id,
+        dataset_version_id=dataset_version_id,
+        specification_version=run.specification_version,
+        context_hash=model_context_hash(run.run_id, dataset_version_id,
+                                        run.specification_version),
+    )
+
+
+def verify_model_result_pins(connection: Connection, node: ModelResultNode, *,
+                             error_path: str) -> ModelContext:
+    """Verify one modelResult block's pins and return its frozen context.
+
+    The run must be a published immutable row and the dataset pin an approved
+    public version (never substituted with latest). The context records the
+    exact ids the author pinned; coefficients never travel through here —
+    they stay on the immutable run row.
+    """
+    run = load_published_run(connection, node.model_run_id,
+                             error_path=f"{error_path}.model_run_id")
+    require_approved_dataset(connection, node.dataset_version_id,
+                             f"{error_path}.dataset_version_id")
+    return build_model_context(run, node.dataset_version_id)
+
+
+def same_model_pins(observed: ModelContext, expected: ModelContext) -> bool:
+    return (
+        observed.model_run_id == expected.model_run_id
+        and observed.dataset_version_id == expected.dataset_version_id
+        and observed.specification_version == expected.specification_version
+        and observed.context_hash == expected.context_hash
+    )
+
+
 def same_chart_pins(observed: ResolvedContext, expected: ResolvedContext) -> bool:
     # resolved_at records a server decision. Ordering metric IDs does not
     # change the selection or canonical context hash.
@@ -221,25 +311,33 @@ def verify_chart_context(connection: Connection, observed: ResolvedContext,
 def resolve_revision_contexts(connection: Connection, canonical: CanonicalDocument,
                               previous: DocumentVersionRow, *,
                               observed_contexts: Sequence[ResolvedContext | dict] = ()) -> dict:
-    """Validate inspected evidence and pin every chart in a new revision.
+    """Validate inspected evidence and pin every chart/model block in a revision.
 
     Claims match a chart by its exact pinned evidence, so multiple blocks
     with the same evidence can share a claim. A legacy save may submit no
     claims and still identifies the inspected versions through canonical attrs.
+
+    NI-055: every ``modelResult`` block is verified against the published-run
+    catalog and the approved-dataset pin, and its frozen ``ModelContext`` is
+    keyed by block_id in the same map. An unchanged block (same run id,
+    dataset pin and interpretation-independent identity) carries its prior
+    context VERBATIM after re-verification — a newer dataset publication or a
+    newer published run never re-points or refits an already-inserted result.
     """
     if len(observed_contexts) > MAX_CONTEXTS:
         raise DocumentSchemaError(
             "Too many observed chart contexts", [("observed_contexts", "too_many_entries")])
     previous_contexts = previous.resolved_contexts or {}
     previous_charts = {}
-    if previous_contexts and canonical.live_charts:
+    previous_models = {}
+    if previous_contexts and (canonical.live_charts or canonical.model_results):
         if not isinstance(previous_contexts, dict):
             raise ReferenceInvalid(
                 "The stored chart contexts are malformed",
                 [("content", "invalid_chart_context")])
-        previous_charts = {
-            chart.block_id: chart for chart in parse_document(previous.content).live_charts
-        }
+        prior_document = parse_document(previous.content)
+        previous_charts = {chart.block_id: chart for chart in prior_document.live_charts}
+        previous_models = {model.block_id: model for model in prior_document.model_results}
     contexts = {}
     expected_by_hash: dict[str, ResolvedContext] = {}
     definitions: dict[UUID, ChartDefinitionRow] = {}
@@ -296,6 +394,49 @@ def resolve_revision_contexts(connection: Connection, canonical: CanonicalDocume
                 "The observed context does not match a chart's immutable definition, "
                 "dataset, selection and version pins in this revision",
                 [(path, "observed_context_mismatch")])
+
+    published_runs: dict[UUID, PublishedRunRow] = {}
+    approved_model_datasets: set[UUID] = set()
+    for model in canonical.model_results:
+        block_id = str(model.block_id)
+        prior = previous_models.get(model.block_id)
+        if (prior is not None and prior.model_run_id == model.model_run_id
+                and prior.dataset_version_id == model.dataset_version_id
+                and block_id in previous_contexts):
+            # Unchanged pin: the stored context stays verbatim after the same
+            # published-run/approved-dataset re-verification every save runs.
+            run = published_runs.get(model.model_run_id)
+            if run is None:
+                run = load_published_run(
+                    connection, model.model_run_id,
+                    error_path=f"modelResult.{block_id}.model_run_id")
+                published_runs[model.model_run_id] = run
+            if model.dataset_version_id not in approved_model_datasets:
+                require_approved_dataset(
+                    connection, model.dataset_version_id,
+                    f"modelResult.{block_id}.dataset_version_id")
+                approved_model_datasets.add(model.dataset_version_id)
+            expected_model = build_model_context(run, model.dataset_version_id)
+            try:
+                stored = ModelContext.model_validate(previous_contexts[block_id])
+            except ValidationError:
+                raise ReferenceInvalid(
+                    "The stored model context is malformed",
+                    [("content", "invalid_model_context")]) from None
+            if not same_model_pins(stored, expected_model):
+                raise ReferenceInvalid(
+                    "The stored model context disagrees with its immutable run "
+                    "and dataset pins",
+                    [("content", "model_context_mismatch")])
+            contexts[block_id] = previous_contexts[block_id]
+        else:
+            # New or re-pointed block: verify the exact pins and freeze the
+            # context. Existing results keep their prior context untouched —
+            # a changed data pointer is a NEW frozen context, never a refit
+            # of the old result.
+            expected_model = verify_model_result_pins(
+                connection, model, error_path=f"modelResult.{block_id}")
+            contexts[block_id] = expected_model.model_dump(mode="json")
     return contexts
 
 
