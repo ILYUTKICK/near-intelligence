@@ -34,6 +34,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from near_api.db.session import user_transaction
 from near_api.documents.context_resolver import model_context_hash
@@ -163,6 +164,17 @@ class ModelBlockDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture,
             for key in MANIFEST_KEYS}
         cls.run_id = derive_run_id(hashes)
         publish_run(os.environ["NI_TEST_OPERATOR_URL"], bundle, cls.run_id)
+
+    def save_document(self, document_id, content, *, revision, subject_id=None,
+                      observed_contexts=None):
+        subject = subject_id or self.alice_id
+        with self.as_session(subject):
+            return self.client.post(
+                f"/api/documents/{document_id}/versions",
+                json={"schema_version": 1, "content": content,
+                      "observed_contexts": observed_contexts or []},
+                headers={"Authorization": f"Bearer t.{subject}",
+                         "If-Match": f'"{revision}"'})
 
     def add_model(self, document_id, payload, *, revision: int = 1,
                   subject_id=None, key=None):
@@ -409,7 +421,7 @@ class ModelBlockDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture,
                 f"/api/documents/{detail.document.id}/versions",
                 json={"schema_version": 1, "content": anchored, "observed_contexts": []},
                 headers={"Authorization": "Bearer t.alice", "If-Match": '"1"'})
-        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(saved.status_code, 201, saved.text)
         dataset_id = self.insert_dataset_version(self.dataset_key("model-position"))
         payload = insert_model_payload(self.run_id, dataset_version_id=str(dataset_id),
                                        after_block_id=anchor["attrs"]["block_id"])
