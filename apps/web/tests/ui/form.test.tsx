@@ -1,4 +1,5 @@
 import { axe } from "jest-axe";
+import Link from "next/link";
 import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -43,6 +44,36 @@ describe("Button pending state", () => {
       // component tests judge the component itself.
       rules: { region: { enabled: false } },
     })).toHaveNoViolations();
+  });
+});
+
+describe("Button asChild (slotted link)", () => {
+  // NI-024 regression: the slot path rendered `{pending ? spinner : null}`
+  // next to the child, so Radix Slot received multiple children and crashed
+  // with React's Children.only error. A real slotted next/link must render.
+  it("renders exactly one slotted element with the button styling", () => {
+    render(
+      <Button asChild variant="primary">
+        <Link href="/workspace/research/abc">Continue research</Link>
+      </Button>,
+    );
+    const link = screen.getByRole("link", { name: "Continue research" });
+    expect(link).toHaveAttribute("href", "/workspace/research/abc");
+    expect(link).toHaveAttribute("data-variant", "primary");
+    expect(link).toHaveClass("h-11"); // 44px token-based height carries over
+  });
+
+  it("stays renderable while pending and announces the state on the anchor", () => {
+    render(
+      <Button asChild pending variant="primary">
+        <Link href="/workspace/research/abc">Continue research</Link>
+      </Button>,
+    );
+    const link = screen.getByRole("link", { name: "Continue research" });
+    // No spinner sibling may be injected into the slot; the pending state is
+    // announced through aria-busy on the slotted anchor itself.
+    expect(link).toHaveAttribute("aria-busy", "true");
+    expect(link.querySelector("span[aria-hidden]")).toBeNull();
   });
 });
 

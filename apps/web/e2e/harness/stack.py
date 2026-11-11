@@ -14,6 +14,12 @@ apps/api/tests/test_saved_charts_http.py:
 - visibly synthetic datasets staged through the real NI-028 pipeline
   (stage -> validate -> approve -> publish) and the registered chart catalog.
 
+NI-064 additions (same harness, same rules): a second 366-day synthetic
+dataset and one 200-block document with 20 liveChart references owned by the
+synthetic alice, created through the real principal bootstrap and the real
+document service, so the desktop performance spec measures the PRD budgets
+(200 blocks / 20 chart refs / 366 daily points) on persisted real-stack data.
+
 Harness-only extras, clearly prefixed `/_ni063_` and never part of the product:
 
 - `GET /_ni063/session/{name}?next=...` — the synthetic-session handoff used by
@@ -78,9 +84,12 @@ from alembic.config import Config  # noqa: E402
 
 from near_api.auth import principal  # noqa: E402
 from near_api.auth.jwks import JWKSCache  # noqa: E402
-from near_api.auth.verification import TokenVerifier  # noqa: E402
+from near_api.auth.principal import bootstrap_principal  # noqa: E402
+from near_api.auth.verification import TokenVerifier, VerifiedToken  # noqa: E402
+from near_api.charts.registry import chart_by_chart_id  # noqa: E402
 from near_api.datasets import delivery  # noqa: E402
 from near_api.datasets.service import publish, stage  # noqa: E402
+from near_api.documents import service as document_service  # noqa: E402
 from near_api.main import app  # noqa: E402
 from near_api.metrics.registry import definition_by_metric_id  # noqa: E402
 
@@ -91,6 +100,15 @@ WINDOW_START = dt.date(2026, 1, 1)
 WINDOW_DAYS = 14
 DATASET_DAYS = WINDOW_DAYS  # coverage end is the last day with an observation
 EXACT_PIN_VALUE = "12.123456789012345678901234"
+
+# NI-064 performance fixture (all visibly synthetic, never published research):
+# a 366-day dataset so the PRD budget measurement resolves 366 daily points,
+# and one 200-block document with 20 liveChart references so the PRD document
+# budget (200 blocks / 20 mounted chart references) is measured on real data.
+PERF_WINDOW_START = dt.date(2026, 1, 1)
+PERF_DATASET_DAYS = 366
+PERF_CHART_REFS = 20
+PERF_BLOCKS = 200
 
 
 def log(message: str) -> None:
@@ -128,6 +146,79 @@ def synthetic_observations() -> tuple[list[dict], dict[str, str]]:
     return observations, dict(zip(
         [(WINDOW_START + dt.timedelta(days=index)).isoformat() for index in range(DATASET_DAYS)],
         values))
+
+
+def perf_observations() -> tuple[list[dict], str]:
+    """366 distinct daily rows so a max-range view resolves 366 real points."""
+    volume = definition_by_metric_id("provider_intents_volume_usd").id
+    observations = []
+    for index in range(PERF_DATASET_DAYS):
+        day = PERF_WINDOW_START + dt.timedelta(days=index)
+        observations.append({
+            "metric_definition_id": str(volume),
+            "period_start": dt.datetime.combine(day, dt.time.min,
+                                                tzinfo=dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "period_end": (dt.datetime.combine(day, dt.time.min, tzinfo=dt.timezone.utc)
+                           + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "dimensions": {"source": "SRC-LLAMA"},
+            "value": f"{100 + (index % 50)}.{(index * 7) % 100:02d}",
+            "quality_status": "verified",
+            "bound_kind": "exact",
+            "source_record_ref": None,
+            "quality": {},
+        })
+    return observations, (PERF_WINDOW_START + dt.timedelta(days=PERF_DATASET_DAYS - 1)).isoformat()
+
+
+def perf_day_values() -> dict[str, str]:
+    """The perf dataset's day -> stored decimal-string map (for assertions)."""
+    return {
+        (PERF_WINDOW_START + dt.timedelta(days=index)).isoformat():
+            f"{100 + (index % 50)}.{(index * 7) % 100:02d}"
+        for index in range(PERF_DATASET_DAYS)
+    }
+
+
+def perf_document_content(chart_definition_id: UUID, dataset_id: UUID) -> dict:
+    """200 top-level blocks: 180 prose blocks + 20 liveChart references.
+
+    Every chart block pins the same approved synthetic dataset and a 7-day
+    selection inside its coverage, exactly the canonical attrs the NI-041
+    insertion produces; the save resolves and freezes all 20 contexts the
+    same way any owner save does. Text is explicitly labeled synthetic.
+    Section and paragraph numbering use SEPARATE counters so the specs can
+    address stable markers ("section 1", "paragraph 1"..."paragraph 160").
+    """
+    selection = {"start": "2026-01-01", "end": "2026-01-08",
+                 "frequency": "day", "filters": {}}
+    content: list[dict] = []
+    section_index = 0
+    paragraph_index = 0
+    for block_index in range(PERF_BLOCKS):
+        if block_index % 10 == 5:
+            content.append({"type": "liveChart", "attrs": {
+                "block_id": str(uuid4()), "mode": "live", "selection": selection,
+                "chart_definition_version_id": str(chart_definition_id),
+                "observed_dataset_version_id": str(dataset_id),
+            }})
+        elif block_index % 10 == 0:
+            section_index += 1
+            content.append({
+                "type": "heading", "attrs": {"block_id": str(uuid4()), "level": 2},
+                "content": [{"type": "text",
+                             "text": f"NI-064 performance fixture section {section_index} (synthetic)"}]})
+        else:
+            paragraph_index += 1
+            content.append({
+                "type": "paragraph", "attrs": {"block_id": str(uuid4())},
+                "content": [{"type": "text",
+                             "text": f"NI-064 performance fixture paragraph {paragraph_index}: "
+                                     "synthetic desktop-QA body text used to measure editor "
+                                     "load, autosave and lazy chart mounting. It carries no "
+                                     "research claim. (synthetic)"}]})
+    assert len(content) == PERF_BLOCKS
+    assert paragraph_index == 160 and section_index == 20
+    return {"schema_version": 1, "type": "doc", "content": content}
 
 
 def main() -> int:
@@ -242,9 +333,43 @@ def main() -> int:
             chart_fixtures.register_test_chart_catalog(operator)
             log("migrations applied, synthetic chart catalog registered")
 
+            # ---- NI-064 performance dataset first: the NI-063 journey ---- #
+            # ---- dataset is published LAST and stays the "latest" one ---- #
+            perf_observations_list, perf_last_day = perf_observations()
+            volume_metric = definition_by_metric_id("provider_intents_volume_usd").id
+            perf_manifest = {
+                "schema_version": 1,
+                "dataset_key": f"ni064-perf.{uuid4().hex[:12]}",
+                "frequency": "daily",
+                "window": {"start": PERF_WINDOW_START.isoformat(),
+                           "end_exclusive": (PERF_WINDOW_START
+                                             + dt.timedelta(days=PERF_DATASET_DAYS)).isoformat()},
+                "pipeline_version": "ni064-perf",
+                "code_commit": None, "config_hash": None, "dependency_lock_hash": None,
+                "source_as_of": None, "retrieved_at": None,
+                "quality": {"notes": "synthetic NI-064 performance fixture — visibly "
+                                     "labeled, never published research"},
+                "member_metrics": [str(volume_metric)],
+                "inputs": [],
+                "observations": perf_observations_list,
+            }
+            fixture_dir = directory / "fixtures"
+            fixture_dir.mkdir()
+            perf_dir = fixture_dir / "perf"
+            perf_dir.mkdir()
+            perf_manifest_path = perf_dir / "dataset.json"
+            perf_manifest_path.write_text(json.dumps(perf_manifest, indent=2, sort_keys=True)
+                                          + "\n", encoding="utf-8")
+            storage_root = directory / "storage"
+            perf_result = stage(operator, perf_manifest_path, storage_root)
+            if perf_result.status != "validated":
+                raise RuntimeError(f"perf dataset did not validate: {perf_result.validation}")
+            publish(operator, perf_result.dataset_version_id)
+            log(f"NI-064 perf dataset published: version {perf_result.dataset_version_id} "
+                f"({PERF_DATASET_DAYS} daily rows)")
+
             # ---- synthetic approved dataset (real NI-028 pipeline) -------- #
             observations, day_values = synthetic_observations()
-            volume_metric = definition_by_metric_id("provider_intents_volume_usd").id
             manifest = {
                 "schema_version": 1,
                 "dataset_key": f"ni063-e2e.{uuid4().hex[:12]}",
@@ -259,18 +384,16 @@ def main() -> int:
                 "inputs": [],
                 "observations": observations,
             }
-            fixture_dir = directory / "fixtures"
-            fixture_dir.mkdir()
             manifest_path = fixture_dir / "dataset.json"
             manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n",
                                      encoding="utf-8")
-            storage_root = directory / "storage"
             result = stage(operator, manifest_path, storage_root)
             if result.status != "validated":
                 raise RuntimeError(f"synthetic dataset did not validate: {result.validation}")
             publish(operator, result.dataset_version_id)
             delivery.reset_delivery_caches()
-            log(f"synthetic dataset published: version {result.dataset_version_id}")
+            log(f"synthetic dataset published: version {result.dataset_version_id} "
+                "(latest approved for its metric)")
 
             # ---- synthetic ES256 verifier (production gateway pattern) ---- #
             secret = secrets.token_urlsafe(32)
@@ -309,6 +432,23 @@ def main() -> int:
             principal._get_engine = lambda: runtime  # noqa: SLF001
 
             users = {name: uuid4() for name in ("alice", "bob")}
+
+            # ---- NI-064 performance document (real service + identity) ---- #
+            perf_alice = bootstrap_principal(runtime, VerifiedToken(
+                subject=users["alice"], expires_at=dt.datetime.now(dt.UTC) + dt.timedelta(hours=2),
+                issued_at=dt.datetime.now(dt.UTC)))
+            perf_definition_id = chart_by_chart_id("intents-volume").id
+            perf_document = document_service.create_document(
+                runtime, perf_alice,
+                title="NI-064 performance fixture (synthetic 200 blocks / 20 charts)")
+            document_service.save_revision(
+                runtime, perf_alice, perf_document.document.id, expected_revision=1,
+                document_payload=perf_document_content(perf_definition_id,
+                                                       perf_result.dataset_version_id),
+                observed_contexts=[])
+            log(f"NI-064 perf fixture ready: dataset {perf_result.dataset_version_id}, "
+                f"document {perf_document.document.id} "
+                f"({PERF_BLOCKS} blocks / {PERF_CHART_REFS} chart refs)")
 
             def session_cookie(name: str, lifetime_seconds: int = 3600) -> str:
                 token = jwt.encode({"sub": str(users[name]), "iss": issuer,
@@ -462,6 +602,14 @@ def main() -> int:
                 "outage": f"{api_url}/_ni063/outage",
                 "inspect_document": f"{api_url}/_ni063/inspect/document",
                 "inspect_dataset": f"{api_url}/_ni063/inspect/dataset",
+                "perf_dataset_version_id": str(perf_result.dataset_version_id),
+                "perf_dataset_key": perf_manifest["dataset_key"],
+                "perf_day_values": perf_day_values(),
+                "perf_window": {"start": PERF_WINDOW_START.isoformat(),
+                                "end": perf_last_day,
+                                "end_exclusive": (PERF_WINDOW_START
+                                                  + dt.timedelta(days=PERF_DATASET_DAYS)).isoformat()},
+                "perf_document_id": str(perf_document.document.id),
                 "cluster_dir": str(directory),
             }, indent=2) + "\n", encoding="utf-8")
             log(f"handoff written to {args.handoff}")

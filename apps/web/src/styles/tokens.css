@@ -133,10 +133,20 @@ h3 {
   font-weight: 500;
 }
 
-a {
-  color: var(--color-accent);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
+/*
+ * Global anchor styling sits in the `base` cascade layer (Tailwind v4
+ * declares theme < base < components < utilities). Unlayered rules beat EVERY
+ * layer regardless of specificity, so an unlayered `a { color }` here used to
+ * override layered foreground utilities such as the primary button's
+ * `text-on-accent` (NI-024 regression; fixed in NI-064). In `base` the rule
+ * still styles every link by default and any utility wins over it.
+ */
+@layer base {
+  a {
+    color: var(--color-accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
 }
 
 /* Tabular lining numerals for metrics/tables. */
