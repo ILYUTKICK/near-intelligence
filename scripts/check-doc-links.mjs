@@ -53,7 +53,7 @@ for (const root of scanRoots) {
         continue; // pure in-page anchor
       }
       const resolved = path.resolve(path.dirname(file), decodeURIComponent(withoutAnchor));
-      const relativeTarget = path.relative(repoRoot, resolved);
+      const relativeTarget = path.relative(repoRoot, resolved).split(path.sep).join("/");
       // The raw research archive and local state are intentionally unshared
       // (README/COLLABORATION: "a fresh clone may lack linked evidence
       // artifacts") — links into them are documented gaps, not breakage.

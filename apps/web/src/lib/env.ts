@@ -1,9 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
-import nextEnv from "@next/env";
+import { loadEnvConfig } from "@next/env";
 import { z } from "zod";
-
-const { loadEnvConfig } = nextEnv;
 
 /**
  * Server-side environment contract for the web runtime (NI-002 skeleton).

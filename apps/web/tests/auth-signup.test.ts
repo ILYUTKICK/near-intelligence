@@ -52,7 +52,7 @@ async function signupRequest(options: {
   }
   let csrfToken = "";
   if (!options.withoutCsrf) {
-    const minted = await csrfGet();
+    const minted = await csrfGet(new NextRequest("http://localhost:3000/api/auth/csrf"));
     csrfToken = ((await minted.json()) as { token: string }).token;
     headers.set("cookie", `${CSRF_COOKIE}=${csrfToken}`);
     headers.set("x-csrf-token", csrfToken);
