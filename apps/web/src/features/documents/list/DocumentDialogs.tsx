@@ -13,8 +13,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import { createDocument, deleteDocument, DocumentApiError, renameDocument } from "./documents-api";
-import { DOCUMENT_TITLE_MAX_LENGTH, type DocumentResponse, type DocumentSummary } from "./documents-schema";
+import { createDocument, deleteDocument, DocumentApiError, renameDocument, updateOrganization } from "./documents-api";
+import {
+  DOCUMENT_ORGANIZATION_MAX_TAGS,
+  DOCUMENT_TAG_MAX_LENGTH,
+  DOCUMENT_TITLE_MAX_LENGTH,
+  type DocumentOrganizationResponse,
+  type DocumentResponse,
+  type DocumentSummary,
+} from "./documents-schema";
 
 /**
  * Create/rename/delete dialogs (NI-023). Pending blocks a second submit;
@@ -279,6 +286,92 @@ export function DeleteDocumentDialog({
             Delete permanently
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Split comma-separated tag text into raw tags for the API (NI-072). The
+ * server normalizes further (trim + lower + dedupe, documented bounds); the
+ * client only splits on commas and drops whitespace-only pieces, so what the
+ * user typed is what gets normalized — nothing is silently renamed locally.
+ */
+export function parseTagInput(text: string): string[] {
+  return text.split(",").map((piece) => piece.trim()).filter((piece) => piece.length > 0);
+}
+
+export function EditTagsDialog({
+  target,
+  onOpenChange,
+  onSaved,
+  onCloseAutoFocus,
+}: {
+  target: DocumentSummary;
+  onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
+  /** Called with the server's stored organization state after the 200. */
+  onSaved: (updated: DocumentOrganizationResponse) => void;
+}) {
+  const [tagsInput, setTagsInput] = useState(target.tags.join(", "));
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending) {
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      const updated = await updateOrganization({
+        documentId: target.id,
+        tags: parseTagInput(tagsInput),
+      });
+      onOpenChange(false);
+      onSaved(updated);
+    } catch (submitError) {
+      setError(describeMutationError(submitError, "The tags could not be saved. Your input is kept."));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogTitle>Edit tags</DialogTitle>
+        <DialogDescription>
+          Private labels for “{target.title}”. Separate tags with commas — up to{" "}
+          {DOCUMENT_ORGANIZATION_MAX_TAGS} tags of {DOCUMENT_TAG_MAX_LENGTH} characters each.
+          Tags never change the document’s revisions or its place in the list.
+        </DialogDescription>
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4" noValidate>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-document-tags">Tags</Label>
+            <Input
+              id="edit-document-tags"
+              value={tagsInput}
+              placeholder="fees, supply"
+              autoComplete="off"
+              onChange={(event) => setTagsInput(event.target.value)}
+            />
+          </div>
+          {error ? (
+            <p role="alert" className="text-ui leading-ui text-danger font-medium">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" pending={pending}>
+              Save tags
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

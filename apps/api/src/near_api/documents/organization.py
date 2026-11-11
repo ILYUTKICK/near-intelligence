@@ -29,6 +29,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import Connection, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from near_api.auth.principal import Principal
 from near_api.db.models import DocumentOrganization
@@ -126,7 +127,7 @@ def update_organization(connection: Connection, principal: Principal, document_i
     new_tags = normalize_tags(tags) if tags is not None else current.tags
     new_favorite = current.favorite if favorite is None else favorite
     row = connection.execute(
-        DocumentOrganization.__table__.insert()
+        pg_insert(DocumentOrganization)
         .values(document_id=document_id, owner_id=principal.id,
                 tags=list(new_tags), favorite=new_favorite)
         .on_conflict_do_update(

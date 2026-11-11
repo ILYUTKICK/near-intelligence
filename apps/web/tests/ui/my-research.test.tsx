@@ -31,6 +31,8 @@ function summaryFixture(overrides: {
   title: string;
   updated_at: string;
   revision?: number;
+  tags?: string[];
+  favorite?: boolean;
 }) {
   return {
     id: overrides.id,
@@ -41,6 +43,8 @@ function summaryFixture(overrides: {
     created_at: "2026-11-01T09:00:00Z",
     updated_at: overrides.updated_at,
     progress: { headings: 0, charts: 0, insights: 0 },
+    tags: overrides.tags ?? [],
+    favorite: overrides.favorite ?? false,
   };
 }
 
@@ -479,5 +483,216 @@ describe("My Research actions — create, rename, delete", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/could not be renamed/i);
     expect(within(dialog).getByLabelText("Title")).toHaveValue("Offline edit (fixture)");
+  });
+});
+
+describe("My Research organization — private tags and favorites (NI-072)", () => {
+  const TAGGED_DOC = summaryFixture({
+    id: DOC_RECENT_ID,
+    title: "Zeta fee attribution notes (fixture)",
+    updated_at: "2026-11-07T12:00:00Z",
+    revision: 3,
+    tags: ["fees", "defi"],
+  });
+
+  function organizationResponse(tags: string[], favorite: boolean): Response {
+    return jsonResponse({
+      document_id: DOC_RECENT_ID,
+      tags,
+      favorite,
+      updated_at: "2026-11-08T02:00:00Z",
+    });
+  }
+
+  it("applies the tag filter from a row chip and recovers by removing it", async () => {
+    const requests = mockApi([
+      (url, init) => {
+        if (!isGetDocuments(url, init)) {
+          return undefined;
+        }
+        const requestUrl = new URL(url, "http://localhost");
+        if (requestUrl.searchParams.get("tag") === "fees") {
+          return listPage([TAGGED_DOC], null);
+        }
+        return listPage([TAGGED_DOC, OLDER_DOC], null);
+      },
+    ]);
+
+    const user = userEvent.setup();
+    await renderList();
+
+    // The row carries its private tags as filter chips.
+    const list = screen.getByRole("list");
+    expect(within(list).getAllByRole("button", { name: "fees" })).toHaveLength(1);
+    await user.click(within(list).getByRole("button", { name: "fees" }));
+
+    // The filter is a server parameter composed with nothing else.
+    await waitFor(() => {
+      const filtered = new URL(requests[requests.length - 1].url, "http://localhost");
+      expect(filtered.searchParams.getAll("tag")).toEqual(["fees"]);
+      expect(filtered.searchParams.has("favorite")).toBe(false);
+    });
+    await screen.findByRole("button", { name: "Remove tag filter fees" });
+    expect(screen.getByRole("button", { name: "fees" })).toHaveAttribute("aria-pressed", "true");
+
+    // Removing the filter recovers the unfiltered list (empty/deleted tag
+    // filters are honest states, never errors).
+    await user.click(screen.getByRole("button", { name: "Remove tag filter fees" }));
+    await waitFor(() => {
+      const cleared = new URL(requests[requests.length - 1].url, "http://localhost");
+      expect(cleared.search).toBe("");
+    });
+    expect(within(screen.getByRole("list")).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("filters to favorites and shows the honest filtered empty state", async () => {
+    const requests = mockApi([
+      (url, init) => {
+        if (!isGetDocuments(url, init)) {
+          return undefined;
+        }
+        // Nothing in the synthetic workspace is favorited: the API returns
+        // an empty page for favorite=true.
+        const requestUrl = new URL(url, "http://localhost");
+        return requestUrl.searchParams.get("favorite") === "true"
+          ? listPage([], null)
+          : listPage([OLDER_DOC], null);
+      },
+    ]);
+
+    const user = userEvent.setup();
+    const { container } = await renderList();
+
+    const favoritesToggle = screen.getByRole("button", { name: "Favorites" });
+    expect(favoritesToggle).toHaveAttribute("aria-pressed", "false");
+    await user.click(favoritesToggle);
+
+    await screen.findByText(/No documents match your filters/i);
+    expect(screen.getByRole("button", { name: "Favorites" })).toHaveAttribute("aria-pressed", "true");
+    const filtered = new URL(requests[requests.length - 1].url, "http://localhost");
+    expect(filtered.searchParams.get("favorite")).toBe("true");
+    expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
+
+    // Clearing filters returns the plain list with no query at all (the
+    // toolbar and the empty state both offer the same recovery action).
+    await user.click(screen.getAllByRole("button", { name: "Clear filters" })[0]);
+    await screen.findByText("Alpha supply questions (fixture)");
+    const cleared = new URL(requests[requests.length - 1].url, "http://localhost");
+    expect(cleared.search).toBe("");
+  });
+
+  it("edits tags through the dialog and applies the server state to the row", async () => {
+    const requests = mockApi([
+      (url, init) => (isGetDocuments(url, init) ? listPage([TAGGED_DOC], null) : undefined),
+      (url, init) =>
+        url === `/api/documents/${DOC_RECENT_ID}/organization` && init.method === "PATCH"
+          ? organizationResponse(["fees", "supply"], false)
+          : undefined,
+    ]);
+
+    const user = userEvent.setup();
+    await renderList();
+
+    await user.click(screen.getByRole("button", { name: "Tags" }));
+    const dialog = await screen.findByRole("dialog", { name: /edit tags/i });
+    const input = within(dialog).getByLabelText("Tags");
+    expect(input).toHaveValue("fees, defi");
+    await user.clear(input);
+    await user.type(input, "  Fees , Supply ");
+    await user.click(within(dialog).getByRole("button", { name: "Save tags" }));
+
+    // The raw comma-separated input is sent; normalization is the API's.
+    const patch = requests.find((request) => request.init.method === "PATCH");
+    expect(patch).toBeDefined();
+    expect(new URL(patch?.url ?? "", "http://localhost").pathname)
+      .toBe(`/api/documents/${DOC_RECENT_ID}/organization`);
+    expect(JSON.parse(String(patch?.init.body))).toEqual({ tags: ["Fees", "Supply"] });
+    const headers = new Headers(patch?.init.headers);
+    // Metadata is not CAS-protected content: no If-Match is sent and no
+    // revision is created.
+    expect(headers.get("if-match")).toBeNull();
+
+    // The server's stored state is applied to the row — new chips appear.
+    await waitFor(() => {
+      expect(within(screen.getByRole("list")).getByRole("button", { name: "supply" }))
+        .toBeInTheDocument();
+    });
+    expect(within(screen.getByRole("list")).queryByRole("button", { name: "defi" })).toBeNull();
+  });
+
+  it("toggles the favorite flag optimistically and reverts with an error on failure", async () => {
+    let rejectPatch: ((reason: unknown) => void) | null = null;
+    const requests = mockApi([
+      (url, init) => (isGetDocuments(url, init) ? listPage([TAGGED_DOC], null) : undefined),
+      (url, init) => {
+        if (url === `/api/documents/${DOC_RECENT_ID}/organization` && init.method === "PATCH") {
+          return new Promise<Response>((_resolve, reject) => {
+            rejectPatch = reject;
+          }) as unknown as Response;
+        }
+        return undefined;
+      },
+    ]);
+
+    const user = userEvent.setup();
+    await renderList();
+
+    await user.click(screen.getByRole("button", { name: "Favorite" }));
+
+    // Optimistic: the row flips while the PATCH is still in flight, and the
+    // request carries exactly the metadata merge (no If-Match).
+    const pendingButton = await screen.findByRole("button", { name: "Favorited" });
+    expect(pendingButton).toHaveAttribute("aria-pressed", "true");
+    const patch = requests.find((request) => request.init.method === "PATCH");
+    expect(JSON.parse(String(patch?.init.body))).toEqual({ favorite: true });
+    expect(new Headers(patch?.init.headers).get("if-match")).toBeNull();
+
+    // The API refuses: the row reverts to the server's last known state and
+    // an honest error is shown — nothing is silently retried or kept fake.
+    rejectPatch?.(new TypeError("network down"));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/could not be changed/i);
+    const reverted = screen.getByRole("button", { name: "Favorite" });
+    expect(reverted).toHaveAttribute("aria-pressed", "false");
+
+    // A successful retry confirms the new state from the server's response.
+    mockApi([
+      (url, init) => (isGetDocuments(url, init) ? listPage([TAGGED_DOC], null) : undefined),
+      (url, init) =>
+        url === `/api/documents/${DOC_RECENT_ID}/organization` && init.method === "PATCH"
+          ? organizationResponse(TAGGED_DOC.tags, true)
+          : undefined,
+    ]);
+    await user.click(screen.getByRole("button", { name: "Favorite" }));
+    await screen.findByRole("button", { name: "Favorited" });
+    expect(screen.getByRole("button", { name: "Favorited" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("moves keyboard focus between documents with arrow keys over the API order", async () => {
+    mockApi([
+      (url, init) => (isGetDocuments(url, init) ? listPage([RECENT_DOC, OLDER_DOC], null) : undefined),
+    ]);
+
+    const user = userEvent.setup();
+    await renderList();
+
+    // Only the document titles are row links; Enter opens the focused one
+    // through the link's native semantics.
+    const links = within(screen.getByRole("list")).getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      `/workspace/research/${DOC_RECENT_ID}`,
+      `/workspace/research/${DOC_OLDER_ID}`,
+    ]);
+    links[0].focus();
+    await user.keyboard("{ArrowDown}");
+    expect(links[1]).toHaveFocus();
+    // ArrowDown on the last row stays put — no wraparound surprise.
+    await user.keyboard("{ArrowDown}");
+    expect(links[1]).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
+    expect(links[0]).toHaveFocus();
+    // Enter on the focused link is the browser's open action (native link);
+    // the row's other controls stay in the plain tab order.
+    expect(screen.getAllByRole("button", { name: "Rename" })).toHaveLength(2);
   });
 });
