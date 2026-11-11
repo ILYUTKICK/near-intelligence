@@ -107,6 +107,8 @@ export async function listDocuments(
 export async function createDocument(input: {
   title: string;
   idempotencyKey: string;
+  /** NI-045 starting structure: the eight-heading investment template. */
+  templateId?: "investment-v1";
   signal?: AbortSignal;
 }): Promise<DocumentResponse> {
   const response = await privateFetch("/api/documents", {
@@ -117,7 +119,9 @@ export async function createDocument(input: {
       accept: "application/json",
       "idempotency-key": input.idempotencyKey,
     },
-    body: JSON.stringify({ title: input.title }),
+    body: JSON.stringify(
+      input.templateId ? { title: input.title, template_id: input.templateId } : { title: input.title },
+    ),
     signal: input.signal,
   });
   assertJsonContentType(response);

@@ -118,16 +118,23 @@ class DocumentDetail:
     resolved_contexts: dict
 
 
-def create_document(engine: Engine, principal: Principal, *, title: str) -> DocumentDetail:
+def create_document(engine: Engine, principal: Principal, *, title: str,
+                    content: dict | None = None,
+                    source_publication_id: UUID | None = None) -> DocumentDetail:
     """Create an owned document together with its first empty revision.
 
     One transaction inserts the document (revision 1, no pointer yet — the
     current-version composite FK is satisfied after the version insert),
     the immutable empty revision and the pointer. Empty content is the valid
     initial document (EDITOR_SPECIFICATION: "Empty document is valid").
+    ``content`` (NI-045) carries the first revision's document JSON for
+    non-empty starts (the investment-v1 template); see
+    :func:`create_document_in_transaction` for the exact semantics.
     """
     with principal_transaction(engine, principal) as connection:
-        return create_document_in_transaction(connection, principal, title=title)
+        return create_document_in_transaction(
+            connection, principal, title=title, content=content,
+            source_publication_id=source_publication_id)
 
 
 def create_document_in_transaction(connection: Connection, principal: Principal,

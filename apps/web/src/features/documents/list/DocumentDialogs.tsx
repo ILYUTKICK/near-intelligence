@@ -62,6 +62,8 @@ export function CreateDocumentDialog({
   // State initialises fresh per mount: the list renders this dialog only
   // while it is open, so no open-transition reset effect is needed.
   const [title, setTitle] = useState("");
+  // P0 default stays the empty document; the template is an explicit choice.
+  const [templateId, setTemplateId] = useState<"empty" | "investment-v1">("empty");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,7 +80,11 @@ export function CreateDocumentDialog({
     setPending(true);
     setError(null);
     try {
-      const document = await createDocument({ title: trimmed, idempotencyKey: newIdempotencyKey() });
+      const document = await createDocument({
+        title: trimmed,
+        idempotencyKey: newIdempotencyKey(),
+        templateId: templateId === "investment-v1" ? "investment-v1" : undefined,
+      });
       onOpenChange(false);
       onCreated(document);
       // The persisted editor route is the canonical destination of a created
@@ -96,7 +102,7 @@ export function CreateDocumentDialog({
       <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogTitle>New research document</DialogTitle>
         <DialogDescription>
-          Creates a private document owned by your account. The first empty revision is saved
+          Creates a private document owned by your account. The first revision is saved
           server-side immediately; you will continue in the editor.
         </DialogDescription>
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4" noValidate>
@@ -111,6 +117,52 @@ export function CreateDocumentDialog({
               onChange={(event) => setTitle(event.target.value)}
             />
           </div>
+          <fieldset
+            disabled={pending}
+            className="flex flex-col gap-2 rounded-surface border border-control-border px-3 py-3"
+          >
+            <legend className="px-1 font-ui text-ui text-text">Starting structure</legend>
+            <div className="flex items-start gap-2">
+              <input
+                id="create-document-template-empty"
+                type="radio"
+                name="create-document-template"
+                value="empty"
+                checked={templateId === "empty"}
+                onChange={() => setTemplateId("empty")}
+                className="mt-1.5 size-4 accent-accent"
+              />
+              <div className="flex flex-col">
+                <Label htmlFor="create-document-template-empty" className="font-medium">
+                  Empty document
+                </Label>
+                <span className="text-ui leading-ui text-text-secondary">
+                  A blank first revision. Start from nothing.
+                </span>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <input
+                id="create-document-template-investment"
+                type="radio"
+                name="create-document-template"
+                value="investment-v1"
+                checked={templateId === "investment-v1"}
+                onChange={() => setTemplateId("investment-v1")}
+                className="mt-1.5 size-4 accent-accent"
+              />
+              <div className="flex flex-col">
+                <Label htmlFor="create-document-template-investment" className="font-medium">
+                  Investment research template
+                </Label>
+                <span className="text-ui leading-ui text-text-secondary">
+                  Eight empty section headings only — Executive Summary, Investment Hypothesis,
+                  Adoption Evidence, Revenue Analysis, Token Economics, Econometric Results,
+                  Risks, Conclusion. No placeholder text or figures.
+                </span>
+              </div>
+            </div>
+          </fieldset>
           {error ? (
             <p role="alert" className="text-ui leading-ui text-danger font-medium">
               {error}
