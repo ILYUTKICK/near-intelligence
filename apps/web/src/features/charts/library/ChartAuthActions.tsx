@@ -7,7 +7,9 @@ import type { components } from "@near-intelligence/shared-types";
 import { Button } from "@/components/ui/button";
 import { SaveChartButton } from "../saved/SaveChartButton";
 import { AddChartToResearch } from "../add-to-research/AddChartToResearch";
+import { FreezeSnapshotButton } from "../snapshots/FreezeSnapshotButton";
 import type { SaveInput } from "../saved/api";
+import type { FreezeInput } from "../snapshots/api";
 import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
 import { AddInsightToResearch } from "@/features/editor/insights/public-insight";
 
@@ -39,6 +41,7 @@ export function ChartAuthActions({
   chartTitle,
   basePath = "/charts/",
   saveInput,
+  freezeInput,
   insightContext,
 }: {
   nextPath: string;
@@ -46,6 +49,8 @@ export function ChartAuthActions({
   /** Internal-path base the continuation may target (with trailing slash). */
   basePath?: string;
   saveInput?: SaveInput;
+  /** NI-044 freeze continuation: the inspected evidence triple, when resolved. */
+  freezeInput?: FreezeInput;
   insightContext?: components["schemas"]["ResolvedContext"];
 }) {
   const router = useRouter();
@@ -107,6 +112,9 @@ export function ChartAuthActions({
       <Fragment key={JSON.stringify(saveInput)}>
         <SaveChartButton input={saveInput} suspended={session.status !== "authenticated"} />
         <AddChartToResearch input={saveInput} suspended={session.status !== "authenticated"} />
+        {freezeInput ? <Fragment key={JSON.stringify(freezeInput)}>
+          <FreezeSnapshotButton input={freezeInput} suspended={session.status !== "authenticated"} />
+        </Fragment> : null}
       </Fragment>
       {insightContext ? <AddInsightToResearch context={insightContext} suspended={session.status !== "authenticated"} /> : null}
       {session.status === "unknown" ? <p role="status">The sign-in state could not be checked. Try returning to this window again.</p> : null}
@@ -127,6 +135,7 @@ export function ChartAuthActions({
           <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
             Sign in to add it to research
           </Button>
+          {freezeInput ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to freeze a snapshot</Button> : null}
           {insightContext ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to add an insight</Button> : null}
         </div>
         {pending ? (
