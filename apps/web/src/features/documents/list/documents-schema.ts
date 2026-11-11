@@ -13,6 +13,15 @@ export const documentProgressSchema = z.object({
   insights: z.number().int().nonnegative(),
 });
 
+/** Maximum title length, mirrored from the API contract (`DocumentCreateRequest`). */
+export const DOCUMENT_TITLE_MAX_LENGTH = 200;
+/** Organization bounds mirrored from the API contract (NI-072). */
+export const DOCUMENT_ORGANIZATION_MAX_TAGS = 20;
+/** Maximum normalized tag length, mirrored from the API contract (NI-072). */
+export const DOCUMENT_TAG_MAX_LENGTH = 40;
+/** Maximum tags combined in one list filter, mirrored from the API contract. */
+export const DOCUMENT_LIST_MAX_FILTER_TAGS = 5;
+
 export const documentSummarySchema = z.object({
   id: z.uuid(),
   title: z.string().min(1).max(200),
@@ -22,6 +31,13 @@ export const documentSummarySchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   progress: documentProgressSchema,
+  // NI-072 private organization metadata. The API documents these with the
+  // empty defaults (`@default []` / `@default false`), so the mirror applies
+  // exactly those defaults when a payload omits them — an honest render
+  // boundary, never a second DTO source.
+  tags: z.array(z.string().min(1).max(DOCUMENT_TAG_MAX_LENGTH))
+    .max(DOCUMENT_ORGANIZATION_MAX_TAGS).default([]),
+  favorite: z.boolean().default(false),
 });
 
 export const documentListResponseSchema = z.object({
@@ -32,6 +48,14 @@ export const documentListResponseSchema = z.object({
 export const documentResponseSchema = documentSummarySchema.extend({
   content: z.record(z.string(), z.unknown()),
   resolved_contexts: z.record(z.string(), z.unknown()),
+});
+
+export const documentOrganizationResponseSchema = z.object({
+  document_id: z.uuid(),
+  tags: z.array(z.string().min(1).max(DOCUMENT_TAG_MAX_LENGTH))
+    .max(DOCUMENT_ORGANIZATION_MAX_TAGS),
+  favorite: z.boolean(),
+  updated_at: z.string(),
 });
 
 export const apiErrorDetailSchema = z.object({
@@ -52,7 +76,5 @@ export const apiErrorResponseSchema = z.object({
 export type DocumentSummary = z.infer<typeof documentSummarySchema>;
 export type DocumentListResponse = z.infer<typeof documentListResponseSchema>;
 export type DocumentResponse = z.infer<typeof documentResponseSchema>;
+export type DocumentOrganizationResponse = z.infer<typeof documentOrganizationResponseSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
-
-/** Maximum title length, mirrored from the API contract (`DocumentCreateRequest`). */
-export const DOCUMENT_TITLE_MAX_LENGTH = 200;
