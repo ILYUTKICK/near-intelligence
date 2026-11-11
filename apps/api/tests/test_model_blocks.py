@@ -410,7 +410,8 @@ class ModelBlockDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture,
         by_revision = {row[0]: row[1] for row in rows}
         self.assertEqual(by_revision[2][block_id], context_v1)
         self.assertEqual(by_revision[3][block_id], context_v1)
-        self.assertEqual(by_revision[4][block_id], context_v2)
+        self.assertEqual(by_revision[4][block_id], context_v1)
+        self.assertEqual(by_revision[5][block_id], context_v2)
 
     def test_06_insertion_position_control(self):
         detail = self.create_document(self.alice)
