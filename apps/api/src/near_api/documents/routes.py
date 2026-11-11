@@ -46,6 +46,7 @@ from near_api.documents.schema import (
     DocumentTooLarge,
     ReferenceInvalid,
 )
+from near_api.documents.templates import template_document
 from near_api.repositories.documents import DocumentRow, get_version
 from near_api.schemas.common import ContractModel, ErrorDetail, ErrorResponse
 from near_api.schemas.delivery import ChartViewResponse
@@ -264,7 +265,14 @@ def create_document(request: Request, principal: PrincipalDependency,
                     engine: RuntimeEngineDependency, response: Response,
                     payload: DocumentCreateRequest,
                     idempotency_key: Annotated[str | None, Header()] = None):
-    """Create an owned document whose first revision is the empty document.
+    """Create an owned document whose first revision is empty or templated.
+
+    With ``template_id: "investment-v1"`` the first revision carries the
+    template's eight section headings and nothing else (EDITOR_SPECIFICATION:
+    no fabricated paragraphs or numerical placeholder claims). Unknown
+    template ids are rejected by the request contract (typed 422) before any
+    write. ``template_id`` is part of the idempotent request fingerprint, so
+    a replayed creation with a template returns the SAME document.
 
     With an ``Idempotency-Key`` header the created result is stored in the
     write transaction and a repeated identical owner/route/body request
@@ -272,11 +280,11 @@ def create_document(request: Request, principal: PrincipalDependency,
     document; the same key with a different body is a 409 idempotency
     collision.
     """
-    if payload.template_id is not None:
-        # P1 templates are feature-gated: 422 FEATURE_UNAVAILABLE, never a
-        # simulated template (API_SPECIFICATION).
-        return error_response(request, 422, "FEATURE_UNAVAILABLE",
-                              "Document templates are not available yet")
+    try:
+        template_content = template_document(payload.template_id) \
+            if payload.template_id is not None else None
+    except DocumentSchemaError as error:
+        return _schema_error(request, error)
     try:
         key = idempotency.parse_idempotency_key(idempotency_key)
     except DocumentSchemaError as error:
@@ -291,7 +299,8 @@ def create_document(request: Request, principal: PrincipalDependency,
                     payload.model_dump(mode="json")),
                 operation=lambda connection: (
                     201, _document_response(service.create_document_in_transaction(
-                        connection, principal, title=payload.title)
+                        connection, principal, title=payload.title,
+                        content=template_content)
                     ).model_dump(mode="json")))
         except idempotency.IdempotencyConflict:
             return error_response(
@@ -307,7 +316,8 @@ def create_document(request: Request, principal: PrincipalDependency,
         response.headers["ETag"] = _etag(int(outcome.body["revision"]))
         return DocumentResponse.model_validate(outcome.body)
     try:
-        detail = service.create_document(engine, principal, title=payload.title)
+        detail = service.create_document(engine, principal, title=payload.title,
+                                         content=template_content)
     except DocumentSchemaError as error:
         return _schema_error(request, error)
     response.headers["Cache-Control"] = "no-store"

@@ -131,14 +131,28 @@ def create_document(engine: Engine, principal: Principal, *, title: str) -> Docu
 
 
 def create_document_in_transaction(connection: Connection, principal: Principal,
-                                   *, title: str) -> DocumentDetail:
-    """Transaction-scoped :func:`create_document` (used by the idempotent create)."""
+                                   *, title: str,
+                                   content: dict | None = None,
+                                   source_publication_id: UUID | None = None) -> DocumentDetail:
+    """Transaction-scoped :func:`create_document` (used by the idempotent create).
+
+    ``content`` (NI-045) carries the first revision's document JSON when the
+    document does not start empty — the ``investment-v1`` template's eight
+    headings or a publication duplicate's remapped public projection. It is
+    parsed through the canonical validator exactly like any saved revision
+    (a template can never drift outside the editor grammar) and carries no
+    chart contexts: template headings have no pins, and a duplicate's contexts
+    are rebuilt from its immutable pins by the publications service before
+    its content revision is written. ``source_publication_id`` records the
+    one-time attribution of a duplicated document (never updated afterwards).
+    """
     title = _validated_title(title)
-    canonical = parse_document(empty_document())
+    canonical = parse_document(content if content is not None else empty_document())
     document_id, version_id = uuid4(), uuid4()
     connection.execute(_insert_document().values(
         id=document_id, owner_id=principal.id, title=title,
-        schema_version=SCHEMA_VERSION, revision=1, current_version_id=None))
+        schema_version=SCHEMA_VERSION, revision=1, current_version_id=None,
+        source_publication_id=source_publication_id))
     connection.execute(_insert_version().values(
         id=version_id, document_id=document_id, owner_id=principal.id,
         revision=1, schema_version=SCHEMA_VERSION,

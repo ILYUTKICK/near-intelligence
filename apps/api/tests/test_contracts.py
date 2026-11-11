@@ -112,6 +112,7 @@ class ContractTests(TestCase):
                 "/api/documents/{document_id}/exports",
                 "/api/documents/{document_id}/exports/{job_id}",
                 "/api/documents/{document_id}/exports/{job_id}/download",
+                "/api/publications/{slug}", "/api/publications/{slug}/duplicate",
             })
             self.assertIn("DecimalString", schema["components"]["schemas"])
             self.assertFalse(schema["components"]["schemas"]["Selection"]["additionalProperties"])

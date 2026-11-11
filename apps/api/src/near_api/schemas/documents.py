@@ -22,7 +22,9 @@ from near_api.schemas.home import DocumentSummary
 
 
 class DocumentCreateRequest(ContractModel):
-    """POST /documents body. `template_id` is P1: providing it is a typed 422."""
+    """POST /documents body. `template_id` selects the starting structure:
+    the P1 `investment-v1` eight-heading template (NI-045) or the empty
+    default. Unknown ids are a typed 422."""
 
     title: str = Field(min_length=1, max_length=200)
     template_id: Literal["investment-v1"] | None = None
