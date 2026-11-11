@@ -201,7 +201,7 @@ export function InteractiveChart({ attrs, context, onApply }: {
   const draftRangeError = definition && (!isIsoCalendarDate(selection.start) || !isIsoCalendarDate(selection.end)
     || windowDays(selection.start, selection.end) < 1 || windowDays(selection.start, selection.end) > definition.available_ranges.max_days);
 
-  return <section className="min-w-0 space-y-3" aria-label="Embedded chart controls">
+  return <div role="group" className="min-w-0 space-y-3" aria-label="Embedded chart controls">
     <div className="flex flex-wrap gap-2 text-metadata leading-metadata">
       <span>{attrs.mode === "live" ? "Live chart · saved observation" : "Snapshot chart · reconstruction unavailable"}</span>
       <span role="status">{context.saved ? "Saved in document revision" : "Changed — document has unsaved edits"}</span>
@@ -251,5 +251,5 @@ export function InteractiveChart({ attrs, context, onApply }: {
       </fieldset>
     </> : null}
     <p className="text-metadata text-text-secondary">Escape returns focus to the selected chart block in the editor.</p>
-  </section>;
+  </div>;
 }

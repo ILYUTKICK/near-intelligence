@@ -120,7 +120,7 @@ export function ChartDetailClient({
   const live = selection.datasetVersion === "latest";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {dropped.length > 0 ? (
         <div role="status" className="rounded-surface border border-border bg-surface-muted p-4">
           <p className="font-ui text-ui leading-ui font-medium">
@@ -136,29 +136,39 @@ export function ChartDetailClient({
         </div>
       ) : null}
 
-      {filterKeys.length > 0 ? (
-        <div role="group" aria-label="Chart filters" className="flex flex-wrap gap-4">
-          {filterKeys.map((key) => {
-            const options = filterEnumOptions(properties, key);
-            return (
-              <div key={key} className="flex flex-col gap-1">
-                <Label htmlFor={`chart-filter-${key}`}>{filterLabel(key)}</Label>
-                <select
-                  id={`chart-filter-${key}`}
-                  value={selection.filters[key] ?? ""}
-                  onChange={(event) => setFilter(key, event.target.value)}
-                  className="h-11 rounded-control border border-control-border bg-surface px-3 font-ui text-ui leading-ui text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                >
-                  <option value="">All — no filter</option>
-                  {options.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
-        </div>
-      ) : <p className="text-metadata text-text-secondary">No filters are registered for this chart version.</p>}
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        {filterKeys.length > 0 ? (
+          <div role="group" aria-label="Chart filters" className="flex flex-wrap gap-4">
+            {filterKeys.map((key) => {
+              const options = filterEnumOptions(properties, key);
+              return (
+                <div key={key} className="flex flex-col gap-1">
+                  <Label htmlFor={`chart-filter-${key}`}>{filterLabel(key)}</Label>
+                  <select
+                    id={`chart-filter-${key}`}
+                    value={selection.filters[key] ?? ""}
+                    onChange={(event) => setFilter(key, event.target.value)}
+                    className="h-11 rounded-control border border-control-border bg-surface px-3 font-ui text-ui leading-ui text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  >
+                    <option value="">All — no filter</option>
+                    {options.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="text-metadata text-text-secondary">No filters are registered for this chart version.</p>}
+        <ChartAuthActions
+          nextPath={detailHref({ ...selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
+          chartTitle={definition.title}
+          saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
+            selection: { ...view.selection, filters: selection.filters }, dataset_version_id: view.dataset.id, mode: "live" } : undefined}
+          insightContext={view ? chartObservation(view) : undefined}
+          basePath={`${basePath}/`}
+        />
+      </div>
 
       <ChartView
         definition={definition}
@@ -214,14 +224,6 @@ export function ChartDetailClient({
                 Refresh to latest
               </Button>
             ) : null}
-            <ChartAuthActions
-              nextPath={detailHref({ ...selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
-              chartTitle={definition.title}
-              saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
-                selection: { ...view.selection, filters: selection.filters }, dataset_version_id: view.dataset.id, mode: "live" } : undefined}
-              insightContext={view ? chartObservation(view) : undefined}
-              basePath={`${basePath}/`}
-            />
           </div>
         }
       />

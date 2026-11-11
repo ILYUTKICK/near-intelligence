@@ -182,14 +182,14 @@ export async function ChartDetailScreen({
   };
 
   return (
-    <div className="page-container">
+    <div className="page-container pt-10">
       <Breadcrumbs items={[
         ...links.breadcrumbRoots,
         ...(links.categoryHref ? [] : [category]),
         { label: definition.title },
       ]} />
       <PageIntro className="mt-5" eyebrow={category.label} title={definition.title} description={definition.description} />
-      <p className="text-ui leading-ui text-text-secondary mt-2 max-w-prose">
+      <p className="mt-2 max-w-prose text-metadata text-text-secondary">
         Definition version v{definition.version} (pinned in the URL); renderer{" "}
         <span className="font-mono">{definition.renderer_version}</span>.
         {rangeNote !== null ? ` ${rangeNote}` : ""}
@@ -220,7 +220,7 @@ export async function ChartDetailScreen({
            no fake loading. The selection prop is required by the renderer's
            contract but unused in this configuration (no loader, no range
            slot), so a minimal value is passed rather than invented dates. */
-        <div className="mt-8">
+        <div className="mt-5">
           <ChartView
             definition={definition}
             view={null}
@@ -232,7 +232,7 @@ export async function ChartDetailScreen({
           {dropped.length > 0 ? <DroppedNotice dropped={dropped} /> : null}
         </div>
       ) : selection !== null && datasetFailure === null && view !== null ? (
-        <div className="mt-8">
+        <div className="mt-5">
           <ChartDetailClient
             chartId={chartId}
             definition={definition}

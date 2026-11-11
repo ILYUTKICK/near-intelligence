@@ -27,8 +27,8 @@ function WorkspaceNavList({ pathname }: { pathname: string | null }) {
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex min-h-11 items-center gap-3 rounded-[14px] px-3 py-1.5",
-                      "text-ui leading-ui",
+                      "flex min-h-11 items-center gap-2.5 rounded-[14px] px-2.5 py-1.5",
+                      "text-[0.8125rem] leading-5",
                       active
                         ? "bg-sage font-semibold text-accent"
                         : "text-text-secondary hover:bg-surface-muted hover:text-text",

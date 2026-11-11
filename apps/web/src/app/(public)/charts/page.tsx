@@ -111,32 +111,32 @@ export default async function ChartLibraryPage({
       <div className="mt-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <CatalogSearch key={q ?? ""} initialQuery={q ?? ""} category={category} />
 
-      <nav aria-label="Chart categories">
-        <ul className="flex flex-wrap gap-2">
-          {[
-            { label: "All charts", value: null as string | null },
-            ...CATALOG_CATEGORIES.map((value) => ({ label: categoryWordings[value], value })),
-          ].map((tab) => {
-            const active = tab.value === category;
-            const href = catalogHref(tab.value, q, null);
-            return (
-              <li key={tab.label}>
-                <Link
-                  href={href}
-                  aria-current={active ? "true" : undefined}
-                  className={
-                    active
-                      ? "inline-flex min-h-11 items-center rounded-full border border-accent bg-accent px-3.5 text-ui text-on-accent"
-                      : "inline-flex min-h-11 items-center rounded-full border border-control-border bg-surface px-3.5 text-ui text-text hover:bg-surface-muted"
-                  }
-                >
-                  {tab.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+        <nav aria-label="Chart categories">
+          <ul className="flex flex-wrap gap-2">
+            {[
+              { label: "All charts", value: null as string | null },
+              ...CATALOG_CATEGORIES.map((value) => ({ label: categoryWordings[value], value })),
+            ].map((tab) => {
+              const active = tab.value === category;
+              const href = catalogHref(tab.value, q, null);
+              return (
+                <li key={tab.label}>
+                  <Link
+                    href={href}
+                    aria-current={active ? "true" : undefined}
+                    className={
+                      active
+                        ? "inline-flex min-h-11 items-center rounded-full border border-accent bg-accent px-3.5 text-ui text-on-accent"
+                        : "inline-flex min-h-11 items-center rounded-full border border-control-border bg-surface px-3.5 text-ui text-text hover:bg-surface-muted"
+                    }
+                  >
+                    {tab.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       </div>
 
       {result.ok ? (

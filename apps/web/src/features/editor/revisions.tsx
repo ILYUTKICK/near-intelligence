@@ -92,7 +92,8 @@ function SavedRevision({ revision, sessionSignal }: {
 
 function SavedPaper({ content }: { content: CanonicalDocument }) {
   const editor = useEditor({ extensions: DOCUMENT_EXTENSIONS, content: canonicalToTiptapDoc(content),
-    editable: false, immediatelyRender: false, editorProps: { attributes: { class: "editor-paper" } } });
+    editable: false, immediatelyRender: false,
+    editorProps: { attributes: { class: "editor-paper", role: "document", "aria-label": "Saved revision content" } } });
   return <article aria-label="Saved research" className="paper-panel min-w-0 p-7">
     <EditorContent editor={editor} />
   </article>;

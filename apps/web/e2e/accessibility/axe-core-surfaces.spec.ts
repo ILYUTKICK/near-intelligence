@@ -92,7 +92,7 @@ test("research editor with the 200-block synthetic performance fixture document"
 
 test("NI-024 regression: every workspace sidebar link resolves (no alias prefetch 404s)", async ({ page }) => {
   await signIn(page, state, "/workspace");
-  const sidebar = page.getByRole("navigation", { name: "Workspace" });
+  const sidebar = page.getByRole("navigation", { name: "Workspace", exact: true });
   await expect(sidebar).toBeVisible();
   const hrefs = await sidebar.getByRole("link").evaluateAll(
     (anchors) => anchors.map((anchor) => (anchor as HTMLAnchorElement).getAttribute("href")),

@@ -41,7 +41,7 @@ export function OutlinePane({
               onClick={() => onNavigate(entry.blockId)}
               style={{ paddingInlineStart: `${(entry.level - 1) * 16 + 8}px` }}
               className={cn(
-                "flex min-h-9 w-full items-center rounded-control px-2 text-left text-metadata",
+                "flex min-h-9 w-full items-center rounded-control px-2 text-left text-xs leading-5",
                 "hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
                 entry.blockId === activeBlockId ? "bg-sage font-medium text-accent" : "text-text-secondary",
               )}
