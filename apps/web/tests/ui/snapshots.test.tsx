@@ -25,7 +25,7 @@ const liveView = view(definition(), [], { dataset: { ...view(definition(), []).d
 const detail = { snapshot, view: frozenView };
 const freezeInput = { chart_definition_version_id: definitionId, dataset_version_id: datasetId, selection };
 function json(body: unknown, status = 200) { return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }); }
-function csrfFetch(respond: (url: string, options: RequestInit) => Promise<Response>) {
+function csrfFetch(respond: (url: string, options: RequestInit) => Response | Promise<Response>) {
   return vi.fn(async (url: string, options: RequestInit = {}) => {
     if (url === "/api/auth/session") return json({ subject: "synthetic-alice" });
     if (url === "/api/auth/csrf") return json({ token: "synthetic-csrf" });
