@@ -1837,7 +1837,13 @@ Specification: [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
 - **Priority:** P1
 - **Dependencies:** NI-058
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode A-role implementation subagent, dispatched by coordinator session sess_9345ee4f-f534-4698-98d2-5809986ac4c3
+- **Execution role:** A
+- **Started at:** 2026-11-11T23:10:43Z
+- **Branch/worktree:** feat/ni-059-pdf; /Users/ilyutkinn/Desktop/near-intelligence-a28
+- **Authorization:** Owner handoff v2 (docs/FINISH_BEFORE_DEPLOY_PROMPT.md, 12 November 2026) requires implementing all registered P1/P2; PR #88 carries the updated registry.
+- **Dependency verification:** NI-058 is DONE in this registry; verified on docs/ni-077-handoff-v2 at commit 2787fd5.
 
 **Description:** Add a polished static report without diverging from evidence used by Markdown.
 
