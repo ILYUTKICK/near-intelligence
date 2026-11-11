@@ -461,6 +461,31 @@ export interface paths {
         patch: operations["updateDocumentInsight"];
         trace?: never;
     };
+    "/api/documents/{document_id}/model-blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Append one pinned model-result block to an owned document (compare-and-set via If-Match)
+         * @description Append one valid modelResult block with its frozen model context.
+         *
+         *     With an ``Idempotency-Key`` the response snapshot is stored in the write
+         *     transaction (NI-037 store), so a repeated identical owner/route/body
+         *     request replays the original 201 (same revision, no second block)
+         *     instead of a spurious 409 against the advanced document.
+         */
+        post: operations["addModelBlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{document_id}/organization": {
         parameters: {
             query?: never;
@@ -2230,6 +2255,58 @@ export interface components {
             unit: string;
             /** Version */
             version: number;
+        };
+        /**
+         * ModelBlockInsertRequest
+         * @description POST /documents/{id}/model-blocks body (If-Match carries the CAS).
+         *
+         *     ``model_run_id`` must reference a published immutable ``app.model_runs``
+         *     row (the picker lists the public catalog; the server re-verifies inside
+         *     the save transaction). ``dataset_version_id`` is the approved public
+         *     dataset version the interpretation reads against — an unapproved one is
+         *     rejected, never substituted with latest. ``after_block_id`` positions the
+         *     new block after an existing top-level block of the document; without it
+         *     the block is appended last.
+         */
+        ModelBlockInsertRequest: {
+            /** After Block Id */
+            after_block_id?: string | null;
+            /**
+             * Dataset Version Id
+             * Format: uuid
+             */
+            dataset_version_id: string;
+            /** Interpretation */
+            interpretation: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList-Input"])[];
+            /**
+             * Model Run Id
+             * Format: uuid
+             */
+            model_run_id: string;
+        };
+        /**
+         * ModelBlockMutationResponse
+         * @description ``MutationResult<{block_id}>``: the new revision summary plus the block.
+         *
+         *     The new revision's content and resolved contexts (including the frozen
+         *     ``ModelContext`` of the inserted block, keyed by ``block_id``) are
+         *     fetchable through ``GET /documents/{id}`` — the response never makes the
+         *     client guess the new revision (the ETag carries it).
+         */
+        ModelBlockMutationResponse: {
+            document: components["schemas"]["DocumentSummary"];
+            value: components["schemas"]["ModelBlockValue"];
+        };
+        /**
+         * ModelBlockValue
+         * @description The inserted block identity (API_SPECIFICATION ``MutationResult`` value).
+         */
+        ModelBlockValue: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
         };
         /**
          * ModelContext
@@ -5292,6 +5369,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InsightMutationResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    addModelBlock: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelBlockInsertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelBlockMutationResponse"];
                 };
             };
             /** @description Missing or invalid session */
