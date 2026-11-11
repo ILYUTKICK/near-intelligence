@@ -188,8 +188,14 @@ def compare_with_live(connection: Connection, owner_id: UUID,
 
 
 def remove(connection: Connection, owner_id: UUID, snapshot_id: UUID) -> None:
-    """Delete an unreferenced owned snapshot; referenced snapshots are 409."""
-    _owned(connection, owner_id, snapshot_id, lock=True)
+    """Delete an unreferenced owned snapshot; referenced snapshots are 409.
+
+    No row lock: snapshots are immutable, and the ``saved_charts`` RESTRICT
+    FK makes a concurrent reference impossible, so a racing insert either
+    committed first (the count below sees it) or fails against the frozen
+    row that no longer exists.
+    """
+    _owned(connection, owner_id, snapshot_id)
     referenced = connection.execute(
         select(func.count()).select_from(SavedChart.__table__)
         .where(SavedChart.snapshot_id == snapshot_id)).scalar_one()

@@ -188,6 +188,10 @@ def edit(connection: Connection, owner_id: UUID, instance_id: UUID, body: SavedC
                         body.dataset_version_id or row["last_resolved_dataset_version_id"])
         values.update(selection=view.selection.model_dump(mode="json"),
                       last_resolved_dataset_version_id=view.dataset.id)
+    if mode == "live" and "snapshot_id" in changes:
+        # An explicit un-pin must clear the column so the row satisfies the
+        # pairing CHECK; _mode already refused a live reference.
+        values["snapshot_id"] = None
     if not values:
         return _response(row)
     updated = connection.execute(update(SavedChart).where(

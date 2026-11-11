@@ -26,6 +26,13 @@ def without_request_id(body: bytes) -> str:
     return json.dumps(document, sort_keys=True)
 
 
+def without_resolution(document: dict) -> dict:
+    """Drop the per-read resolution instant so two frozen views compare by content."""
+    document = json.loads(json.dumps(document))
+    document["view"].pop("resolved_at")
+    return document
+
+
 @unittest.skipUnless(os.environ.get("NI_ISOLATED_PG_TEST") == "1", "Use run-db-tests.py")
 class SnapshotDatabaseTests(unittest.TestCase):
     @classmethod
@@ -131,7 +138,8 @@ class SnapshotDatabaseTests(unittest.TestCase):
                          "123456789.123456789012345678901234")
         self.assertEqual(document["live_view"]["series"][0]["points"][0]["value"], "999")
         # The explicit comparison never rewrote the frozen row or its view.
-        self.assertEqual(self.client.get(path).json(), after)
+        self.assertEqual(without_resolution(self.client.get(path).json()),
+                         without_resolution(after))
 
     def test_bob_matrix_is_byte_equal_404_and_cannot_reference_or_cross_rls(self):
         snapshot = self.freeze()
