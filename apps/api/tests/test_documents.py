@@ -168,6 +168,22 @@ def data_table_attrs(**changes) -> dict:
     return {"type": "dataTable", "attrs": table_attrs}
 
 
+def model_result_attrs(**changes) -> dict:
+    """A modelResult block fixture: ids + rich-text interpretation only.
+
+    The block never carries coefficients or diagnostics (NI-055): summaries
+    are re-projected from the immutable published run row.
+    """
+    attrs = {
+        "block_id": str(uuid4()),
+        "model_run_id": str(uuid4()),
+        "dataset_version_id": str(uuid4()),
+        "interpretation": [paragraph_node("The recorded gate verdict is READY_WITH_LIMITS.")],
+    }
+    attrs.update(changes)
+    return {"type": "modelResult", "attrs": attrs}
+
+
 def full_document(*, insight_context: dict | None = None) -> dict:
     """One fixture containing every savable P0 block type (charts are a
     NI-031 registry gate and are exercised separately)."""
@@ -412,6 +428,80 @@ class DocumentSchemaTests(unittest.TestCase):
             "specification_version": "spec-1", "context_hash": SHA256}
         parsed = parse_document(model_context)
         self.assertEqual(len(parsed.insights), 1)
+
+    def test_09_model_result_block_canonicalization(self):
+        """NI-055: ids + interpretation round-trip; statistical values rejected."""
+        from uuid import UUID
+        document = full_document()
+        document["content"].append(model_result_attrs(
+            interpretation=[paragraph_node("Recorded verdict", marks=[{"type": "bold"}]),
+                            paragraph_node("Association only, never causality.")]))
+        parsed = parse_document(document)
+        self.assertEqual(parsed.blocks[-1].block_type, "modelResult")
+        model = parsed.model_results[-1]
+        self.assertEqual(model.model_run_id, UUID(
+            document["content"][-1]["attrs"]["model_run_id"]))
+        self.assertEqual(model.dataset_version_id, UUID(
+            document["content"][-1]["attrs"]["dataset_version_id"]))
+        self.assertEqual(len(model.interpretation), 2)
+        # Canonicalization is deterministic and UUIDs normalize to one spelling.
+        respelled = copy.deepcopy(document)
+        respelled["content"][-1]["attrs"]["model_run_id"] = \
+            respelled["content"][-1]["attrs"]["model_run_id"].upper()
+        respelled["content"][-1]["attrs"]["dataset_version_id"] = \
+            respelled["content"][-1]["attrs"]["dataset_version_id"].upper()
+        again = parse_document(respelled)
+        self.assertEqual(again.content_sha256, parsed.content_sha256)
+        self.assertEqual(again.canonical["content"][-1]["attrs"],
+                         parsed.canonical["content"][-1]["attrs"])
+        # The generic projection rides the top-level block map verbatim.
+        projections = build_projections(parsed)
+        self.assertEqual(projections.blocks[-1].attrs,
+                         parsed.blocks[-1].attrs)
+
+    def test_10_model_result_rejections(self):
+        """Unknown attrs (any statistical value), missing ids, bad rich text."""
+        cases = {
+            "coefficients_attr": lambda attrs: attrs.update({"coefficients": []}),
+            "estimate_attr": lambda attrs: attrs.update({"estimate": 0.5}),
+            "diagnostics_attr": lambda attrs: attrs.update({"diagnostics": {}}),
+            "context_attr": lambda attrs: attrs.update({"context": resolved_context()}),
+            "missing_run_id": lambda attrs: attrs.pop("model_run_id"),
+            "missing_dataset_id": lambda attrs: attrs.pop("dataset_version_id"),
+            "bad_run_id": lambda attrs: attrs.update({"model_run_id": "not-a-uuid"}),
+            "bad_dataset_id": lambda attrs: attrs.update({"dataset_version_id": 42}),
+            "content_key": lambda attrs: attrs.update({"content": []}),
+        }
+        for name, mutation in cases.items():
+            with self.subTest(case=name):
+                node = model_result_attrs()
+                mutation(node["attrs"])
+                with self.assertRaises(DocumentSchemaError):
+                    parse_document({"schema_version": SCHEMA_VERSION, "type": "doc",
+                                    "content": [node]})
+        # Interpretation follows the shared rich-text grammar: required, bounded,
+        # marks whitelisted.
+        rich_cases = {
+            "missing_interpretation": {"interpretation": None},
+            "empty_interpretation": {"interpretation": []},
+            "too_long_interpretation": {"interpretation": [paragraph_node("y" * 10_001)]},
+            "bad_mark": {"interpretation": [paragraph_node(
+                "x", marks=[{"type": "underline"}])]},
+            "javascript_link": {"interpretation": [paragraph_node(
+                "x", marks=[{"type": "link", "attrs": {"href": "javascript:alert(1)"}}])]},
+            "unsupported_node": {"interpretation": [{"type": "heading", "content": []}]},
+        }
+        for name, change in rich_cases.items():
+            with self.subTest(case=name):
+                with self.assertRaises(DocumentSchemaError):
+                    parse_document({"schema_version": SCHEMA_VERSION, "type": "doc",
+                                    "content": [model_result_attrs(**change)]})
+        # A duplicate block_id in a mixed document is still rejected.
+        document = full_document()
+        document["content"].append(model_result_attrs(
+            block_id=document["content"][0]["attrs"]["block_id"]))
+        with self.assertRaises(DocumentSchemaError):
+            parse_document(document)
 
 
 class DocumentRouteContractTests(unittest.TestCase):
