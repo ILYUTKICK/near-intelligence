@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { PageIntro } from "@/components/layout/PageIntro";
+import { ProductIcon } from "@/components/layout/ProductIcon";
 import { CatalogSearch } from "@/features/charts/library/CatalogSearch";
+import { ChartCatalogEntry } from "@/features/charts/library/ChartCatalogEntry";
 import { fetchChartCatalog } from "@/features/charts/library/catalog-api";
 import type { DroppedParam } from "@/features/charts/library/selection-url";
 import {
   CATALOG_CATEGORIES,
   categoryWordings,
-  updateFrequencyWordings,
-  visualizationWordings,
 } from "@/features/charts/library/wording";
 
 export const metadata: Metadata = { title: "Chart library — NEAR Intelligence" };
@@ -86,14 +86,12 @@ export default async function ChartLibraryPage({
   });
 
   return (
-    <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-      <Breadcrumbs items={[{ label: "Overview", href: "/" }, { label: "Charts" }]} />
-      <h1 className="mt-4">Chart library</h1>
-      <p className="text-body leading-body text-text-secondary mt-2 max-w-prose">
-        Every registered analytical chart with its data status. Unavailable charts stay
-        listed with their recorded reason — they are never hidden and never shown as zero.
-        The catalog is versioned: each chart pins an immutable definition version.
-      </p>
+    <div className="page-container">
+      <PageIntro
+        eyebrow="Chart library"
+        title="A library of evidence."
+        description="Explore registered charts, inspect their data and definitions, and bring a selection into your research."
+      />
 
       {dropped.length > 0 ? (
         <div role="status" className="mt-4 rounded-surface border border-border bg-surface-muted p-4 max-w-prose">
@@ -110,40 +108,45 @@ export default async function ChartLibraryPage({
         </div>
       ) : null}
 
-      <CatalogSearch initialQuery={q ?? ""} category={category} />
+      <div className="mt-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <CatalogSearch key={q ?? ""} initialQuery={q ?? ""} category={category} />
 
-      <nav aria-label="Chart categories" className="mt-4">
-        <ul className="flex flex-wrap gap-2">
-          {[
-            { label: "All charts", value: null as string | null },
-            ...CATALOG_CATEGORIES.map((value) => ({ label: categoryWordings[value], value })),
-          ].map((tab) => {
-            const active = tab.value === category;
-            const href = catalogHref(tab.value, q, null);
-            return (
-              <li key={tab.label}>
-                <Link
-                  href={href}
-                  aria-current={active ? "true" : undefined}
-                  className={
-                    active
-                      ? "inline-flex h-11 items-center rounded-control border border-accent bg-accent px-4 font-ui text-ui leading-ui text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                      : "inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                  }
-                >
-                  {tab.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+        <nav aria-label="Chart categories">
+          <ul className="flex flex-wrap gap-2">
+            {[
+              { label: "All charts", value: null as string | null },
+              ...CATALOG_CATEGORIES.map((value) => ({ label: categoryWordings[value], value })),
+            ].map((tab) => {
+              const active = tab.value === category;
+              const href = catalogHref(tab.value, q, null);
+              return (
+                <li key={tab.label}>
+                  <Link
+                    href={href}
+                    aria-current={active ? "true" : undefined}
+                    className={
+                      active
+                        ? "inline-flex min-h-11 items-center rounded-full border border-accent bg-accent px-3.5 text-ui text-on-accent"
+                        : "inline-flex min-h-11 items-center rounded-full border border-control-border bg-surface px-3.5 text-ui text-text hover:bg-surface-muted"
+                    }
+                  >
+                    {tab.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </div>
 
       {result.ok ? (
         result.data.items.length === 0 ? (
-          <div className="mt-8 rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
-            <h2>Nothing to show</h2>
-            <p className="text-body leading-body text-text-secondary mt-2">
+          <div role="status" className="paper-panel mt-6 flex flex-col items-center p-10 text-center">
+            <span className="mb-4 grid size-12 place-items-center rounded-full bg-sage text-accent">
+              <ProductIcon name="search" className="size-5" />
+            </span>
+            <h2 className="text-heading">Nothing to show</h2>
+            <p className="mt-2 max-w-prose text-ui text-text-secondary">
               {q !== null
                 ? "No registered chart matches this search. Search covers titles, descriptions and chart ids."
                 : category !== null
@@ -159,48 +162,9 @@ export default async function ChartLibraryPage({
           </div>
         ) : (
           <>
-            <ul className="mt-8 flex flex-col gap-4 max-w-prose">
+            <ul className="paper-panel mt-6 divide-y divide-border">
               {result.data.items.map((item) => (
-                <li key={item.chart_id} className="rounded-surface border border-border bg-surface p-6 flex flex-col gap-3">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <h2 className="text-lg">
-                      <Link
-                        href={`/charts/${item.chart_id}`}
-                        className="hover:underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                      >
-                        {item.title}
-                      </Link>
-                    </h2>
-                    {item.data_status === "available" ? (
-                      <span className="font-ui text-ui leading-ui font-medium text-accent">Available</span>
-                    ) : (
-                      <span className="font-ui text-ui leading-ui font-medium text-danger">
-                        Unavailable — this is not zero
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-body leading-body text-text-secondary">{item.description}</p>
-                  {item.data_status === "unavailable" && item.unavailable_reason ? (
-                    <p className="text-ui leading-ui text-text-secondary">
-                      Reason: {item.unavailable_reason}
-                    </p>
-                  ) : null}
-                  <p className="text-ui leading-ui text-text-secondary">
-                    {categoryWordings[item.category] ?? item.category} ·{" "}
-                    {visualizationWordings[item.visualization_type] ?? item.visualization_type} ·{" "}
-                    {updateFrequencyWordings[item.update_frequency] ?? item.update_frequency} · Units:{" "}
-                    {[...new Set(Object.values(item.units))].join(", ")}
-                  </p>
-                  <div>
-                    <Link
-                      href={`/charts/${item.chart_id}`}
-                      aria-label={`Open chart: ${item.title}`}
-                      className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                    >
-                      Open chart
-                    </Link>
-                  </div>
-                </li>
+                <ChartCatalogEntry key={item.chart_id} chart={item} href={`/charts/${item.chart_id}`} row />
               ))}
             </ul>
             {result.data.next_cursor ? (
@@ -216,7 +180,7 @@ export default async function ChartLibraryPage({
           </>
         )
       ) : (
-        <div role="alert" className="mt-8 rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
+        <div role="alert" className="paper-panel mt-6 p-8">
           <h2>The catalog could not be loaded</h2>
           <p className="text-body leading-body text-text-secondary mt-2">
             {result.status === 503

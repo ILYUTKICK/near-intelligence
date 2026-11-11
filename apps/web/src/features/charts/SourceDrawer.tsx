@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import { ProductIcon } from "@/components/layout/ProductIcon";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,8 +12,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { DataSource } from "./chart-frame-types";
-
-import { cn } from "@/lib/utils";
 
 /**
  * Only http(s) URLs may become links. Anything else (javascript:, data:,
@@ -107,17 +107,19 @@ export function SourceDrawer({
 }) {
   return (
     <Dialog>
-      <DialogTrigger className={cn("font-ui text-ui leading-ui underline underline-offset-2", triggerClassName)}>
-        {label}
+      <DialogTrigger asChild>
+        <Button variant="secondary" className={triggerClassName}>
+          <ProductIcon name="book" /> {label}
+        </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85dvh] overflow-auto">
+      <DialogContent className="w-[min(40rem,calc(100vw-2rem))]">
         <DialogTitle>Sources and definitions</DialogTitle>
         <DialogDescription>
           Provenance for this chart: who produces the data, under which license, verified
           when, and how it reaches this product.
         </DialogDescription>
         {definition ? (
-          <div className="mt-4">
+          <div className="mt-4 rounded-surface bg-sage p-4">
             <p className="text-ui leading-ui font-medium">Definition</p>
             <p className="text-ui leading-ui text-text-secondary">{definition}</p>
             {formulaUrl ? (

@@ -44,6 +44,7 @@ import { ContextPane } from "./context-pane";
 import { DeleteConfirmationDialog } from "./delete-confirmation";
 import {
   EDITOR_OPEN_BLOCK_PROPERTIES,
+  EDITOR_OPERATION_ANNOUNCE,
   EDITOR_REQUEST_BLOCK_DELETE,
   EDITOR_SLASH_TRIGGER,
   detailOf,
@@ -207,6 +208,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
   const [tabletOutlineOpen, setTabletOutlineOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const exportReturnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
@@ -532,15 +534,23 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         coordinates: computeSlashCoordinates(editor, position, container),
       });
     };
+    const onOperationAnnounce = (event: Event) => {
+      const { message } = detailOf<{ message: string }>(event, { message: "" });
+      if (message) {
+        announce(message);
+      }
+    };
     container.addEventListener(EDITOR_OPEN_BLOCK_PROPERTIES, onOpenProperties);
     container.addEventListener(EDITOR_REQUEST_BLOCK_DELETE, onRequestDelete);
     container.addEventListener(EDITOR_SLASH_TRIGGER, onSlashTrigger);
+    container.addEventListener(EDITOR_OPERATION_ANNOUNCE, onOperationAnnounce);
     return () => {
       container.removeEventListener(EDITOR_OPEN_BLOCK_PROPERTIES, onOpenProperties);
       container.removeEventListener(EDITOR_REQUEST_BLOCK_DELETE, onRequestDelete);
       container.removeEventListener(EDITOR_SLASH_TRIGGER, onSlashTrigger);
+      container.removeEventListener(EDITOR_OPERATION_ANNOUNCE, onOperationAnnounce);
     };
-  }, [editor, openHypothesis, openEvidence]);
+  }, [editor, openHypothesis, openEvidence, announce]);
 
   // -- operations ------------------------------------------------------------ //
 
@@ -692,41 +702,43 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         {announcement}
       </p>
 
-      <header>
-        <h1 className="font-serif text-title leading-title">{title}</h1>
-        <p className="text-metadata leading-metadata text-text-secondary mt-1">
-          Updated <time dateTime={displayedUpdatedAt}>{displayedUpdatedAt}</time> · Revision{" "}
-          {controller.revision} · Schema version 1
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3">
+        <div className="min-w-0 flex-1 basis-64">
+          <h1 className="font-serif text-title leading-title [overflow-wrap:anywhere]">{title}</h1>
+          <p className="mt-1 text-metadata text-text-secondary">
+            Updated <time dateTime={displayedUpdatedAt}>{displayedUpdatedAt}</time> · Revision{" "}
+            {controller.revision} · Schema version 1
+          </p>
+          <div className="mt-2">
+            <SaveStatusBar
+              status={controller.status}
+              onSave={handleSaveNow}
+              onRetry={handleStatusRetry}
+              onOpenConflict={handleConflictOpen}
+              onDownloadCopy={handleDownloadLocalCopy}
+            />
+          </div>
+        </div>
         {controller.status.kind === "clean" ? (
-          <div className="mt-2 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link href={`/workspace/research/${documentId}/versions`} prefetch={false}
               className="inline-block text-ui underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
               Revision history
             </Link>
-            <Button variant="secondary" data-testid="export-open"
+            <Button ref={exportReturnFocusRef} data-testid="export-open"
               disabled={!currentVersionId}
               onClick={() => setExportOpen(true)}>
               Export
             </Button>
           </div>
         ) : <p className="mt-2 text-metadata text-text-secondary">Save your edits to open revision history and export.</p>}
-        <div className="mt-2">
-          <SaveStatusBar
-            status={controller.status}
-            onSave={handleSaveNow}
-            onRetry={handleStatusRetry}
-            onOpenConflict={handleConflictOpen}
-            onDownloadCopy={handleDownloadLocalCopy}
-          />
-        </div>
       </header>
 
       {controller.draft ? (
         <div
           role="alert"
           data-testid="draft-recovery"
-          className="rounded-surface border border-border bg-surface p-4"
+          className="rounded-surface border border-warning/50 bg-surface p-5"
         >
           <p className="text-ui leading-ui font-medium text-text">
             A draft with unsaved changes from this session was found (saved at{" "}
@@ -757,7 +769,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-start gap-2">
+      <div className="flex flex-wrap items-start gap-2 border-b border-border pb-3">
         <InsertMenuButton onInsert={handleInsert} disabled={!editor} />
         <Button variant="secondary" disabled={!editor || controller.status.kind !== "clean" || Boolean(controller.draft)}
           onClick={() => openHypothesis({ kind: "create" })}>Add hypothesis</Button>
@@ -828,16 +840,21 @@ export function EditorShell({ documentId, title, revision, updatedAt,
       ) : null}
 
       <div
-        className="grid gap-4 xl:grid-cols-[16rem_minmax(0,1fr)_18rem]"
+        className={cn(
+          "grid items-start gap-4",
+          !outlineCollapsed && !toolsCollapsed && "xl:grid-cols-[var(--width-editor-outline)_minmax(0,1fr)_var(--width-editor-tools)]",
+          outlineCollapsed && !toolsCollapsed && "xl:grid-cols-[minmax(0,1fr)_var(--width-editor-tools)]",
+          !outlineCollapsed && toolsCollapsed && "xl:grid-cols-[var(--width-editor-outline)_minmax(0,1fr)]",
+        )}
         data-testid="editor-grid"
       >
         <aside
           data-pane="outline"
           aria-label="Document outline"
-          className={cn("hidden xl:block min-w-0", outlineCollapsed && "xl:hidden")}
+          className={cn("hidden min-w-0 xl:sticky xl:top-4", !outlineCollapsed && "xl:block")}
         >
-          <div className="rounded-surface border border-border bg-surface p-3">
-            <p className="font-ui text-ui leading-ui font-medium text-text mb-2">Outline</p>
+          <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto px-1 py-2">
+            <p className="eyebrow mb-2 px-2">Outline</p>
             <OutlinePane
               entries={outline}
               activeBlockId={currentBlock?.blockId ?? null}
@@ -847,7 +864,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         </aside>
 
         <section data-pane="paper" className="min-w-0">
-          <div ref={paperRef} className="relative rounded-surface border border-border bg-surface p-6">
+          <div ref={paperRef} className="paper-panel relative min-h-[28rem] p-5 sm:p-8">
             {editor ? (
               <EditorContent editor={editor} />
             ) : (
@@ -875,10 +892,11 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         <aside
           data-pane="tools"
           aria-label="Block properties"
-          className={cn("hidden xl:block min-w-0", toolsCollapsed && "xl:hidden")}
+          className={cn("hidden min-w-0", !toolsCollapsed && "xl:block")}
         >
-          <div className="rounded-surface border border-border bg-surface p-3">
-            <p className="font-ui text-ui leading-ui font-medium text-text mb-2">Properties</p>
+          <div className="paper-panel p-4">
+            <p className="eyebrow mb-2">Research context</p>
+            <p className="mb-3 font-serif text-heading">Properties</p>
             {editor ? (
               <ContextPane editor={editor} currentBlock={currentBlock} onTableChange={handleTableChange} />
             ) : null}
@@ -942,6 +960,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         documentId={documentId}
         versionId={currentVersionId ?? ""}
         onAnnounce={announce}
+        returnFocusRef={exportReturnFocusRef}
       />
       <ConflictRecoveryDialog
         open={conflictDialogOpen}

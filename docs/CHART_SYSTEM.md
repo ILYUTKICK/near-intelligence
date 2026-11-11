@@ -37,6 +37,8 @@ Plot adapter receives normalized typed series, not provider responses. Use EChar
 
 ## Interaction, provenance and accessibility
 
+NI-075 uses the same chart-detail screen for public library and category URLs. Featured category charts resolve the latest approved view through ChartView. Their detail links carry the inspected dataset and range when that view resolves. Saved Charts shows up to two previews per page from the owned detail endpoint. Custom dates use the existing range validation in a keyboard-accessible dialog. The exact-value table remains below the plot. The versioned renderer palette stays stable for frozen export reproduction.
+
 Every frame includes definitions, sources and lineage, last observation/retrieval times, quality, mode, permitted actions and an equivalent data table. Keyboard range controls and point/table inspection must work; charts cannot require hover. Source drawer links metric formula and sanitized manifest. Enable ECharts ARIA component explicitly and add concise manual summary/table; [official ARIA guidance](https://echarts.apache.org/handbook/en/best-practices/aria/) does not imply fully keyboard-operable charts automatically.
 
 States: loading skeleton; refreshing with last good; empty confirmed no observations; missing/incomplete coverage; stale historical/live; unavailable source; query validation error; reconstruction error for missing pinned artifact. Do not show zero in a KPI because plot array is empty.

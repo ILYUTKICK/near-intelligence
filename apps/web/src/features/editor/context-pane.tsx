@@ -28,7 +28,7 @@ const PANEL_DDL_CLASS = "text-metadata leading-metadata text-text-secondary";
 
 function InfoList({ children }: { children: React.ReactNode }) {
   return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-metadata leading-metadata text-text-secondary">
+    <dl className="grid gap-y-0.5 text-metadata text-text-secondary [&_dt]:mt-2 [&_dt]:font-medium [&_dd]:min-w-0 [&_dd]:break-normal [&_dd]:[overflow-wrap:anywhere]">
       {children}
     </dl>
   );

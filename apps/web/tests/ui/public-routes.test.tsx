@@ -39,15 +39,14 @@ vi.mock("@/features/public-research/landing-metrics", async (importOriginal) => 
 describe("Landing", () => {
   it("renders the standfirst, registry links and honest unavailability with no fabricated values", async () => {
     const { container } = render(await HomePage());
-    expect(screen.getByRole("heading", { level: 1, name: "NEAR Intelligence" })).toBeInTheDocument();
-    expect(screen.getByText(/missing value is never shown as zero/i)).toBeInTheDocument();
-    for (const link of ["Read the research", "How the numbers are made"]) {
+    expect(screen.getByRole("heading", { level: 1, name: /Follow the evidence/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Recorded claim" })).toHaveAttribute("href", "/research#CL-002-heading");
+    for (const link of ["Read the research", "Read the methodology"]) {
       const anchor = screen.getByRole("link", { name: link });
       expect(
         publicNav.map((item) => item.href).concat(["/research", "/methodology", "/workspace"]),
       ).toContain(anchor.getAttribute("href"));
     }
-    // Two workspace CTAs (header list and closing section) reach /workspace.
     const workspaceLinks = screen.getAllByRole("link", { name: "Open the workspace" });
     expect(workspaceLinks.length).toBeGreaterThanOrEqual(1);
     for (const workspaceLink of workspaceLinks) {

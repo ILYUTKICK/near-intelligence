@@ -12,15 +12,10 @@
  */
 
 export const landing = {
-  title: "NEAR Intelligence",
+  title: "Follow the evidence.",
+  emphasis: "Understand NEAR.",
   standfirst:
-    "Evidence-first investment research on the NEAR ecosystem. Every published number carries its source, definition version and limitations — and a missing value is never shown as zero.",
-  whatYouCanDo:
-    "Read the full thesis, follow each economic mechanism, and check the methodology before trusting any conclusion.",
-  links: [
-    { label: "Read the research", href: "/research" },
-    { label: "How the numbers are made", href: "/methodology" },
-  ],
+    "From cross-chain activity to token value capture. Read the research, inspect the data, and build a thesis you can trace.",
 } as const;
 
 export const mechanism = {
@@ -192,7 +187,8 @@ export const thesisToc: readonly { readonly id: string; readonly title: string }
 export const hypothesisIds = ["h1", "h2", "h3", "h4"] as const;
 
 export const thesis = {
-  title: "Research",
+  title: "A conversion channel.",
+  emphasis: "A conditional thesis.",
   standfirst:
     "The complete original conditional thesis, with supporting and contrary evidence side by side. Every number carries its source, scope and definition version, bounds stay bounds, and the model section states its honest release status.",
   evidenceStatus:
@@ -994,7 +990,8 @@ export const claimRegistry: readonly ThesisClaim[] = [
  */
 
 export const methodology = {
-  title: "Methodology",
+  title: "Trust the process.",
+  emphasis: "Inspect the evidence.",
   standfirst:
     "How the numbers are made: providers, definitions, collection, cleaning and the reproduction path. Published so a reader can assess the evidence before trusting a conclusion.",
 

@@ -3,40 +3,43 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Brand } from "./Brand";
 import { MobileNavDrawer } from "./MobileNavDrawer";
-import { workspaceNavByGroup } from "@/lib/navigation";
+import { ProductIcon } from "./ProductIcon";
+import { isWithinRoute, workspaceNavByGroup } from "@/lib/navigation";
 
 import { cn } from "@/lib/utils";
 
 function WorkspaceNavList({ pathname }: { pathname: string | null }) {
   return (
-    <nav aria-label="Workspace" className="flex flex-col gap-5">
+    <nav aria-label="Workspace" className="flex flex-1 flex-col gap-5">
       {workspaceNavByGroup().map(({ group, items }) => (
-        <div key={group}>
-          <p className="text-metadata leading-metadata text-text-secondary font-medium uppercase tracking-wide px-2">
-            {group}
-          </p>
-          <ul>
+        <div key={group} className={group === "Account" ? "mt-auto" : undefined}>
+          {group === "Data Explorer" || group === "Analytics" ? (
+            <p className="px-3 pb-1 text-metadata font-medium tracking-widest text-text-secondary uppercase">{group}</p>
+          ) : null}
+          <ul className="space-y-0.5">
             {items.map((item) => {
-              const active = pathname === item.href;
+              const active = item.href === "/workspace" ? pathname === item.href : isWithinRoute(pathname, item.href);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex min-h-11 items-center rounded-control px-2",
-                      "text-ui leading-ui",
+                      "flex min-h-11 items-center gap-2.5 rounded-[14px] px-2.5 py-1.5",
+                      "text-[0.8125rem] leading-5",
                       active
-                        ? "bg-surface-muted text-text font-medium"
+                        ? "bg-sage font-semibold text-accent"
                         : "text-text-secondary hover:bg-surface-muted hover:text-text",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
                     )}
                   >
+                    {item.icon ? <ProductIcon name={item.icon} className="size-[18px] shrink-0" /> : null}
                     <span>
                       {item.label}
                       {item.availabilityNote ? (
-                        <span className="text-metadata leading-metadata text-text-secondary block">
+                        <span className="sr-only">
                           {item.availabilityNote}
                         </span>
                       ) : null}
@@ -62,7 +65,8 @@ export function WorkspaceSidebar() {
   const pathname = usePathname();
   return (
     <>
-      <aside className="hidden w-(--width-sidebar) shrink-0 border-r border-border bg-surface p-4 md:block">
+      <aside aria-label="Workspace navigation panel" className="sticky top-0 hidden max-h-dvh w-(--width-sidebar) shrink-0 flex-col gap-8 self-start overflow-y-auto border-r border-border bg-surface/55 px-4 py-7 md:flex md:min-h-dvh">
+        <div className="px-2"><Brand /></div>
         <WorkspaceNavList pathname={pathname} />
       </aside>
       <div className="md:hidden p-2">

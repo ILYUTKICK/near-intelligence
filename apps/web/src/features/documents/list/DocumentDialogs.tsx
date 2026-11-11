@@ -51,8 +51,10 @@ function describeMutationError(error: unknown, fallback: string): string {
 export function CreateDocumentDialog({
   onOpenChange,
   onCreated,
+  onCloseAutoFocus,
 }: {
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   /** Called after the API confirms the persisted document (201). */
   onCreated: (document: DocumentResponse) => void;
 }) {
@@ -91,7 +93,7 @@ export function CreateDocumentDialog({
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogTitle>New research document</DialogTitle>
         <DialogDescription>
           Creates a private document owned by your account. The first empty revision is saved
@@ -133,9 +135,11 @@ export function RenameDocumentDialog({
   onOpenChange,
   onRenamed,
   onRevisionConflict,
+  onCloseAutoFocus,
 }: {
   target: DocumentSummary;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   onRenamed: (updated: DocumentSummary) => void;
   onRevisionConflict: (documentId: string) => void;
 }) {
@@ -179,7 +183,7 @@ export function RenameDocumentDialog({
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogTitle>Rename document</DialogTitle>
         <DialogDescription>
           Renaming creates a new immutable revision with the same content.
@@ -220,9 +224,11 @@ export function DeleteDocumentDialog({
   onOpenChange,
   onDeleted,
   onRevisionConflict,
+  onCloseAutoFocus,
 }: {
   target: DocumentSummary;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   onDeleted: (deletedId: string) => void;
   onRevisionConflict: (documentId: string) => void;
 }) {
@@ -253,7 +259,7 @@ export function DeleteDocumentDialog({
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogTitle>Delete document</DialogTitle>
         <DialogDescription>
           Delete “{target.title}”? This permanently removes the document with all of its

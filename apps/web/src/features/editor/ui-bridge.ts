@@ -9,9 +9,20 @@
 export const EDITOR_OPEN_BLOCK_PROPERTIES = "editor-open-block-properties";
 export const EDITOR_REQUEST_BLOCK_DELETE = "editor-request-block-delete";
 export const EDITOR_SLASH_TRIGGER = "editor-slash-trigger";
+export const EDITOR_OPERATION_ANNOUNCE = "editor-operation-announce";
 
 function dispatchDetail(host: HTMLElement | null, type: string, detail: Record<string, unknown>): void {
   host?.dispatchEvent(new CustomEvent(type, { detail, bubbles: true }));
+}
+
+/**
+ * Announce a completed operation from the ProseMirror keyboard-shortcut path
+ * (NI-064: the toolbar paths announce through the shell; the Mod-Alt arrow /
+ * duplicate / delete shortcuts run inside the editor, so their result must
+ * reach the shell's polite live region through this bridge).
+ */
+export function emitOperationAnnounce(editor: { view: { dom: HTMLElement } }, message: string): void {
+  dispatchDetail(editor.view.dom, EDITOR_OPERATION_ANNOUNCE, { message });
 }
 
 /** Select the block and reveal its properties (opens the tools pane/drawer). */

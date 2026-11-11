@@ -18,13 +18,17 @@ import { cn } from "@/lib/utils";
  */
 const buttonVariants = cva(
   cn(
-    "inline-flex items-center justify-center gap-2 rounded-control border",
+    "press-feedback inline-flex items-center justify-center gap-2 rounded-full border",
     "font-ui text-ui leading-ui font-medium select-none",
     "h-11 min-w-11 px-4",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
-    "disabled:pointer-events-none disabled:opacity-60",
-    "aria-busy:pointer-events-none aria-busy:opacity-80",
-    "transition-colors duration-(--transition-fast) motion-reduce:transition-none",
+    "disabled:pointer-events-none",
+    // Pending blocks duplicate submits via aria-busy without dimming: opacity
+    // < 1 blends the button colors with whatever is behind it and the blended
+    // pair fails the WCAG contrast rule while the request is in flight (axe
+    // caught exactly that on workspace home in CI). Contrast must hold in
+    // every reachable state, pending included.
+    "aria-busy:pointer-events-none",
   ),
   {
     variants: {
@@ -33,7 +37,7 @@ const buttonVariants = cva(
         secondary:
           "border-control-border bg-surface text-text hover:bg-surface-muted",
         quiet: "border-transparent bg-transparent text-text hover:bg-surface-muted",
-        destructive: "border-transparent bg-danger text-on-accent hover:opacity-90",
+        destructive: "border-transparent bg-danger text-on-accent hover:bg-danger/90",
       },
       block: {
         true: "w-full",
@@ -65,14 +69,30 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
-  const Component = asChild ? Slot : "button";
+  // Radix Slot requires exactly ONE child: the slotted element is cloned with
+  // the merged props, so a spinner sibling (or a null placeholder next to the
+  // child) crashes with React's Children.only error (NI-024 regression,
+  // regression-tested in tests/ui/form.test.tsx). Slotted links announce the
+  // pending state through aria-busy on the anchor instead of a spinner.
+  if (asChild) {
+    return (
+      <Slot
+        data-variant={variant}
+        className={cn(buttonVariants({ variant, block }), className)}
+        aria-busy={pending || undefined}
+        {...props}
+      >
+        {children}
+      </Slot>
+    );
+  }
   return (
-    <Component
+    <button
       data-variant={variant}
       className={cn(buttonVariants({ variant, block }), className)}
       aria-busy={pending || undefined}
       disabled={disabled || pending}
-      type={asChild ? undefined : (type ?? "button")}
+      type={type ?? "button"}
       {...props}
     >
       {pending ? (
@@ -82,7 +102,7 @@ export function Button({
         />
       ) : null}
       {children}
-    </Component>
+    </button>
   );
 }
 

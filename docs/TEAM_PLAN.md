@@ -167,6 +167,7 @@ A/B — лид приёмки всей задачи; второй участни
 | NI-068 | Verify backups, restore and operational monitoring | P0 | A | B |
 | NI-069 | Run hackathon demo and reviewer reproduction | P0 | A | B |
 | NI-070 | Finalize and publish original research release | P0 | A | B |
+| NI-075 | Integrate the NI-074 desktop design into the working application | P0 | A | Owner |
 | NI-071 | Add advanced supported analytical filters | P1 | A | B |
 | NI-072 | Add lightweight private research organization | P1 | B | A |
 

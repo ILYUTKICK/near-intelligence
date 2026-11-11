@@ -1,30 +1,28 @@
 /*
- * Design tokens (NI-006) — source of truth: docs/DESIGN_SYSTEM.md.
- * Values are the documented proposal; measured WCAG results are recorded in
- * docs/TASKS.md (NI-006). Components must consume these variables instead of
- * page-local palette values. Breakpoints for media queries (768, 1280) cannot
- * be CSS custom properties: use them as constants in component styles.
+ * Design tokens for the NI-074 desktop direction. Semantic names remain
+ * shared by Tailwind, interaction primitives and chart rendering.
  */
 
 :root {
   /* --- color.canvas --- */
-  --color-canvas: #f6f4ec; /* main warm ivory background */
-  --color-surface: #fffefa; /* reading paper, cards, dialogs */
-  --color-surface-muted: #e9eee5; /* quiet section/selection background */
-  --color-text: #17242d; /* primary navy-charcoal typography */
-  --color-text-secondary: #4b5c54; /* secondary descriptions, metadata */
-  --color-accent: #214d3b; /* primary action, links, chart series 1 */
-  --color-accent-hover: #173a2c; /* hover/pressed action */
-  --color-sage: #dce6d7; /* highlight fill only; dark text above */
-  --color-border: #d8ddd2; /* decorative border; never sole control boundary */
+  --color-canvas: #f8f6ee; /* main warm ivory background */
+  --color-surface: #fffdfa; /* reading paper, cards, dialogs */
+  --color-surface-muted: #f0ede5; /* quiet neutral fill */
+  --color-text: #132c41; /* primary navy typography */
+  --color-text-secondary: #596b75; /* secondary descriptions, metadata */
+  --color-accent: #1c5b41; /* primary action, links, chart series 1 */
+  --color-accent-hover: #154632; /* hover/pressed action */
+  --color-sage: #e7efdd; /* highlight fill only; dark text above */
+  --color-border: #e7e1d6; /* decorative border; never sole control boundary */
   --color-control-border: #79877c; /* input boundaries on light surfaces */
   --color-focus: #285f9a; /* focus ring, >=2px plus offset */
-  --color-warning: #80521d; /* stale/partial text with pale background */
-  --color-danger: #9b3b38; /* errors and opposing evidence, always with label/icon */
-  --color-chart-2: #5a7189; /* distinguishable secondary series */
+  --color-warning: #8a5c2b; /* stale/partial text with pale background */
+  --color-danger: #973e36; /* errors and opposing evidence, always with label/icon */
+  --color-chart-2: #3a6684; /* distinguishable secondary series */
   --color-chart-3: #99662d;
   --color-chart-4: #86657e;
-  --color-on-accent: #fffefa; /* text on primary action fills */
+  --color-on-accent: #fffdfa; /* text on primary action fills */
+  --color-info-surface: #e8eef2;
 
   /* --- spacing scale (px) --- */
   --space-1: 4px;
@@ -38,11 +36,12 @@
   --space-24: 96px;
 
   /* --- radius and elevation --- */
-  --radius-surface: 12px;
-  --radius-control: 8px;
-  --radius-dialog: 16px;
+  --radius-surface: 22px;
+  --radius-control: 10px;
+  --radius-dialog: 24px;
   --border-width: 1px;
-  --shadow-overlay: 0 8px 32px rgba(23, 36, 45, 0.08); /* menus/dialogs only */
+  --shadow-panel: 0 14px 38px -28px #5e4b2f66;
+  --shadow-overlay: 0 20px 64px -24px #132c414d;
 
   /* --- focus --- */
   --focus-ring-width: 2px;
@@ -51,6 +50,7 @@
   /* --- motion (restrained; see DESIGN_SYSTEM.md) --- */
   --transition-fast: 120ms;
   --transition-base: 180ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
   /* --- typography families (fonts self-hosted via next/font in layout.tsx) --- */
   --font-serif: var(--font-newsreader, "Newsreader"), Georgia, "Times New Roman", serif;
@@ -60,6 +60,8 @@
      media query below. Hero 64/68 desktop, 40/44 phone. --- */
   --text-hero-size: 64px;
   --text-hero-leading: 68px;
+  --text-page-size: clamp(2.625rem, 4.3vw, 4rem);
+  --text-page-leading: 1.03;
   --text-title-size: 36px;
   --text-title-leading: 42px;
   --text-heading-size: 24px;
@@ -76,9 +78,10 @@
   /* --- layout widths --- */
   --width-content-max: 1280px; /* desktop max */
   --width-prose: 72ch; /* public prose reading width 68-74ch */
-  --width-sidebar: 240px;
-  --width-editor-outline: 200px;
-  --width-editor-tools: 280px;
+  --width-sidebar: 216px;
+  --width-editor-outline: 154px;
+  --width-editor-tools: 236px;
+  --page-gutter: clamp(1rem, 3.125vw, 2.5rem);
 }
 
 @media (max-width: 767px) {
@@ -105,38 +108,47 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-serif);
-  color: var(--color-text);
-  margin: 0;
-  text-wrap: balance;
-}
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-serif);
+    color: var(--color-text);
+    margin: 0;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
 
-h1 {
-  font-size: var(--text-hero-size);
-  line-height: var(--text-hero-leading);
-  font-weight: 500;
-}
+  h1 {
+    font-size: var(--text-hero-size);
+    line-height: var(--text-hero-leading);
+    font-weight: 500;
+  }
 
-h2 {
-  font-size: var(--text-title-size);
-  line-height: var(--text-title-leading);
-  font-weight: 500;
-}
+  h2 {
+    font-size: var(--text-title-size);
+    line-height: var(--text-title-leading);
+    font-weight: 500;
+  }
 
-h3 {
-  font-size: var(--text-heading-size);
-  line-height: var(--text-heading-leading);
-  font-weight: 500;
-}
+  h3 {
+    font-size: var(--text-heading-size);
+    line-height: var(--text-heading-leading);
+    font-weight: 500;
+  }
 
-a {
-  color: var(--color-accent);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
+  /* Let button and navigation utilities override the default link color. */
+  a {
+    color: var(--color-accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+
+  :where(a, button, input, select, textarea, summary):focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: var(--focus-ring-offset);
+  }
 }
 
 /* Tabular lining numerals for metrics/tables. */

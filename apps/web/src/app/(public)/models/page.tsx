@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { PageIntro } from "@/components/layout/PageIntro";
+import { ModelAvailability } from "@/features/models/ModelAvailability";
 import { ModelRunList } from "@/features/models/ModelRunList";
 import { fetchModelRunCatalog } from "@/features/models/models-api";
 
@@ -55,15 +56,12 @@ export default async function ModelsPage({
   const result = await fetchModelRunCatalog(cursor !== null ? { cursor } : {});
 
   return (
-    <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-      <Breadcrumbs items={[{ label: "Overview", href: "/" }, { label: "Models" }]} />
-      <h1 className="mt-4">Econometric models</h1>
-      <p className="text-body leading-body text-text-secondary mt-2 max-w-prose">
-        Published model runs only. A run appears here exactly when the operator publication
-        gate verified its bundle and the recorded review approved it; unpublished, failed or
-        gate-rejected runs do not exist on these pages and are indistinguishable from absent
-        ones. Every recorded value is shown as served.
-      </p>
+    <div className="page-container">
+      <PageIntro
+        eyebrow="Econometric evidence"
+        title="Models with their limits attached."
+        description="Published runs include the data, specification, diagnostics and recorded approval behind each result."
+      />
 
       {dropped.length > 0 ? (
         <div role="status" className="mt-4 rounded-surface border border-border bg-surface-muted p-4 max-w-prose">
@@ -82,21 +80,10 @@ export default async function ModelsPage({
 
       {result.ok ? (
         result.data.items.length === 0 ? (
-          <div className="mt-8 rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
-            <h2>No published model yet</h2>
-            <p className="text-body leading-body text-text-secondary mt-2">
-              No model run has been published through the verification and review flow yet.
-              This page states that honestly — it is not a placeholder result, and no
-              coefficient or statistic is invented for display. Publication is an operator
-              flow, never a browser action.
-            </p>
-            <Link
-              href="/methodology#reproduce"
-              className="mt-4 inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            >
-              How models are verified and reproduced
-            </Link>
-          </div>
+          <ModelAvailability
+            title="No published model yet"
+            description="No model run has completed the publication process. Coefficients and intervals become available when a verified run is published."
+          />
         ) : (
           <>
             <ModelRunList items={result.data.items} />
@@ -113,7 +100,7 @@ export default async function ModelsPage({
           </>
         )
       ) : (
-        <div role="alert" className="mt-8 rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
+        <div role="alert" className="paper-panel mt-8 p-8">
           <h2>The model catalog could not be loaded</h2>
           <p className="text-body leading-body text-text-secondary mt-2">
             {result.status === 503

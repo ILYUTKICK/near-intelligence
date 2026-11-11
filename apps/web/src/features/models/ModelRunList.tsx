@@ -12,14 +12,14 @@ import type { ModelRunSummary } from "@/features/models/models-schema";
  */
 export function ModelRunList({ items }: { items: ModelRunSummary[] }) {
   return (
-    <ul className="mt-8 flex flex-col gap-4 max-w-prose">
+    <ul className="mt-8 grid gap-5 lg:grid-cols-2">
       {items.map((item) => (
         <li
           key={item.run_id}
-          className="rounded-surface border border-border bg-surface p-6 flex flex-col gap-3"
+          className="paper-panel flex min-w-0 flex-col gap-4 p-6"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h2 className="text-lg">
+            <h2 className="text-heading">
               <Link
                 href={`/models/${encodeURIComponent(item.run_id)}`}
                 className="hover:underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"

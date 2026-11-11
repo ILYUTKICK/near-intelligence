@@ -3,14 +3,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { fetchChartCatalog } from "@/features/charts/library/catalog-api";
+import { PageIntro } from "@/components/layout/PageIntro";
+import { ProductIcon } from "@/components/layout/ProductIcon";
+import { Button } from "@/components/ui/button";
+import { ChartCatalogEntry } from "@/features/charts/library/ChartCatalogEntry";
+import { fetchChartCatalog, fetchChartView } from "@/features/charts/library/catalog-api";
 import { explorerCategoryBySlug } from "@/features/charts/library/explorer-categories";
 import { dropUnknownParams } from "@/features/charts/library/search-values";
-import {
-  categoryWordings,
-  updateFrequencyWordings,
-  visualizationWordings,
-} from "@/features/charts/library/wording";
+import { defaultRangeFor, detailHrefFor, todayUtc } from "@/features/charts/library/selection-url";
+import { categoryWordings } from "@/features/charts/library/wording";
+import { ChartView } from "@/features/charts/renderer/ChartView";
 
 type SearchValues = Record<string, string | string[] | undefined>;
 
@@ -63,27 +65,25 @@ export default async function DataCategoryPage({
   );
   const failure = results.find((result): result is Extract<typeof result, { ok: false }> => !result.ok);
   const items = results.flatMap((result) => (result.ok ? result.data.items : []));
+  const featured = failure ? [] : await Promise.all(
+    (explorer.featuredChartIds ?? []).flatMap((chartId) => {
+      const definition = items.find((item) => item.chart_id === chartId && item.data_status === "available");
+      if (!definition) return [];
+      const range = defaultRangeFor(definition, todayUtc());
+      return [fetchChartView(chartId, {
+        definitionVersion: definition.version,
+        start: range.start,
+        end: range.end,
+        datasetVersion: "latest",
+        filters: {},
+      }).then((result) => ({ definition, range, result }))];
+    }),
+  );
 
   return (
-    <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
+    <div className="page-container">
       <Breadcrumbs items={[{ label: "Data", href: "/data" }, { label: explorer.label }]} />
-      <h1 className="mt-4">{explorer.label}</h1>
-      <p className="text-lg leading-body text-text mt-2 max-w-prose">{explorer.question}</p>
-      <p className="text-body leading-body text-text-secondary mt-2 max-w-prose">
-        {explorer.scopeNote}
-      </p>
-      <p className="text-ui leading-ui text-text-secondary mt-2 max-w-prose">
-        {explorer.registryCategories.length === 0
-          ? "No registry category is mapped to this explorer category yet."
-          : `Registry categories mapped here: ${explorer.registryCategories
-              .map((registryCategory) => categoryWordings[registryCategory] ?? registryCategory)
-              .join(", ")}.`}
-        {" "}The flat catalog of every registered chart remains the{" "}
-        <Link href="/charts" className="text-accent underline underline-offset-2 hover:text-accent-hover">
-          chart library
-        </Link>
-        .
-      </p>
+      <PageIntro className="mt-5" eyebrow="Data explorer" title={explorer.label} description={explorer.question} />
 
       {dropped.length > 0 ? (
         <div role="status" className="mt-4 rounded-surface border border-border bg-surface-muted p-4 max-w-prose">
@@ -101,7 +101,7 @@ export default async function DataCategoryPage({
       ) : null}
 
       {failure !== undefined ? (
-        <div role="alert" className="mt-8 rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
+        <div role="alert" className="paper-panel mt-8 p-8">
           <h2>The catalog could not be loaded</h2>
           <p className="text-body leading-body text-text-secondary mt-2">
             {failure.status === 503
@@ -116,72 +116,59 @@ export default async function DataCategoryPage({
           </Link>
         </div>
       ) : items.length === 0 ? (
-        <div className="mt-8 rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
-          <h2>{explorer.emptyExplanation.heading}</h2>
-          <p className="text-body leading-body text-text-secondary mt-2">
+        <div className="paper-panel mt-8 flex flex-col items-center p-10 text-center sm:p-14">
+          <span className="mb-4 grid size-12 place-items-center rounded-full bg-sage text-accent">
+            <ProductIcon name={slug === "ecosystem" ? "grid" : "globe"} className="size-6" />
+          </span>
+          <h2 className="text-heading md:text-title">{explorer.emptyExplanation.heading}</h2>
+          <p className="mt-2 max-w-[55ch] text-ui text-text-secondary">
             {explorer.emptyExplanation.body}
           </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              href="/charts"
-              className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            >
-              Browse the chart library
-            </Link>
-            <Link
-              href="/methodology#definitions"
-              className="inline-flex h-11 items-center rounded-control border border-transparent px-4 font-ui text-ui leading-ui text-text underline underline-offset-2 hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            >
-              Metric definitions
-            </Link>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Button asChild><Link href="/charts">Browse the chart library</Link></Button>
+            <Button asChild variant="quiet"><Link href="/methodology#definitions">Metric definitions</Link></Button>
           </div>
         </div>
       ) : (
-        <ul className="mt-8 flex flex-col gap-4 max-w-prose">
-          {items.map((item) => (
-            <li key={item.chart_id} className="rounded-surface border border-border bg-surface p-6 flex flex-col gap-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <h2 className="text-lg">
-                  <Link
-                    href={`/data/${explorer.slug}/${item.chart_id}`}
-                    className="hover:underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                  >
-                    {item.title}
-                  </Link>
-                </h2>
-                {item.data_status === "available" ? (
-                  <span className="font-ui text-ui leading-ui font-medium text-accent">Available</span>
+        <>
+          {featured.length > 0 ? (
+            <div className={`mt-8 grid items-start gap-5 ${featured.length > 1 ? "lg:grid-cols-2" : ""}`}>
+              {featured.map(({ definition, range, result }) => {
+                const href = detailHrefFor(`/data/${slug}`, definition.chart_id, {
+                  ...range,
+                  version: definition.version,
+                  datasetVersion: result.ok ? result.data.dataset.id : "latest",
+                  filters: {},
+                });
+                const action = <Button asChild variant="secondary"><Link href={href}>Inspect range and data <ProductIcon name="arrow" /></Link></Button>;
+                return result.ok ? (
+                  <ChartView key={definition.id} definition={definition} view={result.data}
+                    selection={range} mode="live" height={240} actions={action} />
                 ) : (
-                  <span className="font-ui text-ui leading-ui font-medium text-danger">
-                    Unavailable — this is not zero
-                  </span>
-                )}
-              </div>
-              <p className="text-body leading-body text-text-secondary">{item.description}</p>
-              {item.data_status === "unavailable" && item.unavailable_reason ? (
-                <p className="text-ui leading-ui text-text-secondary">
-                  Reason: {item.unavailable_reason}
-                </p>
-              ) : null}
-              <p className="text-ui leading-ui text-text-secondary">
-                {categoryWordings[item.category] ?? item.category} ·{" "}
-                {visualizationWordings[item.visualization_type] ?? item.visualization_type} ·{" "}
-                {updateFrequencyWordings[item.update_frequency] ?? item.update_frequency} · Units:{" "}
-                {[...new Set(Object.values(item.units))].join(", ")}
-              </p>
-              <div>
-                <Link
-                  href={`/data/${explorer.slug}/${item.chart_id}`}
-                  aria-label={`Open chart: ${item.title}`}
-                  className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                >
-                  Open chart
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
+                  <section key={definition.id} className="paper-panel p-6">
+                    <p className="eyebrow">Data unavailable</p>
+                    <h2 className="mt-2 text-heading">{definition.title}</h2>
+                    <p className="my-3 text-ui text-text-secondary">{result.message ?? "The selected chart could not be resolved."}</p>
+                    {action}
+                  </section>
+                );
+              })}
+            </div>
+          ) : null}
+          <h2 className="mt-10 text-heading">Registered charts</h2>
+          <ul className="mt-3 grid gap-4 sm:grid-cols-2">
+            {items.map((item) => (
+              <ChartCatalogEntry key={item.chart_id} chart={item} href={`/data/${slug}/${item.chart_id}`} />
+            ))}
+          </ul>
+        </>
       )}
+      <p className="mt-6 max-w-(--width-prose) text-ui text-text-secondary">{explorer.scopeNote}</p>
+      <p className="mt-2 text-metadata text-text-secondary">
+        {explorer.registryCategories.length === 0
+          ? "No registry category is mapped to this explorer category yet."
+          : `Registry categories mapped here: ${explorer.registryCategories.map((category) => categoryWordings[category] ?? category).join(", ")}.`}
+      </p>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { PageIntro } from "@/components/layout/PageIntro";
 import { ChartView } from "@/features/charts/renderer/ChartView";
 import { ChartDetailClient } from "@/features/charts/library/ChartDetailClient";
 import { DefinitionQualityPanel } from "@/features/charts/library/DefinitionQualityPanel";
@@ -20,6 +21,7 @@ import {
 import type { DroppedParam, SerializedSelection } from "@/features/charts/library/selection-url";
 import { firstValue, toPairs } from "@/features/charts/library/search-values";
 import type { SearchValues } from "@/features/charts/library/search-values";
+import { categoryWordings } from "./wording";
 
 /**
  * Shared chart-detail screen (NI-015 extraction of the NI-034 detail flow).
@@ -27,11 +29,8 @@ import type { SearchValues } from "@/features/charts/library/search-values";
  * One server component renders the whole validated chart-detail experience —
  * definition load, the single selection-URL gate (`parseSelectionUrl`),
  * range anchoring, metric/quality provenance and the resolved view — under
- * any detail route base. The NI-034 chart detail (/charts/{chart_id}) keeps
- * its own page implementation unchanged; the public data explorer
- * (/data/{category}/{chart_id}) renders through this component so both
- * routes go through exactly the same selection-url/catalog-api gates and the
- * same serialized selection produces exactly the same view request.
+ * any public detail route base. The same serialized selection produces the
+ * same view request under /charts and /data.
  *
  * Everything route-specific is parameterized by {@link ChartDetailLinks}:
  * the mounted base (selection URLs, retry/reset links, sign-in continuation)
@@ -45,9 +44,9 @@ export interface ChartDetailLinks {
   /** Route base this detail is mounted at (e.g. "/charts", "/data/revenue"). */
   basePath: string;
   /** The category/library listing to link back to. */
-  categoryHref: string;
+  categoryHref?: string;
   /** Visible label of that listing (e.g. the explorer category label). */
-  categoryLabel: string;
+  categoryLabel?: string;
   /** Breadcrumb entries before the chart title crumb. */
   breadcrumbRoots: Array<{ label: string; href?: string }>;
   /**
@@ -84,9 +83,9 @@ export async function ChartDetailScreen({
       notFound();
     }
     return (
-      <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-        <div role="alert" className="rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
-          <h1>Chart unavailable</h1>
+      <div className="page-container">
+        <div role="alert" className="paper-panel p-8">
+          <h1 className="text-page">Chart unavailable</h1>
           <p className="text-body leading-body text-text-secondary mt-2">
             The chart definition could not be loaded right now. Nothing is shown rather than
             partial or fabricated content.
@@ -177,22 +176,27 @@ export async function ChartDetailScreen({
 
   /** The retry/reset URL: only the definition version re-pinned. */
   const resetHref = `${links.basePath}/${encodeURIComponent(chartId)}?version=${definition.version}`;
+  const category = {
+    label: links.categoryLabel ?? categoryWordings[definition.category] ?? definition.category,
+    href: links.categoryHref ?? `/charts?category=${definition.category}`,
+  };
 
   return (
-    <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-      <Breadcrumbs items={[...links.breadcrumbRoots, { label: definition.title }]} />
-      <h1 className="mt-4">{definition.title}</h1>
-      <p className="text-body leading-body text-text-secondary mt-2 max-w-prose">
-        {definition.description}
-      </p>
-      <p className="text-ui leading-ui text-text-secondary mt-2 max-w-prose">
+    <div className="page-container pt-10">
+      <Breadcrumbs items={[
+        ...links.breadcrumbRoots,
+        ...(links.categoryHref ? [] : [category]),
+        { label: definition.title },
+      ]} />
+      <PageIntro className="mt-5" eyebrow={category.label} title={definition.title} description={definition.description} />
+      <p className="mt-2 max-w-prose text-metadata text-text-secondary">
         Definition version v{definition.version} (pinned in the URL); renderer{" "}
         <span className="font-mono">{definition.renderer_version}</span>.
         {rangeNote !== null ? ` ${rangeNote}` : ""}
       </p>
 
       {datasetFailure !== null ? (
-        <div role="alert" className="mt-6 rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
+        <div role="alert" className="paper-panel mt-6 p-8">
           <h2>The pinned dataset could not be resolved</h2>
           <p className="text-body leading-body text-text-secondary mt-2">
             The dataset version in the URL does not resolve to an approved dataset, so no chart
@@ -216,7 +220,7 @@ export async function ChartDetailScreen({
            no fake loading. The selection prop is required by the renderer's
            contract but unused in this configuration (no loader, no range
            slot), so a minimal value is passed rather than invented dates. */
-        <div className="mt-8">
+        <div className="mt-5">
           <ChartView
             definition={definition}
             view={null}
@@ -228,7 +232,7 @@ export async function ChartDetailScreen({
           {dropped.length > 0 ? <DroppedNotice dropped={dropped} /> : null}
         </div>
       ) : selection !== null && datasetFailure === null && view !== null ? (
-        <div className="mt-8">
+        <div className="mt-5">
           <ChartDetailClient
             chartId={chartId}
             definition={definition}
@@ -249,10 +253,10 @@ export async function ChartDetailScreen({
 
       <p className="mt-8 max-w-prose">
         <Link
-          href={links.categoryHref}
+          href={category.href}
           className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
-          More charts in {links.categoryLabel}
+          More charts in {category.label}
         </Link>
       </p>
     </div>
@@ -290,7 +294,7 @@ function ViewFailurePanel({
   resetHref: string;
 }) {
   return (
-    <div role="alert" className="mt-6 rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
+    <div role="alert" className="paper-panel mt-6 p-8">
       <h2>The chart data could not be resolved</h2>
       <p className="text-body leading-body text-text-secondary mt-2">
         {failure.status === 503

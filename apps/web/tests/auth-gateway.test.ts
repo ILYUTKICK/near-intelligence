@@ -90,7 +90,7 @@ function findCookie(cookies: string[], name: string): string | null {
 
 describe("CSRF minting", () => {
   it("sets a readable double-submit cookie and returns the token", async () => {
-    const response = await csrfGet();
+    const response = await csrfGet(new NextRequest("http://localhost:3000/api/auth/csrf"));
     expect(response.status).toBe(200);
     const cookie = findCookie(setCookies(response), CSRF_COOKIE);
     expect(cookie).toMatch(/samesite=lax/i);
@@ -102,7 +102,7 @@ describe("CSRF minting", () => {
 
 describe("Login gateway", () => {
   it("mints a token then accepts a same-origin login with valid CSRF and sets HttpOnly cookies", async () => {
-    const minted = await csrfGet();
+    const minted = await csrfGet(new NextRequest("http://localhost:3000/api/auth/csrf"));
     const { token } = (await minted.json()) as { token: string };
     providerFetchMock.mockResolvedValueOnce(
       providerReply(200, { access_token: "access.jwt.sig", refresh_token: "refresh-1", expires_in: 600 }),
@@ -130,7 +130,7 @@ describe("Login gateway", () => {
     providerFetchMock.mockResolvedValue(
       providerReply(200, { access_token: "a", refresh_token: "r", expires_in: 600 }),
     );
-    const minted = await csrfGet();
+    const minted = await csrfGet(new NextRequest("http://localhost:3000/api/auth/csrf"));
     const { token } = (await minted.json()) as { token: string };
 
     const internal = await loginPost(
@@ -168,7 +168,7 @@ describe("Login gateway", () => {
   });
 
   it("returns one generic error for wrong password and unknown email", async () => {
-    const minted = await csrfGet();
+    const minted = await csrfGet(new NextRequest("http://localhost:3000/api/auth/csrf"));
     const { token } = (await minted.json()) as { token: string };
     providerFetchMock.mockResolvedValueOnce(providerReply(400, { msg: "Invalid login credentials" }));
     const wrongPassword = await loginPost(
@@ -186,7 +186,7 @@ describe("Login gateway", () => {
   });
 
   it("maps provider rate limits and outages to honest statuses", async () => {
-    const minted = await csrfGet();
+    const minted = await csrfGet(new NextRequest("http://localhost:3000/api/auth/csrf"));
     const { token } = (await minted.json()) as { token: string };
     providerFetchMock.mockResolvedValueOnce(providerReply(429, {}));
     const limited = await loginPost(loginRequest({ csrfCookie: token }));
@@ -206,7 +206,7 @@ describe("Logout gateway", () => {
       cookies.push(`${SESSION_COOKIE}=${sessionCookie}`);
     }
     // A real minted token: the gateway verifies the signed payload, not just equality.
-    const minted = await csrfGet();
+    const minted = await csrfGet(new NextRequest("http://localhost:3000/api/auth/csrf"));
     const csrfToken = ((await minted.json()) as { token: string }).token;
     cookies.push(`${CSRF_COOKIE}=${csrfToken}`);
     headers.set("cookie", cookies.join("; "));

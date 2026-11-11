@@ -134,7 +134,7 @@ export function ChartAuthActions({
             Signing in to continue — this chart and its selection are preserved in the sign-in link.
           </p>
         ) : (
-          <p className="text-ui leading-ui text-text-secondary">
+          <p className="text-metadata text-text-secondary">
             Saving and adding to research need your account. Signing in returns you to
             &ldquo;{chartTitle}&rdquo; with the current selection preserved.
           </p>

@@ -127,7 +127,7 @@ afterEach(() => {
 async function renderList() {
   const { container } = render(<DocumentList />);
   // Initial load resolves before interactions.
-  await screen.findByRole("heading", { name: "Documents" });
+  await screen.findByRole("heading", { name: "Your research, connected." });
   return { container };
 }
 

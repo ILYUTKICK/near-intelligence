@@ -1,52 +1,62 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { AccountMenu } from "@/components/layout/AccountMenu";
+import { PageIntro } from "@/components/layout/PageIntro";
+import { ProductIcon } from "@/components/layout/ProductIcon";
 
 export const metadata: Metadata = { title: "Settings — NEAR Intelligence" };
 
-/**
- * Minimal settings (NI-025): session/logout control lives here; local draft
- * clearing arrives with the editor (NI-038/040) and is stated honestly rather
- * than rendered as a dead control. Billing/team/account-deletion controls are
- * intentionally absent — operator-assisted deletion is documented in the
- * security specification, and this page must not fake success for it.
- */
 export default function SettingsPage() {
   return (
-    <div className="max-w-(--width-prose)">
-      <h1>Settings</h1>
-      <section aria-labelledby="session-heading" className="mt-8">
-        <h2 id="session-heading" className="font-serif text-title leading-title">
-          Session
-        </h2>
-        <p className="text-body leading-body text-text-secondary mt-2">
-          Sign out ends your session server-side: the provider refresh token is revoked and
-          both cookies are cleared from this browser.
-        </p>
-        <div className="mt-4">
-          <AccountMenu />
+    <div>
+      <PageIntro compact eyebrow="Account / Settings" title="A little less friction."
+        description="Review your workspace preferences, draft recovery and account session." />
+      <div className="mt-7 grid items-start gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
+        <div className="space-y-5">
+          <section className="paper-panel p-6" aria-labelledby="preferences-heading">
+            <h2 id="preferences-heading" className="text-heading">Research preferences</h2>
+            <dl className="mt-3 divide-y divide-border text-ui">
+              <div className="flex flex-wrap items-baseline justify-between gap-3 py-3">
+                <dt className="font-medium">Display name and timezone</dt>
+                <dd><Link href="/workspace/profile" className="underline underline-offset-2">Edit profile</Link></dd>
+              </div>
+              <div className="flex flex-wrap items-baseline justify-between gap-3 py-3">
+                <dt className="font-medium">Reduced motion</dt>
+                <dd className="text-text-secondary">Follows system preference</dd>
+              </div>
+              <div className="flex flex-wrap items-baseline justify-between gap-3 pt-3">
+                <dt className="font-medium">Analytical periods</dt>
+                <dd className="rounded-full bg-surface-muted px-2.5 py-1 text-metadata text-text-secondary">UTC</dd>
+              </div>
+            </dl>
+          </section>
+          <section className="paper-panel p-6" aria-labelledby="drafts-heading">
+            <h2 id="drafts-heading" className="text-heading">Local recovery</h2>
+            <p className="mt-2 text-ui text-text-secondary">
+              If a tab reloads with unsaved changes, reopen the document in that tab. The editor offers to restore or discard its recovery copy.
+            </p>
+            <Link href="/workspace/research" className="mt-3 inline-flex min-h-11 items-center gap-2 text-ui font-medium hover:underline">
+              Open My Research <ProductIcon name="arrow" />
+            </Link>
+          </section>
+          <section className="paper-panel p-6" aria-labelledby="account-heading">
+            <h2 id="account-heading" className="text-heading">Account</h2>
+            <p className="mt-2 text-ui text-text-secondary">Sign out to end this session. For account deletion, contact the project operator.</p>
+            <div className="mt-3 flex"><AccountMenu /></div>
+          </section>
         </div>
-      </section>
-      <section aria-labelledby="drafts-heading" className="mt-10">
-        <h2 id="drafts-heading" className="font-serif text-title leading-title">
-          Local drafts
-        </h2>
-        <p className="text-body leading-body text-text-secondary mt-2">
-          Document drafts are kept in browser memory only while the editor is open. The explicit
-          clear-drafts control is added together with the editor itself (NI-038/NI-040); nothing
-          is stored on our servers before you save.
-        </p>
-      </section>
-      <section aria-labelledby="account-heading" className="mt-10">
-        <h2 id="account-heading" className="font-serif text-title leading-title">
-          Account
-        </h2>
-        <p className="text-body leading-body text-text-secondary mt-2">
-          Account deletion is operator-assisted: request it through the project contact and the
-          operator removes your data and confirms back to you. There is no self-service deletion
-          button, and this page will never pretend one succeeded.
-        </p>
-      </section>
+        <aside className="rounded-surface bg-sage p-6">
+          <p className="eyebrow">Data policy</p>
+          <h2 className="mt-2 text-heading">Freshness belongs to the source.</h2>
+          <p className="mt-2 text-ui text-text-secondary">
+            A chart records the period and dataset it uses. Saved revisions keep that evidence with the document.
+          </p>
+          <Link href="/methodology#sources" className="mt-3 inline-flex min-h-11 items-center gap-2 text-ui font-medium hover:underline">
+            Read the source policy <ProductIcon name="arrow" />
+          </Link>
+        </aside>
+      </div>
     </div>
   );
 }

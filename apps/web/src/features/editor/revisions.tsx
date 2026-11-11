@@ -4,8 +4,12 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import Link from "next/link";
 import { useCallback } from "react";
 import type { components } from "@near-intelligence/shared-types";
+import { LoadingPanel } from "@/components/data-state/DataState";
+import { PageIntro } from "@/components/layout/PageIntro";
+import { ProductIcon } from "@/components/layout/ProductIcon";
 import { Button } from "@/components/ui/button";
 import { useOwnedData } from "@/features/charts/saved/use-owned-data";
+import { formatUpdated } from "@/features/documents/list/format";
 import { HistoricalRevisionContext } from "./blocks/chart-context";
 import { CANONICAL_SCHEMA_VERSION, validateCanonicalDocument, type CanonicalDocument } from "./canonical";
 import { DOCUMENT_EXTENSIONS } from "./extensions";
@@ -27,24 +31,33 @@ export function ResearchRevisions({ documentId, versionId, cursor }: {
   const historyHref = `${editorHref}/versions`;
 
   return <div className="min-w-0 space-y-4">
-    <nav aria-label="Research revision navigation" className="flex flex-wrap gap-4">
-      <Link href={editorHref} prefetch={false} className={linkClass}>Back to editor</Link>
-      {versionId ? <Link href={historyHref} prefetch={false} className={linkClass}>Revision history</Link> : null}
-    </nav>
-    <h1 className="font-serif text-title leading-title">
-      {versionId ? data?.kind === "revision" ? `Revision ${data.revision.revision}` : "Saved revision" : "Revision history"}
-    </h1>
-    {loading ? <p role="status">Loading saved research…</p> : null}
-    {error ? <div className="space-y-2">
+    <PageIntro compact eyebrow="Revision history"
+      title={versionId ? data?.kind === "revision" ? `Revision ${data.revision.revision}` : "Saved revision" : "A record of your reasoning."}
+      description={versionId ? "This read-only revision retains its saved evidence." : "Saved revisions retain the data and chart context seen at that moment."}
+      action={<nav aria-label="Research revision navigation" className="flex flex-wrap gap-2">
+        {versionId ? <Button asChild variant="quiet"><Link href={historyHref} prefetch={false}>Revision history</Link></Button> : null}
+        <Button asChild variant="secondary"><Link href={editorHref} prefetch={false}>Back to editor</Link></Button>
+      </nav>}
+    />
+    {loading ? <LoadingPanel label="Loading saved research" /> : null}
+    {error ? <div className="paper-panel space-y-3 p-6">
       <p role="alert">{error}</p>
       <Button variant="secondary" onClick={reload}>Try again</Button>
     </div> : null}
     {data?.kind === "history" ? <>
-      <ol className="divide-y divide-border rounded-surface border border-border bg-surface">
-        {data.page.items.map(revision => <li key={revision.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 p-4">
-          <Link href={`${historyHref}?version=${revision.id}`} prefetch={false} className={linkClass}>Revision {revision.revision}</Link>
-          <time dateTime={revision.created_at} className="text-metadata text-text-secondary">{revision.created_at}</time>
-        </li>)}
+      <ol className="paper-panel divide-y divide-border">
+        {data.page.items.map((revision, index) => (
+          <li key={revision.id} className="flex flex-wrap items-center gap-3 p-5">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-sage text-accent"><ProductIcon name="document" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="eyebrow">{!cursor && index === 0 ? "Latest saved" : "Read-only revision"}</p>
+              <time dateTime={revision.created_at} className="mt-1 block text-ui text-text-secondary">{formatUpdated(revision.created_at)} UTC</time>
+            </div>
+            <Button asChild variant="secondary">
+              <Link href={`${historyHref}?version=${revision.id}`} prefetch={false}>Revision {revision.revision} <ProductIcon name="arrow" /></Link>
+            </Button>
+          </li>
+        ))}
       </ol>
       <div className="flex flex-wrap gap-4">
         {cursor ? <Link href={historyHref} prefetch={false} className={linkClass}>Newest revisions</Link> : null}
@@ -79,8 +92,9 @@ function SavedRevision({ revision, sessionSignal }: {
 
 function SavedPaper({ content }: { content: CanonicalDocument }) {
   const editor = useEditor({ extensions: DOCUMENT_EXTENSIONS, content: canonicalToTiptapDoc(content),
-    editable: false, immediatelyRender: false, editorProps: { attributes: { class: "editor-paper" } } });
-  return <article aria-label="Saved research" className="min-w-0 rounded-surface border border-border bg-surface p-6">
+    editable: false, immediatelyRender: false,
+    editorProps: { attributes: { class: "editor-paper", role: "document", "aria-label": "Saved revision content" } } });
+  return <article aria-label="Saved research" className="paper-panel min-w-0 p-7">
     <EditorContent editor={editor} />
   </article>;
 }

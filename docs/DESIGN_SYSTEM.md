@@ -1,31 +1,31 @@
 # Design system
 
-Premium editorial research interface: warm ivory surfaces, forest accents, calm charts and clear evidence. Existing SVGs in `product-plan` are visual references; written product scope and canonical routes prevail. No new image assets or component code are created in this phase.
+NI-075 applies the NI-074 desktop design to the application. Public pages use generous editorial compositions. Data and the private workspace use denser controls and the same paper, type and evidence styles. The original notebook illustration from NI-074 appears on the Overview, auth pages and workspace Home.
 
-## Tokens to implement
+## Application tokens
 
 | Token | Value | Use |
 | --- | --- | --- |
-| color.canvas | #F6F4EC | Main warm ivory background |
-| color.surface | #FFFEFA | Reading paper, cards, dialogs |
-| color.surface-muted | #E9EEE5 | Quiet section/selection background |
-| color.text | #17242D | Primary navy-charcoal typography |
-| color.text-secondary | #4B5C54 | Secondary descriptions, readable metadata |
-| color.accent | #214D3B | Primary action, links, series 1 |
-| color.accent-hover | #173A2C | Hover/pressed action |
-| color.sage | #DCE6D7 | Highlight fill only, dark text above |
-| color.border | #D8DDD2 | Decorative border; not sole control boundary |
+| color.canvas | #F8F6EE | Main warm ivory background |
+| color.surface | #FFFDFA | Reading paper, cards, dialogs |
+| color.surface-muted | #F0EDE5 | Quiet neutral fill |
+| color.text | #132C41 | Primary navy typography |
+| color.text-secondary | #596B75 | Secondary descriptions, readable metadata |
+| color.accent | #1C5B41 | Primary actions and links |
+| color.accent-hover | #154632 | Hover/pressed action |
+| color.sage | #E7EFDD | Selected rows and positive status surfaces |
+| color.border | #E7E1D6 | Decorative divider |
 | color.control-border | #79877C | Input boundaries on light surfaces |
 | color.focus | #285F9A | Focus ring, ≥2px plus offset |
-| color.warning | #80521D | Stale/partial text with pale background |
-| color.danger | #9B3B38 | Errors and opposing evidence, with label/icon |
-| color.chart-2/3/4 | #5A7189 / #99662D / #86657E | Distinguishable secondary series |
+| color.warning | #8A5C2B | Stale/partial text with pale background |
+| color.danger | #973E36 | Errors and opposing evidence, with label/icon |
+| color.info-surface / color.chart-2 | #E8EEF2 / #3A6684 | Informational status surfaces and text |
 
-Validate WCAG contrast using actual combinations; token values are proposals, not a completed audit. Small text needs 4.5:1; large text/control boundaries/focus ≥3:1 where applicable. Sage/border fills do not qualify as text colors. Opposing evidence uses descriptive text rather than red alone. **Audit status (NI-006, 2026-11-05):** all 22 documented role pairings pass their targets — run `pnpm --filter web check:contrast` ([apps/web/scripts/check-contrast.mjs](../apps/web/scripts/check-contrast.mjs)); measured values are in the NI-006 task record.
+Small text needs 4.5:1 contrast and control boundaries and focus rings need at least 3:1 where applicable. Statuses carry text and icons. Run `pnpm --filter web check:contrast` against the current tokens. The versioned ECharts palette stays fixed for reproducible exports. [Contrast check](../apps/web/scripts/check-contrast.mjs)
 
-Typography: editorial hero/research title uses a self-hosted open-license serif candidate (Newsreader, **license/build check passed 2026-11-05** — SIL OFL 1.1, self-hosted WOFF2 in [apps/web/src/styles/fonts](../apps/web/src/styles/fonts) with provenance notes); app UI uses self-hosted Inter (SIL OFL 1.1). Avoid externally blocking font calls. Hero 64/68px desktop, 40/44px phone; page title 36/42; section heading 24/32; body 16/26; UI 14/20; metadata 12/18 only for supplementary content; document body 17/28. Tabular lining numerals for metrics/tables. Reading width 68–74ch, no dense full-width research prose.
+Newsreader with a true italic face serves editorial headings and the writing paper. Inter serves controls, chart metadata and data tables. Both are self-hosted. Desktop page titles use a fluid 42–64 px scale and the workspace uses a smaller title scale. Body text is 16/26 px, UI is 14/20 px, supplementary metadata is 12/18 px and document text is 17/28 px. Metrics and tables use tabular lining numerals. Long-form prose is set to about 72 characters per line. [Font provenance](../apps/web/src/styles/fonts/LICENSE-NOTES.md)
 
-Spacing scale px: 4,8,12,16,24,32,48,64,96. Surface radius 12; inputs/buttons 8; dialogs 16; no pill treatment for every element. Border 1px; elevation only for menus/dialogs, subtle 0 8px 32px rgba(23,36,45,.08). Primary button height44; icon targets ≥44×44; controls labeled. Desktop max width1280, public prose760; sidebar240; editor outline200/tools280; main document min560 when three panes fit.
+Use the 4 px spacing scale, 22 px paper corners, 10 px field corners and 24 px dialog corners. Buttons and status chips use rounded ends. Main actions retain 44 px controls and visible focus. Public content is capped at 1280 px. The private workspace sidebar is 216 px, with 154 px and 236 px for the editor outline and properties when both panes are open.
 
 ## Component contracts
 
@@ -39,7 +39,7 @@ Breakpoints: <768 phone single column, 768–1279 tablet/collapsed tools, ≥128
 
 Phone inputs use ≥16px font to prevent zoom, touch-action chosen per control, hover styles behind `(hover:hover)`, safe-area bottom padding, `100dvh` with fallback for full-height layout. Do not disable page zoom. Charts retain vertical page scrolling; horizontal brush/pan is explicit, not a scroll trap. Essential values available through table/tap and keyboard, not hover.
 
-Motion is restrained: 120–180ms opacity/color for menus/status; no animated KPI counters, autoplay data motion or decorative cryptocurrency gradients. Respect prefers-reduced-motion; errors/save status use no blocking transitions. Editor keystrokes/chart inspection should feel immediate; do not animate every pointer movement.
+Buttons give 120 ms transform feedback on pointer press. Keyboard navigation, editing and save status are immediate. Reduced motion disables press scaling.
 
 ## Accessibility verification
 

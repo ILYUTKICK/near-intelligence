@@ -96,13 +96,15 @@ describe("Methodology anchors and honesty", () => {
   it("links only verified provider documentation (no repository or file links)", () => {
     const { container } = renderedPage();
     const hrefs = Array.from(container.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    // Every link is an https URL from the verified set; no repo/file hrefs.
-    for (const href of hrefs) {
+    const external = hrefs.filter((href) => !href?.startsWith("#"));
+    // External links are HTTPS and come from the verified provider register.
+    expect(new Set(hrefs.filter((href) => href?.startsWith("#")))).toEqual(new Set(["#collection", "#sources"]));
+    for (const href of external) {
       expect(href).toMatch(/^https:\/\//);
       expect(verifiedExternalHrefs).toContain(href);
     }
-    expect(hrefs).toHaveLength(verifiedExternalHrefs.length);
-    expect(hrefs).toHaveLength(new Set(hrefs).size);
+    expect(external).toHaveLength(verifiedExternalHrefs.length);
+    expect(external).toHaveLength(new Set(external).size);
   });
 });
 

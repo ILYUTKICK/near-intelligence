@@ -10,12 +10,14 @@ import { cn } from "@/lib/utils";
 export function Breadcrumbs({
   items,
   className,
+  label = "Breadcrumb",
 }: {
   items: Array<{ label: string; href?: string }>;
   className?: string;
+  label?: string;
 }) {
   return (
-    <nav aria-label="Breadcrumb" className={cn("text-ui leading-ui", className)}>
+    <nav aria-label={label} className={cn("text-ui leading-ui", className)}>
       <ol className="flex flex-wrap items-center gap-1">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;

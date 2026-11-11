@@ -105,6 +105,29 @@ constant and refuses a definition pinned to a different capability set.
 Lockfile diff was contained to the echarts/zrender/tslib subtree. Recharts,
 Chart.js and uPlot were considered and rejected in ADR-019/ADR-006.
 
+### Desktop accessibility QA (NI-064)
+
+Added 10 November 2026 for the desktop axe scans; version from the npm registry
+on that date (`dist-tags.latest`, published 2026-10-15 — well past pnpm's
+`minimumReleaseAge` window). Alternatives compared: `axe-playwright`
+(unofficial community wrapper, smaller maintenance base) and injecting
+`axe-core` directly via `page.addScriptTag` (more moving parts, no maintained
+Playwright binding). Deque Systems' `@axe-core/playwright` is the canonical
+binding, maintained by the axe-core authors, pairs with the already-pinned
+`@playwright/test` 1.65.0 (peer `playwright-core >= 1.0.0`, resolved against
+the existing playwright-core 1.65.0), and runs axe-core 4.14.0 in the page.
+MPL-2.0 is file-level copyleft on a devDependency-only test tool — no
+application code links against it.
+
+| Package | Version | Purpose | Declared license |
+| --- | --- | --- | --- |
+| [@axe-core/playwright](https://www.npmjs.com/package/@axe-core/playwright/v/4.14.0) | 4.14.0 | Desktop axe scans of the core surfaces (zero serious/critical gate) | MPL-2.0 |
+| [axe-core](https://www.npmjs.com/package/axe-core/v/4.14.0) | 4.14.0 (transitive, exact) | The rules engine executed in the page | MPL-2.0 |
+
+Lockfile diff was contained to the `@axe-core/playwright`/`axe-core` subtree
+(2 packages). The pre-existing eslint-plugin peer-dependency warnings are
+unchanged and unrelated.
+
 ## API contract generation (NI-004, 6 November 2026)
 
 The shared-types package pins `openapi-typescript` **7.13.0** (generation only)

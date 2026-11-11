@@ -9,7 +9,7 @@ import { CSRF_COOKIE, SESSION_COOKIE, decodeSessionCookie, mintCsrfToken,
  * login form reads it via document.cookie and echoes it in X-CSRF-Token).
  * GET is safe: minting a token grants no privileges by itself.
  */
-export async function GET(request?: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     loadServerAuthConfig();
   } catch (error) {
@@ -18,11 +18,11 @@ export async function GET(request?: NextRequest) {
       { status: 503, headers: { "cache-control": "no-store" } },
     );
   }
-  const existing = request?.cookies.get(CSRF_COOKIE)?.value;
+  const existing = request.cookies.get(CSRF_COOKIE)?.value;
   if (existing && verifyCsrfPair(existing, existing)) {
     return NextResponse.json({ token: existing }, { headers: { "cache-control": "no-store" } });
   }
-  const session = decodeSessionCookie(request?.cookies.get(SESSION_COOKIE)?.value);
+  const session = decodeSessionCookie(request.cookies.get(SESSION_COOKIE)?.value);
   const token = session ? mintSessionCsrfToken(session) : mintCsrfToken();
   const response = NextResponse.json({ token }, { headers: { "cache-control": "no-store" } });
   response.cookies.set(CSRF_COOKIE, token, {

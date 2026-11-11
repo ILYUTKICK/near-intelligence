@@ -65,11 +65,11 @@ export function ChartFrame({
   className?: string;
 }) {
   return (
-    <figure className={cn("rounded-surface border border-border bg-surface p-6", className)}>
+    <figure className={cn("paper-panel min-w-0 p-5 lg:p-7", className)}>
       <figcaption className="flex flex-col gap-2">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-heading leading-heading font-serif text-text">{title}</p>
+            <p className="font-serif text-heading leading-heading font-medium text-text">{title}</p>
             {units ? (
               <p className="text-ui leading-ui text-text-secondary">
                 Units: <span className="font-medium">{units}</span>
@@ -77,7 +77,7 @@ export function ChartFrame({
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-ui text-ui leading-ui rounded-control border border-border px-2 py-1 text-text-secondary">
+            <span className="rounded-full bg-sage px-2.5 py-1 text-metadata font-medium text-accent">
               {mode === "live" ? "Live — latest approved data" : "Historical — pinned version"}
             </span>
             {quality ? <QualityBadge quality={quality} /> : null}
@@ -94,12 +94,18 @@ export function ChartFrame({
       </figcaption>
 
       {/* Toolbar: wraps on narrow screens; all controls are real buttons. */}
-      {rangeSlot || actions ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {rangeSlot}
-          {actions}
-        </div>
-      ) : null}
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-y border-border py-2.5">
+        {rangeSlot}
+        {actions}
+        <SourceDrawer
+          label="Sources & definitions"
+          sources={sources}
+          formulaUrl={formulaUrl}
+          manifestUrl={manifestUrl}
+          definition={definition}
+          triggerClassName="ml-auto"
+        />
+      </div>
 
       <div className="mt-4">{children}</div>
 
@@ -117,19 +123,6 @@ export function ChartFrame({
             valueHeader={units ? `Value (${units})` : valueHeader}
           />
         ) : null}
-        <div className="text-ui leading-ui text-text-secondary flex flex-wrap items-center gap-x-4 gap-y-1">
-          <SourceDrawer
-            label="Sources & definitions"
-            sources={sources}
-            formulaUrl={formulaUrl}
-            manifestUrl={manifestUrl}
-            definition={definition}
-          />
-          <span className="text-metadata leading-metadata">
-            Source timestamps and bounds stay visible at every screen size — open the drawer
-            for full provenance.
-          </span>
-        </div>
       </div>
     </figure>
   );

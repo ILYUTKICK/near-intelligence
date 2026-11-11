@@ -37,9 +37,9 @@ export default async function ModelRunPage({
       notFound();
     }
     return (
-      <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-        <div role="alert" className="rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
-          <h1>Model run unavailable</h1>
+      <div className="page-container">
+        <div role="alert" className="paper-panel p-8">
+          <h1 className="text-page">Model run unavailable</h1>
           <p className="text-body leading-body text-text-secondary mt-2">
             The model run could not be loaded right now. Nothing is shown rather than partial
             or fabricated content.
@@ -65,7 +65,7 @@ export default async function ModelRunPage({
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
+    <div className="page-container">
       <Breadcrumbs
         items={[{ label: "Overview", href: "/" }, { label: "Models", href: "/models" }, { label: `Model run ${run.model_id} v${run.model_version}` }]}
       />

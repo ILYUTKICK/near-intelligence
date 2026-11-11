@@ -10,7 +10,7 @@ const toneClasses = {
   positive: "bg-sage text-text border-transparent",
   warning: "bg-surface text-warning border-warning",
   critical: "bg-surface text-danger border-danger",
-  info: "bg-surface-muted text-text-secondary border-border",
+  info: "bg-info-surface text-chart-2 border-transparent",
 } as const;
 
 /** Status glyphs — status is never conveyed by color alone. */
@@ -82,8 +82,8 @@ export function QualityBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-control border px-2 py-1",
-        "font-ui text-ui leading-ui font-medium",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1",
+        "text-metadata font-medium",
         toneClasses[presentation.tone],
         className,
       )}

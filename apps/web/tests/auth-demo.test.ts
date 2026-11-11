@@ -55,7 +55,7 @@ async function demoRequest(options: {
     headers.set("origin", options.origin ?? "http://localhost:3000");
   }
   if (!options.withoutCsrf) {
-    const minted = await csrfGet();
+    const minted = await csrfGet(new NextRequest("http://localhost:3000/api/auth/csrf"));
     const token = ((await minted.json()) as { token: string }).token;
     headers.set("cookie", `${SESSION_COOKIE === "ni_session" ? "ni_csrf" : "ni_csrf"}=${token}`);
     headers.set("x-csrf-token", token);
