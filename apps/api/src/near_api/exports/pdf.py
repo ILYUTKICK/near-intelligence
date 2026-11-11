@@ -347,7 +347,7 @@ def _styles() -> dict[str, ParagraphStyle]:
         "list_item": ParagraphStyle(
             "list_item", fontName=_FONT_REGULAR, fontSize=9.5, leading=13.5,
             spaceAfter=2, leftIndent=14, bulletIndent=4,
-            textColor=colors.black),
+            bulletFontName=_FONT_REGULAR, textColor=colors.black),
         "card_label": ParagraphStyle(
             "card_label", fontName=_FONT_REGULAR, fontSize=9.5, leading=13.5,
             spaceBefore=6, spaceAfter=2, backColor=_CARD_BACKGROUND,
@@ -373,10 +373,10 @@ def _styles() -> dict[str, ParagraphStyle]:
             "table_cell", fontName=_FONT_REGULAR, fontSize=8.5, leading=11.5,
             textColor=colors.black),
         "mono_cell": ParagraphStyle(
-            "mono_cell", fontName=_FONT_MONO, fontSize=7.5, leading=10,
+            "mono_cell", fontName=_FONT_MONO, fontSize=7, leading=9.5,
             textColor=colors.black),
         "mono_header": ParagraphStyle(
-            "mono_header", fontName=_FONT_MONO_BOLD, fontSize=7.5, leading=10,
+            "mono_header", fontName=_FONT_MONO_BOLD, fontSize=7, leading=9.5,
             textColor=colors.black),
         "appendix_label": ParagraphStyle(
             "appendix_label", fontName=_FONT_BOLD, fontSize=9.5, leading=13,
@@ -433,7 +433,8 @@ def _list_flowables(items: tuple[RichTextListItem, ...], *, ordered: bool,
                     "does not support", "list_item", "unsupported_list_child")
         style = ParagraphStyle(
             f"list-{depth}", parent=styles["list_item"],
-            leftIndent=14 * depth, bulletIndent=14 * (depth - 1) + 4)
+            leftIndent=14 * depth, bulletIndent=14 * (depth - 1) + 4,
+            bulletFontName=_FONT_REGULAR)
         flowables.append(Paragraph(
             " ".join(inline).rstrip(), style, bulletText=marker))
         flowables.extend(nested)
@@ -547,50 +548,58 @@ def _cell_text(cell) -> str:
     return str(cell)
 
 
-def _column_widths(header_lengths: list[int], body_max_lengths: list[int],
-                   count: int) -> list[float]:
-    """Content-weighted column widths over the printable width.
+def _column_widths(token_lengths: list[int], *, char_width: float,
+                   padding: float = 10.0) -> list[float]:
+    """Column widths sized to each column's widest unbreakable token.
 
-    Cells are wrapping paragraphs, so every column stays readable and no
-    cell is ever clipped; narrow tables get proportional widths, and past
-    ten columns the width is distributed evenly (each column then wraps its
-    values line-by-line — exact but taller).
+    ``token_lengths`` are the per-column maximum token lengths (headers and
+    cells); ``char_width`` approximates the font's advance width. When the
+    token needs fit the printable width, every token renders on one line;
+    when they cannot (physically too wide), the needs shrink proportionally
+    and wrapping paragraph cells break long tokens across lines — values
+    stay complete and exact, never clipped, and tables still split across
+    pages under repeating header rows. Past ten columns the width is
+    distributed evenly.
     """
+    count = len(token_lengths)
     if count > 10:
         even = _FRAME_WIDTH / count
         return [even] * count
-    weights = [max(min(header, 40), min(body, 40), 6) + 4
-               for header, body in zip(header_lengths, body_max_lengths)]
-    total = sum(weights)
-    widths = [_FRAME_WIDTH * weight / total for weight in weights]
-    # Normalize to the exact frame width (float rounding guard).
-    correction = (_FRAME_WIDTH - sum(widths)) / count
-    return [width + correction for width in widths]
+    needs = [min(length, 64) * char_width + padding for length in token_lengths]
+    total = sum(needs)
+    if total <= _FRAME_WIDTH:
+        extra = (_FRAME_WIDTH - total) / count
+        return [need + extra for need in needs]
+    factor = _FRAME_WIDTH / total
+    return [max(need * factor, 18.0) for need in needs]
+
+
+def _max_token_lengths(rows_of_text: list[list[str]]) -> list[int]:
+    """Per-column maximum unbreakable-token length (headers included)."""
+    lengths: list[int] = []
+    for row in rows_of_text:
+        for index, cell in enumerate(row):
+            token = max((len(word) for word in cell.split()), default=0)
+            if index < len(lengths):
+                lengths[index] = max(lengths[index], token)
+            else:
+                lengths.append(token)
+    return lengths
 
 
 def _data_table_flowables(block: ExportDataTableBlock,
                           styles: dict[str, ParagraphStyle]) -> list[Flowable]:
-    header_lengths = [len(column.label) + (len(column.unit or "") + 2)
-                      for column in block.columns]
-    body_max: list[int] = []
-    rows = None
+    header_text = [column.label + (f" ({column.unit})" if column.unit else "")
+                   for column in block.columns]
+    body_text: list[list[str]] = []
     if block.rows is not None:
-        rows = [[Paragraph(escape_text(_cell_text(cell)), styles["table_cell"])
-                 for cell in row] for row in block.rows]
-        for row in block.rows:
-            for index, cell in enumerate(row):
-                length = len(_cell_text(cell))
-                if index < len(body_max):
-                    body_max[index] = max(body_max[index], length)
-                else:
-                    body_max.append(length)
-    header = [Paragraph(escape_text(column.label)
-                        + (f" ({escape_text(column.unit)})" if column.unit else ""),
-                        styles["table_header"])
-              for column in block.columns]
+        body_text = [[_cell_text(cell) for cell in row] for row in block.rows]
+    token_lengths = _max_token_lengths([header_text, *body_text])
+    header = [Paragraph(escape_text(text), styles["table_header"])
+              for text in header_text]
     count = len(block.columns)
-    body_max += [0] * (count - len(body_max))
-    widths = _column_widths(header_lengths, body_max, count)
+    token_lengths += [0] * (count - len(token_lengths))
+    widths = _column_widths(token_lengths, char_width=4.9)
     table_style = TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), _TABLE_HEADER_BACKGROUND),
         ("GRID", (0, 0), (-1, -1), 0.4, _GRID_COLOR),
@@ -601,7 +610,7 @@ def _data_table_flowables(block: ExportDataTableBlock,
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ])
     flowables: list[Flowable] = []
-    if rows is None:
+    if block.rows is None:
         dataset = block.dataset
         assert dataset is not None  # the export contract keeps exactly one payload
         pin = Paragraph(
@@ -613,6 +622,8 @@ def _data_table_flowables(block: ExportDataTableBlock,
                                               repeatRows=1, style=table_style),
                                        pin]))
     else:
+        rows = [[Paragraph(escape_text(text), styles["table_cell"])
+                 for text in row] for row in body_text]
         flowables.append(Table([header, *rows], colWidths=widths,
                                repeatRows=1, style=table_style))
     flowables.append(Spacer(1, 6))
@@ -645,10 +656,7 @@ def _exact_value_table(csv_text: str, path: str,
               for cell in rows[0]]
     body = [[Paragraph(escape_text(cell), styles["mono_cell"]) for cell in row]
             for row in rows[1:]]
-    widths = _column_widths([len(cell) for cell in rows[0]],
-                            [max([len(row[index]) for row in rows[1:]], default=0)
-                             for index in range(count)],
-                            count)
+    widths = _column_widths(_max_token_lengths(rows), char_width=4.25, padding=8.0)
     return Table([header, *body], colWidths=widths, repeatRows=1, style=TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), _TABLE_HEADER_BACKGROUND),
         ("GRID", (0, 0), (-1, -1), 0.4, _GRID_COLOR),
@@ -700,26 +708,25 @@ def _model_result_flowables(block, styles: dict[str, ParagraphStyle]) -> list[Fl
                   ("name", "estimate", "std_error", "t_stat", "p_value",
                    "ci95_low", "ci95_high")]
         rows = []
-        max_lengths = [len(name) for name in
-                       ("name", "estimate", "std_error", "t_stat", "p_value",
-                        "ci95_low", "ci95_high")]
+        coefficient_text = []
         for coefficient in coefficients:
             values = [str(getattr(coefficient, field))
                       for field in ("name", "estimate", "std_error", "t_stat",
                                     "p_value", "ci95_low", "ci95_high")]
-            for index, value in enumerate(values):
+            for value in values:
                 _require_glyphs(value, f"modelResult.{summary.run_id}", mono=True)
-                max_lengths[index] = max(max_lengths[index], len(value))
+            coefficient_text.append(values)
             rows.append([Paragraph(escape_text(value), styles["mono_cell"])
                          for value in values])
         flowables.append(Paragraph("Coefficients (exact values):",
                                    styles["card_body"]))
         flowables.append(Table([header, *rows],
                                colWidths=_column_widths(
-                                   [len(name) for name in
-                                    ("name", "estimate", "std_error", "t_stat",
-                                     "p_value", "ci95_low", "ci95_high")],
-                                   max_lengths, 7),
+                                   _max_token_lengths(
+                                       [["name", "estimate", "std_error",
+                                         "t_stat", "p_value", "ci95_low",
+                                         "ci95_high"], *coefficient_text]),
+                                   char_width=4.25, padding=8.0),
                                repeatRows=1, style=TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), _TABLE_HEADER_BACKGROUND),
             ("GRID", (0, 0), (-1, -1), 0.4, _GRID_COLOR),
