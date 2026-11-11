@@ -621,13 +621,15 @@ describe("My Research organization — private tags and favorites (NI-072)", () 
   });
 
   it("toggles the favorite flag optimistically and reverts with an error on failure", async () => {
-    let rejectPatch: ((reason: unknown) => void) | null = null;
+    // Holder object: the reject function is captured from inside the fetch
+    // mock so the test controls exactly when the PATCH fails.
+    const patchGate: { reject: ((reason: unknown) => void) | null } = { reject: null };
     const requests = mockApi([
       (url, init) => (isGetDocuments(url, init) ? listPage([TAGGED_DOC], null) : undefined),
       (url, init) => {
         if (url === `/api/documents/${DOC_RECENT_ID}/organization` && init.method === "PATCH") {
           return new Promise<Response>((_resolve, reject) => {
-            rejectPatch = reject;
+            patchGate.reject = reject;
           }) as unknown as Response;
         }
         return undefined;
@@ -649,7 +651,7 @@ describe("My Research organization — private tags and favorites (NI-072)", () 
 
     // The API refuses: the row reverts to the server's last known state and
     // an honest error is shown — nothing is silently retried or kept fake.
-    rejectPatch?.(new TypeError("network down"));
+    patchGate.reject?.(new TypeError("network down"));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/could not be changed/i);
     const reverted = screen.getByRole("button", { name: "Favorite" });
