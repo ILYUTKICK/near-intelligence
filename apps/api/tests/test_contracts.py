@@ -81,11 +81,14 @@ class ContractTests(TestCase):
             # NI-036 added the document revision routes, NI-037 added the
             # version detail route, NI-032 added the public
             # metrics/chart/dataset/source delivery routes, NI-054 added
-            # the public model definition/readiness/run routes and NI-041
-            # added the chart-block insertion route.
+            # the public model definition/readiness/run routes, NI-041
+            # added the chart-block insertion route and NI-044 added the
+            # owner-scoped research snapshot routes.
             self.assertEqual(set(schema["paths"]), {
                 "/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
+                "/api/snapshots", "/api/snapshots/{snapshot_id}",
+                "/api/snapshots/{snapshot_id}/compare-live",
                 "/api/documents", "/api/documents/{document_id}",
                 "/api/documents/{document_id}/versions",
                 "/api/documents/{document_id}/versions/{version_id}",
