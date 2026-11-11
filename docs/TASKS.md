@@ -2150,7 +2150,7 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0, explicitly commissioned desktop redesign
 - **Dependencies:** NI-006, NI-008, NI-009, NI-010, NI-015, NI-017, NI-024, NI-025, NI-034, NI-035, NI-041, NI-043, NI-050, NI-054, NI-058, NI-062, NI-063, NI-070
 - **Complexity:** L
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** Codex chat `01a1cb7a-2069-7291-bf14-941f53886671`
 - **Execution role:** A
 - **Started at:** 2026-11-11T19:48:26+03:00
@@ -2162,3 +2162,7 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 **Acceptance criteria:** The desktop routes use the NI-074 visual hierarchy and preserve the existing English UI, fifteen thesis sections and H1–H4 anchors. Chart rendering, provenance, exact values, historical/estimate/unavailable/stale states, workspace ownership, autosave/reopen, pinned revisions and acknowledged-version export continue through their existing contracts. Keyboard focus, dialog dismissal and focus return work. Record changed surfaces, screenshots and remaining limitations for owner review.
 
 **Testing requirements:** Lint, strict TypeScript, relevant web tests, production build, real-stack research workflow and desktop browser checks. Use isolated fixtures for private actions and retain honest unavailable states for missing approved data.
+
+- **Result (2026-11-11):** The NI-074 desktop design is integrated across public, auth, Data, chart, editor and account routes. The original thesis, registered chart selection, exact values, owner boundaries and frozen export paths remain in use. Profile now persists through the existing private API. [Route inventory, 35 screenshots, and integration decisions](verification/ni-075/README.md)
+- **Verification (2026-11-11):** Web lint, strict TypeScript, production Webpack build, 531 web tests, 22 contrast checks, 22 Python export tests and 17 desktop Playwright scenarios passed. The disposable browser stack verified the acknowledged-revision ZIP during a dataset outage, server-side isolation and profile persistence. Axe found zero serious or critical violations and one moderate landmark finding on the synthetic 200-block editor. [PR #87 checks](https://github.com/ILYUTKICK/near-intelligence/pull/87/checks)
+- **Acceptance:** Independent review skipped by user instruction 2026-11-09. Owner review and merge are through [PR #87](https://github.com/ILYUTKICK/near-intelligence/pull/87).
