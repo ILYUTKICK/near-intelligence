@@ -185,7 +185,7 @@ class ExportIrDatabaseTests(unittest.TestCase):
             for key in MANIFEST_KEYS}
         cls.run_id = derive_run_id(hashes)
         publish_run(os.environ["NI_TEST_OPERATOR_URL"], bundle, cls.run_id)
-        cls.fit_manifest = bundle["manifests"]["fit_manifest"]
+        cls.fit_manifest = bundle["fit_manifest"]
 
     @classmethod
     def insert_public_citation(cls):
