@@ -150,6 +150,13 @@ export interface paths {
         /**
          * Owner-scoped document list
          * @description List the verified principal's documents, newest first, owner-scoped.
+         *
+         *     Optional private organization filters (NI-072): ``tag`` may repeat (AND
+         *     semantics — a document matches when it carries EVERY listed normalized
+         *     tag; at most :data:`MAX_FILTER_TAGS` values), ``favorite`` filters to
+         *     favorited (``true``) or non-favorited (``false``) documents. Filters
+         *     compose with ``q`` and pagination inside one owner-scoped query; a tag
+         *     no document carries is an honest empty page, never an error.
          */
         get: operations["listDocuments"];
         put?: never;
@@ -452,6 +459,33 @@ export interface paths {
         head?: never;
         /** Edit an insight in the current owned document revision */
         patch: operations["updateDocumentInsight"];
+        trace?: never;
+    };
+    "/api/documents/{document_id}/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update an owned document's private tags and favorite flag
+         * @description Merge private organization metadata on the owned document (NI-072).
+         *
+         *     PATCH semantics: absent fields stay unchanged; ``tags`` normalizes
+         *     server-side (trim + lower + dedupe) and ``tags: []`` clears them. This is
+         *     metadata-only — no revision is created, no content hash changes and
+         *     ``documents.updated_at`` (the list order) is untouched, so no If-Match
+         *     precondition applies. The document must exist and be owned (one generic
+         *     404 otherwise).
+         */
+        patch: operations["updateDocumentOrganization"];
         trace?: never;
     };
     "/api/documents/{document_id}/versions": {
@@ -1246,6 +1280,41 @@ export interface components {
             next_cursor: string | null;
         };
         /**
+         * DocumentOrganizationResponse
+         * @description The verified owner's organization metadata for one document.
+         */
+        DocumentOrganizationResponse: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Favorite */
+            favorite: boolean;
+            /** Tags */
+            tags: string[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * DocumentOrganizationUpdateRequest
+         * @description PATCH /documents/{id}/organization body.
+         *
+         *     PATCH semantics: an absent field is left unchanged, so a favorite toggle
+         *     never resends tags and a tag edit never resends the favorite. Raw tags
+         *     are normalized server-side (trim + lower + dedupe) and re-bounded to
+         *     MAX_TAG_LENGTH/MAX_TAGS_PER_DOCUMENT after normalization.
+         */
+        DocumentOrganizationUpdateRequest: {
+            /** Favorite */
+            favorite?: boolean | null;
+            /** Tags */
+            tags?: string[] | null;
+        };
+        /**
          * DocumentProgress
          * @description Per-document work-completion counters (`{headings,charts,insights}`).
          *
@@ -1288,6 +1357,11 @@ export interface components {
             /** Current Version Id */
             current_version_id: string | null;
             /**
+             * Favorite
+             * @default false
+             */
+            favorite: boolean;
+            /**
              * Id
              * Format: uuid
              */
@@ -1301,6 +1375,11 @@ export interface components {
             revision: number;
             /** Schema Version */
             schema_version: number;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: string[];
             /** Title */
             title: string;
             /**
@@ -1341,6 +1420,13 @@ export interface components {
          *     `revision`/`current_version_id` come from the live app.documents row, so
          *     a summary always reflects the document's current revision. A document
          *     that has no saved revision yet carries `current_version_id: null`.
+         *
+         *     `tags`/`favorite` (NI-072) are private organization metadata from
+         *     app.document_organization, separate from the immutable research chain:
+         *     they carry defaults so every producer stays honest — a document without
+         *     organization rows has no tags and is not favorited, never fabricated
+         *     metadata. Editing them never changes `revision`/`updated_at` or the list
+         *     order.
          */
         DocumentSummary: {
             /**
@@ -1351,6 +1437,11 @@ export interface components {
             /** Current Version Id */
             current_version_id: string | null;
             /**
+             * Favorite
+             * @default false
+             */
+            favorite: boolean;
+            /**
              * Id
              * Format: uuid
              */
@@ -1360,6 +1451,11 @@ export interface components {
             revision: number;
             /** Schema Version */
             schema_version: number;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: string[];
             /** Title */
             title: string;
             /**
@@ -3145,6 +3241,8 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                tag?: string[] | null;
+                favorite?: boolean | null;
                 cursor?: string | null;
                 limit?: number | null;
             };
@@ -5043,6 +5141,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InsightMutationResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateDocumentOrganization: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentOrganizationUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOrganizationResponse"];
                 };
             };
             /** @description Missing or invalid session */
