@@ -25,6 +25,7 @@ Honesty rules carried over from the IR:
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
 from typing import NamedTuple
 from uuid import UUID
@@ -48,6 +49,7 @@ from near_api.schemas.export import (
     ExportInsightBlock,
     ExportIr,
     ExportListBlock,
+    ExportModelResultBlock,
     ExportParagraphBlock,
     ExportRiskBlock,
 )
@@ -255,6 +257,63 @@ def _render_chart(block: ExportChartBlock, number: int,
     ]
 
 
+def _recorded_number(value: float) -> str:
+    """The recorded statistical value verbatim (the shortest round-trip
+    spelling, never rounded or locale-formatted)."""
+    return str(value)
+
+
+def _render_model_result(block: ExportModelResultBlock) -> list[str]:
+    """Render one pinned model result from the plan's frozen projection.
+
+    Every number comes from ``block.summary`` — the NI-056 projection of the
+    immutable published run row — never from the document JSON (which stores
+    no statistical value at all). The interpretation renders as prose; the
+    recorded limitations of the run always precede the coefficients.
+    """
+    summary = block.summary
+    lines = [
+        f"> **Model result** — pinned published run `{summary.run_id}` "
+        f"(specification `{escape_text(block.spec_id)}` version {block.spec_version}).",
+        ">",
+        f"> Gate verdict: {escape_text(summary.gate_verdict)} · sample "
+        f"{escape_text(summary.sample_start)} to {escape_text(summary.sample_end_exclusive)} "
+        f"(end exclusive) · {summary.nobs} observations.",
+        f"> Recorded reproduction tolerances: rtol {escape_text(summary.coefficient_rtol)} / "
+        f"atol {escape_text(summary.coefficient_atol)}.",
+        ">",
+        f"> Recorded limitations apply to every value below; the run's own limitation "
+        f"notes travel in the published bundle. Coefficients are associations recorded "
+        f"by the publication gate — never causal effects.",
+        ">",
+        "> Recorded coefficients:",
+        ">",
+        "> | Term | Estimate | Std. error | t | p | 95% CI |",
+        "> | --- | --- | --- | --- | --- | --- |",
+    ]
+    for coefficient in summary.coefficients:
+        cells = (
+            escape_text(coefficient.name), _recorded_number(coefficient.estimate),
+            _recorded_number(coefficient.std_error), _recorded_number(coefficient.t_stat),
+            _recorded_number(coefficient.p_value),
+            f"[{_recorded_number(coefficient.ci95_low)}, "
+            f"{_recorded_number(coefficient.ci95_high)}]",
+        )
+        lines.append("> | " + " | ".join(cells) + " |")
+    lines.append(">")
+    lines.append("> Recorded diagnostics: "
+                 + escape_text(json.dumps(summary.diagnostics, sort_keys=True,
+                                          separators=(",", ":"), default=str)) + ".")
+    lines.append(">")
+    lines.append(f"> Source: the recorded manifest bundle of this run "
+                 f"([{escape_text(summary.manifest_url)}]({_escape_link(summary.manifest_url)})) "
+                 f"— verify offline with the bundle's hashes; the block pins run "
+                 f"`{summary.run_id}` and dataset version `{block.dataset_version_id}`.")
+    lines.append(">")
+    lines.extend(_render_body(block.interpretation, prefix="> "))
+    return lines
+
+
 def _render_data_table(block: ExportDataTableBlock) -> list[str]:
     header = [escape_text(column.label)
               + (f" ({escape_text(column.unit)})" if column.unit else "")
@@ -310,6 +369,8 @@ def _render_block(block: ExportBlock, *, chart_number: int,
         return _render_evidence(block), chart_number
     if isinstance(block, ExportRiskBlock):
         return _render_risk(block), chart_number
+    if isinstance(block, ExportModelResultBlock):
+        return _render_model_result(block), chart_number
     if isinstance(block, ExportDividerBlock):
         return ["---"], chart_number
     raise MarkdownRenderError(

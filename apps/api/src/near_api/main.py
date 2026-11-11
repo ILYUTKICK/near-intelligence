@@ -15,6 +15,7 @@ from near_api.contracts import error_response, install_contracts
 from near_api.datasets.delivery import DeliveryError, delivery_error_shape
 from near_api.datasets.routes import router as datasets_router
 from near_api.documents.chart_blocks import router as chart_blocks_router
+from near_api.documents.model_blocks import router as model_blocks_router
 from near_api.documents.routes import router as documents_router
 from near_api.evidence.link_routes import router as evidence_router
 from near_api.evidence.routes import router as hypotheses_router
@@ -58,6 +59,7 @@ async def delivery_failure(request: Request, error: DeliveryError):
 app.include_router(workspace_router)
 app.include_router(documents_router)
 app.include_router(chart_blocks_router)
+app.include_router(model_blocks_router)
 app.include_router(exports_router)
 app.include_router(insights_router)
 app.include_router(hypotheses_router)
