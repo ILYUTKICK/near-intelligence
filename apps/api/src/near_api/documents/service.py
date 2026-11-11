@@ -170,12 +170,13 @@ def get_document_detail(engine: Engine, principal: Principal,
 
 
 def list_document_details(engine: Engine, principal: Principal, *, search: str | None = None,
+                          tags: list[str] | None = None, favorite: bool | None = None,
                           limit: int | None = None,
                           offset: int | None = None) -> Page:
     """Owner-scoped, paginated document list (delegates to the NI-019 repository)."""
     with principal_transaction(engine, principal) as connection:
-        return list_documents(connection, principal, search=search,
-                              limit=limit, offset=offset)
+        return list_documents(connection, principal, search=search, tags=tags,
+                              favorite=favorite, limit=limit, offset=offset)
 
 
 def save_revision(engine: Engine, principal: Principal, document_id: UUID, *,
