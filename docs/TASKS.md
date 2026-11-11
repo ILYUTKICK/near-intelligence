@@ -1092,7 +1092,13 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 - **Priority:** P1
 - **Dependencies:** NI-035, NI-043, NI-058
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode A-role implementation subagent, dispatched by coordinator session sess_9345ee4f-f534-4698-98d2-5809986ac4c3
+- **Execution role:** A
+- **Started at:** 2026-11-11T23:09:10Z
+- **Branch/worktree:** feat/ni-071-filters; /Users/ilyutkinn/Desktop/near-intelligence-a27
+- **Authorization:** Owner handoff v2 (docs/FINISH_BEFORE_DEPLOY_PROMPT.md, 12 November 2026) requires implementing all registered P1/P2; PR #88 carries the updated registry.
+- **Dependency verification:** NI-035, NI-043 and NI-058 are DONE in this registry; verified on docs/ni-077-handoff-v2 at commit 2787fd5.
 
 **Description:** Extend the small P0 selection set only where verified source dimensions support a meaningful economic comparison.
 
