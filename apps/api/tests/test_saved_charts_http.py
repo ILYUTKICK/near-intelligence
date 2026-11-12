@@ -179,7 +179,7 @@ class SavedChartsHTTPE2E(unittest.TestCase):
         headers = {"Origin": web_url, "x-csrf-token": token, "Idempotency-Key": str(uuid4())}
         body = {"chart_definition_version_id": str(chart_by_chart_id("intents-volume").id),
                 "dataset_version_id": str(dataset.dataset_version_id), "mode": "live", "label": "Synthetic HTTP E2E",
-                "selection": {"start": "2026-01-01", "end": "2026-01-02", "frequency": "day", "filters": {"source": "SRC-LLAMA"}}}
+                "selection": {"start": "2026-01-01", "end": "2026-01-02", "frequency": "day", "filters": {"source": ["SRC-LLAMA"]}}}
         response = client.post("/api/saved-charts", json=body, headers=headers)
         self.assertEqual(response.status_code, 201, response.text)
         saved = response.json()
