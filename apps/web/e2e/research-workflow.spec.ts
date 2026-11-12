@@ -350,6 +350,11 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await page.getByTestId("export-open").click();
   const exportDialog = page.getByTestId("export-dialog");
   await expect(exportDialog).toBeVisible();
+  // NI-059: the dialog first asks for the bundle format and starts the job
+  // only on the explicit Start action (Markdown ZIP is the preselected
+  // default; the PDF path is the same job lifecycle).
+  await expect(exportDialog.getByTestId("export-choosing")).toBeVisible();
+  await exportDialog.getByTestId("export-start").click();
   const download = await downloadPromise;
   const exportDir = path.join(os.tmpdir(), `ni063-e2e-export-${Date.now()}`);
   mkdirSync(exportDir, { recursive: true });
