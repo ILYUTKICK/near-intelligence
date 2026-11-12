@@ -140,7 +140,7 @@ describe("Saved chart workflow", () => {
 
 describe("Saved Charts compact cards (NI-078, NI-076 D4)", () => {
   it("renders every card with the shared renderer preview and one concise context line", async () => {
-    const second = { ...saved, id: "33333333-3333-4333-8333-333333333333", label: "Second synthetic saved chart", selection: { ...selection, filters: {} } };
+      const second = { ...saved, id: "33333333-3333-4333-8333-333333333333", label: "Second synthetic saved chart", selection: { ...selection, filters: {} as Record<string, string> } };
     const chartView = view(definition(), []);
     const detailFor = (item: typeof saved) => ({ saved_chart: item, view: chartView, dataset_changed: false });
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
