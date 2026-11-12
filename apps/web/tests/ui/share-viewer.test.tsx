@@ -23,7 +23,9 @@ function viewerProjection(): ShareProjectionPayload {
     observation("2026-11-02", null),
   ], { start: "2026-11-01", end: "2026-11-06" });
   const view = {
-    definition: definition(),
+    // The generated contract marks `unavailable_reason` optional (the API
+    // defaults it); the render-boundary schema requires the resolved shape.
+    definition: { ...definition(), unavailable_reason: null },
     selection: chartSeries.selection,
     dataset: chartSeries.dataset,
     series: [chartSeries],
@@ -91,10 +93,11 @@ describe("ShareViewer (read-only rendering)", () => {
     // The token never exists inside the viewer state: the projection carries
     // no owner or private identifiers at all.
     expect(viewer.textContent).not.toMatch(/owner_id|author|document_id/);
-    await waitFor(async () => {
-      const results = await axe(screen.getByTestId("share-viewer"));
-      expect(results).toHaveNoViolations();
-    });
+    // The exact-value table renders synchronously with the controlled view;
+    // wait for it so the async chart mount has settled before the axe pass.
+    await screen.findByText("12.5");
+    const results = await axe(screen.getByTestId("share-viewer"));
+    expect(results).toHaveNoViolations();
   });
 
   it("renders a list block and evidence reference without any editor surface", () => {

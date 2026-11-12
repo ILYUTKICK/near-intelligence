@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   chartDefinitionResponseSchema,
   chartViewResponseSchema,
+  metricResponseSchema,
+  seriesResponseSchema,
 } from "@/features/charts/library/catalog-schema";
 import type { components } from "@near-intelligence/shared-types";
 
@@ -60,6 +62,16 @@ const richTextChildSchema: z.ZodType<ShareRichTextChild> = z.lazy(() =>
 const richTextListItemSchema: z.ZodType<ShareRichTextListItem> = z.lazy(() =>
   z.object({ type: z.literal("list_item"), content: z.array(richTextChildSchema).min(1) }));
 
+// The embedded chart view mirrors the GENERATED contract exactly: the two
+// fields the API may omit (server-side defaults) stay optional here, so a
+// fixture/response checked against the generated type also validates.
+const shareChartViewSchema = chartViewResponseSchema.extend({
+  definition: chartDefinitionResponseSchema.partial({ unavailable_reason: true }),
+  series: z.array(seriesResponseSchema.extend({
+    metric: metricResponseSchema.partial({ source_id: true }),
+  })),
+});
+
 const insightContextSchema = z.union([
   // ResolvedContext (chart pin: public-safe registries only).
   z.object({
@@ -92,7 +104,7 @@ export const shareBlockSchema = z.discriminatedUnion("block_type", [
     chart_definition_version_id: z.uuid(), mode: z.literal("live"),
     selection: z.object({ start: isoDate, end: isoDate, frequency: z.literal("day"),
       filters: z.record(z.string(), z.string()) }),
-    observed_dataset_version_id: z.uuid(), view: chartViewResponseSchema,
+    observed_dataset_version_id: z.uuid(), view: shareChartViewSchema,
   }).strict(),
   z.object({
     block_type: z.literal("dataTable"), block_id: z.uuid(),
