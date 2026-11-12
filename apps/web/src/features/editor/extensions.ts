@@ -10,6 +10,7 @@ import {
   Risk,
 } from "./blocks/annotation-nodes";
 import { LiveChart } from "./blocks/live-chart";
+import { ModelResult } from "./blocks/model-result";
 import { blockIdAttr } from "./attributes";
 import { BlockOperationShortcuts } from "./commands";
 import { SlashMenuTrigger } from "./slash-menu";
@@ -92,6 +93,7 @@ export const DOCUMENT_EXTENSIONS = [
   Hypothesis,
   Evidence,
   Risk,
+  ModelResult,
 ];
 
 export const EDITOR_EXTENSIONS = [

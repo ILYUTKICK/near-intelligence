@@ -71,6 +71,7 @@ from near_api.documents.schema import (
     HypothesisNode,
     InsightNode,
     LiveChartNode,
+    ModelResultNode,
     RiskNode,
     parse_document,
 )
@@ -83,6 +84,7 @@ from near_api.insights.schemas import (
     RichTextList,
     RichTextRun,
 )
+from near_api.models import service as model_service
 from near_api.repositories.documents import (
     DocumentRow,
     DocumentVersionRow,
@@ -108,6 +110,9 @@ from near_api.schemas.export import (
     ExportInsightBlock,
     ExportIr,
     ExportListBlock,
+    ExportModelResultBlock,
+    ExportModelResultCoefficient,
+    ExportModelResultSummary,
     ExportModelRunReference,
     ExportParagraphBlock,
     ExportRiskBlock,
@@ -230,6 +235,7 @@ class _Mapping:
     hypotheses: dict[UUID, HypothesisNode]
     evidence: dict[UUID, EvidenceNode]
     risks: dict[UUID, RiskNode]
+    models: dict[UUID, ModelResultNode]
 
 
 def _map_paragraph(mapping: _Mapping, block: Block, node: dict) -> ExportBlock:
@@ -403,6 +409,80 @@ def _map_divider(mapping: _Mapping, block: Block, node: dict) -> ExportBlock:
     return ExportDividerBlock(block_type="divider", block_id=block.block_id)
 
 
+def _run_summary_projection(run_id: UUID, row: dict) -> ExportModelResultSummary:
+    """Project the immutable published row for one block (nothing re-run).
+
+    The same mechanical rules as the public run detail (NI-054): recorded
+    values verbatim, missing values absent, no fabrication. A row that lost
+    its manifest set is not a servable result and fails closed.
+    """
+    try:
+        fit = model_service._row_manifests(row)["fit_manifest"]
+        diagnostics = model_service._row_manifests(row)["diagnostics_report"]
+        sample = fit["sample"]["window"]
+        coefficients = tuple(
+            ExportModelResultCoefficient.model_validate(entry)
+            for entry in fit["coefficients"])
+    except (KeyError, TypeError, ValidationError) as error:
+        raise ExportIrError(
+            f"The published model run {run_id} does not carry a servable "
+            "recorded result set",
+            [("model_run", "model_result_projection_failed")]) from error
+    return ExportModelResultSummary(
+        run_id=run_id,
+        model_id=fit["model"]["model_id"],
+        model_version=int(fit["model"]["model_version"]),
+        gate_verdict=fit["admission"]["verdict"],
+        sample_start=sample["start"],
+        sample_end_exclusive=sample["end_exclusive"],
+        nobs=int(fit["sample"]["nobs"]),
+        coefficient_rtol=fit["reproduction"]["coefficient_rtol"],
+        coefficient_atol=fit["reproduction"]["coefficient_atol"],
+        manifest_url=f"/api/model-runs/{run_id}/manifest",
+        coefficients=coefficients,
+        diagnostics={
+            "stationarity": diagnostics.get("stationarity", {}),
+            "residual_diagnostics": diagnostics.get("residual_diagnostics", {}),
+            "sensitivity": diagnostics.get("sensitivity", {}),
+            "diagnostics_config": diagnostics.get("diagnostics_config", {}),
+        },
+    )
+
+
+def _map_model_result(mapping: _Mapping, block: Block, node: dict) -> ExportBlock:
+    """Map a modelResult block against its immutable published run (NI-055).
+
+    The run is re-verified published-only at build time (an unpublished,
+    absent or malformed identity fails closed — never a substitution with a
+    newer run) and the dataset pin is re-verified as an approved public
+    version. The exported values are projected from the run row, never read
+    from the document, so the plan cannot carry a number the author typed.
+    """
+    del node
+    model = mapping.models[block.block_id]
+    try:
+        require_approved_dataset(mapping.connection, model.dataset_version_id,
+                                 "modelResult.dataset_version_id")
+    except DocumentSchemaError as error:
+        raise ExportIrError(
+            "The stored modelResult references a dataset version that is not "
+            "an approved public dataset",
+            error.details) from error
+    row = model_service.get_published_run_row(mapping.connection, model.model_run_id)
+    if row is None or row.get("status") != "published":
+        raise ExportIrError(
+            f"Model result block {block.block_id} pins a model run that is "
+            "not a published immutable artifact",
+            [(f"blocks.{block.block_id}", "dangling_model_run_reference")])
+    return ExportModelResultBlock(
+        block_type="modelResult", block_id=block.block_id,
+        model_run_id=model.model_run_id,
+        dataset_version_id=model.dataset_version_id,
+        spec_id=row["spec_id"], spec_version=int(row["spec_version"]),
+        interpretation=_body(model.interpretation_json),
+        summary=_run_summary_projection(model.model_run_id, row))
+
+
 _BLOCK_MAPPERS = {
     "paragraph": _map_paragraph,
     "heading": _map_heading,
@@ -414,6 +494,7 @@ _BLOCK_MAPPERS = {
     "hypothesis": _map_hypothesis,
     "evidence": _map_evidence,
     "risk": _map_risk,
+    "modelResult": _map_model_result,
     "divider": _map_divider,
 }
 """Exhaustive dispatch over the canonical P0 taxonomy. A block type missing
@@ -438,12 +519,13 @@ def _map_block(mapping: _Mapping, block: Block, node: dict) -> ExportBlock:
 
 def _verify_public_references(connection: Connection, canonical: CanonicalDocument,
                               contexts: tuple[ResolvedContext | ModelContext, ...],
-                              ) -> dict[UUID, ModelRun]:
+                              ) -> dict[UUID, _RunIdentity]:
     """Validate every public reference the plan will carry; return run rows.
 
     Evidence ``model_run``/``citation`` targets go through NI-049's shared
     validator (the same rule the save transaction enforced); insight
-    ``ModelContext`` runs resolve through the same published-only catalog.
+    ``ModelContext`` runs and NI-055 ``modelResult`` pins resolve through the
+    same published-only catalog.
     """
     try:
         validate_public_targets(connection, canonical)
@@ -456,6 +538,7 @@ def _verify_public_references(connection: Connection, canonical: CanonicalDocume
                if item.target_kind == "model_run"}
     run_ids |= {context.model_run_id for context in contexts
                 if isinstance(context, ModelContext)}
+    run_ids |= {model.model_run_id for model in canonical.model_results}
     runs: dict[UUID, _RunIdentity] = {}
     if run_ids:
         rows = connection.execute(
@@ -492,6 +575,8 @@ def _model_run_references(blocks: tuple[ExportBlock, ...],
             referenced.add(block.context.model_run_id)
         elif isinstance(block, ExportEvidenceBlock) and block.target_kind == "model_run":
             referenced.add(block.target_id)
+        elif isinstance(block, ExportModelResultBlock):
+            referenced.add(block.model_run_id)
     return tuple(ExportModelRunReference(run_id=run.run_id, spec_id=run.spec_id,
                                          spec_version=run.spec_version)
                  for run in sorted((runs[item] for item in referenced),
@@ -572,7 +657,8 @@ def _build_ir(connection: Connection, document: DocumentRow,
         insights={item.block_id: item for item in canonical.insights},
         hypotheses={item.block_id: item for item in canonical.hypotheses},
         evidence={item.block_id: item for item in canonical.evidence},
-        risks={item.block_id: item for item in canonical.risks})
+        risks={item.block_id: item for item in canonical.risks},
+        models={model.block_id: model for model in canonical.model_results})
 
     blocks: list[ExportBlock] = []
     for block, node in zip(canonical.blocks, canonical.canonical["content"]):

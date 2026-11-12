@@ -66,6 +66,7 @@ import { EditorInsightDialog, type InsightAction } from "./insights/editor-dialo
 import { EditorHypothesisDialog, type HypothesisAction } from "./hypotheses/editor-dialog";
 import { EditorEvidenceDialog, type EvidenceAction } from "./evidence/editor-dialog";
 import { EvidenceNavigationPanel } from "./evidence/evidence-panel";
+import { EditorModelBlockDialog } from "./models/model-block-dialog";
 
 /**
  * The three-pane research editor workbench (NI-039):
@@ -131,6 +132,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const [conflictBusy, setConflictBusy] = useState(false);
   const [conflictActionError, setConflictActionError] = useState<string | null>(null);
   const [annotationIntent, setAnnotationIntent] = useState<AnnotationIntent | null>(null);
+  const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const annotationTrigger = useRef<HTMLElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const paperRef = useRef<HTMLDivElement>(null);
@@ -493,6 +495,25 @@ export function EditorShell({ documentId, title, revision, updatedAt,
     announce(`Loaded the current revision. Review the retained ${annotationIntent.kind} draft before saving.`);
   }, [adoptAnnotationPaper, announce, annotationIntent]);
 
+  // NI-055: the acknowledged revision returned after a confirmed Add Model
+  // insertion is adopted into the paper (the dialog enforces the clean-state
+  // rule and the CAS, so the local paper cannot have drifted).
+  const acceptModelInsert = useCallback((savedContent: CanonicalDocument, revision: number, savedAt: string) => {
+    const current = editorRef.current;
+    setModelDialogOpen(false);
+    if (!current
+      || !current.chain().setMeta("addToHistory", false).setContent(canonicalToTiptapDoc(savedContent), { emitUpdate: false }).run()) {
+      announce("Model result saved on the server. Reload the document to see it in this paper.");
+      return;
+    }
+    refreshDoc(current, false);
+    controller.adoptServerState(revision, savedAt);
+    announce("Model result added with its pinned run and dataset.");
+    const nodePosition = topLevelNodePosition(current, current.state.doc.childCount - 1);
+    current.commands.setNodeSelection(nodePosition);
+    current.view.focus();
+  }, [announce, controller, refreshDoc]);
+
   const restoreAnnotationFocus = useCallback(() => {
     const trigger = annotationTrigger.current;
     if (trigger?.isConnected) {
@@ -560,10 +581,22 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         return;
       }
       setSlashMenu(null);
+      // NI-055: a model result is pinned server-side (published run + dataset
+      // verified in the save transaction) — never a local draft. The same
+      // clean-state rule as the annotation dialogs applies.
+      if (choice.type === "modelResult") {
+        if (!controller.isClean(controller.revision) || controller.draft) {
+          announce("Save your current edits before adding a model result.");
+          return;
+        }
+        setModelDialogOpen(true);
+        announce("The Add Model dialog is open.");
+        return;
+      }
       const ok = insertBlock(editor, choice.type, { headingLevel: choice.headingLevel });
       announce(ok ? "Block inserted. Focus is in the new block." : "The block could not be inserted at this position.");
     },
-    [editor, announce],
+    [editor, announce, controller],
   );
 
   const handleMove = useCallback(
@@ -693,7 +726,9 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const displayedUpdatedAt = savedAt ?? updatedAt;
 
   return (
-    <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasEvidenceActions || annotationIntent?.kind === "hypothesis"}
+    // The identity guard powers every owner mutation surface; the NI-055
+    // Add Model dialog needs it too, even on an evidence-free document.
+    <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasEvidenceActions || modelDialogOpen || annotationIntent?.kind === "hypothesis"}
       saved={controller.status.kind === "clean"} revision={controller.revision} onObserve={recordObservation}
       onInsightAction={controller.draft ? undefined : openInsight} onHypothesisAction={controller.draft ? undefined : openHypothesis}
       onEvidenceAction={controller.draft ? undefined : openEvidence}>
@@ -984,6 +1019,9 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         onSaved={acceptAnnotationSave} onReload={reloadAnnotationPaper} restoreFocus={restoreAnnotationFocus} /> : null}
       {annotationIntent?.kind === "evidence" ? <EditorEvidenceDialog intent={annotationIntent} onClose={() => setAnnotationIntent(null)}
         onSaved={acceptAnnotationSave} onReload={reloadAnnotationPaper} restoreFocus={restoreAnnotationFocus} /> : null}
+      {modelDialogOpen && annotationIntent === null ? <EditorModelBlockDialog documentId={documentId}
+        revision={controller.revision} onClose={() => { setModelDialogOpen(false); restoreAnnotationFocus(); }}
+        onInserted={acceptModelInsert} /> : null}
     </div>
     </ChartEditorProvider>
   );
