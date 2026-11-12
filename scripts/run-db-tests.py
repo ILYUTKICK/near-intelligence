@@ -120,7 +120,7 @@ def main() -> int:
                     "test_home_aggregation.py", "test_archive_import.py",
                     "test_dataset_staging.py", "test_metrics.py",
                     "test_refresh_adapter.py", "test_chart_registry.py",
-                    "test_delivery_apis.py", "test_saved_charts.py",
+                    "test_delivery_apis.py", "test_saved_charts.py", "test_snapshots.py",
                     "test_profile.py", "test_documents.py", "test_chart_blocks.py",
                     "test_model_blocks.py", "test_document_insights.py",
                     "test_models_readiness.py",
@@ -143,7 +143,7 @@ def main() -> int:
             environment["NI_LIVE_SMOKE"] = "1"
             patterns.append("test_refresh_live_smoke.py")
         if args.saved_charts_http:
-            patterns = ["test_saved_charts.py", "test_saved_charts_http.py"]
+            patterns = ["test_saved_charts.py", "test_snapshots.py", "test_saved_charts_http.py"]
         if args.chart_insertion_http:
             patterns = ["test_chart_blocks.py", "test_chart_insertion_http.py"]
         if args.workspace_home_http:
