@@ -62,3 +62,23 @@ EOF
 The renderer is deterministic: rebuilding with the same inputs reproduces
 byte-identical PDFs (test-enforced), so these artifacts equal what the
 worker stores for the same frozen plans.
+
+## NI-080 CI/main integration repair — 12 November 2026
+
+The initial PR merge tree had two Alembic heads: organization `0014` and PDF
+`0016`, both independently descended from `0012_export_jobs`. The original
+`get_current_head()` failure was reproduced locally. Migration
+`0018_merge_pdf_organization` now joins the two without altering either applied
+parent. The existing export migration regression verifies upgrade from each
+individual parent, combined schema/mirror, downgrade and re-upgrade.
+
+Normal merges retain main `129262d` and the author's concurrent E2E format-start
+fix `f7ef860`. The PDF renderer and the visual artifacts above are unchanged.
+Local verification: PDF unit 27/27; real PostgreSQL export/IR integration 27/27;
+production build, lint/types/contracts/docs (815 links)/contrast (22 pairs),
+frozen lock and whitespace checks pass. The complete desktop Playwright run
+passes 17/17, with synthetic auth/data over real web/API/PostgreSQL/worker,
+including the frozen export and outage/owner-denial branches. Existing moderate
+editor landmark finding is not hidden. Final-head GitHub required checks and
+cross-PR migration-head integration are coordinated through NI-080; no deployed
+or real-data release readiness is claimed by this repair.
