@@ -2,9 +2,11 @@ import { privateFetch } from "@/lib/auth/private-fetch";
 import {
   apiErrorResponseSchema,
   documentListResponseSchema,
+  documentOrganizationResponseSchema,
   documentResponseSchema,
   documentSummarySchema,
   type DocumentListResponse,
+  type DocumentOrganizationResponse,
   type DocumentResponse,
   type DocumentSummary,
 } from "./documents-schema";
@@ -71,11 +73,26 @@ export interface DocumentPage {
 
 /** GET /api/documents — owner-scoped, newest first (updated_at DESC). */
 export async function listDocuments(
-  options: { query?: string; cursor?: string | null; limit?: number; signal?: AbortSignal } = {},
+  options: {
+    query?: string;
+    /** Exact normalized tag names (repeatable `tag` params, AND semantics). */
+    tags?: string[];
+    /** True = favorites only, false = explicitly non-favorites. */
+    favorite?: boolean;
+    cursor?: string | null;
+    limit?: number;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<DocumentPage> {
   const params = new URLSearchParams();
   if (options.query) {
     params.set("q", options.query);
+  }
+  for (const tag of options.tags ?? []) {
+    params.append("tag", tag);
+  }
+  if (options.favorite !== undefined) {
+    params.set("favorite", String(options.favorite));
   }
   if (options.cursor) {
     params.set("cursor", options.cursor);
@@ -101,6 +118,46 @@ export async function listDocuments(
   }
   const data: DocumentListResponse = parsed.data;
   return { items: data.items, nextCursor: data.next_cursor };
+}
+
+/**
+ * PATCH /api/documents/{id}/organization — merge private tags/favorite
+ * (NI-072). Metadata-only: absent fields stay unchanged and the call never
+ * creates a revision, so no If-Match is sent. Returns the server's stored
+ * state; callers apply it to the row (optimistic toggles revert on error).
+ */
+export async function updateOrganization(input: {
+  documentId: string;
+  tags?: string[];
+  favorite?: boolean;
+}): Promise<DocumentOrganizationResponse> {
+  const body: Record<string, unknown> = {};
+  if (input.tags !== undefined) {
+    body.tags = input.tags;
+  }
+  if (input.favorite !== undefined) {
+    body.favorite = input.favorite;
+  }
+  const response = await privateFetch(`/api/documents/${input.documentId}/organization`, {
+    method: "PATCH",
+    credentials: "same-origin",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  assertJsonContentType(response);
+  const raw: unknown = await response.json();
+  if (!response.ok) {
+    throw await parseErrorResponse(response, raw);
+  }
+  const parsed = documentOrganizationResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new DocumentApiError(response.status, "INVALID_RESPONSE",
+      "The document organization could not be read.");
+  }
+  return parsed.data;
 }
 
 /** POST /api/documents — create with a client-generated Idempotency-Key. */

@@ -97,12 +97,15 @@ class HomeContractTests(unittest.TestCase):
         # NI-036 added the document revision routes, NI-037 added the version
         # detail route, NI-032 added the public
         # metrics/chart/dataset/source delivery routes, NI-054 added the
-        # public model definition/readiness/run routes and NI-041 added the
-        # chart-block insertion route.
+        # public model definition/readiness/run routes, NI-041 added the
+        # chart-block insertion route and NI-044 added the snapshot routes.
         self.assertEqual(set(schema["paths"]), {"/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
+                "/api/snapshots", "/api/snapshots/{snapshot_id}",
+                "/api/snapshots/{snapshot_id}/compare-live",
                                                 "/api/documents",
                                                 "/api/documents/{document_id}",
+                                                "/api/documents/{document_id}/organization",
                                                 "/api/documents/{document_id}/versions",
                                                 "/api/documents/{document_id}/versions/{version_id}",
                                                 "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/view",
@@ -135,7 +138,8 @@ class HomeContractTests(unittest.TestCase):
                                                 "/api/publications/{slug}/duplicate",
                                                 "/api/documents/{document_id}/exports",
                                                 "/api/documents/{document_id}/exports/{job_id}",
-                                                "/api/documents/{document_id}/exports/{job_id}/download"})
+                                                "/api/documents/{document_id}/exports/{job_id}/download",
+                                            "/api/documents/{document_id}/model-blocks"})
         self.assertEqual(schema["paths"]["/api/home"]["get"]["operationId"], "getWorkspaceHome")
         response_schema = schema["components"]["schemas"]["HomeResponse"]
         # Every documented field is always present: empty arrays stay explicit
@@ -336,14 +340,18 @@ class HomeAggregationTests(unittest.TestCase):
         self.assertEqual([item["title"] for item in payload["recent_documents"]],
                          [f"alice-doc-{number:02d}" for number in range(24, 19, -1)])
         newest = payload["recent_documents"][0]
+        # NI-072: the summary carries the private organization metadata too;
+        # a document without metadata rows shows the honest empty defaults.
         self.assertEqual(set(newest), {"id", "title", "revision", "schema_version",
                                        "current_version_id", "created_at", "updated_at",
-                                       "progress"})
+                                       "progress", "tags", "favorite"})
         self.assertEqual(newest["id"], str(alice_documents[-1][0]))
         # The summary carries the document's current revision, not a stale one.
         self.assertEqual(newest["revision"], 2)
         self.assertEqual(newest["current_version_id"], str(alice_documents[-1][1]))
         self.assertEqual(newest["progress"], {"headings": 0, "charts": 0, "insights": 0})
+        self.assertEqual(newest["tags"], [])
+        self.assertEqual(newest["favorite"], False)
         HomeResponse.model_validate(payload)
         with self.as_session(self.bob_id):
             response = self.client.get("/api/home", headers={"Authorization": "Bearer t.bob"})

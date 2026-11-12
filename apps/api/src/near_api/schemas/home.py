@@ -10,6 +10,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
+from near_api.documents.organization import MAX_TAGS_PER_DOCUMENT
 from near_api.schemas.common import ContractModel
 from near_api.schemas.delivery import SeriesResponse
 from near_api.schemas.saved_charts import SavedChartResponse
@@ -38,6 +39,13 @@ class DocumentSummary(ContractModel):
     `revision`/`current_version_id` come from the live app.documents row, so
     a summary always reflects the document's current revision. A document
     that has no saved revision yet carries `current_version_id: null`.
+
+    `tags`/`favorite` (NI-072) are private organization metadata from
+    app.document_organization, separate from the immutable research chain:
+    they carry defaults so every producer stays honest — a document without
+    organization rows has no tags and is not favorited, never fabricated
+    metadata. Editing them never changes `revision`/`updated_at` or the list
+    order.
     """
 
     id: UUID
@@ -48,6 +56,8 @@ class DocumentSummary(ContractModel):
     created_at: datetime
     updated_at: datetime
     progress: DocumentProgress
+    tags: tuple[str, ...] = Field(default=(), max_length=MAX_TAGS_PER_DOCUMENT)
+    favorite: bool = False
 
 
 class HomeInsightSummary(ContractModel):

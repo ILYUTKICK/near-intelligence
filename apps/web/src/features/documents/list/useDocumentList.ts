@@ -9,8 +9,9 @@ import type { DocumentSummary } from "./documents-schema";
  * Owner-scoped document list state (NI-023). All data comes from
  * GET /api/documents through the verified session — the client never sends a
  * user identifier and never reorders, filters or fabricates rows locally:
- * search (`q`), the updated_at-DESC order and pagination cursors are the
- * API's. Failures keep the previously loaded rows and stay retryable.
+ * search (`q`), the organization filters (`tag`, `favorite` — NI-072), the
+ * updated_at-DESC order and pagination cursors are the API's. Failures keep
+ * the previously loaded rows and stay retryable.
  */
 
 export type ListStatus = "loading" | "ready" | "error";
@@ -21,7 +22,7 @@ export interface DocumentListState {
   status: ListStatus;
   /** Human-readable load failure, null while the last load succeeded. */
   loadError: string | null;
-  /** True while a first-page reload (search change or refresh) is in flight. */
+  /** True while a first-page reload (search or filter change) is in flight. */
   refreshing: boolean;
   /** True while a next-page load is in flight. */
   loadingMore: boolean;
@@ -29,8 +30,16 @@ export interface DocumentListState {
   nextCursor: string | null;
   /** The submitted search query currently applied to the loaded list. */
   activeQuery: string;
+  /** The tag filter currently applied (normalized exact tag, or null). */
+  activeTag: string | null;
+  /** True while the list is filtered to favorites only. */
+  favoriteOnly: boolean;
   submitSearch: (query: string) => void;
   clearSearch: () => void;
+  applyTagFilter: (tag: string | null) => void;
+  toggleFavoriteOnly: () => void;
+  /** Merge server-confirmed organization metadata into one loaded row. */
+  applyOrganization: (update: { documentId: string; tags?: string[]; favorite?: boolean }) => void;
   loadMore: () => void;
   refresh: () => void;
 }
@@ -50,6 +59,8 @@ function describeLoadError(error: unknown): string {
 
 export function useDocumentList(): DocumentListState {
   const [activeQuery, setActiveQuery] = useState("");
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [items, setItems] = useState<DocumentSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -66,7 +77,11 @@ export function useDocumentList(): DocumentListState {
     let cancelled = false;
     void (async () => {
       try {
-        const page = await listDocuments({ query: activeQuery || undefined });
+        const page = await listDocuments({
+          query: activeQuery || undefined,
+          tags: activeTag ? [activeTag] : undefined,
+          favorite: favoriteOnly ? true : undefined,
+        });
         if (cancelled || epoch !== firstPageEpoch.current) {
           return;
         }
@@ -89,7 +104,7 @@ export function useDocumentList(): DocumentListState {
     return () => {
       cancelled = true;
     };
-  }, [activeQuery, refreshKey]);
+  }, [activeQuery, activeTag, favoriteOnly, refreshKey]);
 
   const submitSearch = useCallback((query: string) => {
     // The applied query is the trimmed input, bounded like the API's `q`.
@@ -101,6 +116,34 @@ export function useDocumentList(): DocumentListState {
     setRefreshing(true);
     setActiveQuery("");
   }, []);
+
+  const applyTagFilter = useCallback((tag: string | null) => {
+    // The filter value is the normalized tag exactly as the list returned it;
+    // the API matches the stored metadata, the client never pre-filters.
+    setRefreshing(true);
+    setActiveTag(tag);
+  }, []);
+
+  const toggleFavoriteOnly = useCallback(() => {
+    setRefreshing(true);
+    setFavoriteOnly((current) => !current);
+  }, []);
+
+  const applyOrganization = useCallback(
+    (update: { documentId: string; tags?: string[]; favorite?: boolean }) => {
+      // Only ever called with the server's own PATCH response (or an exact
+      // revert of the previous server state) — a row is updated in place,
+      // never reordered, refiltered or fabricated.
+      setItems((previous) => previous.map((item) => item.id === update.documentId
+        ? {
+            ...item,
+            ...(update.tags !== undefined ? { tags: update.tags } : {}),
+            ...(update.favorite !== undefined ? { favorite: update.favorite } : {}),
+          }
+        : item));
+    },
+    [],
+  );
 
   const refresh = useCallback(() => {
     setRefreshing(true);
@@ -115,7 +158,12 @@ export function useDocumentList(): DocumentListState {
     const epoch = firstPageEpoch.current;
     void (async () => {
       try {
-        const page = await listDocuments({ query: activeQuery || undefined, cursor: nextCursor });
+        const page = await listDocuments({
+          query: activeQuery || undefined,
+          tags: activeTag ? [activeTag] : undefined,
+          favorite: favoriteOnly ? true : undefined,
+          cursor: nextCursor,
+        });
         if (epoch !== firstPageEpoch.current) {
           return;
         }
@@ -130,7 +178,7 @@ export function useDocumentList(): DocumentListState {
         }
       }
     })();
-  }, [activeQuery, loadingMore, nextCursor]);
+  }, [activeQuery, activeTag, favoriteOnly, loadingMore, nextCursor]);
 
   return {
     items,
@@ -140,8 +188,13 @@ export function useDocumentList(): DocumentListState {
     loadingMore,
     nextCursor,
     activeQuery,
+    activeTag,
+    favoriteOnly,
     submitSearch,
     clearSearch,
+    applyTagFilter,
+    toggleFavoriteOnly,
+    applyOrganization,
     loadMore,
     refresh,
   };

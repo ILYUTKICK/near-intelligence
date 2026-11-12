@@ -42,6 +42,8 @@ export interface SaveAttempt {
 export interface SaveAck {
   /** The new current revision — equals the response ETag value. */
   revision: number;
+  /** The immutable version UUID returned by the save. */
+  versionId?: string | null;
   /** `document.updated_at` of the acknowledged revision (saved-at display). */
   savedAt: string;
 }
@@ -110,7 +112,7 @@ export async function saveRevision(attempt: SaveAttempt): Promise<SaveAck> {
     throw new DocumentApiError(response.status, "INVALID_RESPONSE", "The save response could not be read.");
   }
   const savedAt = parsed.data.document.updated_at;
-  return { revision: parsed.data.document.revision, savedAt };
+  return { revision: parsed.data.document.revision, versionId: parsed.data.document.current_version_id, savedAt };
 }
 
 /**

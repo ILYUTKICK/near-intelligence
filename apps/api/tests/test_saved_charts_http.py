@@ -57,6 +57,45 @@ class SavedChartsHTTPE2E(unittest.TestCase):
     def after_gateway_checks(self, client, session_cookie, body):
         """Extension point for NI-041 using the same real auth/gateway setup."""
 
+    def snapshot_gateway_checks(self, client, session_cookie, body, dataset):
+        """NI-044 through the same real gateway: freeze/reopen/compare/delete.
+
+        Restores Bob's cookie so the NI-041 ``after_gateway_checks`` hook
+        observes exactly the state the base test ended with.
+        """
+        client.cookies.set("ni_session", session_cookie("alice"))
+        token = client.get("/api/auth/csrf").json()["token"]
+        origin = str(client.base_url).rstrip("/")
+        freeze_headers = {"Origin": origin, "x-csrf-token": token, "Idempotency-Key": str(uuid4())}
+        freeze_body = {"chart_definition_version_id": body["chart_definition_version_id"],
+                       "dataset_version_id": str(dataset.dataset_version_id),
+                       "selection": body["selection"]}
+        frozen = client.post("/api/snapshots", json=freeze_body, headers=freeze_headers)
+        self.assertEqual(frozen.status_code, 201, frozen.text)
+        frozen_id = frozen.json()["id"]
+        self.assertRegex(frozen.json()["content_sha256"], r"^[0-9a-f]{64}$")
+        detail = client.get(f"/api/snapshots/{frozen_id}")
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["view"]["dataset"]["id"], str(dataset.dataset_version_id))
+        self.assertEqual(detail.headers["cache-control"], "no-store")
+        comparison = client.get(f"/api/snapshots/{frozen_id}/compare-live")
+        self.assertEqual(comparison.status_code, 200, comparison.text)
+        self.assertFalse(comparison.json()["dataset_changed"])
+        pinned = client.post("/api/saved-charts", json={**body, "mode": "snapshot",
+                             "snapshot_id": frozen_id},
+                             headers={"Origin": origin, "x-csrf-token": token,
+                                      "Idempotency-Key": str(uuid4())})
+        self.assertEqual(pinned.status_code, 201, pinned.text)
+        self.assertEqual(client.delete(f"/api/snapshots/{frozen_id}", headers=freeze_headers).status_code, 409)
+        self.assertEqual(client.delete(f"/api/saved-charts/{pinned.json()['id']}",
+                                       headers=freeze_headers).status_code, 204)
+        self.assertEqual(client.delete(f"/api/snapshots/{frozen_id}", headers=freeze_headers).status_code, 204)
+        client.cookies.set("ni_session", session_cookie("bob"))
+        self.assertEqual(client.get("/api/snapshots").json()["items"], [])
+        self.assertEqual(client.get(f"/api/snapshots/{frozen_id}").status_code, 404)
+        print("NI-044 real HTTP E2E: gateway freeze/reopen/compare/delete, 409 referenced, Bob denial passed",
+              flush=True)
+
     def test_cookie_gateway_save_reopen_and_two_users(self):
         web = self.repo / "apps/web"
         self.assertTrue((web / ".next/BUILD_ID").exists(), "Build the frozen web app first")
@@ -155,6 +194,7 @@ class SavedChartsHTTPE2E(unittest.TestCase):
         self.assertEqual(client.get(path).status_code, 404)
         self.assertEqual(client.patch(path, json={"label": "Stolen"}, headers=headers).status_code, 404)
         self.assertEqual(client.delete(path, headers=headers).status_code, 404)
+        self.snapshot_gateway_checks(client, session_cookie, body, dataset)
         self.after_gateway_checks(client, session_cookie, body)
         if os.environ.get("NI_BROWSER_HANDOFF") == "1":
             info = self.repo / ".local/ni035-browser.json"

@@ -24,7 +24,7 @@ import { INSERTABLE_BLOCK_TYPES, type InsertableBlockType } from "./commands";
  */
 
 const INSERT_ITEMS: Array<{
-  type: InsertableBlockType;
+  type: InsertableBlockType | "modelResult";
   label: string;
   hint: string;
 }> = [
@@ -36,11 +36,14 @@ const INSERT_ITEMS: Array<{
   { type: "ordered_list", label: "Ordered list", hint: "Numbered list block" },
   { type: "dataTable", label: "Data table", hint: "Small authored table (max 1k cells)" },
   { type: "risk", label: "Risk", hint: "Explicit counterargument card" },
+  // NI-055: the model result is pinned server-side — the shell intercepts
+  // this choice and opens the published-run chooser instead of a local draft.
+  { type: "modelResult", label: "Model result", hint: "Published model run + your interpretation" },
   { type: "divider", label: "Divider", hint: "Semantic separator" },
 ];
 
 export interface InsertItemChoice {
-  type: InsertableBlockType;
+  type: InsertableBlockType | "modelResult";
   headingLevel?: number;
 }
 

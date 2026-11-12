@@ -150,6 +150,13 @@ export interface paths {
         /**
          * Owner-scoped document list
          * @description List the verified principal's documents, newest first, owner-scoped.
+         *
+         *     Optional private organization filters (NI-072): ``tag`` may repeat (AND
+         *     semantics — a document matches when it carries EVERY listed normalized
+         *     tag; at most :data:`MAX_FILTER_TAGS` values), ``favorite`` filters to
+         *     favorited (``true``) or non-favorited (``false``) documents. Filters
+         *     compose with ``q`` and pagination inside one owner-scoped query; a tag
+         *     no document carries is an honest empty page, never an error.
          */
         get: operations["listDocuments"];
         put?: never;
@@ -459,6 +466,58 @@ export interface paths {
         head?: never;
         /** Edit an insight in the current owned document revision */
         patch: operations["updateDocumentInsight"];
+        trace?: never;
+    };
+    "/api/documents/{document_id}/model-blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Append one pinned model-result block to an owned document (compare-and-set via If-Match)
+         * @description Append one valid modelResult block with its frozen model context.
+         *
+         *     With an ``Idempotency-Key`` the response snapshot is stored in the write
+         *     transaction (NI-037 store), so a repeated identical owner/route/body
+         *     request replays the original 201 (same revision, no second block)
+         *     instead of a spurious 409 against the advanced document.
+         */
+        post: operations["addModelBlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update an owned document's private tags and favorite flag
+         * @description Merge private organization metadata on the owned document (NI-072).
+         *
+         *     PATCH semantics: absent fields stay unchanged; ``tags`` normalizes
+         *     server-side (trim + lower + dedupe) and ``tags: []`` clears them. This is
+         *     metadata-only — no revision is created, no content hash changes and
+         *     ``documents.updated_at`` (the list order) is untouched, so no If-Match
+         *     precondition applies. The document must exist and be owned (one generic
+         *     404 otherwise).
+         */
+        patch: operations["updateDocumentOrganization"];
         trace?: never;
     };
     "/api/documents/{document_id}/versions": {
@@ -853,6 +912,59 @@ export interface paths {
         head?: never;
         /** Update Saved */
         patch: operations["updateSavedChart"];
+        trace?: never;
+    };
+    "/api/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Snapshots */
+        get: operations["listSnapshots"];
+        put?: never;
+        /** Create Snapshot */
+        post: operations["createSnapshot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Snapshot */
+        get: operations["getSnapshot"];
+        put?: never;
+        post?: never;
+        /** Delete Snapshot */
+        delete: operations["deleteSnapshot"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/snapshots/{snapshot_id}/compare-live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Compare Snapshot */
+        get: operations["compareSnapshotWithLive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/health": {
@@ -1301,6 +1413,41 @@ export interface components {
             next_cursor: string | null;
         };
         /**
+         * DocumentOrganizationResponse
+         * @description The verified owner's organization metadata for one document.
+         */
+        DocumentOrganizationResponse: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Favorite */
+            favorite: boolean;
+            /** Tags */
+            tags: string[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * DocumentOrganizationUpdateRequest
+         * @description PATCH /documents/{id}/organization body.
+         *
+         *     PATCH semantics: an absent field is left unchanged, so a favorite toggle
+         *     never resends tags and a tag edit never resends the favorite. Raw tags
+         *     are normalized server-side (trim + lower + dedupe) and re-bounded to
+         *     MAX_TAG_LENGTH/MAX_TAGS_PER_DOCUMENT after normalization.
+         */
+        DocumentOrganizationUpdateRequest: {
+            /** Favorite */
+            favorite?: boolean | null;
+            /** Tags */
+            tags?: string[] | null;
+        };
+        /**
          * DocumentProgress
          * @description Per-document work-completion counters (`{headings,charts,insights}`).
          *
@@ -1343,6 +1490,11 @@ export interface components {
             /** Current Version Id */
             current_version_id: string | null;
             /**
+             * Favorite
+             * @default false
+             */
+            favorite: boolean;
+            /**
              * Id
              * Format: uuid
              */
@@ -1356,6 +1508,11 @@ export interface components {
             revision: number;
             /** Schema Version */
             schema_version: number;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: string[];
             /** Title */
             title: string;
             /**
@@ -1396,6 +1553,13 @@ export interface components {
          *     `revision`/`current_version_id` come from the live app.documents row, so
          *     a summary always reflects the document's current revision. A document
          *     that has no saved revision yet carries `current_version_id: null`.
+         *
+         *     `tags`/`favorite` (NI-072) are private organization metadata from
+         *     app.document_organization, separate from the immutable research chain:
+         *     they carry defaults so every producer stays honest — a document without
+         *     organization rows has no tags and is not favorited, never fabricated
+         *     metadata. Editing them never changes `revision`/`updated_at` or the list
+         *     order.
          */
         DocumentSummary: {
             /**
@@ -1406,6 +1570,11 @@ export interface components {
             /** Current Version Id */
             current_version_id: string | null;
             /**
+             * Favorite
+             * @default false
+             */
+            favorite: boolean;
+            /**
              * Id
              * Format: uuid
              */
@@ -1415,6 +1584,11 @@ export interface components {
             revision: number;
             /** Schema Version */
             schema_version: number;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: string[];
             /** Title */
             title: string;
             /**
@@ -2136,6 +2310,58 @@ export interface components {
             unit: string;
             /** Version */
             version: number;
+        };
+        /**
+         * ModelBlockInsertRequest
+         * @description POST /documents/{id}/model-blocks body (If-Match carries the CAS).
+         *
+         *     ``model_run_id`` must reference a published immutable ``app.model_runs``
+         *     row (the picker lists the public catalog; the server re-verifies inside
+         *     the save transaction). ``dataset_version_id`` is the approved public
+         *     dataset version the interpretation reads against — an unapproved one is
+         *     rejected, never substituted with latest. ``after_block_id`` positions the
+         *     new block after an existing top-level block of the document; without it
+         *     the block is appended last.
+         */
+        ModelBlockInsertRequest: {
+            /** After Block Id */
+            after_block_id?: string | null;
+            /**
+             * Dataset Version Id
+             * Format: uuid
+             */
+            dataset_version_id: string;
+            /** Interpretation */
+            interpretation: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList-Input"])[];
+            /**
+             * Model Run Id
+             * Format: uuid
+             */
+            model_run_id: string;
+        };
+        /**
+         * ModelBlockMutationResponse
+         * @description ``MutationResult<{block_id}>``: the new revision summary plus the block.
+         *
+         *     The new revision's content and resolved contexts (including the frozen
+         *     ``ModelContext`` of the inserted block, keyed by ``block_id``) are
+         *     fetchable through ``GET /documents/{id}`` — the response never makes the
+         *     client guess the new revision (the ETag carries it).
+         */
+        ModelBlockMutationResponse: {
+            document: components["schemas"]["DocumentSummary"];
+            value: components["schemas"]["ModelBlockValue"];
+        };
+        /**
+         * ModelBlockValue
+         * @description The inserted block identity (API_SPECIFICATION ``MutationResult`` value).
+         */
+        ModelBlockValue: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
         };
         /**
          * ModelContext
@@ -2889,6 +3115,104 @@ export interface components {
             sources: components["schemas"]["DataSourceResponse"][];
         };
         /**
+         * SnapshotCalculationContext
+         * @description Frozen calculation inputs recorded at freeze time (immutable).
+         */
+        SnapshotCalculationContext: {
+            /** Context Hash */
+            context_hash: string;
+            /** Metric Definition Versions */
+            metric_definition_versions: string[];
+            /** Renderer Version */
+            renderer_version: string;
+        };
+        /**
+         * SnapshotCompareResponse
+         * @description GET /api/snapshots/{id}/compare-live: frozen view plus the live view.
+         *
+         *     ``live_view`` resolves the SAME selection against the latest approved
+         *     dataset for the explicit comparison only; the snapshot row itself is
+         *     never rewritten by a comparison.
+         */
+        SnapshotCompareResponse: {
+            /** Dataset Changed */
+            dataset_changed: boolean;
+            frozen_view: components["schemas"]["ChartViewResponse"];
+            live_view: components["schemas"]["ChartViewResponse"];
+            snapshot: components["schemas"]["SnapshotResponse"];
+        };
+        /**
+         * SnapshotCreateRequest
+         * @description POST /api/snapshots body (API_SPECIFICATION row, no owner field).
+         */
+        SnapshotCreateRequest: {
+            /**
+             * Chart Definition Version Id
+             * Format: uuid
+             */
+            chart_definition_version_id: string;
+            /**
+             * Dataset Version Id
+             * Format: uuid
+             */
+            dataset_version_id: string;
+            selection: components["schemas"]["SavedChartSelectionInput"];
+        };
+        /**
+         * SnapshotDetailResponse
+         * @description GET /api/snapshots/{id}: the snapshot plus its FROZEN ChartView.
+         *
+         *     ``view`` resolves the pinned dataset version and stored selection through
+         *     the shared NI-032 delivery service — never the latest dataset — so the
+         *     frozen evidence stays byte-identical through any later refresh.
+         */
+        SnapshotDetailResponse: {
+            snapshot: components["schemas"]["SnapshotResponse"];
+            view: components["schemas"]["ChartViewResponse"];
+        };
+        /**
+         * SnapshotListResponse
+         * @description Owner-scoped snapshot list (bounded opaque offset cursor).
+         */
+        SnapshotListResponse: {
+            /** Items */
+            items: components["schemas"]["SnapshotResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
+         * SnapshotResponse
+         * @description One owned immutable research snapshot (DATABASE_SCHEMA row).
+         */
+        SnapshotResponse: {
+            /** Artifact Id */
+            artifact_id: string | null;
+            calculation_context: components["schemas"]["SnapshotCalculationContext"];
+            /**
+             * Chart Definition Version Id
+             * Format: uuid
+             */
+            chart_definition_version_id: string;
+            /** Content Sha256 */
+            content_sha256: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Dataset Version Id
+             * Format: uuid
+             */
+            dataset_version_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            selection: components["schemas"]["SavedChartSelectionInput"];
+        };
+        /**
          * TolerancesResponse
          * @description The declared reproduction tolerances of a published fit.
          */
@@ -3265,6 +3589,8 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                tag?: string[] | null;
+                favorite?: boolean | null;
                 cursor?: string | null;
                 limit?: number | null;
             };
@@ -5230,6 +5556,190 @@ export interface operations {
             };
         };
     };
+    addModelBlock: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-match"?: string | null;
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelBlockInsertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelBlockMutationResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateDocumentOrganization: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentOrganizationUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOrganizationResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Revision conflict (document moved) or Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document exceeds a hard size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description If-Match precondition is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     listDocumentVersions: {
         parameters: {
             query?: {
@@ -6560,6 +7070,398 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedChartResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listSnapshots: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createSnapshot: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnapshotCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSnapshot: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotDetailResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteSnapshot: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    compareSnapshotWithLive: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotCompareResponse"];
                 };
             };
             /** @description Unauthorized */

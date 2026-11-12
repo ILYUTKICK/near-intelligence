@@ -10,8 +10,11 @@ import { AUTH_CHANGE } from "@/lib/auth/change";
 import { definition, view } from "./renderer/fixtures";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("@/features/charts/renderer/ChartView", () => ({ ChartView: () => <div>Shared chart renderer</div> }));
+vi.mock("@/features/charts/renderer/ChartView", () => ({
+  ChartView: (props: { actions?: React.ReactNode }) => <div>Shared chart renderer{props.actions ?? null}</div>,
+}));
 const id = "22222222-2222-4222-8222-222222222222";
+const datasetId = "55555555-5555-4555-8555-555555555555";
 const selection = { start: "2026-11-01", end: "2026-11-06", frequency: "day" as const, filters: { source: "SRC-LLAMA" } };
 const saved = { id, label: "Synthetic saved chart", mode: "live" as const,
   chart_definition_version_id: id, selection, snapshot_id: null,
@@ -135,5 +138,69 @@ describe("Saved chart workflow", () => {
     await screen.findByText("Shared chart renderer");
     expect(screen.getByRole("status")).toHaveTextContent("Data changed");
     expect(screen.getByText(/latest approved dataset/)).toHaveTextContent(chartView.dataset.id);
+  });
+
+  it("freezes a live context from the saved detail and links to the snapshot list", async () => {
+    const chartView = view(definition(), []);
+    const frozen = {
+      id: "77777777-7777-4777-8777-777777777777", chart_definition_version_id: chartView.definition.id,
+      dataset_version_id: chartView.dataset.id, selection: saved.selection,
+      calculation_context: { context_hash: "c".repeat(64), metric_definition_versions: [chartView.definition.id], renderer_version: "synthetic-renderer/1" },
+      artifact_id: null, content_sha256: "d".repeat(64), created_at: "2026-11-06T12:00:00Z",
+    };
+    const bodies: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {
+      if (url === "/api/auth/session") return json({ subject: "synthetic-alice" });
+      if (url === "/api/auth/csrf") return json({ token: "synthetic-csrf" });
+      if (url === "/api/snapshots") {
+        bodies.push(String(options.body));
+        return json(frozen, 201);
+      }
+      return json({ saved_chart: saved, view: chartView, dataset_changed: false });
+    }));
+    const user = userEvent.setup();
+    render(<SavedChartDetail instanceId={id} />);
+    await screen.findByText("Shared chart renderer");
+    await user.click(screen.getByRole("button", { name: "Freeze snapshot" }));
+    await screen.findByRole("status");
+    expect(JSON.parse(bodies[0])).toEqual({ chart_definition_version_id: chartView.definition.id,
+      dataset_version_id: chartView.dataset.id,
+      selection: { start: saved.selection.start, end: saved.selection.end, frequency: "day", filters: saved.selection.filters } });
+    expect(screen.getByRole("link", { name: "Open snapshots" })).toHaveAttribute("href", "/workspace/saved-charts/snapshots");
+  });
+
+  it("renders a snapshot context frozen with metadata and compare-to-live", async () => {
+    const snapshotId = "77777777-7777-4777-8777-777777777777";
+    const pinnedSaved = { ...saved, mode: "snapshot" as const, snapshot_id: snapshotId,
+      last_resolved_dataset_version_id: datasetId };
+    const snapshotRow = {
+      id: snapshotId, chart_definition_version_id: saved.chart_definition_version_id,
+      dataset_version_id: datasetId, selection: saved.selection,
+      calculation_context: { context_hash: "c".repeat(64), metric_definition_versions: [saved.chart_definition_version_id], renderer_version: "synthetic-renderer/1" },
+      artifact_id: null, content_sha256: "d".repeat(64), created_at: "2026-11-06T12:00:00Z",
+    };
+    const frozenView = view(definition(), [], { dataset: { ...view(definition(), []).dataset, id: datasetId } });
+    const liveView = view(definition(), [], { dataset: { ...view(definition(), []).dataset, id: "88888888-8888-4888-8888-888888888888" } });
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {
+      if (url === "/api/auth/session") return json({ subject: "synthetic-alice" });
+      if (url === `/api/saved-charts/${id}`) return json({ saved_chart: pinnedSaved, view: frozenView, dataset_changed: false });
+      if (url === `/api/snapshots/${snapshotId}`) return json({ snapshot: snapshotRow, view: frozenView });
+      if (url === `/api/snapshots/${snapshotId}/compare-live`) {
+        expect(new Headers(options.headers).get("x-csrf-token")).toBeNull();
+        return json({ snapshot: snapshotRow, frozen_view: frozenView, live_view: liveView, dataset_changed: true });
+      }
+      throw new Error(`unexpected ${url}`);
+    }));
+    const user = userEvent.setup();
+    render(<SavedChartDetail instanceId={id} />);
+    await screen.findByText("Shared chart renderer");
+    expect(screen.getByText(/Frozen snapshot view/)).toHaveTextContent(datasetId);
+    expect(await screen.findByText(new RegExp("d".repeat(8)))).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open snapshot" })).toHaveAttribute("href", `/workspace/saved-charts/snapshots/${snapshotId}`);
+    expect(screen.queryByText("Data changed")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Compare to live" }));
+    await screen.findByRole("heading", { name: "Compare to live" });
+    expect(screen.getByText(/latest approved dataset differs/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Shared chart renderer/).length).toBeGreaterThanOrEqual(3);
   });
 });

@@ -69,6 +69,7 @@ export interface SaveCoordinatorOptions {
   transport: (attempt: SaveAttempt) => Promise<SaveAck>;
   /** Captures the current editor state as a save request body. May throw. */
   capture: () => SaveRequestBody;
+  initialVersionId?: string | null;
   /** Idle window after the last change before autosave fires (spec: 1s). */
   idleDelayMs?: number;
   /** Hard ceiling while typing continues (spec: max 5s). */
@@ -109,6 +110,7 @@ export class SaveCoordinator {
   private readonly onCapture: ((body: SaveRequestBody, revision: number) => void) | null;
 
   private status: SaveStatus;
+  private versionId: string | null;
   private listeners = new Set<(status: SaveStatus) => void>();
   private stopped = false;
 
@@ -140,6 +142,7 @@ export class SaveCoordinator {
     this.timers = options.timers ?? defaultTimers;
     this.newKey = options.newKey ?? newIdempotencyKey;
     this.onCapture = options.onCapture ?? null;
+    this.versionId = options.initialVersionId ?? null;
     this.status = { kind: "clean", revision: initialRevision, savedAt: null };
   }
 
@@ -156,6 +159,10 @@ export class SaveCoordinator {
 
   getStatus(): SaveStatus {
     return this.status;
+  }
+
+  getVersionId(): string | null {
+    return this.versionId;
   }
 
   onStatus(listener: (status: SaveStatus) => void): () => void {
@@ -196,6 +203,7 @@ export class SaveCoordinator {
     this.cancelTimers();
     this.retainedAttempt = null;
     this.followUpManual = false;
+    if (revision !== this.revisionOf()) this.versionId = null;
     this.setStatus({ kind: "clean", revision, savedAt: null });
   }
 
@@ -311,7 +319,7 @@ export class SaveCoordinator {
    * Adopts a server state after an explicit reload: the editor now holds the
    * server content, which becomes the acknowledged baseline.
    */
-  adoptServerState(revision: number, savedAt: string | null = null): void {
+  adoptServerState(revision: number, savedAt: string | null = null, versionId: string | null = null): void {
     if (this.stopped || this.inFlight) {
       return;
     }
@@ -320,6 +328,7 @@ export class SaveCoordinator {
     this.cancelTimers();
     this.retainedAttempt = null;
     this.followUpManual = false;
+    this.versionId = versionId;
     this.setStatus({ kind: "clean", revision, savedAt });
   }
 
@@ -432,21 +441,22 @@ export class SaveCoordinator {
     }
     const acknowledged = stableBody(attempt.body);
     const matches = current !== null && current === acknowledged;
+    this.baselineBody = acknowledged;
+    this.versionId = ack.versionId ?? null;
     this.dirtyAnchor = null;
     if (matches) {
-      this.baselineBody = acknowledged;
       this.followUpManual = false;
       this.setStatus({ kind: "clean", revision: ack.revision, savedAt: ack.savedAt });
       return;
     }
     // Newer edits exist (or could not be read): remain dirty at the new
     // revision and schedule the coalesced follow-up.
+    this.setStatus({ kind: "dirty", revision: ack.revision });
     if (this.followUpManual) {
       this.followUpManual = false;
       this.fireAutosave();
       return;
     }
-    this.setStatus({ kind: "dirty", revision: ack.revision });
     this.markChanged();
   }
 

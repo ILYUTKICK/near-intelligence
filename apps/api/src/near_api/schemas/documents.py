@@ -10,15 +10,40 @@ unknown-node/attribute rejection lives there, not in these envelope models).
 """
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, StringConstraints
 
+from near_api.documents.organization import MAX_TAG_LENGTH, MAX_TAGS_PER_DOCUMENT
 from near_api.documents.schema import MAX_CONTEXTS
 from near_api.insights.schemas import ResolvedContext
 from near_api.schemas.common import ContractModel
 from near_api.schemas.home import DocumentSummary
+
+RawTag = Annotated[str, StringConstraints(min_length=1, max_length=120)]
+
+
+class DocumentOrganizationUpdateRequest(ContractModel):
+    """PATCH /documents/{id}/organization body.
+
+    PATCH semantics: an absent field is left unchanged, so a favorite toggle
+    never resends tags and a tag edit never resends the favorite. Raw tags
+    are normalized server-side (trim + lower + dedupe) and re-bounded to
+    MAX_TAG_LENGTH/MAX_TAGS_PER_DOCUMENT after normalization.
+    """
+
+    tags: tuple[RawTag, ...] | None = Field(default=None, max_length=MAX_TAGS_PER_DOCUMENT)
+    favorite: bool | None = None
+
+
+class DocumentOrganizationResponse(ContractModel):
+    """The verified owner's organization metadata for one document."""
+
+    document_id: UUID
+    tags: tuple[str, ...] = Field(max_length=MAX_TAGS_PER_DOCUMENT)
+    favorite: bool
+    updated_at: datetime
 
 
 class DocumentCreateRequest(ContractModel):

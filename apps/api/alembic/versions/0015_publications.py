@@ -41,7 +41,7 @@ at duplication time inside the INSERT grant; no UPDATE grant is added.
 from alembic import op
 
 revision = "0015_publications"
-down_revision = "0012_export_jobs"
+down_revision = "0013_chart_snapshots"
 branch_labels = None
 depends_on = None
 

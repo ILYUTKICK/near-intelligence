@@ -18,8 +18,8 @@ from near_api.schemas.delivery import ChartViewResponse
 SAVED_CHART_MODES = ("live", "snapshot")
 """``live`` is a working-view resolution policy (latest approved dataset at
 read time, labeled); ``snapshot`` pins an owner-matched research snapshot
-(snapshot API is P1, so P0 rejects snapshot-mode writes as a typed 422
-REFERENCE_INVALID)."""
+(NI-044): the context renders exactly the frozen snapshot's pinned dataset
+version and selection, never latest."""
 
 
 class SavedChartSelectionInput(ChartSelection):
