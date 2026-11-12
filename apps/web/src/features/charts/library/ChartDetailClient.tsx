@@ -108,10 +108,6 @@ export function ChartDetailClient({
     applySelection({ filters });
   }
 
-  const properties = definition.filter_schema["properties"];
-  const filterKeys = properties !== null && typeof properties === "object" && !Array.isArray(properties)
-    ? Object.keys(properties as Record<string, unknown>).sort()
-    : [];
   const live = selection.datasetVersion === "latest";
 
   return (
