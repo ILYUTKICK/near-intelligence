@@ -4,6 +4,7 @@ import { PageIntro } from "@/components/layout/PageIntro";
 import { ClaimCard } from "@/features/public-research/ClaimCard";
 import { MechanismFlow } from "@/features/public-research/MechanismFlow";
 import { RecordedPurchases } from "@/features/public-research/RecordedPurchases";
+import { SupplyScaleFigure, UsdWindowsFigure } from "@/features/public-research/ResearchFigures";
 import {
   claimRegistry,
   thesis,
@@ -24,6 +25,13 @@ export const metadata: Metadata = { title: "Research — NEAR Intelligence" };
  * fit run pending operator execution, and the model catalog honestly empty.
  * The content carries no private editor metadata and no live data fetching;
  * internal links stay on implemented routes and verified methodology anchors.
+ *
+ * NI-078 presentation (resolving NI-076 D1/D2 without changing the thesis):
+ * a compact H1–H4 assessment sits beside the opening evidence with real
+ * anchor links into the unchanged full sections, and the two missing
+ * recorded-evidence figures (CL-004 USD windows, CL-007 supply-scale) render
+ * in their owning sections through the shared claim-registry figure
+ * components. All fifteen sections, definitions and limitations are intact.
  */
 
 const sectionClasses = "mt-12 max-w-(--width-prose)";
@@ -59,6 +67,52 @@ function EvidenceLinks({ links, label }: { readonly links: readonly ClaimEvidenc
   );
 }
 
+/**
+ * NI-076 D1 — compact H1–H4 assessment beside the opening evidence. Statuses
+ * restate `hypothesis.status` from the thesis verbatim; each card links to
+ * the unchanged full section (real anchors, keyboard reachable). No new
+ * claims, no API dependency; the block is server-rendered.
+ */
+function HypothesisAssessment() {
+  const { question } = thesis;
+  return (
+    <section
+      id="hypothesis-assessment"
+      aria-labelledby="hypothesis-assessment-heading"
+      className={sectionClasses}
+    >
+      <h2 id="hypothesis-assessment-heading" className={h2Classes}>
+        Hypothesis assessment at a glance
+      </h2>
+      <p className={bodyClasses}>
+        The four canonical hypotheses currently carry these recorded assessments. Each card links
+        to the full statement below — question, rationale, weakening condition and cited claims.
+      </p>
+      <ul className="mt-4 grid gap-3 sm:grid-cols-2" aria-label="H1–H4 current assessment">
+        {question.hypotheses.map((hypothesis) => (
+          <li key={hypothesis.id} className="rounded-surface border border-border bg-surface p-4">
+            <p className="font-ui text-ui leading-ui text-text-secondary">
+              <span className="font-medium text-text">{hypothesis.code}</span> —{" "}
+              <span className="font-medium text-text">{hypothesis.status}</span>
+            </p>
+            <p className="text-heading leading-heading mt-1">{hypothesis.title}</p>
+            <a href={`#${hypothesis.id}`} className={`${linkClasses} mt-2 inline-block`}>
+              Read the full {hypothesis.code} assessment
+            </a>
+          </li>
+        ))}
+      </ul>
+      <p className={noteClasses}>
+        The complete thesis follows with all fifteen sections, definitions and limitations:{" "}
+        <a href="#executive-summary" className={linkClasses}>
+          continue to the executive summary
+        </a>
+        .
+      </p>
+    </section>
+  );
+}
+
 function ThesisBody() {
   const {
     executiveSummary,
@@ -84,6 +138,9 @@ function ThesisBody() {
       <p className="mt-4 rounded-surface bg-sage px-5 py-4 text-ui text-text">
         {thesis.evidenceStatus}
       </p>
+
+      {/* NI-076 D1: compact overview of the four canonical hypotheses. */}
+      <HypothesisAssessment />
 
       <MechanismFlow />
 
@@ -199,7 +256,11 @@ function ThesisBody() {
           {revenueCapture.title}
         </h2>
         <p className={bodyClasses}>{revenueCapture.intro}</p>
-        <ol aria-label="Claim registry: revenue capture" className="mt-4 flex flex-col gap-6 list-none pl-0">
+        {/* NI-076 D2: the approximate USD windows (CL-004) beside their claim. */}
+        <div className="mt-6 max-w-none">
+          <UsdWindowsFigure />
+        </div>
+        <ol aria-label="Claim registry: revenue capture" className="mt-6 flex flex-col gap-6 list-none pl-0">
           {revenueCapture.claimIds.map((id) => (
             <li key={id}>
               <ClaimCard claim={getClaim(id)} />
@@ -215,7 +276,11 @@ function ThesisBody() {
           {tokenEconomics.title}
         </h2>
         <p className={bodyClasses}>{tokenEconomics.intro}</p>
-        <ol aria-label="Claim registry: token economics" className="mt-4 flex flex-col gap-6 list-none pl-0">
+        {/* NI-076 D2: purchases versus net supply growth on one NEAR scale (CL-007). */}
+        <div className="mt-6 max-w-none">
+          <SupplyScaleFigure />
+        </div>
+        <ol aria-label="Claim registry: token economics" className="mt-6 flex flex-col gap-6 list-none pl-0">
           {tokenEconomics.claimIds.map((id) => (
             <li key={id}>
               <ClaimCard claim={getClaim(id)} />
