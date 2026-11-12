@@ -165,6 +165,8 @@ export function ChartDetailClient({
           chartTitle={definition.title}
           saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
             selection: { ...view.selection, filters: selection.filters }, dataset_version_id: view.dataset.id, mode: "live" } : undefined}
+          freezeInput={view ? { chart_definition_version_id: definition.id, dataset_version_id: view.dataset.id,
+            selection: { ...view.selection, filters: selection.filters } } : undefined}
           insightContext={view ? chartObservation(view) : undefined}
           basePath={`${basePath}/`}
         />

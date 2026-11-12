@@ -4338,6 +4338,200 @@
         "title": "SeriesResponse",
         "type": "object"
       },
+      "SnapshotCalculationContext": {
+        "additionalProperties": false,
+        "description": "Frozen calculation inputs recorded at freeze time (immutable).",
+        "properties": {
+          "context_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Context Hash",
+            "type": "string"
+          },
+          "metric_definition_versions": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Metric Definition Versions",
+            "type": "array"
+          },
+          "renderer_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Renderer Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "context_hash",
+          "metric_definition_versions",
+          "renderer_version"
+        ],
+        "title": "SnapshotCalculationContext",
+        "type": "object"
+      },
+      "SnapshotCompareResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/snapshots/{id}/compare-live: frozen view plus the live view.\n\n``live_view`` resolves the SAME selection against the latest approved\ndataset for the explicit comparison only; the snapshot row itself is\nnever rewritten by a comparison.",
+        "properties": {
+          "dataset_changed": {
+            "title": "Dataset Changed",
+            "type": "boolean"
+          },
+          "frozen_view": {
+            "$ref": "#/components/schemas/ChartViewResponse"
+          },
+          "live_view": {
+            "$ref": "#/components/schemas/ChartViewResponse"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/SnapshotResponse"
+          }
+        },
+        "required": [
+          "snapshot",
+          "frozen_view",
+          "live_view",
+          "dataset_changed"
+        ],
+        "title": "SnapshotCompareResponse",
+        "type": "object"
+      },
+      "SnapshotCreateRequest": {
+        "additionalProperties": false,
+        "description": "POST /api/snapshots body (API_SPECIFICATION row, no owner field).",
+        "properties": {
+          "chart_definition_version_id": {
+            "format": "uuid",
+            "title": "Chart Definition Version Id",
+            "type": "string"
+          },
+          "dataset_version_id": {
+            "format": "uuid",
+            "title": "Dataset Version Id",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/SavedChartSelectionInput"
+          }
+        },
+        "required": [
+          "chart_definition_version_id",
+          "dataset_version_id",
+          "selection"
+        ],
+        "title": "SnapshotCreateRequest",
+        "type": "object"
+      },
+      "SnapshotDetailResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/snapshots/{id}: the snapshot plus its FROZEN ChartView.\n\n``view`` resolves the pinned dataset version and stored selection through\nthe shared NI-032 delivery service \u2014 never the latest dataset \u2014 so the\nfrozen evidence stays byte-identical through any later refresh.",
+        "properties": {
+          "snapshot": {
+            "$ref": "#/components/schemas/SnapshotResponse"
+          },
+          "view": {
+            "$ref": "#/components/schemas/ChartViewResponse"
+          }
+        },
+        "required": [
+          "snapshot",
+          "view"
+        ],
+        "title": "SnapshotDetailResponse",
+        "type": "object"
+      },
+      "SnapshotListResponse": {
+        "additionalProperties": false,
+        "description": "Owner-scoped snapshot list (bounded opaque offset cursor).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SnapshotResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "SnapshotListResponse",
+        "type": "object"
+      },
+      "SnapshotResponse": {
+        "additionalProperties": false,
+        "description": "One owned immutable research snapshot (DATABASE_SCHEMA row).",
+        "properties": {
+          "artifact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id"
+          },
+          "calculation_context": {
+            "$ref": "#/components/schemas/SnapshotCalculationContext"
+          },
+          "chart_definition_version_id": {
+            "format": "uuid",
+            "title": "Chart Definition Version Id",
+            "type": "string"
+          },
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dataset_version_id": {
+            "format": "uuid",
+            "title": "Dataset Version Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/SavedChartSelectionInput"
+          }
+        },
+        "required": [
+          "id",
+          "chart_definition_version_id",
+          "dataset_version_id",
+          "selection",
+          "calculation_context",
+          "artifact_id",
+          "content_sha256",
+          "created_at"
+        ],
+        "title": "SnapshotResponse",
+        "type": "object"
+      },
       "TolerancesResponse": {
         "additionalProperties": false,
         "description": "The declared reproduction tolerances of a published fit.",
@@ -10661,6 +10855,582 @@
         "summary": "Update Saved",
         "tags": [
           "saved-charts"
+        ]
+      }
+    },
+    "/api/snapshots": {
+      "get": {
+        "operationId": "listSnapshots",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Snapshots",
+        "tags": [
+          "snapshots"
+        ]
+      },
+      "post": {
+        "operationId": "createSnapshot",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create Snapshot",
+        "tags": [
+          "snapshots"
+        ]
+      }
+    },
+    "/api/snapshots/{snapshot_id}": {
+      "delete": {
+        "operationId": "deleteSnapshot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete Snapshot",
+        "tags": [
+          "snapshots"
+        ]
+      },
+      "get": {
+        "operationId": "getSnapshot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Snapshot",
+        "tags": [
+          "snapshots"
+        ]
+      }
+    },
+    "/api/snapshots/{snapshot_id}/compare-live": {
+      "get": {
+        "operationId": "compareSnapshotWithLive",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotCompareResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Compare Snapshot",
+        "tags": [
+          "snapshots"
         ]
       }
     },
