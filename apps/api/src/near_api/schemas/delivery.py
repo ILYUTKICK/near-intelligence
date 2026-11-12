@@ -56,6 +56,22 @@ class ResolvedSelectionFilters(ContractModel):
                                                              max_length=32)]] = \
         Field(init=False)
 
+    @model_validator(mode="before")
+    @classmethod
+    def legacy_single_values(cls, value):
+        """Normalize pre-NI-071 bare-string filter values to the list form.
+
+        Resolved contexts persisted before NI-071 carry ``"key": "value"``
+        filter entries; they keep loading (and re-pinning) unchanged — the
+        canonicalized single-element list serializes identically to the
+        pre-NI-071 hash payload because ``datasets.delivery._context_hash``
+        hashes a single-element list back as the bare string.
+        """
+        if isinstance(value, dict):
+            value = {key: ([item] if isinstance(item, str) else item)
+                     for key, item in value.items()}
+        return value
+
 
 class ResolvedSelection(Selection):
     """The resolved selection echoed back on series/chart-view responses.

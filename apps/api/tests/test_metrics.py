@@ -664,6 +664,12 @@ class SyntheticEmissionTests(unittest.TestCase):
     def setUp(self):
         self.inputs = synthetic_inputs()
 
+    @staticmethod
+    def values(document, metric_id, version=1):
+        definition = metric_registry.definition_by_metric_id_version(metric_id, version)
+        return [record for record in document["observations"]
+                if UUID(record["metric_definition_id"]) == definition.id]
+
     def test_emitted_manifests_parse_and_validate(self):
         manifests = build_all_manifests(self.inputs, dataset_spec=DATASET_SPEC, manifest_inputs=())
         self.assertEqual(set(manifests), {"metrics.flows.daily", "metrics.windows.snapshot"})
@@ -702,11 +708,6 @@ class SyntheticEmissionTests(unittest.TestCase):
         flows = manifests["metrics.flows.daily"]
         windows = manifests["metrics.windows.snapshot"]
 
-        def values(document, metric_id, version=1):
-            definition = metric_registry.definition_by_metric_id_version(metric_id, version)
-            return [record for record in document["observations"]
-                    if UUID(record["metric_definition_id"]) == definition.id]
-
         # saved summary: totals computed independently from the fixture constants
         saved = {
             "buy_total": Decimal("1500000000000000000000000")
@@ -718,17 +719,17 @@ class SyntheticEmissionTests(unittest.TestCase):
             "events_total": 3 + 1 + 4,
             "payout_count_total": 3,
         }
-        self.assertEqual(sum(Decimal(r["value"]) for r in values(flows, "observed_near_purchases"))
+        self.assertEqual(sum(Decimal(r["value"]) for r in self.values(flows, "observed_near_purchases"))
                          * YOCTO, saved["buy_total"])
-        self.assertEqual(sum(Decimal(r["value"]) for r in values(flows, "treasury_payouts_near"))
+        self.assertEqual(sum(Decimal(r["value"]) for r in self.values(flows, "treasury_payouts_near"))
                          * YOCTO, saved["payout_total"])
-        self.assertEqual(sum(int(r["value"]) for r in values(flows, "conversion_count")),
+        self.assertEqual(sum(int(r["value"]) for r in self.values(flows, "conversion_count")),
                          saved["events_total"])
-        self.assertEqual(sum(int(r["value"]) for r in values(flows, "treasury_payout_count")),
+        self.assertEqual(sum(int(r["value"]) for r in self.values(flows, "treasury_payout_count")),
                          saved["payout_count_total"])
         # USD window total: day1 2.0 NEAR * price + day2 2.0 * 2.5 (day3 missing -> n/a)
         # here the window estimate is unavailable; the two covered daily values are exact
-        usd = values(flows, "estimated_purchase_usd")
+        usd = self.values(flows, "estimated_purchase_usd")
         exacts = sorted(Decimal(r["quality"].get("exact_value", r["value"])) for r in usd
                         if r["dimensions"]["price_basis"] == "start" and r["value"] is not None)
         self.assertEqual(len(exacts), 2)
@@ -738,11 +739,42 @@ class SyntheticEmissionTests(unittest.TestCase):
                                                              Decimal("1.6978914247582741")))
         # supply: net change equals the independent boundary difference
         boundaries = {boundary.date: boundary for boundary in inputs.supply_boundaries}
-        for record, window in zip(values(windows, "net_supply_change_near"),
+        for record, window in zip(self.values(windows, "net_supply_change_near"),
                                   inputs.supply_windows):
             self.assertEqual(Decimal(record["value"]),
                              boundaries[window.closing_date].supply_near
                              - boundaries[window.opening_date].supply_near)
+
+    def test_ni071_per_recipient_payout_emission_reconciles_with_aggregate(self):
+        """The v2 per-recipient observations are the v1 matcher run split by
+        receiver: per day, the three named treasuries sum exactly to the v1
+        aggregate observation, and every recipient row carries its
+        dimensions.recipient identity."""
+        manifests = build_all_manifests(self.inputs, dataset_spec=DATASET_SPEC,
+                                        manifest_inputs=())
+        flows = manifests["metrics.flows.daily"]
+        from near_api.metrics.compute import TREASURY_ACCOUNTS
+
+        by_day_recipient = {}
+        for record in self.values(flows, "treasury_payouts_near", version=2):
+            self.assertEqual(set(record["dimensions"]), {"recipient"})
+            self.assertIn(record["dimensions"]["recipient"], TREASURY_ACCOUNTS)
+            self.assertEqual(record["quality"]["recipient"],
+                             record["dimensions"]["recipient"])
+            by_day_recipient.setdefault(record["period_start"][:10], {})[
+                record["dimensions"]["recipient"]] = record
+        for aggregate in self.values(flows, "treasury_payouts_near", version=1):
+            day = aggregate["period_start"][:10]
+            rows = by_day_recipient.get(day, {})
+            self.assertEqual(set(rows), set(TREASURY_ACCOUNTS),
+                             f"{day}: the declared universe is incomplete")
+            total = sum(Decimal(row["value"]) for row in rows.values())
+            self.assertEqual(total, Decimal(aggregate["value"]),
+                             f"{day}: per-recipient sum diverges from the aggregate")
+            # a proven zero day is emitted per recipient with the coverage note
+            if Decimal(aggregate["value"]) == 0:
+                self.assertTrue(all("verified_zero" in row["quality"]
+                                    for row in rows.values()))
 
 
 # --------------------------------------------------------------------------- #

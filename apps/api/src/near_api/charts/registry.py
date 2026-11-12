@@ -105,10 +105,32 @@ class ChartRegistryError(RuntimeError):
 
 @dataclass(frozen=True)
 class ChartSeries:
-    """One metric binding: the registered metric id plus its series role."""
+    """One metric binding: the registered metric id, its exact definition
+    version and its series role.
+
+    NI-071: metric ids are superseded by new versions over time, so a chart
+    version pins the exact definition version it binds. Registered charts
+    keep that binding forever (their junction rows are content-verified);
+    resolving "whatever is latest" would silently rebind a stored chart.
+    """
 
     metric_id: str
     series_role: str
+    metric_version: int = 1
+
+
+def resolve_binding(metrics: Mapping[str, MetricDefinition],
+                    binding: ChartSeries) -> MetricDefinition:
+    """The exact registered metric definition version one binding pins.
+
+    ``metrics`` holds the latest version per metric id (the shape callers
+    build from the registry tuple); a binding pinned to another version
+    resolves through the versioned registry lookup.
+    """
+    metric = metrics.get(binding.metric_id)
+    if metric is not None and metric.version == binding.metric_version:
+        return metric
+    return definition_by_metric_id_version(binding.metric_id, binding.metric_version)
 
 
 @dataclass(frozen=True)
@@ -155,14 +177,15 @@ class ChartDefinition:
             "allowed_ranges": self.allowed_ranges,
             "filter_schema": self.filter_schema,
             "unit_schema": self.unit_schema,
-            "metric_definition_ids": sorted(str(metrics[s.metric_id].id) for s in self.series),
+            "metric_definition_ids": sorted(str(resolve_binding(metrics, s).id)
+                                            for s in self.series),
             "source_lineage": self.source_lineage,
             "renderer_version": self.renderer_version,
         }
 
     def junction_rows(self, metrics: Mapping[str, MetricDefinition]) -> list[dict]:
         return [{"chart_definition_version_id": self.id,
-                 "metric_definition_id": metrics[s.metric_id].id,
+                 "metric_definition_id": resolve_binding(metrics, s).id,
                  "series_role": s.series_role}
                 for s in self.series]
 
@@ -208,9 +231,10 @@ def _chart(chart_id: str, *, version: int, title: str, description: str, categor
     )
 
 
-def _series(*bindings: tuple[str, str]) -> tuple[ChartSeries, ...]:
-    return tuple(ChartSeries(metric_id=metric_id, series_role=role)
-                 for metric_id, role in bindings)
+def _series(*bindings: "tuple[str, str] | tuple[str, str, int]") -> tuple[ChartSeries, ...]:
+    return tuple(ChartSeries(metric_id=binding[0], series_role=binding[1],
+                             metric_version=binding[2] if len(binding) > 2 else 1)
+                 for binding in bindings)
 
 
 GatedRevenueReason = ("protocol_revenue_usd is gated (OQ-01): no verified economically "
@@ -269,7 +293,7 @@ CHARTS: tuple[ChartDefinition, ...] = (
         description="What cash transfers reached the selected named wallets: matched "
                     "successful native transfers out of intents.near, per recipient.",
         category="treasury", visualization_type="bar", update_frequency="daily",
-        series=_series(("treasury_payouts_near", "required_primary")),
+        series=_series(("treasury_payouts_near", "required_primary", 1)),
         filter_schema=_filter_enum("recipient", FILTER_TREASURY_RECIPIENTS),
         unit_schema={"required_primary": "NEAR"},
         source_lineage={"sources": ["SRC-BQ"],
@@ -286,7 +310,7 @@ CHARTS: tuple[ChartDefinition, ...] = (
                     "with the aggregate payout definition; a mismatch is withheld "
                     "with a reason, never shown inconsistently.",
         category="treasury", visualization_type="bar", update_frequency="daily",
-        series=_series(("treasury_payouts_near", "required_primary")),
+        series=_series(("treasury_payouts_near", "required_primary", 2)),
         filter_schema=_filter_comparison("recipient"),
         unit_schema={"required_primary": "NEAR"},
         source_lineage={"sources": ["SRC-BQ"],
@@ -550,8 +574,8 @@ def _validate_source_lineage(chart: ChartDefinition, metrics: Mapping[str, Metri
     note = lineage["note"]
     _reject(not isinstance(note, str) or not note,
             f"{chart.chart_id}: source_lineage requires a qualification note")
-    declared_sources = {metrics[s.metric_id].source_id for s in chart.series
-                        if metrics[s.metric_id].source_id is not None}
+    declared_sources = {resolve_binding(metrics, s).source_id for s in chart.series
+                        if resolve_binding(metrics, s).source_id is not None}
     _reject(not set(sources) <= declared_sources,
             f"{chart.chart_id}: source_lineage lists sources that no bound metric "
             "definition records")
@@ -604,16 +628,19 @@ def _validate_chart(chart: ChartDefinition, metrics: Mapping[str, MetricDefiniti
         if binding.series_role not in SERIES_ROLES:
             raise ChartRegistryError(
                 f"{chart.chart_id}: unsupported series role {binding.series_role!r}")
-        if binding.metric_id not in metrics:
+        try:
+            metric = resolve_binding(metrics, binding)
+        except KeyError:
             raise ChartRegistryError(
-                f"{chart.chart_id}: metric {binding.metric_id!r} is not a registered "
-                "metric definition; a chart may only bind resolved definitions")
+                f"{chart.chart_id}: metric {binding.metric_id!r} "
+                f"v{binding.metric_version} is not a registered metric definition "
+                "version; a chart may only bind resolved definitions") from None
         if (binding.metric_id, binding.series_role) in bound_pairs:
             raise ChartRegistryError(
                 f"{chart.chart_id}: duplicate binding {binding.metric_id}/"
                 f"{binding.series_role}")
         bound_pairs.add((binding.metric_id, binding.series_role))
-        bound_metrics.append(metrics[binding.metric_id])
+        bound_metrics.append(metric)
 
     _reject(len({binding.metric_id for binding in chart.series}) != len(chart.series),
             f"{chart.chart_id}: a metric is bound more than once")
@@ -630,7 +657,7 @@ def _validate_chart(chart: ChartDefinition, metrics: Mapping[str, MetricDefiniti
     _reject(set(chart.unit_schema) != roles,
             f"{chart.chart_id}: unit_schema must hold exactly the bound series roles")
     for binding in chart.series:
-        metric = metrics[binding.metric_id]
+        metric = resolve_binding(metrics, binding)
         _reject(chart.unit_schema[binding.series_role] != metric.unit,
                 f"{chart.chart_id}: series {binding.series_role} declares unit "
                 f"{chart.unit_schema[binding.series_role]!r} but metric "
@@ -687,10 +714,11 @@ def view_contract(chart: ChartDefinition,
         "filter_schema": chart.filter_schema,
         "series": [{"series_role": binding.series_role,
                     "metric_id": binding.metric_id,
-                    "metric_definition_id": str(metrics[binding.metric_id].id),
-                    "unit": metrics[binding.metric_id].unit,
-                    "frequency": metrics[binding.metric_id].frequency,
-                    "availability": metrics[binding.metric_id].definition["availability"]}
+                    "metric_definition_id": str(resolve_binding(metrics, binding).id),
+                    "unit": resolve_binding(metrics, binding).unit,
+                    "frequency": resolve_binding(metrics, binding).frequency,
+                    "availability": resolve_binding(metrics, binding)
+                                    .definition["availability"]}
                    for binding in chart.series],
         "source_lineage": chart.source_lineage,
     }

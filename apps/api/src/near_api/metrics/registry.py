@@ -191,11 +191,10 @@ DEFINITIONS: tuple[MetricDefinition, ...] = (
         "treasury_payouts_near", version=2,
         name="Treasury payouts from intents.near per recipient",
         unit="NEAR", frequency="daily", source_id="SRC-BQ",
-        economic_scope="Successful native TRANSFER receipts from intents.near to "
-                       "buybacks.multisignature.near, fefundsadmin.sputnik-dao.near and "
-                       "1csfundsadmin.sputnik-dao.near matched to DIP4 native_withdraw "
-                       "events, one observation per recipient; "
-                       "dimensions.recipient carries the verified receiver",
+        economic_scope="Native TRANSFER receipts from intents.near to the three named "
+                       "intents treasuries matched to DIP4 native_withdraw events; one "
+                       "observation per recipient, dimensions.recipient is the verified "
+                       "receiver",
         formula_key="treasury_payouts_near_v2", availability="A",
         description="Per-recipient variant of the v1 aggregate definition: the same "
                     "matcher run, split by the verified transfer receiver into one "
