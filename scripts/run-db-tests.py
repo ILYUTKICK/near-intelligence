@@ -25,10 +25,10 @@ def main() -> int:
     parser.add_argument("--saved-charts-http", action="store_true",
                         help="run saved-chart DB and production gateway HTTP checks only")
     parser.add_argument("--pg-bin", type=Path, required=True)
-    parser.add_argument("--suite", choices=("all", "landing", "insights", "exports"),
+    parser.add_argument("--suite", choices=("all", "landing", "insights", "exports", "publications"),
                         default="all",
                         help="run all database suites, landing HTTP integration, focused "
-                             "insight checks, or focused export checks")
+                             "insight, export, or publication checks")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     local = (repo / ".local").resolve()
@@ -112,7 +112,8 @@ def main() -> int:
         # RLS matrix), the NI-036 document revision suites, the NI-041
         # chart-block insertion suites, the NI-055 model-result block
         # insertion suites, the NI-056 frozen export representation suite,
-        # the NI-058 export job lifecycle suite, the NI-061 integration
+        # the NI-058 export job lifecycle suite, the NI-045 template and
+        # publication suites, the NI-061 integration
         # invariant suite (independent oracles across DB/API/editor
         # boundaries) and the NI-062 security audit suites (HTTP ownership
         # matrix, direct RLS probes).
@@ -122,7 +123,7 @@ def main() -> int:
                     "test_refresh_adapter.py", "test_chart_registry.py",
                     "test_delivery_apis.py", "test_saved_charts.py", "test_snapshots.py",
                     "test_profile.py", "test_documents.py", "test_chart_blocks.py",
-                    "test_model_blocks.py", "test_document_insights.py",
+                    "test_model_blocks.py", "test_document_insights.py", "test_publications.py",
                     "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py",
@@ -135,6 +136,8 @@ def main() -> int:
             patterns = ["test_home_aggregation.py", "test_documents.py", "test_insights.py", "test_document_insights.py"]
         if args.suite == "exports":
             patterns = ["test_exports_ir.py", "test_exports_jobs.py"]
+        if args.suite == "publications":
+            patterns = ["test_publications.py"]
         # NI-030 bounded authorized live smoke: only when the operator
         # explicitly sets NI_LIVE_SMOKE=1 in the invoking environment (the same
         # gate the smoke file itself requires) does one real finalized-header

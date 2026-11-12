@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { AuthConfigError, loadServerAuthConfig } from "@/lib/auth/config";
-import { SESSION_COOKIE, decodeSessionCookie, secureCookies } from "@/lib/auth/session";
+import { SESSION_COOKIE, decodeSessionCookie, secureCookies, sessionSubject } from "@/lib/auth/session";
 
 /**
  * Session check (NI-020): the client asks "who am I" and receives one of
@@ -14,21 +14,6 @@ import { SESSION_COOKIE, decodeSessionCookie, secureCookies } from "@/lib/auth/s
  * against the provider JWKS is the API's job (NI-018, apps/api) and runs on
  * every private request; a disabled account fails closed there.
  */
-function jwtPayloadSubject(accessToken: string): string | null {
-  const [, payload] = accessToken.split(".");
-  if (!payload) {
-    return null;
-  }
-  try {
-    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
-      sub?: unknown;
-    };
-    return typeof claims.sub === "string" ? claims.sub : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(request: NextRequest) {
   try {
     loadServerAuthConfig();
@@ -57,7 +42,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     status: "ok",
-    subject: jwtPayloadSubject(session.accessToken) ?? "unknown",
+    subject: sessionSubject(session) ?? "unknown",
     expiresAt: new Date(session.expiresAt).toISOString(),
   }, { headers: { "cache-control": "no-store" } });
 }

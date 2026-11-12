@@ -550,6 +550,7 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/model-definitions/{model_id}/readiness",
             "/api/model-runs", "/api/model-runs/{run_id}",
             "/api/model-runs/{run_id}/manifest",
+            "/api/publications/{slug}", "/api/publications/{slug}/duplicate",
         })
         self.assertEqual(schema["paths"]["/api/documents"]["post"]["operationId"],
                          "createDocument")
@@ -1192,13 +1193,22 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             self.assertEqual(contexts.status_code, 422)
             self.assertEqual(ErrorResponse.model_validate(contexts.json()).error.code,
                              "REFERENCE_INVALID")
-            # Template selection is feature-gated.
+            # Template selection (NI-045): the eight-heading template creates
+            # real heading blocks; unknown template ids stay a typed 422.
             template = self.client.post("/api/documents",
                                         json={"title": "T", "template_id": "investment-v1"},
                                         headers=alice_headers)
-            self.assertEqual(template.status_code, 422)
-            self.assertEqual(ErrorResponse.model_validate(template.json()).error.code,
-                             "FEATURE_UNAVAILABLE")
+            self.assertEqual(template.status_code, 201)
+            template_content = template.json()["content"]["content"]
+            self.assertEqual([node["content"][0]["text"] for node in template_content],
+                             ["Executive Summary", "Investment Hypothesis",
+                              "Adoption Evidence", "Revenue Analysis",
+                              "Token Economics", "Econometric Results",
+                              "Risks", "Conclusion"])
+            unknown_template = self.client.post(
+                "/api/documents", json={"title": "T", "template_id": "unknown-v1"},
+                headers=alice_headers)
+            self.assertEqual(unknown_template.status_code, 422)
             # Bob's session cannot see or save Alice's document.
         bob_headers = {"Authorization": "Bearer t.bob"}
         with self.as_session(self.bob_id):

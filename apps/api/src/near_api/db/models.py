@@ -24,6 +24,11 @@ same-owner composite foreign key.
 NI-058 adds the owner-scoped Markdown ZIP export jobs (export_jobs): the
 queued/leased/TTL-bounded job rows that freeze the NI-056 export IR and hold
 the finished owner-private ZIP bytes.
+NI-045 adds the public research publication zone (research_publications,
+publication_model_runs): operator-seeded immutable (slug, version) releases
+whose canonical content the public read route serves and the duplicate flow
+clones into private IDs, plus the documents.source_publication_id
+attribution pin recorded on private duplicates.
 NI-072 adds the private document organization metadata (document_organization):
 per-document private tags and favorite flag, separate from the immutable
 research chain — tagging never touches document_versions or documents.
@@ -110,6 +115,11 @@ class Document(Base):
     revision: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("1"))
     current_version_id: Mapped[UUID | None]
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    # NI-045 one-time attribution: the public release this document was
+    # duplicated from (NULL for ordinary documents; never updated after insert).
+    source_publication_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("app.research_publications.id", ondelete="RESTRICT",
+                   name="fk_documents_source_publication"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -1070,3 +1080,67 @@ class ModelRun(Base):
     published_by: Mapped[str] = mapped_column(String(120), nullable=False)
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
                                                    nullable=False, server_default=func.now())
+
+
+class ResearchPublication(Base):
+    """One operator-seeded public research release (NI-045).
+
+    Mirrors migration 0015 exactly (DATABASE_SCHEMA.md "research_publications",
+    the implemented shape): an immutable (slug, version) row whose ``content``
+    is the canonical editor document JSON the public read route serves and the
+    duplicate flow clones into fresh private IDs. Only published rows exist
+    (CHECK ``status = 'published'``); near_app reads them with no owner
+    predicate, near_operator seeds and deletes, and no role can UPDATE —
+    a correction appends a new version or removes the row.
+    """
+
+    __tablename__ = "research_publications"
+    __table_args__ = (
+        CheckConstraint(r"slug ~ '^[a-z0-9][a-z0-9-]{0,79}$'", name="slug"),
+        CheckConstraint("version >= 1", name="version"),
+        CheckConstraint("title <> ''", name="title_nonempty"),
+        CheckConstraint("status = 'published'", name="status"),
+        CheckConstraint(r"content_sha256 ~ '^[0-9a-f]{64}$'", name="content_sha256_format"),
+        CheckConstraint("octet_length(content::text) <= 2097152", name="content_size"),
+        CheckConstraint("octet_length(evidence_manifest::text) <= 65536",
+                        name="manifest_size"),
+        UniqueConstraint("slug", "version", name="uq_research_publications_slug_version"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(80), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    evidence_manifest: Mapped[dict] = mapped_column(JSONB, nullable=False,
+                                                    server_default=text("'[]'::jsonb"))
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False,
+                                        server_default=text("'published'"))
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+                                                   nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+                                                 nullable=False, server_default=func.now())
+
+
+class PublicationModelRun(Base):
+    """Binding of one published model run into one publication (NI-045).
+
+    Both sides are published rows; the run FK is RESTRICT because published
+    runs are immutable (migration 0010). near_app may read a binding only
+    while its publication is published (RLS policy of migration 0015).
+    """
+
+    __tablename__ = "publication_model_runs"
+    __table_args__ = (
+        ForeignKeyConstraint(["publication_id"], ["app.research_publications.id"],
+                             name="fk_publication_model_runs_publication",
+                             ondelete="CASCADE"),
+        ForeignKeyConstraint(["model_run_id"], ["app.model_runs.run_id"],
+                             name="fk_publication_model_runs_model_run",
+                             ondelete="RESTRICT"),
+    )
+
+
+    publication_id: Mapped[UUID] = mapped_column(primary_key=True)
+    model_run_id: Mapped[UUID] = mapped_column(primary_key=True)

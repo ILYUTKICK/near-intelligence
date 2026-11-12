@@ -10,7 +10,15 @@ import { join } from "node:path";
 
 import { axe } from "jest-axe";
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The NI-045 duplication CTA on the research page is a client component that
+// reads the router for the sign-in continuation; these structural tests stub
+// the router (they render the page outside the app-router context). The CTA
+// behavior itself is covered by tests/ui/duplicate-release.test.tsx.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 import ResearchPage from "@/app/(public)/research/page";
 import {
