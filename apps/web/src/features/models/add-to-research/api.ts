@@ -1,9 +1,17 @@
 import type { components } from "@near-intelligence/shared-types";
 import { z } from "zod";
 import { privateFetch } from "@/lib/auth/private-fetch";
+import { DocumentApiError } from "@/features/documents/list/documents-api";
 import { apiErrorResponseSchema, documentSummarySchema } from "@/features/documents/list/documents-schema";
 
 export type InsertModelInput = components["schemas"]["ModelBlockInsertRequest"];
+
+export function interpretationLines(text: string): InsertModelInput["interpretation"] {
+  return text.split(/\r?\n/).map(line => ({
+    type: "paragraph",
+    content: line ? [{ type: "text", text: line, marks: [] }] : [],
+  }));
+}
 
 const resultSchema: z.ZodType<components["schemas"]["ModelBlockMutationResponse"]> = z.object({
   document: documentSummarySchema,
@@ -25,19 +33,15 @@ export async function insertModel(documentId: string, revision: number, input: I
     body: JSON.stringify(input), signal,
   });
   if (!response.ok) {
-    if (response.status === 409) {
-      throw new Error("The research changed. Confirm again to append to its current revision; existing work will be retained.");
-    }
-    if (response.status === 404) {
-      throw new Error("The selected research or pinned model data is no longer available.");
-    }
-    if (response.status === 401 || response.status === 403) {
-      throw new Error("Your session changed. Sign in again.");
-    }
     const parsed = apiErrorResponseSchema.safeParse(await response.json().catch(() => null));
-    throw new Error(parsed.success && parsed.data.error.message
-      ? parsed.data.error.message
-      : "The model result could not be added. The pinned run and dataset are verified server-side; retry with the same pins.");
+    const error = parsed.success ? parsed.data.error : null;
+    const message = error?.code === "REVISION_CONFLICT" ? "The research changed. Review its current revision before confirming again."
+      : response.status === 404 ? "The selected research or pinned model data is no longer available."
+        : response.status === 401 || response.status === 403 ? "Your session changed. Sign in again."
+          : error?.message ?? "The model result could not be added. Retry with the same pins.";
+    throw new DocumentApiError(response.status, error?.code ?? "UNKNOWN_ERROR", message);
   }
-  return resultSchema.parse(await response.json());
+  const result = resultSchema.parse(await response.json());
+  if (result.document.id !== documentId) throw new Error("The insertion response did not match the selected research.");
+  return result;
 }

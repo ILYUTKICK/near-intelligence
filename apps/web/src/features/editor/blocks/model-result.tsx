@@ -4,7 +4,7 @@ import {
   ReactNodeViewRenderer,
   type NodeViewProps,
 } from "@tiptap/react";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 
 import { blockIdAttr, jsonAttr, stringAttr } from "../attributes";
 import { emitOpenBlockProperties } from "../ui-bridge";
@@ -191,37 +191,31 @@ function ModelResultBlockView({ node, editor, getPos, updateAttributes }: NodeVi
   };
   const historical = useContext(HistoricalRevisionContext);
   const account = useChartEditorContext();
-  const [run, setRun] = useState<ModelRunDetail | null>(null);
-  const [loading, setLoading] = useState(() => Boolean(attrs.model_run_id));
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    runId: string;
+    retry: number;
+    run?: ModelRunDetail;
+    error?: string;
+  } | null>(null);
   const [retry, setRetry] = useState(0);
-
-  const reload = useCallback((signal: AbortSignal) => {
-    loadPinnedRun(attrs.model_run_id ?? "", signal)
-      .then((value) => {
-        if (!signal.aborted) {
-          setRun(value);
-          setError(null);
-          setLoading(false);
-        }
-      })
-      .catch((cause: unknown) => {
-        if (!signal.aborted) {
-          setRun(null);
-          setError(cause instanceof Error ? cause.message : "The pinned model run could not be loaded.");
-          setLoading(false);
-        }
-      });
-  }, [attrs.model_run_id]);
+  const runId = attrs.model_run_id;
+  const current = result?.runId === runId && result.retry === retry ? result : null;
+  const run = current?.run;
+  const error = current?.error;
+  const loading = Boolean(runId && !current);
 
   useEffect(() => {
-    if (!attrs.model_run_id) {
-      return;
-    }
+    if (!runId) return;
     const controller = new AbortController();
-    reload(controller.signal);
+    loadPinnedRun(runId, controller.signal).then((value) => {
+      if (!controller.signal.aborted) setResult({ runId, retry, run: value });
+    }).catch((cause: unknown) => {
+      if (!controller.signal.aborted) {
+        setResult({ runId, retry, error: cause instanceof Error ? cause.message : "The pinned model run could not be loaded." });
+      }
+    });
     return () => controller.abort();
-  }, [reload, attrs.model_run_id, retry]);
+  }, [runId, retry]);
 
   const editable = editor.isEditable && !historical;
 

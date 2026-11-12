@@ -46,7 +46,7 @@ from near_api.insights.schemas import (
 from near_api.schemas.chart_selection import ChartSelection
 from near_api.schemas.common import ContractModel
 from near_api.schemas.delivery import ChartViewResponse
-from near_api.schemas.models import GateVerdict, SPEC_ID_PATTERN
+from near_api.schemas.models import CoefficientResponse, GateVerdict, LimitationsResponse, SPEC_ID_PATTERN
 
 EXPORT_IR_VERSION = 1
 """The only frozen-representation version this builder emits. A future
@@ -109,12 +109,15 @@ class ExportModelRunReference(ContractModel):
     """One published model run referenced by the plan (NI-054 catalog).
 
     Only published runs resolve; an unpublished run id can never appear here
-    because the builder refuses it, and a published run is immutable.
+    because the builder refuses it, and a published run is immutable. A run
+    used by a model-result block carries one verified manifest for the ZIP.
     """
 
     run_id: UUID
     spec_id: Annotated[str, StringConstraints(min_length=3, max_length=80)]
     spec_version: int = Field(strict=True, ge=1)
+    manifest_bundle: dict[str, object] | None = Field(
+        default=None, exclude_if=lambda bundle: bundle is None)
 
 
 class ExportCitationReference(ContractModel):
@@ -284,28 +287,14 @@ class ExportRiskBlock(ContractModel):
     related_hypothesis_id: UUID | None
 
 
-class ExportModelResultCoefficient(ContractModel):
-    """One recorded coefficient of the pinned run (the ``CoefficientResponse``
-    row verbatim — finite float64 records, never re-computed)."""
-
-    name: Annotated[str, StringConstraints(min_length=1, max_length=120)]
-    estimate: Annotated[float, Field(float, allow_inf_nan=False)]
-    std_error: Annotated[float, Field(float, allow_inf_nan=False)]
-    t_stat: Annotated[float, Field(float, allow_inf_nan=False)]
-    p_value: Annotated[float, Field(float, allow_inf_nan=False)]
-    ci95_low: Annotated[float, Field(float, allow_inf_nan=False)]
-    ci95_high: Annotated[float, Field(float, allow_inf_nan=False)]
-
-
 class ExportModelResultSummary(ContractModel):
     """The frozen projection of the pinned published run (NI-054/NI-055).
 
     Projected from the immutable ``app.model_runs`` row at IR build time with
     the same mechanical rules as the public run detail (values verbatim,
     nothing re-run, nothing fabricated): the coefficient table, the gate
-    verdict, the recorded sample window, the reproduction tolerances and the
-    same-origin manifest link. The document JSON never carries any of this —
-    the plan carries it so the renderer stays a pure function of the plan.
+    verdict, sample window, reproduction tolerances and recorded limitations.
+    The plan carries these so the renderer stays a pure function of the plan.
     """
 
     run_id: UUID
@@ -318,8 +307,9 @@ class ExportModelResultSummary(ContractModel):
     coefficient_rtol: Annotated[str, StringConstraints(pattern=r"^[0-9]+(\.[0-9]+)?$")]
     coefficient_atol: Annotated[str, StringConstraints(pattern=r"^[0-9]+(\.[0-9]+)?$")]
     manifest_url: Annotated[str, StringConstraints(min_length=1)]
-    coefficients: tuple[ExportModelResultCoefficient, ...] = Field(min_length=1)
+    coefficients: tuple[CoefficientResponse, ...] = Field(min_length=1)
     diagnostics: dict[str, object]
+    limitations: LimitationsResponse
 
 
 class ExportModelResultBlock(ContractModel):

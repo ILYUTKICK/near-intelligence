@@ -25,7 +25,7 @@ export function EditorInsightDialog({ intent, onClose, onSaved, onReload, restor
   intent: InsightIntent;
   onClose: () => void;
   onSaved: (result: AnnotationSave) => void;
-  onReload: (content: CanonicalDocument, revision: number, savedAt: string) => void;
+  onReload: (content: CanonicalDocument, revision: number, savedAt: string, versionId: string | null) => void;
   restoreFocus: () => void;
 }) {
   const account = useChartEditorContext();
@@ -109,7 +109,7 @@ export function EditorInsightDialog({ intent, onClose, onSaved, onReload, restor
         throw new Error("This insight changed. Keep a copy of your edits before reopening its current revision.");
       }
       signal.throwIfAborted();
-      onReload(next, document.revision, document.updated_at);
+      onReload(next, document.revision, document.updated_at, document.current_version_id);
       if (draft.hypothesisId && !hypothesisOptions(next).some(option => option.id === draft.hypothesisId)) {
         setDraft({ ...draft, hypothesisId: "" });
         setNotice("The selected hypothesis was removed. Review the insight before saving.");

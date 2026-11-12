@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 import { privateFetch } from "@/lib/auth/private-fetch";
 import { modelRunDetailSchema, modelRunListSchema, type ModelRunDetail, type ModelRunList } from "@/features/models/models-schema";
 
@@ -45,7 +43,7 @@ export async function loadPinnedRun(runId: string, signal?: AbortSignal): Promis
   } catch {
     throw new Error(RUN_DETAIL_NOT_AVAILABLE);
   }
-  if (z.uuid().safeParse(runId).success && run.run_id !== runId) {
+  if (run.run_id !== runId) {
     throw new Error(RUN_DETAIL_MISMATCH);
   }
   return run;

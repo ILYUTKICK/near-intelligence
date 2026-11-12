@@ -239,7 +239,7 @@ function installApiMock(routes: Array<(url: URL) => Response | undefined>): Reco
   const requests: RecordedRequest[] = [];
   const fetchMock = vi.fn((input: RequestInfo | URL, init: RequestInit = {}) => {
     // openapi-fetch passes a Request object; extract its URL and method.
-    const request = input instanceof Request ? input : new Request(String(input), init);
+    const request = input instanceof Request ? input : new Request(new URL(String(input), process.env.APP_ORIGIN), init);
     const url = new URL(request.url);
     requests.push({ url, method: request.method });
     for (const handler of routes) {
@@ -305,6 +305,7 @@ function detailRoutes(extra: Array<(url: URL) => Response | undefined> = []) {
     definitionRoute(jsonResponse(DEFINITION)),
     readinessRoute(jsonResponse(READINESS_READY)),
     ...extra,
+    (url: URL) => url.pathname === "/api/auth/session" ? jsonResponse({}, 401) : undefined,
   ];
 }
 
@@ -496,6 +497,13 @@ describe("Model catalog page — the honest published-runs catalog", () => {
 // -- detail page (/models/{run_id}) --------------------------------------------- //
 
 describe("Model run detail page — limits before coefficients, recorded values verbatim", () => {
+  it("returns an anonymous reader to the exact published run after sign-in", async () => {
+    const requests = installApiMock(detailRoutes());
+    await renderDetail();
+    const link = await screen.findByRole("link", { name: "Sign in to add this model result" });
+    expect(link).toHaveAttribute("href", `/login?next=${encodeURIComponent(`/models/${RUN_ID}`)}`);
+    expect(requestsTo(requests, "/api/documents")).toHaveLength(0);
+  });
   it("renders the limits section BEFORE any coefficient, with every gate limit code visible", async () => {
     installApiMock(detailRoutes());
     const { container } = await renderDetail();
