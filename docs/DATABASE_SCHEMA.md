@@ -103,3 +103,13 @@ Empty DB → head, rollback last reversible migration, upgrade again; two-user R
 ### NI-035 storage implementation
 
 Migration `0011_saved_charts` applies FORCE RLS with active-identity checks, composite `(id,owner_id)` uniqueness, RESTRICT references to the immutable chart definition and last resolved dataset, and user-delete cascade. P0 CHECKs require `mode='live'` and `snapshot_id IS NULL`; the target snapshot column must acquire its real same-owner FK before a P1 migration can lift that gate. Selection/label/mode edits advance `updated_at`; resolution-only dataset telemetry does not. The runtime cannot update owner or definition columns. Instance deletion leaves the global registries/datasets intact.
+
+### NI-080 PDF/organization migration join (12 November 2026)
+
+PR #93 keeps both independently applied parents unchanged: `0014_document_organization`
+and `0016_pdf_export_format` each descend from `0012_export_jobs`. No-op merge
+`0018_merge_pdf_organization` joins them into one branch head. It has no schema
+operations; an environment already at either parent receives only the missing
+sibling before the merge. The export integration suite checks both upgrade paths,
+rollback/re-upgrade and the SQLAlchemy mirror. Later pending-feature integration
+may add another merge revision without rewriting these applied identities.

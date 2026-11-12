@@ -739,14 +739,29 @@ class ExportJobDatabaseTests(unittest.TestCase):
         self.assertEqual(row["error_code"], "export_plan_hash_mismatch")
 
     def test_09_migration_round_trip_and_mirror(self):
-        command.downgrade(self.config, "0011_saved_charts")
-        with self.admin.connect() as connection:
-            missing = connection.execute(text(
-                "SELECT count(*) FROM information_schema.tables "
-                "WHERE table_schema='app' AND table_name='export_jobs'")).scalar_one()
-        self.assertEqual(missing, 0)
-        command.upgrade(self.config, "head")
-        command.check(self.config)  # the SQLAlchemy mirror matches the migration
+        # NI-080: production may already have applied either independent
+        # branch. The no-op merge must complete the missing sibling without
+        # changing either historical parent or losing its schema changes.
+        for parent in ("0014_document_organization", "0016_pdf_export_format"):
+            with self.subTest(applied_parent=parent):
+                command.downgrade(self.config, "0011_saved_charts")
+                with self.admin.connect() as connection:
+                    self.assertIsNone(connection.scalar(text(
+                        "SELECT to_regclass('app.export_jobs')")))
+                command.upgrade(self.config, parent)
+                with self.admin.connect() as connection:
+                    self.assertEqual(connection.scalar(text(
+                        "SELECT version_num FROM app.alembic_version")), parent)
+                command.upgrade(self.config, "head")
+                command.check(self.config)  # the mirror includes both branches
+                with self.admin.connect() as connection:
+                    self.assertIsNotNone(connection.scalar(text(
+                        "SELECT to_regclass('app.document_organization')")))
+                    format_check = connection.scalar(text(
+                        "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                        "WHERE conrelid = 'app.export_jobs'::regclass "
+                        "AND conname = 'ck_export_jobs_format'"))
+                self.assertIn("pdf", format_check)
         with self.admin.connect() as connection:
             columns = {row["column_name"] for row in connection.execute(text(
                 "SELECT column_name FROM information_schema.columns "
