@@ -1855,8 +1855,13 @@ Specification: [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
 - **Priority:** P2
 - **Dependencies:** NI-058, NI-062, NI-043
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode implementation subagent, dispatched by coordinator session sess_9345ee4f-f534-4698-98d2-5809986ac4c3
 - **Execution role:** B with A sharing UI handoff
+- **Started at:** 2026-11-12T16:52:42Z
+- **Branch/worktree:** feat/ni-060-sharing; /Users/ilyutkinn/Desktop/near-intelligence-a29
+- **Authorization:** Owner handoff v2 (docs/FINISH_BEFORE_DEPLOY_PROMPT.md, 12 November 2026) supersedes the former design-only card and requires a working feature; PR #88 carries the updated registry.
+- **Dependency verification:** NI-058, NI-062 and NI-043 are DONE in this registry; verified on docs/ni-077-handoff-v2 at commit 2787fd5.
 - **Scope update:** Owner 2026-11-12 requires a working feature before deployment; the former design-only card is superseded, not considered implementation evidence.
 
 **Description:** Implement explicit, revocable read-only publication of a chosen frozen research revision, separate from private drafts and private UUID routes.
