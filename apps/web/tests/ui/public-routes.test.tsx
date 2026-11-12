@@ -18,6 +18,13 @@ import MethodologyPage from "@/app/(public)/methodology/page";
 import ResearchPage from "@/app/(public)/research/page";
 import { publicNav } from "@/lib/navigation";
 
+// The NI-045 duplication CTA on the research page reads the router for the
+// sign-in continuation; these shell tests stub the router (the page renders
+// outside the app-router context). CTA behavior: duplicate-release.test.tsx.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 vi.mock("@/features/public-research/landing-metrics", async (importOriginal) => {
   const actual = await importOriginal<
     typeof import("@/features/public-research/landing-metrics")

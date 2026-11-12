@@ -56,11 +56,10 @@ export function DuplicateReleaseAction({ slug, nextPath }: { slug: string; nextP
   const attempt = useRef<{ key: string } | null>(null);
   const busy = useRef(false);
 
-  const checkSession = useCallback((resetIdentity = false) => {
-    setSession((previous) => ({
-      status: "checking",
-      subject: resetIdentity ? null : previous.subject,
-    }));
+  const checkSession = useCallback(() => {
+    // State changes only when an answer arrives (no synchronous setState in
+    // the effect body); a stale identity is replaced atomically by the next
+    // answer, exactly like the other public-to-private continuations.
     fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" })
       .then(async (response) => {
         if (response.status === 401) {
@@ -94,14 +93,15 @@ export function DuplicateReleaseAction({ slug, nextPath }: { slug: string; nextP
           || typeof value.version !== "number" || typeof value.title !== "string") {
           throw new Error("Release response invalid");
         }
-        setRelease({ version: value.version, title: value.title });
+        const { version, title: releaseTitle } = value;
+        setRelease({ version, title: releaseTitle });
         // The pre-filled private title is the release title, once, unless the
         // field already holds an edited value (it starts empty per mount).
-        setTitle((previous) => previous || value.title);
+        setTitle((previous) => previous || releaseTitle);
       })
       .catch(() => { if (!controller.signal.aborted) setRelease(null); });
-    const onAuthChange = () => checkSession(true);
-    const onStorage = (event: StorageEvent) => { if (event.key === AUTH_CHANGE_STORAGE) checkSession(true); };
+    const onAuthChange = () => checkSession();
+    const onStorage = (event: StorageEvent) => { if (event.key === AUTH_CHANGE_STORAGE) checkSession(); };
     const onFocus = () => checkSession();
     checkSession();
     window.addEventListener(AUTH_CHANGE, onAuthChange);

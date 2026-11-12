@@ -297,6 +297,37 @@ describe("My Research actions — create, rename, delete", () => {
     expect(headers.get("content-type")).toContain("application/json");
   });
 
+  it("sends the selected template_id (NI-045) and keeps the empty default template-free", async () => {
+    const requests = mockApi([
+      (url, init) => (isGetDocuments(url, init) ? listPage([RECENT_DOC], null) : undefined),
+      (url, init) =>
+        url === "/api/documents" && init.method === "POST"
+          ? jsonResponse(CREATED_DOC, 201)
+          : undefined,
+    ]);
+
+    const user = userEvent.setup();
+    await renderList();
+
+    await user.click(screen.getByRole("button", { name: "New document" }));
+    const dialog = await screen.findByRole("dialog", { name: /new research document/i });
+    // The empty document stays the default choice.
+    expect(within(dialog).getByLabelText("Empty document")).toBeChecked();
+    expect(within(dialog).getByLabelText("Investment research template")).not.toBeChecked();
+    await user.type(within(dialog).getByLabelText("Title"), "Templated research (fixture)");
+    await user.click(within(dialog).getByLabelText("Investment research template"));
+    await user.click(within(dialog).getByRole("button", { name: "Create document" }));
+
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith(`/workspace/research/${DOC_CREATED_ID}`);
+    });
+    const post = requests.find((request) => request.init.method === "POST");
+    expect(JSON.parse(String(post?.init.body))).toEqual({
+      title: "Templated research (fixture)",
+      template_id: "investment-v1",
+    });
+  });
+
   it("retains the typed title and stays open when creation fails", async () => {
     mockApi([
       (url, init) => (isGetDocuments(url, init) ? listPage([], null) : undefined),
