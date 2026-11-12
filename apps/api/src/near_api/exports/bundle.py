@@ -109,8 +109,8 @@ def chart_asset_files(chart_blocks: tuple[ExportChartBlock, ...],
         for block in chart_blocks}
 
 
-def _model_manifest_files(plan: ExportIr) -> tuple[BundleFile, ...]:
-    """Package each frozen model-result manifest exactly once per run."""
+def model_manifest_files(plan: ExportIr) -> tuple[BundleFile, ...]:
+    """Validate and serialize the frozen model manifests for both export formats."""
     references = {run.run_id: run for run in plan.model_runs}
     files: dict[UUID, BundleFile] = {}
     for block in plan.blocks:
@@ -124,7 +124,8 @@ def _model_manifest_files(plan: ExportIr) -> tuple[BundleFile, ...]:
         manifest = reference.manifest_bundle
         if (reference.spec_id != block.spec_id or reference.spec_version != block.spec_version
                 or manifest.get("run_id") != str(run_id) or manifest.get("spec_id") != block.spec_id
-                or block.summary.run_id != run_id):
+                or block.summary.run_id != run_id or block.summary.model_id != block.spec_id
+                or block.summary.model_version != block.spec_version):
             raise BundleError(f"The published manifest disagrees with the pinned run {run_id}",
                               [(f"blocks.{block.block_id}", "model_manifest_mismatch")])
         if run_id not in files:
@@ -157,7 +158,7 @@ def build_bundle(plan: ExportIr, render_result: ChartRenderResult | None) -> Exp
                 "exactly",
                 [("charts", "chart_set_mismatch")])
 
-    model_manifests = _model_manifest_files(plan)
+    model_manifests = model_manifest_files(plan)
     assets = chart_asset_files(chart_blocks)
     research_md = render_markdown(plan, assets).encode("utf-8")
 

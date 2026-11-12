@@ -1725,7 +1725,7 @@
       },
       "ExportJobResponse": {
         "additionalProperties": false,
-        "description": "The typed lifecycle state of one owned export job.\n\n``download_path`` is the same-origin owner-checked download route and is\nset only while the bundle is downloadable (``succeeded`` and unexpired);\n``error_code`` is set exactly when ``status`` is ``failed``. No field of\nthis response carries a server filesystem path or a credential.",
+        "description": "The typed lifecycle state of one owned export job.\n\n``download_path`` is the same-origin owner-checked download route and is\nset only while the artifact is downloadable (``succeeded`` and\nunexpired); ``error_code`` is set exactly when ``status`` is ``failed``.\nNo field of this response carries a server filesystem path or a\ncredential.",
         "properties": {
           "document_id": {
             "format": "uuid",
@@ -1769,7 +1769,10 @@
             "type": "string"
           },
           "format": {
-            "const": "markdown_zip",
+            "enum": [
+              "markdown_zip",
+              "pdf"
+            ],
             "title": "Format",
             "type": "string"
           },
@@ -7249,7 +7252,7 @@
     },
     "/api/documents/{document_id}/exports": {
       "post": {
-        "description": "Queue one Markdown ZIP export of the owned document's current revision.\n\nThe frozen export plan is built in the same transaction that inserts the\njob (NI-056): the requested revision must be the document's acknowledged\ncurrent version \u2014 a valid but superseded revision is the typed 409\n``REVISION_NOT_ACKNOWLEDGED`` (save/rename again and export the new\ncurrent revision), and an unresolvable pin or reference is the typed 422.\nWith an ``Idempotency-Key: UUID`` a repeated identical owner/route/body\nrequest replays the ORIGINAL job instead of creating a second one; the\nsame key with a different body is a 409 idempotency collision.",
+        "description": "Queue one export (Markdown ZIP or PDF) of the owned document's current\nrevision.\n\nThe frozen export plan is built in the same transaction that inserts the\njob (NI-056): the requested revision must be the document's acknowledged\ncurrent version \u2014 a valid but superseded revision is the typed 409\n``REVISION_NOT_ACKNOWLEDGED`` (save/rename again and export the new\ncurrent revision), and an unresolvable pin or reference is the typed 422.\nThe format selects the worker's renderer only (``markdown_zip`` \u2192\nresearch.md + assets + manifest; ``pdf`` \u2192 the deterministic static\nreport); both formats freeze the SAME plan. With an ``Idempotency-Key:\nUUID`` a repeated identical owner/route/body request replays the ORIGINAL\njob instead of creating a second one; the same key with a different body\nis a 409 idempotency collision.",
         "operationId": "createDocumentExport",
         "parameters": [
           {
@@ -7377,7 +7380,7 @@
             "description": "Request failed validation or references an unavailable target"
           }
         },
-        "summary": "Create (idempotently) the Markdown ZIP export job of the acknowledged revision",
+        "summary": "Create (idempotently) the export job of the acknowledged revision in the requested documented format",
         "tags": [
           "exports"
         ]
@@ -7505,7 +7508,7 @@
     },
     "/api/documents/{document_id}/exports/{job_id}/download": {
       "get": {
-        "description": "Stream the stored ZIP of one succeeded, unexpired export job.\n\nThe bytes are re-verified against the job's recorded SHA-256 before they\nare returned; anything else (queued/running, failed, expired, corrupt)\nis a typed refusal \u2014 never a stale or altered file.",
+        "description": "Stream the stored artifact of one succeeded, unexpired export job.\n\nThe media type follows the job's recorded format (``application/zip``\nfor Markdown ZIP bundles, ``application/pdf`` for the static PDF\nreport). The bytes are re-verified against the job's recorded SHA-256\nbefore they are returned; anything else (queued/running, failed,\nexpired, corrupt) is a typed refusal \u2014 never a stale or altered file.",
         "operationId": "downloadDocumentExport",
         "parameters": [
           {
@@ -7550,6 +7553,12 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
               },
               "application/zip": {
                 "schema": {
@@ -7621,7 +7630,7 @@
             "description": "Request failed validation or references an unavailable target"
           }
         },
-        "summary": "Download the finished export ZIP (owner-only, unexpired)",
+        "summary": "Download the finished export artifact (owner-only, unexpired; ZIP or PDF by the job's format)",
         "tags": [
           "exports"
         ]

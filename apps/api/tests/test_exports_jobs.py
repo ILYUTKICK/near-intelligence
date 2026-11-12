@@ -23,10 +23,13 @@ evidence. Covered guarantees (all fixtures visibly synthetic):
 - typed download refusals for queued/running (409) and failed (409 with
   the error code);
 - owner matrix: Bob cannot create, poll or download Alice's export (one
-  generic 404) at the HTTP layer with the real dependency chain;
-- PDF format refusal (typed 422 FEATURE_UNAVAILABLE);
+  generic 404) at the HTTP layer with the real dependency chain, for both
+  documented formats;
+- the PDF format success path (NI-059): create -> worker render -> download
+  streams application/pdf with the server-controlled filename, and the
+  same-key different-format idempotency conflict stays typed 409;
 - a corrupted stored plan fails the worker typed;
-- migration 0012 downgrade/upgrade round trip with the model mirror.
+- migration 0012 + 0016 downgrade/upgrade round trip with the model mirror.
 """
 
 import copy
@@ -252,12 +255,13 @@ class ExportJobDatabaseTests(unittest.TestCase):
         return created, saved
 
     def create_job(self, document_id: UUID, version_id: UUID, *,
-                   key: str | None = None, principal: Principal | None = None):
+                   key: str | None = None, principal: Principal | None = None,
+                   format: str = "markdown_zip"):
         from near_api.exports import service as export_service
 
         return export_service.create_export_job(
             self.engine, principal or self.alice, document_id, version_id,
-            idempotency_key=key)
+            format=format, idempotency_key=key)
 
     def job_row(self, document_id: UUID, job_id: UUID):
         with self.admin.connect() as connection:
@@ -381,6 +385,10 @@ class ExportJobDatabaseTests(unittest.TestCase):
 
         with self.assertRaises(IdempotencyConflict):
             self.create_job(created.document.id, uuid4(), key=key)
+        # same key and revision, different FORMAT -> also a different request
+        with self.assertRaises(IdempotencyConflict):
+            self.create_job(created.document.id, saved.version.id, key=key,
+                            format="pdf")
         # malformed key -> 422 at the route
         with self.as_session(self.alice_id):
             response = self.client.post(
@@ -554,7 +562,7 @@ class ExportJobDatabaseTests(unittest.TestCase):
                 headers=self.bearer(self.alice_id))
         self.assertEqual(download.status_code, 410)
 
-    def test_06_download_not_ready_failed_and_pdf_refusal(self):
+    def test_06_download_not_ready_failed_and_pdf_success_path(self):
         dataset_id = self.stage_volume(self.dataset_key("intents"), "5")
         created, saved = self.create_full_document(
             self.alice, dataset_id=dataset_id, table_dataset_id=dataset_id)
@@ -567,40 +575,95 @@ class ExportJobDatabaseTests(unittest.TestCase):
             self.assertEqual(queued.status_code, 409)
             self.assertEqual(ErrorResponse.model_validate(queued.json()).error.code,
                              "EXPORT_NOT_READY")
+            # NI-059: the PDF format is a documented export now — the SAME
+            # frozen-plan machinery, the PDF renderer on the worker.
             pdf = self.client.post(
                 f"/api/documents/{created.document.id}/exports",
                 headers=self.bearer(self.alice_id),
                 json={"document_version_id": str(saved.version.id),
                       "format": "pdf"})
-        self.assertEqual(pdf.status_code, 422)
-        self.assertEqual(ErrorResponse.model_validate(pdf.json()).error.code,
-                         "FEATURE_UNAVAILABLE")
+        self.assertEqual(pdf.status_code, 202)
+        pdf_job = pdf.json()
+        self.assertEqual(pdf_job["format"], "pdf")
+        self.assertEqual(pdf_job["status"], "queued")
+        self.assertIsNone(pdf_job["download_path"])
 
-        # A typed worker refusal marks the job failed: the leased job is
-        # failed through the owner-scoped worker path (the renderer
-        # failure path is exercised the same way by the boundary suite).
+        # The worker renders both queued jobs (Markdown ZIP first by
+        # creation order, then the PDF) from their frozen plans.
+        self.assertTrue(process_one(self.engine, self.operator,
+                                    worker_id="ni058-test", lease_seconds=300,
+                                    timeout=60.0, node_bin=None,
+                                    renderer_script=None))
+        self.assertTrue(process_one(self.engine, self.operator,
+                                    worker_id="ni058-test", lease_seconds=300,
+                                    timeout=60.0, node_bin=None,
+                                    renderer_script=None))
+        with self.as_session(self.alice_id):
+            zip_poll = self.client.get(
+                f"/api/documents/{created.document.id}/exports/{job_id}",
+                headers=self.bearer(self.alice_id))
+            pdf_poll = self.client.get(
+                f"/api/documents/{created.document.id}/exports/{pdf_job['id']}",
+                headers=self.bearer(self.alice_id))
+            zip_download = self.client.get(
+                f"/api/documents/{created.document.id}/exports/{job_id}/download",
+                headers=self.bearer(self.alice_id))
+            pdf_download = self.client.get(
+                f"/api/documents/{created.document.id}/exports/{pdf_job['id']}/download",
+                headers=self.bearer(self.alice_id))
+        self.assertEqual(zip_poll.json()["status"], "succeeded")
+        self.assertEqual(pdf_poll.json()["status"], "succeeded")
+        self.assertEqual(zip_poll.json()["format"], "markdown_zip")
+        self.assertEqual(pdf_poll.json()["format"], "pdf")
+        self.assertEqual(zip_download.status_code, 200)
+        self.assertEqual(zip_download.headers["Content-Type"], "application/zip")
+        self.assertIn(f"near-export-{job_id}.zip",
+                      zip_download.headers["Content-Disposition"])
+        self.assertEqual(pdf_download.status_code, 200)
+        self.assertEqual(pdf_download.headers["Content-Type"], "application/pdf")
+        self.assertIn(f"near-export-{pdf_job['id']}.pdf",
+                      pdf_download.headers["Content-Disposition"])
+        self.assertTrue(pdf_download.content.startswith(b"%PDF-"))
+        # The stored PDF artifact matches its recorded identity (the
+        # download route re-verifies the hash before streaming).
+        row = self.job_row(created.document.id, UUID(pdf_job["id"]))
+        self.assertEqual(row["status"], "succeeded")
+        with self.as_session(self.bob_id):
+            pdf_path = f"/api/documents/{created.document.id}/exports/{pdf_job['id']}"
+            for path in (pdf_path, f"{pdf_path}/download"):
+                denied = self.client.get(path, headers=self.bearer(self.bob_id))
+                self.assertEqual(denied.status_code, 404)
+                self.assertEqual(ErrorResponse.model_validate(denied.json()).error.code,
+                                 "NOT_FOUND")
+
+        # A typed worker refusal marks the job failed: one more job is
+        # failed through the owner-scoped worker path (the renderer failure
+        # path is exercised the same way by the boundary suite).
+        third = self.create_job(created.document.id, saved.version.id)
+        third_id = third.job.id
         claim_job(self.operator, "failing-worker", lease_seconds=300)
         from near_api.exports.worker import ClaimedJob, fail_job as fail_claimed
 
         with self.operator.connect() as connection:
             row = connection.execute(text(
-                "SELECT id, owner_id, document_id, document_version_id, revision,"
-                " attempts, leased_by FROM app.export_jobs WHERE id = :id"),
-                {"id": job_id}).mappings().one()
+                "SELECT id, owner_id, document_id, document_version_id, format,"
+                " revision, attempts, leased_by FROM app.export_jobs"
+                " WHERE id = :id"), {"id": third_id}).mappings().one()
         claimed = ClaimedJob(job_id=row["id"], owner_id=row["owner_id"],
                              document_id=row["document_id"],
                              document_version_id=row["document_version_id"],
+                             format=row["format"],
                              revision=row["revision"], attempts=row["attempts"],
                              worker_id=row["leased_by"])
         self.assertTrue(fail_claimed(self.engine, claimed, "renderer_unavailable"))
         with self.as_session(self.alice_id):
             poll = self.client.get(
-                f"/api/documents/{created.document.id}/exports/{job_id}",
+                f"/api/documents/{created.document.id}/exports/{third_id}",
                 headers=self.bearer(self.alice_id))
             self.assertEqual(poll.json()["status"], "failed")
             self.assertEqual(poll.json()["error_code"], "renderer_unavailable")
             download = self.client.get(
-                f"/api/documents/{created.document.id}/exports/{job_id}/download",
+                f"/api/documents/{created.document.id}/exports/{third_id}/download",
                 headers=self.bearer(self.alice_id))
         self.assertEqual(download.status_code, 409)
         error = ErrorResponse.model_validate(download.json()).error
@@ -620,6 +683,11 @@ class ExportJobDatabaseTests(unittest.TestCase):
                 headers=self.bearer(self.bob_id),
                 json={"document_version_id": str(saved.version.id),
                       "format": "markdown_zip"})
+            create_pdf = self.client.post(
+                f"/api/documents/{created.document.id}/exports",
+                headers=self.bearer(self.bob_id),
+                json={"document_version_id": str(saved.version.id),
+                      "format": "pdf"})
             poll = self.client.get(
                 f"/api/documents/{created.document.id}/exports/{job_id}",
                 headers=self.bearer(self.bob_id))
@@ -629,11 +697,11 @@ class ExportJobDatabaseTests(unittest.TestCase):
             cross_document = self.client.get(
                 f"/api/documents/{uuid4()}/exports/{job_id}",
                 headers=self.bearer(self.bob_id))
-        for response in (create, poll, download, cross_document):
+        for response in (create, create_pdf, poll, download, cross_document):
             self.assertEqual(response.status_code, 404)
             self.assertEqual(ErrorResponse.model_validate(response.json()).error.code,
                              "NOT_FOUND")
-        # Bob's own document export works independently.
+        # Bob's own document export works independently (both formats).
         bob_dataset = self.insert_dataset_row(self.dataset_key("bob-table"))
         bob_created, bob_saved = self.create_full_document(
             self.bob, dataset_id=self.stage_volume(self.dataset_key("bob-intents"), "4"),
@@ -644,9 +712,16 @@ class ExportJobDatabaseTests(unittest.TestCase):
                 headers=self.bearer(self.bob_id),
                 json={"document_version_id": str(bob_saved.version.id),
                       "format": "markdown_zip"})
+            bob_pdf = self.client.post(
+                f"/api/documents/{bob_created.document.id}/exports",
+                headers=self.bearer(self.bob_id),
+                json={"document_version_id": str(bob_saved.version.id),
+                      "format": "pdf"})
         self.assertEqual(bob_export.status_code, 202)
         self.assertEqual(bob_export.json()["document_id"],
                          str(bob_created.document.id))
+        self.assertEqual(bob_pdf.status_code, 202)
+        self.assertEqual(bob_pdf.json()["format"], "pdf")
 
     def test_08_corrupted_plan_fails_typed(self):
         dataset_id = self.stage_volume(self.dataset_key("intents"), "6")
@@ -671,14 +746,34 @@ class ExportJobDatabaseTests(unittest.TestCase):
         self.assertEqual(row["error_code"], "export_plan_hash_mismatch")
 
     def test_09_migration_round_trip_and_mirror(self):
-        command.downgrade(self.config, "0011_saved_charts")
-        with self.admin.connect() as connection:
-            missing = connection.execute(text(
-                "SELECT count(*) FROM information_schema.tables "
-                "WHERE table_schema='app' AND table_name='export_jobs'")).scalar_one()
-        self.assertEqual(missing, 0)
-        command.upgrade(self.config, "head")
-        command.check(self.config)  # the SQLAlchemy mirror matches the migration
+        # Preserve the independent parents and both heads that precede the
+        # final join. Upgrading each applies the missing schema changes.
+        for parent in ("0014_document_organization", "0016_pdf_export_format",
+                       "0015_publications", "0018_merge_pdf_organization"):
+            with self.subTest(applied_parent=parent):
+                command.downgrade(self.config, "0011_saved_charts")
+                with self.admin.connect() as connection:
+                    self.assertIsNone(connection.scalar(text(
+                        "SELECT to_regclass('app.export_jobs')")))
+                command.upgrade(self.config, parent)
+                with self.admin.connect() as connection:
+                    self.assertEqual(connection.scalar(text(
+                        "SELECT version_num FROM app.alembic_version")), parent)
+                command.upgrade(self.config, "head")
+                command.check(self.config)
+                with self.admin.connect() as connection:
+                    self.assertEqual(connection.scalar(text(
+                        "SELECT version_num FROM app.alembic_version")),
+                        "0019_merge_pdf_publications")
+                    self.assertIsNotNone(connection.scalar(text(
+                        "SELECT to_regclass('app.document_organization')")))
+                    self.assertIsNotNone(connection.scalar(text(
+                        "SELECT to_regclass('app.research_publications')")))
+                    format_check = connection.scalar(text(
+                        "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                        "WHERE conrelid = 'app.export_jobs'::regclass "
+                        "AND conname = 'ck_export_jobs_format'"))
+                self.assertIn("pdf", format_check)
         with self.admin.connect() as connection:
             columns = {row["column_name"] for row in connection.execute(text(
                 "SELECT column_name FROM information_schema.columns "
