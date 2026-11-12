@@ -483,6 +483,9 @@ def reconstruct_revision_chart(connection: Connection, version: DocumentVersionR
     except (DocumentSchemaError, DeliveryInvalidFilter, ValidationError):
         raise ReconstructionError("pinned_definition_unavailable") from None
     if not same_chart_pins(context, expected):
+        import sys
+        print("NI071-DEBUG observed:", context.model_dump(mode="json"), file=sys.stderr)
+        print("NI071-DEBUG expected:", expected.model_dump(mode="json"), file=sys.stderr)
         raise ReconstructionError("chart_context_mismatch")
     try:
         view = delivery.build_chart_view(
@@ -494,7 +497,11 @@ def reconstruct_revision_chart(connection: Connection, version: DocumentVersionR
         raise ReconstructionError("pinned_artifact_unavailable") from None
     if (view.context_hash != context.context_hash
             or view.definition.renderer_version != context.renderer_version
-            or sorted(series.metric.id for series in view.series)
+            # NI-071 fan-out: one bound metric version can resolve several
+            # compared series, so the pinned context lists each metric
+            # definition version exactly once while the view repeats it per
+            # series.
+            or sorted({series.metric.id for series in view.series})
             != sorted(context.metric_definition_versions)):
         raise ReconstructionError("chart_context_mismatch")
     return view.model_copy(update={"resolved_at": context.resolved_at})

@@ -23,6 +23,16 @@ The invariants this module owns:
   ``data_status``; unavailable charts are never advertised as live, and a
   missing or ambiguous observation serializes as an explicit null point with
   a reason, never as zero or a fabricated bound.
+- **Multi-value fan-out with enforced reconciliation (NI-071).** A
+  multi-value filter selection resolves one series per selected value
+  combination in one ChartView (server-side fan-out — the design decision
+  recorded in docs/CHART_SYSTEM.md), with the canonical value order coming
+  from the chart's filter schema, never the request. When a chart's schema
+  declares a reconcilable dimension and the selection covers the full
+  declared universe, the per-value series must sum to the declared aggregate
+  definition of the SAME dataset version at exact Decimal precision; a
+  mismatched period is replaced with explicit unavailable points carrying a
+  reason, never shown inconsistently and never silently.
 - **Bounded version-keyed caching.** Approved dataset versions are immutable,
   so their loaded observation content is cached in a bounded LRU keyed by the
   full version UUID (no truncated/prefix keys, hence no cross-version
@@ -43,12 +53,17 @@ import threading
 import time
 from collections import OrderedDict
 from decimal import Decimal
-from typing import Callable, Iterable, Mapping
+from typing import Callable, Iterable, Mapping, Sequence
 from urllib.parse import urlparse
 from uuid import UUID
 
 from sqlalchemy import Connection, text
 
+from near_api.charts.filter_registry import (
+    MAX_FILTER_SERIES,
+    MAX_FILTER_VALUES_PER_KEY,
+    RECONCILIATION_MISMATCH_REASON,
+)
 from near_api.charts.registry import SERIES_ROLES
 from near_api.datasets.canonical import (
     CanonicalFormatError,
@@ -228,13 +243,15 @@ def reset_delivery_caches() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def parse_filters_document(raw: str | None) -> dict[str, str]:
+def parse_filters_document(raw: str | None) -> dict[str, list[str]]:
     """Parse the urlencoded ``filters`` query parameter into a canonical dict.
 
     Accepts absent/empty (no filters) or a JSON object with non-empty string
-    keys and string values; anything else is unsupported. The returned dict is
-    sorted by key so identical selections canonicalize identically before any
-    hash/cache computation.
+    keys and either a string value or a non-empty list of string values (the
+    NI-071 multi-value form); anything else is unsupported. The returned dict
+    is sorted by key so identical selections canonicalize identically before
+    any hash/cache computation; per-key value order is canonicalized against
+    the resolved chart schema later (:func:`validate_filters_against_schema`).
     """
     if raw is None or raw == "":
         return {}
@@ -246,39 +263,71 @@ def parse_filters_document(raw: str | None) -> dict[str, str]:
     if not isinstance(value, dict) or len(value) > 32:
         raise DeliveryInvalidFilter(
             "filters must be a JSON object of approved string values")
-    canonical: dict[str, str] = {}
+    canonical: dict[str, list[str]] = {}
     for key, item in value.items():
-        if not isinstance(key, str) or not key.strip() or len(key) > 120 \
-                or not isinstance(item, str) or len(item) > 120:
+        if not isinstance(key, str) or not key.strip() or len(key) > 120:
             raise DeliveryInvalidFilter(
                 "filters must be a JSON object of approved string values")
-        canonical[key] = item
+        if isinstance(item, str):
+            items = [item]
+        elif isinstance(item, list) and item and len(item) <= MAX_FILTER_VALUES_PER_KEY:
+            items = item
+        else:
+            raise DeliveryInvalidFilter(
+                "filters must be a JSON object of approved string values")
+        values: list[str] = []
+        for entry in items:
+            if not isinstance(entry, str) or not entry or len(entry) > 120:
+                raise DeliveryInvalidFilter(
+                    "filters must be a JSON object of approved string values")
+            values.append(entry)
+        canonical[key] = values
     return dict(sorted(canonical.items()))
 
 
-def validate_filters_against_schema(filters: Mapping[str, str],
-                                    filter_schema: Mapping) -> dict[str, str]:
+def validate_filters_against_schema(filters: Mapping[str, "str | Sequence[str]"],
+                                    filter_schema: Mapping) -> dict[str, tuple[str, ...]]:
     """Validate filters against one chart version's closed filter schema.
 
     The NI-031 registry stores a closed JSON-Schema object whose properties
-    are string enums drawn from approved mappings. Unknown keys and unlisted
-    values are rejected, never ignored; the canonicalized result is what the
-    resolution, hashing and caching see.
+    are string enums drawn from approved mappings; NI-071 adds list-valued
+    multi-selections for dimensions the schema marks ``multi_value``. Unknown
+    keys and unlisted values are rejected, never ignored; duplicates are
+    collapsed once and the canonical per-key value order is the schema's
+    declared enum order, never the request order. The canonicalized result is
+    what the resolution, hashing and caching see.
     """
     properties = filter_schema.get("properties")
     if not isinstance(properties, dict):
         raise DeliveryInvalidFilter("this chart version declares no filter schema")
-    canonical: dict[str, str] = {}
-    for key, value in filters.items():
+    canonical: dict[str, tuple[str, ...]] = {}
+    for key, raw_values in filters.items():
         bound = properties.get(key)
         if bound is None:
             raise DeliveryInvalidFilter(
                 "filters must be a JSON object of approved string values")
         options = bound.get("enum") if isinstance(bound, dict) else None
-        if not isinstance(options, list) or value not in options:
+        if not isinstance(options, list):
             raise DeliveryInvalidFilter(
                 "filters must be a JSON object of approved string values")
-        canonical[key] = value
+        values = (raw_values,) if isinstance(raw_values, str) else raw_values
+        if isinstance(values, (str, bytes)) or not isinstance(values, (list, tuple)) \
+                or not values or len(values) > MAX_FILTER_VALUES_PER_KEY \
+                or any(not isinstance(value, str) or not value for value in values):
+            raise DeliveryInvalidFilter(
+                "filters must be a JSON object of approved string values")
+        # Duplicates collapse once: an identical value listed twice is the
+        # same selection, not a hidden request for extra weight.
+        selected = set(values)
+        unknown = selected - set(options)
+        if unknown:
+            raise DeliveryInvalidFilter(
+                "filters must be a JSON object of approved string values")
+        if len(values) > 1 and not bound.get("multi_value"):
+            raise DeliveryInvalidFilter(
+                "filters must be a JSON object of approved string values")
+        ordered = tuple(option for option in options if option in selected)
+        canonical[key] = ordered
     return dict(sorted(canonical.items()))
 
 
@@ -884,6 +933,19 @@ def _series_sources(connection: Connection, metric_source_id: str | None,
     return source_responses(connection, tuple(ids), include_checkpoint=include_checkpoint)
 
 
+def _hashable_filters(filters: Mapping[str, Sequence[str]]) -> dict:
+    """The canonical hash payload of a multi-value filter selection.
+
+    NI-071 canonical stored form is a list per key. A single-element list is
+    hashed as the bare string, so every context hash computed before NI-071
+    (whose stored selections carried bare strings) stays byte-identical, while
+    a genuine multi-value selection is hashed as the exact list in its
+    canonical order.
+    """
+    return {key: (values[0] if len(values) == 1 else list(values))
+            for key, values in sorted(filters.items())}
+
+
 def _context_hash(chart_row: Mapping, dataset_version_id: UUID,
                   selection: ResolvedSelection,
                   metric_definition_ids: tuple[UUID, ...]) -> str:
@@ -893,16 +955,108 @@ def _context_hash(chart_row: Mapping, dataset_version_id: UUID,
         "selection": {"start": selection.start.isoformat(),
                       "end": selection.end.isoformat(),
                       "frequency": selection.frequency,
-                      "filters": dict(selection.filters.model_dump())},
+                      "filters": _hashable_filters(selection.filters.model_dump())},
         "metric_definition_versions": sorted(str(item) for item in metric_definition_ids),
     }
     return sha256_hex(dump_canonical(payload))
 
 
+def _filter_combinations(resolved: Mapping[str, Sequence[str]]) -> list[dict[str, str]]:
+    """The canonical cross product of a resolved multi-value selection.
+
+    Keys sorted, values in the schema's canonical enum order; an empty
+    selection yields the single no-filter combination (the historical
+    resolution). Each combination is one exact-match filter document, so a
+    fan-out series resolves exactly one dimension variant — values are never
+    averaged, summed or picked silently.
+    """
+    combinations: list[dict[str, str]] = [{}]
+    for key in sorted(resolved):
+        combinations = [{**combination, key: value}
+                        for combination in combinations
+                        for value in resolved[key]]
+    return combinations
+
+
+def _reconciliation_dimension(chart_row: Mapping) -> tuple[str, dict, list[str]] | None:
+    """The (key, spec, canonical universe) of a declared reconcilable dimension.
+
+    Registry validation guarantees at most one reconciliation declaration per
+    chart and that such a chart binds exactly one metric.
+    """
+    properties = (chart_row["filter_schema"] or {}).get("properties") or {}
+    for key, bound in properties.items():
+        if isinstance(bound, dict) and isinstance(bound.get("reconciliation"), dict):
+            options = bound.get("enum")
+            if isinstance(options, list):
+                return key, dict(bound["reconciliation"]), [str(o) for o in options]
+    return None
+
+
+def _apply_reconciliation(dimension: tuple[str, dict, list[str]],
+                          resolved: Mapping[str, Sequence[str]],
+                          version_row: Mapping, content: Mapping,
+                          resolved_series: list[tuple[dict[str, str], list[dict]]],
+                          start: dt.date, end: dt.date) -> None:
+    """Enforce the declared sum identity in place (NI-071).
+
+    Active only when the selection covers the dimension's full declared
+    universe: then the selected per-value series must sum to the declared
+    aggregate definition's value for the same period, at exact Decimal
+    precision, from the SAME immutable dataset version. A period whose values
+    disagree is replaced with explicit unavailable points carrying a reason —
+    inconsistent values are withheld, never shown and never silently averaged
+    or picked. Periods where either side is not fully verified keep their own
+    explicit missing/unavailable reasons.
+    """
+    key, spec, universe = dimension
+    if sorted(resolved.get(key, ())) != sorted(universe):
+        return
+    from near_api.metrics.registry import definition_by_metric_id_version
+    try:
+        aggregate = definition_by_metric_id_version(spec["aggregate_metric_id"],
+                                                    spec["aggregate_metric_version"])
+    except KeyError:
+        return
+    aggregate_points = build_series_points(version_row, content, aggregate.id,
+                                           start, end, {})
+    for aggregate_point in aggregate_points:
+        if aggregate_point["quality"]["status"] != "ok" \
+                or aggregate_point["value"] is None:
+            continue
+        period = aggregate_point["start"]
+        total = Decimal(0)
+        complete = True
+        for _combination, points in resolved_series:
+            point = next((p for p in points if p["start"] == period), None)
+            if point is None or point["quality"]["status"] != "ok" \
+                    or point["value"] is None:
+                complete = False
+                break
+            total += Decimal(point["value"])
+        if not complete:
+            continue
+        if total != Decimal(aggregate_point["value"]):
+            for _combination, points in resolved_series:
+                for index, point in enumerate(points):
+                    if point["start"] == period and point["quality"]["status"] == "ok":
+                        points[index] = _unavailable_point(
+                            point["start"], point["end"], RECONCILIATION_MISMATCH_REASON)
+
+
 def build_chart_view(connection: Connection, *, chart_id: str, version: int | None,
                      start: dt.date, end: dt.date, dataset_version: UUID | None,
-                     filters: dict[str, str], verify_content: bool = False) -> ChartViewResponse:
-    """Resolve the complete renderer-agnostic ChartView for one selection."""
+                     filters: Mapping[str, "str | Sequence[str]"],
+                     verify_content: bool = False) -> ChartViewResponse:
+    """Resolve the complete renderer-agnostic ChartView for one selection.
+
+    NI-071 multi-value fan-out: every selected value combination resolves one
+    exact-match series per bound metric, ordered canonically (bindings by
+    series role, then combinations by schema enum order). Each series echoes
+    its own exact-match filters (single values per key), while the view-level
+    selection echoes the full multi-value selection — the context hash and
+    every persisted surface capture the exact multi-selection.
+    """
     if verify_content and (version is None or dataset_version is None):
         raise DeliveryReferenceInvalid("verified chart reads require immutable versions")
     chart_row, bindings, metric_rows = load_chart_view_inputs(connection, chart_id, version)
@@ -925,24 +1079,45 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
                 "definition; incompatible metric versions are never mixed silently")
 
     selection = ResolvedSelection(start=start, end=end, frequency="day",
-                                  filters=dict(resolved_filters))
+                                  filters={key: list(values)
+                                           for key, values in resolved_filters.items()})
     dataset = dataset_response(version_row, content)
-    series: list[SeriesResponse] = []
-    all_points: list[dict] = []
+    combinations = _filter_combinations(resolved_filters)
+    if len(bindings) * len(combinations) > MAX_FILTER_SERIES:
+        raise DeliveryInvalidFilter(
+            f"this selection resolves more than {MAX_FILTER_SERIES} compared series; "
+            "narrow the filter selection")
+    dimension = _reconciliation_dimension(chart_row)
+    resolved_series: list[tuple[dict[str, str], list[dict]]] = []
     for metric_id, role in bindings:
         metric_row = metric_rows.get(metric_id)
         if metric_row is None:
             raise DeliveryReferenceInvalid(
                 "a bound metric definition does not resolve to a registered version")
-        points = build_series_points(version_row, content, metric_id, start, end,
-                                     resolved_filters)
-        all_points.extend(points)
-        series.append(SeriesResponse(
-            metric=metric_response(metric_row), dataset=dataset, selection=selection,
-            points=tuple(Observation.model_validate(point) for point in points),
-            sources=_series_sources(connection, metric_row["source_id"],
-                                    content["input_source_ids"],
-                                    include_checkpoint=not verify_content)))
+        for combination in combinations:
+            points = build_series_points(version_row, content, metric_id, start, end,
+                                         combination)
+            resolved_series.append((combination, points))
+    if dimension is not None:
+        _apply_reconciliation(dimension, resolved_filters, version_row, content,
+                              resolved_series, start, end)
+    series: list[SeriesResponse] = []
+    all_points: list[dict] = []
+    series_index = 0
+    for metric_id, role in bindings:
+        metric_row = metric_rows.get(metric_id)
+        for combination, points in resolved_series[series_index:series_index + len(combinations)]:
+            all_points.extend(points)
+            series.append(SeriesResponse(
+                metric=metric_response(metric_row), dataset=dataset,
+                selection=ResolvedSelection(start=start, end=end, frequency="day",
+                                            filters={key: [value]
+                                                     for key, value in combination.items()}),
+                points=tuple(Observation.model_validate(point) for point in points),
+                sources=_series_sources(connection, metric_row["source_id"],
+                                        content["input_source_ids"],
+                                        include_checkpoint=not verify_content)))
+        series_index += len(combinations)
     return ChartViewResponse(
         definition=chart_response(chart_row), selection=selection, dataset=dataset,
         series=tuple(series), resolved_at=dt.datetime.now(UTC),

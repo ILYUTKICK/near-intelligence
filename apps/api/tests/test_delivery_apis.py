@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 from uuid import UUID, uuid4
@@ -37,7 +38,7 @@ from near_api.datasets.delivery import (
 from near_api.datasets.service import publish, stage
 from near_api.datasets.storage import ArtifactStorage
 from near_api.main import app
-from near_api.metrics.registry import definition_by_metric_id
+from near_api.metrics.registry import definition_by_metric_id, definition_by_metric_id_version
 from near_api.pagination import decode_page_cursor, encode_page_cursor
 from near_api.schemas.delivery import (
     ChartDefinitionResponse,
@@ -57,8 +58,12 @@ METRIC_PURCHASES = definition_by_metric_id("observed_near_purchases").id
 METRIC_CONVERSIONS = definition_by_metric_id("conversion_count").id
 METRIC_VOLUME = definition_by_metric_id("provider_intents_volume_usd").id
 METRIC_FEES = definition_by_metric_id("provider_gross_fees_usd").id
-METRIC_PAYOUTS = definition_by_metric_id("treasury_payouts_near").id
+METRIC_PAYOUTS = definition_by_metric_id_version("treasury_payouts_near", 1).id
+METRIC_PAYOUTS_V2 = definition_by_metric_id_version("treasury_payouts_near", 2).id
 METRIC_PAYOUT_COUNT = definition_by_metric_id("treasury_payout_count").id
+
+RECIPIENTS = ("buybacks.multisignature.near", "fefundsadmin.sputnik-dao.near",
+              "1csfundsadmin.sputnik-dao.near")
 
 SOURCE_IDS = {"SRC-BQ": "BigQuery export", "SRC-PRICE": "Saved price snapshots",
               "SRC-LLAMA": "DefiLlama saved snapshots",
@@ -111,10 +116,18 @@ class ResolvedSelectionContractTests(unittest.TestCase):
 
     def test_resolved_selection_carries_validated_filters(self):
         selection = ResolvedSelection(start="2026-01-01", end="2026-01-31",
-                                      frequency="day", filters={"source": "SRC-LLAMA"})
-        self.assertEqual(selection.filters.model_dump(), {"source": "SRC-LLAMA"})
+                                      frequency="day", filters={"source": ["SRC-LLAMA"]})
+        self.assertEqual(selection.filters.model_dump(), {"source": ["SRC-LLAMA"]})
+        # NI-071: resolved contexts persisted before the list canonical form
+        # carry a bare string per key; they keep loading unchanged.
+        legacy = ResolvedSelection(start="2026-01-01", end="2026-01-31",
+                                   frequency="day", filters={"source": "SRC-LLAMA"})
+        self.assertEqual(legacy.filters.model_dump(), {"source": ["SRC-LLAMA"]})
         for changes in ({"end": "2024-01-01"}, {"end": "2026-01-01"},
                         {"filters": {"source": 123}},
+                        {"filters": {"source": ["SRC-LLAMA", 4]}},
+                        {"filters": {"source": []}},
+                        {"filters": {"source": ["SRC-LLAMA", ""]}},
                         {"frequency": "week"}, {"owner_id": "synthetic"},
                         {"start": "2025-01-01", "end": "2027-01-01"}):
             with self.subTest(changes=changes):
@@ -123,6 +136,21 @@ class ResolvedSelectionContractTests(unittest.TestCase):
                                                       "end": "2026-01-31",
                                                       "frequency": "day", "filters": {},
                                                       **changes})
+
+    def test_chart_selection_normalizes_legacy_string_values(self):
+        from near_api.schemas.chart_selection import ChartSelection
+        legacy = ChartSelection(start="2026-01-01", end="2026-01-31",
+                                frequency="day", filters={"source": "SRC-LLAMA"})
+        self.assertEqual(legacy.filters, {"source": ["SRC-LLAMA"]})
+        multi = ChartSelection(start="2026-01-01", end="2026-01-31", frequency="day",
+                               filters={"recipient": ["buybacks.multisignature.near"]})
+        self.assertEqual(multi.filters, {"recipient": ["buybacks.multisignature.near"]})
+        with self.assertRaises(Exception):
+            ChartSelection(start="2026-01-01", end="2026-01-31", frequency="day",
+                           filters={"wallet": ["x"]})
+        with self.assertRaises(Exception):
+            ChartSelection(start="2026-01-01", end="2026-01-31", frequency="day",
+                           filters={"recipient": []})
 
     def test_unavailable_chart_responses_carry_reason_and_available_do_not(self):
         from near_api.schemas.delivery import AvailableRanges
@@ -155,22 +183,97 @@ class FilterAndQualityUnitTests(unittest.TestCase):
     def test_filter_parsing_canonicalizes_and_rejects_fuzz(self):
         self.assertEqual(parse_filters_document(None), {})
         self.assertEqual(parse_filters_document(""), {})
-        self.assertEqual(parse_filters_document('{"b":"2","a":"1"}'), {"a": "1", "b": "2"})
+        self.assertEqual(parse_filters_document('{"b":"2","a":"1"}'),
+                         {"a": ["1"], "b": ["2"]})
+        self.assertEqual(parse_filters_document('{"recipient":["b","a","b"]}'),
+                         {"recipient": ["b", "a", "b"]})
         for raw in ("{", "[1,2]", '"x"', "null", '{"a": 1}', '{"a": {"b": "c"}}',
-                    '{"": "x"}', '{"a": null}', '{"k%s": "v"}' .replace("%s", "e" * 200)):
+                    '{"": "x"}', '{"a": null}', '{"a": []}', '{"a": [1]}',
+                    '{"k%s": "v"}' .replace("%s", "e" * 200)):
             with self.subTest(raw=raw[:20]), self.assertRaises(delivery.DeliveryInvalidFilter):
                 parse_filters_document(raw)
 
     def test_chart_filter_schema_validation_is_closed(self):
         schema = chart_by_chart_id("intents-volume").filter_schema
         self.assertEqual(validate_filters_against_schema(
-            {"source": "SRC-LLAMA"}, schema), {"source": "SRC-LLAMA"})
-        for filters in ({"wallet": "x"}, {"source": "SRC-NOPE"}, {"source": 1}):
+            {"source": "SRC-LLAMA"}, schema), {"source": ("SRC-LLAMA",)})
+        # a single-value dimension rejects list selections beyond one value
+        for filters in ({"wallet": "x"}, {"source": "SRC-NOPE"}, {"source": 1},
+                        {"source": ["SRC-LLAMA", "SRC-DASHBOARD"]}):
             with self.subTest(filters=filters), \
                     self.assertRaises(delivery.DeliveryInvalidFilter):
                 validate_filters_against_schema(filters, schema)
         with self.assertRaises(delivery.DeliveryInvalidFilter):
             validate_filters_against_schema({}, {"type": "object"})
+
+    def test_multi_value_validation_canonicalizes_to_enum_order(self):
+        schema = chart_by_chart_id("treasury-payouts", ).filter_schema
+        resolved = validate_filters_against_schema(
+            {"recipient": ["fefundsadmin.sputnik-dao.near",
+                           "buybacks.multisignature.near",
+                           "fefundsadmin.sputnik-dao.near"]}, schema)
+        self.assertEqual(resolved, {"recipient": (
+            "buybacks.multisignature.near", "fefundsadmin.sputnik-dao.near")})
+        # duplicates collapse once; unknown values are rejected, never dropped
+        for filters in ({"recipient": ["nope"]}, {"recipient": []},
+                        {"recipient": ["buybacks.multisignature.near", 3]},
+                        {"recipient": "buybacks.multisignature.near,"
+                                      "fefundsadmin.sputnik-dao.near"}):
+            with self.subTest(filters=filters), \
+                    self.assertRaises(delivery.DeliveryInvalidFilter):
+                validate_filters_against_schema(filters, schema)
+
+    def test_parse_rejects_selections_beyond_the_multi_value_bounds(self):
+        document = json.dumps({"recipient": [f"v{index:02d}" for index in range(33)]})
+        with self.assertRaises(delivery.DeliveryInvalidFilter):
+            parse_filters_document(document)
+        bounded = json.dumps({"recipient": RECIPIENTS})
+        self.assertEqual(parse_filters_document(bounded), {"recipient": list(RECIPIENTS)})
+
+    def test_context_hash_stays_stable_for_legacy_single_value_selections(self):
+        """A single selected value hashes exactly as the pre-NI-071 string form."""
+        chart_row = {"id": uuid4()}
+        legacy_payload = {
+            "chart_definition_version_id": str(chart_row["id"]),
+            "dataset_version_id": str(uuid4()),
+            "selection": {"start": "2026-01-01", "end": "2026-01-31",
+                          "frequency": "day", "filters": {"recipient": RECIPIENTS[0]}},
+            "metric_definition_versions": [str(METRIC_PAYOUTS)],
+        }
+        selection = ResolvedSelection(start="2026-01-01", end="2026-01-31",
+                                      frequency="day",
+                                      filters={"recipient": [RECIPIENTS[0]]})
+        modern = delivery._context_hash(chart_row,
+                                        UUID(legacy_payload["dataset_version_id"]),
+                                        selection, (METRIC_PAYOUTS,))
+        from near_api.datasets.canonical import dump_canonical, sha256_hex
+        self.assertEqual(modern, sha256_hex(dump_canonical(legacy_payload)))
+        # a genuine multi-value selection hashes the exact canonical list
+        multi_payload = {**legacy_payload,
+                         "selection": {**legacy_payload["selection"],
+                                       "filters": {"recipient": list(RECIPIENTS[:2])}}}
+        multi = delivery._context_hash(chart_row,
+                                       UUID(legacy_payload["dataset_version_id"]),
+                                       ResolvedSelection(start="2026-01-01",
+                                                         end="2026-01-31",
+                                                         frequency="day",
+                                                         filters={"recipient":
+                                                                  list(RECIPIENTS[:2])}),
+                                       (METRIC_PAYOUTS,))
+        self.assertEqual(multi, sha256_hex(dump_canonical(multi_payload)))
+        self.assertNotEqual(modern, multi)
+
+    def test_filter_combinations_are_canonical_cross_products(self):
+        # the combination builder preserves the per-key canonical order that
+        # validate_filters_against_schema produced (schema enum order)
+        resolved = {"recipient": (RECIPIENTS[0], RECIPIENTS[1])}
+        combinations = delivery._filter_combinations(resolved)
+        self.assertEqual(combinations,
+                         [{"recipient": RECIPIENTS[0]}, {"recipient": RECIPIENTS[1]}])
+        self.assertEqual(delivery._filter_combinations({}), [{}])
+        crossed = delivery._filter_combinations(
+            {"b": ("1", "2"), "a": ("x",)})
+        self.assertEqual(crossed, [{"a": "x", "b": "1"}, {"a": "x", "b": "2"}])
 
     def test_row_quality_maps_verified_missing_and_unavailable(self):
         verified = delivery._row_quality({"quality_status": "verified",
@@ -790,7 +893,8 @@ class DeliveryDatabaseTests(unittest.TestCase):
         self.assertEqual([point.value for point in view.series[0].points],
                          ["100.5"] * DAILY_PERIODS)
         self.assertEqual(view.quality.status, "ok")
-        self.assertEqual(view.selection.filters.model_dump(), {"source": "SRC-LLAMA"})
+        self.assertEqual(view.selection.filters.model_dump(),
+                         {"source": ["SRC-LLAMA"]})
         for filters, code in (({"wallet": "x"}, "FILTER_UNSUPPORTED"),
                               ({"source": "SRC-NOPE"}, "FILTER_UNSUPPORTED")):
             with self.subTest(filters=filters):
@@ -985,6 +1089,173 @@ class DeliveryDatabaseTests(unittest.TestCase):
         self.assertEqual(series.json()["dataset"]["id"], str(first.dataset_version_id))
         self.assertEqual([point["value"] for point in series.json()["points"]],
                          ["2"] * DAILY_PERIODS)
+
+    # -- NI-071 multi-value comparison and reconciliation ---------------------- #
+
+    def treasury_dataset(self, dataset_key: str, *, recipients: dict[str, list[str]],
+                         aggregate: list[str] | None = None,
+                         member_metrics=None):
+        """One synthetic daily dataset carrying the v1 aggregate payout rows
+        (dimensions {}) and the v2 per-recipient rows
+        (dimensions {"recipient": ...}) for the three named wallets."""
+        assert set(recipients) == set(RECIPIENTS)
+        days = [dt.date.fromisoformat(WINDOW[0]) + dt.timedelta(days=index)
+                for index in range(DAILY_PERIODS)]
+        totals = aggregate or [str(sum(Decimal(values[index])
+                                       for values in recipients.values()))
+                               for index in range(DAILY_PERIODS)]
+        observations = []
+        for index, day in enumerate(days):
+            observations.append(observation(METRIC_PAYOUTS, day, value=totals[index]))
+            for account, values in recipients.items():
+                observations.append(observation(METRIC_PAYOUTS_V2, day,
+                                                value=values[index],
+                                                dimensions={"recipient": account}))
+        return self.stage_fixture(dataset_key, observations,
+                                  list(member_metrics or [METRIC_PAYOUTS,
+                                                          METRIC_PAYOUTS_V2]))
+
+    def recipient_view(self, dataset_version: str, **filters_changes):
+        params = {"definition_version": 2, "start": WINDOW[0], "end": WINDOW[1],
+                  "dataset_version": dataset_version}
+        if filters_changes.get("filters") is not None:
+            params["filters"] = json.dumps(filters_changes["filters"])
+        return self.get_json("/api/charts/treasury-payouts/view", **params)
+
+    def test_13_multi_value_recipient_view_fans_out_and_reconciles(self):
+        recipients = {account: [f"{index + 1}.{offset}" for index in range(DAILY_PERIODS)]
+                      for offset, account in enumerate(RECIPIENTS, start=1)}
+        staged = self.treasury_dataset(f"ni071.fanout-{uuid4().hex[:10]}",
+                                       recipients=recipients)
+        version_id = str(staged.dataset_version_id)
+        scrambled = [RECIPIENTS[2], RECIPIENTS[0], RECIPIENTS[1]]
+        response = self.recipient_view(version_id, filters={"recipient": scrambled})
+        self.assertEqual(response.status_code, 200, response.text)
+        view = ChartViewResponse.model_validate_json(response.text)
+        # one compared series per selected value, in canonical schema order
+        self.assertEqual(len(view.series), 3)
+        self.assertEqual([series.selection.filters.model_dump()["recipient"]
+                          for series in view.series],
+                         [[account] for account in RECIPIENTS])
+        for series in view.series:
+            account = series.selection.filters.model_dump()["recipient"][0]
+            self.assertEqual([point.value for point in series.points],
+                             recipients[account])
+            self.assertEqual(series.metric.metric_id, "treasury_payouts_near")
+            self.assertEqual(series.metric.version, 2)
+        # the view-level selection carries the EXACT multi-selection,
+        # canonicalized, and it drives the context hash
+        self.assertEqual(view.selection.filters.model_dump(),
+                         {"recipient": list(RECIPIENTS)})
+        self.assertEqual(view.quality.status, "ok")
+        repeat = self.recipient_view(version_id, filters={"recipient": scrambled})
+        self.assertEqual(repeat.json()["context_hash"], view.context_hash)
+        pair = self.recipient_view(version_id, filters={"recipient": scrambled[:2]})
+        pair_view = ChartViewResponse.model_validate_json(pair.text)
+        # a partial selection is canonicalized to schema order and resolved
+        # without claiming the full-universe identity
+        self.assertEqual([series.selection.filters.model_dump()["recipient"]
+                          for series in pair_view.series],
+                         [[RECIPIENTS[0]], [RECIPIENTS[2]]])
+        self.assertNotEqual(pair.json()["context_hash"], view.context_hash)
+        # reconciliation identity: the compared series sum exactly to the v1
+        # aggregate definition for every period of the same dataset version
+        aggregate = self.get_json("/api/metrics/treasury_payouts_near/series",
+                                  definition_version=1, start=WINDOW[0],
+                                  end=WINDOW[1], dataset_version=version_id)
+        self.assertEqual(aggregate.status_code, 200)
+        expected = [point["value"] for point in aggregate.json()["points"]]
+        for index in range(DAILY_PERIODS):
+            total = sum(Decimal(series.points[index].value) for series in view.series)
+            self.assertEqual(total, Decimal(expected[index]),
+                             f"period {index}: recipient sum diverges from the "
+                             "aggregate definition")
+
+    def test_14_reconciliation_mismatch_withholds_values_never_shows_them(self):
+        recipients = {account: ["1" for _ in range(DAILY_PERIODS)]
+                      for account in RECIPIENTS}
+        # the aggregate claims 10 but the universe sums to 3: an inconsistent
+        # dataset, so the full-universe view must withhold every value
+        staged = self.treasury_dataset(f"ni071.mismatch-{uuid4().hex[:10]}",
+                                       recipients=recipients,
+                                       aggregate=["10"] * DAILY_PERIODS)
+        version_id = str(staged.dataset_version_id)
+        response = self.recipient_view(version_id,
+                                       filters={"recipient": list(RECIPIENTS)})
+        self.assertEqual(response.status_code, 200)
+        view = ChartViewResponse.model_validate_json(response.text)
+        for series in view.series:
+            for point in series.points:
+                self.assertIsNone(point.value)
+                self.assertEqual(point.quality.status, "unavailable")
+                self.assertIn(delivery.RECONCILIATION_MISMATCH_REASON,
+                              point.quality.reasons)
+        self.assertEqual(view.quality.status, "unavailable")
+        # a partial selection does not claim the identity: its own exact
+        # values resolve without the aggregate comparison
+        partial = self.recipient_view(version_id, filters={"recipient": RECIPIENTS[:2]})
+        self.assertEqual(partial.status_code, 200)
+        partial_view = ChartViewResponse.model_validate_json(partial.text)
+        self.assertEqual(len(partial_view.series), 2)
+        for series in partial_view.series:
+            self.assertTrue(all(point.value == "1" and point.quality.status == "ok"
+                                for point in series.points))
+
+    def test_15_v1_chart_renders_unchanged_and_v2_is_data_gated(self):
+        recipients = {account: [f"{index + 1}.5" for index in range(DAILY_PERIODS)]
+                      for account in RECIPIENTS}
+        staged = self.treasury_dataset(f"ni071.legacy-{uuid4().hex[:10]}",
+                                       recipients=recipients)
+        version_id = str(staged.dataset_version_id)
+        base = {"definition_version": 1, "start": WINDOW[0], "end": WINDOW[1],
+                "dataset_version": version_id}
+        # the v1 chart view resolves the aggregate rows exactly as before
+        v1 = self.get_json("/api/charts/treasury-payouts/view", **base)
+        self.assertEqual(v1.status_code, 200)
+        v1_view = ChartViewResponse.model_validate_json(v1.text)
+        self.assertEqual(v1_view.definition.version, 1)
+        self.assertEqual(len(v1_view.series), 1)
+        self.assertEqual([point.value for point in v1_view.series[0].points],
+                         [str(sum(Decimal(values[index])
+                                  for values in recipients.values()))
+                          for index in range(DAILY_PERIODS)])
+        # the v1 recipient filter matches zero rows (aggregate rows carry
+        # dimensions {}): the honest explicit-missing behavior is unchanged
+        filtered_v1 = self.get_json("/api/charts/treasury-payouts/view",
+                                    **{**base, "filters": json.dumps(
+                                        {"recipient": RECIPIENTS[0]})})
+        self.assertEqual(filtered_v1.status_code, 200)
+        v1_filtered = ChartViewResponse.model_validate_json(filtered_v1.text)
+        self.assertTrue(all(point.value is None
+                            and point.quality.status == "missing"
+                            for point in v1_filtered.series[0].points))
+        # a multi-value selection is unsupported on the v1 schema
+        multi_v1 = self.get_json("/api/charts/treasury-payouts/view",
+                                 **{**base, "definition_version": 1,
+                                    "filters": json.dumps({"recipient": RECIPIENTS})})
+        self.assertEqual((multi_v1.status_code,
+                          multi_v1.json()["error"]["code"]),
+                         (422, "FILTER_UNSUPPORTED"))
+        # v2 on the same (v1-and-v2) dataset resolves; on a dataset without
+        # the per-recipient definition it is a typed reference/not-ready
+        # failure, never a silent substitution
+        v2_view = self.recipient_view(version_id, filters={"recipient": RECIPIENTS[:1]})
+        self.assertEqual(v2_view.status_code, 200)
+        v1_only = self.stage_fixture(
+            f"ni071.v1only-{uuid4().hex[:10]}",
+            [observation(METRIC_PAYOUTS, dt.date.fromisoformat(WINDOW[0])
+                         + dt.timedelta(days=index), value="4.25")
+             for index in range(DAILY_PERIODS)],
+            [METRIC_PAYOUTS])
+        explicit = self.get_json("/api/charts/treasury-payouts/view",
+                                 definition_version=2, start=WINDOW[0],
+                                 end=WINDOW[1],
+                                 dataset_version=str(v1_only.dataset_version_id))
+        self.assertEqual((explicit.status_code, explicit.json()["error"]["code"]),
+                         (422, "REFERENCE_INVALID"))
+        # (the not-ready state under `latest` is covered by the gated-chart
+        # matrix in test_08; the disposable cluster holds other approved v2
+        # datasets from the sibling tests, so `latest` legitimately resolves)
 
 
 if __name__ == "__main__":

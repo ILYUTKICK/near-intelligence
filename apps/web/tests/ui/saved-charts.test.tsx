@@ -15,7 +15,7 @@ vi.mock("@/features/charts/renderer/ChartView", () => ({
 }));
 const id = "22222222-2222-4222-8222-222222222222";
 const datasetId = "55555555-5555-4555-8555-555555555555";
-const selection = { start: "2026-11-01", end: "2026-11-06", frequency: "day" as const, filters: { source: "SRC-LLAMA" } };
+const selection = { start: "2026-11-01", end: "2026-11-06", frequency: "day" as const, filters: { source: ["SRC-LLAMA"] } };
 const saved = { id, label: "Synthetic saved chart", mode: "live" as const,
   chart_definition_version_id: id, selection, snapshot_id: null,
   last_resolved_dataset_version_id: id, created_at: "2026-11-06T12:00:00Z", updated_at: "2026-11-06T12:00:00Z" };

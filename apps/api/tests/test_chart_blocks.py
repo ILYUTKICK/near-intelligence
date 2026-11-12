@@ -154,7 +154,13 @@ class ChartBlockContractTests(unittest.TestCase):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(selection={"start": "2026-01-01", "end": "2026-01-08",
                                           "frequency": "day",
-                                          "filters": {"source": ["SRC-LLAMA"]}}))
+                                          "filters": {"source": []}}))
+        # a single selected value may arrive in the NI-071 list canonical form
+        listed = ChartBlockInsertRequest.model_validate(
+            insert_payload(selection={"start": "2026-01-01", "end": "2026-01-08",
+                                      "frequency": "day",
+                                      "filters": {"source": ["SRC-LLAMA"]}}))
+        self.assertEqual(listed.selection.filters, {"source": ["SRC-LLAMA"]})
         with self.assertRaises(ValidationError):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(block_id=str(uuid4()), owner_id=str(uuid4())))
@@ -452,7 +458,10 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
     def test_source_filter_is_persisted_and_unsupported_values_are_rejected(self):
         detail = self.create_document(self.alice)
         dataset_id = self.insert_dataset_version(self.dataset_key("filtered"))
-        selected = {**selection(), "filters": {"source": "SRC-LLAMA"}}
+        # NI-071 canonical stored form: the server-validated selection stores
+        # the list-shaped value, so the resolved context and the document
+        # attrs carry the exact same canonical document.
+        selected = {**selection(), "filters": {"source": ["SRC-LLAMA"]}}
         payload = insert_payload(dataset_version_id=str(dataset_id), selection=selected)
         response = self.add_chart(detail.document.id, payload)
         self.assertEqual(response.status_code, 201, response.text)
@@ -700,19 +709,23 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
                               str([detail.reason for detail in (error.details or ())]))
                 self.assertEqual(self.table_counts(detail.document.id),
                                  {"document_versions": 1, "document_blocks": 0})
-        # A non-empty filters object never reaches the service: the shared
-        # Selection contract rejects it (the P0 filter domain is empty).
+        # A filter value outside the chart version's closed schema never
+        # reaches storage: the resolved-context validation rejects it before
+        # any block row is written (NI-071 keeps the same fail-closed rule
+        # for the multi-value list form).
         with self.as_session(self.alice_id):
             filtered = self.client.post(
                 f"/api/documents/{detail.document.id}/chart-blocks",
                 json=insert_payload(selection={"start": "2026-01-01",
                                                "end": "2026-01-08",
                                                "frequency": "day",
-                                               "filters": {"source": ["SRC-LLAMA"]}}),
+                                               "filters": {"source": ["unapproved"]}}),
                 headers={"Authorization": "Bearer t.alice", "If-Match": '"1"'})
         self.assertEqual(filtered.status_code, 422)
         self.assertEqual(ErrorResponse.model_validate(filtered.json()).error.code,
-                         "VALIDATION_ERROR")
+                         "FILTER_UNSUPPORTED")
+        self.assertEqual(self.table_counts(detail.document.id),
+                         {"document_versions": 1, "document_blocks": 0})
 
     def test_08_inspected_evidence_survives_source_changes(self):
         detail = self.create_document(self.alice)
@@ -755,8 +768,10 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
         # NI-042 explicit edits freeze the supplied inspected pin and selection;
         # this is not latest resolution (v2 exists, but v1 remains selected).
         changed = copy.deepcopy(revision_three["content"])
+        # NI-071 canonical stored form: every filter value is a list; a
+        # single selected value hashes exactly as the pre-NI-071 string form.
         selected = {**selection("2026-01-02", "2026-01-09"),
-                    "filters": {"source": "SRC-LLAMA"}}
+                    "filters": {"source": ["SRC-LLAMA"]}}
         changed["content"][0]["attrs"]["selection"] = selected
         changed_save = self.save_document(detail.document.id, changed, revision=3)
         self.assertEqual(changed_save.status_code, 201, changed_save.text)

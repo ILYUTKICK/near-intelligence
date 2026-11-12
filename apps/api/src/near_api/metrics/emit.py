@@ -28,8 +28,7 @@ import datetime as dt
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-
-from decimal import Decimal
+from typing import Callable
 
 from near_api.datasets.canonical import decimal_string
 from near_api.datasets.manifest import (
@@ -58,6 +57,7 @@ from near_api.metrics.compute import (
     formula_treasury_balance_near_v1,
     formula_treasury_payout_count_v1,
     formula_treasury_payouts_near_v1,
+    formula_treasury_payouts_near_v2,
     formula_total_supply_near_v1,
     payout_aggregate,
     purchases_by_day,
@@ -66,39 +66,50 @@ from near_api.metrics.compute import (
 from near_api.metrics.events import MATCHER_VERSION, amount_string
 from near_api.metrics.inputs import MetricInputs
 
-FLOWS_DATASET_MEMBERS = (
-    "observed_near_purchases", "conversion_count", "treasury_payouts_near",
-    "treasury_payout_count", "near_price_usd", "estimated_purchase_usd",
-    "provider_intents_volume_usd", "provider_gross_fees_usd", "effective_gross_fee_bps",
-    "protocol_revenue_usd", "protocol_capture_rate",
+FLOWS_DATASET_MEMBERS: tuple[tuple[str, int], ...] = (
+    ("observed_near_purchases", 1), ("conversion_count", 1),
+    ("treasury_payouts_near", 1), ("treasury_payouts_near", 2),
+    ("treasury_payout_count", 1), ("near_price_usd", 1), ("estimated_purchase_usd", 1),
+    ("provider_intents_volume_usd", 1), ("provider_gross_fees_usd", 1),
+    ("effective_gross_fee_bps", 1),
+    ("protocol_revenue_usd", 1), ("protocol_capture_rate", 1),
 )
-WINDOWS_DATASET_MEMBERS = (
-    "total_supply_near", "net_supply_change_near", "issuance_lower_bound_near",
-    "burns_lower_bound_near", "purchases_to_net_supply_pct", "purchases_to_issuance_upper_pct",
-    "effective_gross_fee_bps", "estimated_purchase_usd", "fee_funded_buybacks_near",
-    "treasury_balance_near",
+WINDOWS_DATASET_MEMBERS: tuple[tuple[str, int], ...] = (
+    ("total_supply_near", 1), ("net_supply_change_near", 1),
+    ("issuance_lower_bound_near", 1),
+    ("burns_lower_bound_near", 1), ("purchases_to_net_supply_pct", 1),
+    ("purchases_to_issuance_upper_pct", 1),
+    ("effective_gross_fee_bps", 1), ("estimated_purchase_usd", 1),
+    ("fee_funded_buybacks_near", 1),
+    ("treasury_balance_near", 1),
 )
 
-FORMULAS = {
-    "observed_near_purchases": formula_observed_near_purchases_v1,
-    "conversion_count": formula_conversion_count_v1,
-    "treasury_payouts_near": formula_treasury_payouts_near_v1,
-    "treasury_payout_count": formula_treasury_payout_count_v1,
-    "near_price_usd": formula_near_price_usd_v1,
-    "estimated_purchase_usd": formula_estimated_purchase_usd_v1,
-    "provider_intents_volume_usd": formula_provider_intents_volume_usd_v1,
-    "provider_gross_fees_usd": formula_provider_gross_fees_usd_v1,
-    "effective_gross_fee_bps": formula_effective_gross_fee_bps_v1,
-    "total_supply_near": formula_total_supply_near_v1,
-    "net_supply_change_near": formula_net_supply_change_near_v1,
-    "issuance_lower_bound_near": formula_issuance_lower_bound_near_v1,
-    "burns_lower_bound_near": formula_burns_lower_bound_near_v1,
-    "purchases_to_net_supply_pct": formula_purchases_to_net_supply_pct_v1,
-    "purchases_to_issuance_upper_pct": formula_purchases_to_issuance_upper_pct_v1,
-    "treasury_balance_near": formula_treasury_balance_near_v1,
-    "protocol_revenue_usd": formula_protocol_revenue_usd_v1,
-    "protocol_capture_rate": formula_protocol_capture_rate_v1,
-    "fee_funded_buybacks_near": formula_fee_funded_buybacks_near_v1,
+# Dataset members are (metric_id, version) pairs resolved against exact
+# registered definition versions: an emitted manifest names the definition
+# versions its formulas actually emit, never "whatever is latest". NI-071
+# adds the v2 per-recipient payout emission alongside the v1 aggregate, so a
+# rebuilt dataset carries both sides of the reconciliation identity.
+FORMULAS: dict[tuple[str, int], Callable] = {
+    ("observed_near_purchases", 1): formula_observed_near_purchases_v1,
+    ("conversion_count", 1): formula_conversion_count_v1,
+    ("treasury_payouts_near", 1): formula_treasury_payouts_near_v1,
+    ("treasury_payouts_near", 2): formula_treasury_payouts_near_v2,
+    ("treasury_payout_count", 1): formula_treasury_payout_count_v1,
+    ("near_price_usd", 1): formula_near_price_usd_v1,
+    ("estimated_purchase_usd", 1): formula_estimated_purchase_usd_v1,
+    ("provider_intents_volume_usd", 1): formula_provider_intents_volume_usd_v1,
+    ("provider_gross_fees_usd", 1): formula_provider_gross_fees_usd_v1,
+    ("effective_gross_fee_bps", 1): formula_effective_gross_fee_bps_v1,
+    ("total_supply_near", 1): formula_total_supply_near_v1,
+    ("net_supply_change_near", 1): formula_net_supply_change_near_v1,
+    ("issuance_lower_bound_near", 1): formula_issuance_lower_bound_near_v1,
+    ("burns_lower_bound_near", 1): formula_burns_lower_bound_near_v1,
+    ("purchases_to_net_supply_pct", 1): formula_purchases_to_net_supply_pct_v1,
+    ("purchases_to_issuance_upper_pct", 1): formula_purchases_to_issuance_upper_pct_v1,
+    ("treasury_balance_near", 1): formula_treasury_balance_near_v1,
+    ("protocol_revenue_usd", 1): formula_protocol_revenue_usd_v1,
+    ("protocol_capture_rate", 1): formula_protocol_capture_rate_v1,
+    ("fee_funded_buybacks_near", 1): formula_fee_funded_buybacks_near_v1,
 }
 
 DATASET_PERIOD_SHAPES = {
@@ -197,11 +208,12 @@ def build_manifest(inputs: MetricInputs, *, dataset_key: str,
         members = WINDOWS_DATASET_MEMBERS
         window_start, window_end = windows_dataset_span(inputs)
     observations: list[dict] = []
-    for metric_id in members:
-        formula = FORMULAS.get(metric_id)
+    for member_id, member_version in members:
+        formula = FORMULAS.get((member_id, member_version))
         if formula is None:
             raise MetricComputationError(
-                f"metric {metric_id} has no registered formula; refusing to emit it")
+                f"metric {member_id} v{member_version} has no registered formula; "
+                "refusing to emit it")
         observations.extend(formula(inputs, shape=shape))
     quality = dict(dataset_spec.quality)
     quality.setdefault("emitter", "near_api.metrics (NI-029)")
@@ -223,8 +235,9 @@ def build_manifest(inputs: MetricInputs, *, dataset_key: str,
         "retrieved_at": (dataset_spec.retrieved_at.isoformat()
                          if dataset_spec.retrieved_at else None),
         "quality": quality,
-        "member_metrics": [str(metric_registry.definition_by_metric_id(metric_id).id)
-                           for metric_id in members],
+        "member_metrics": [str(metric_registry.definition_by_metric_id_version(
+                                   member_id, member_version).id)
+                           for member_id, member_version in members],
         "inputs": [{"kind": "file", "path": str(item.path), "role": item.role,
                     "source_id": item.source_id, "query_hash": None,
                     "license_status": item.license_status}

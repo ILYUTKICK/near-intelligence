@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Button } from "@/components/ui/button";
 import { ChartView } from "@/features/charts/renderer/ChartView";
+import type { FiltersSelection } from "@/features/charts/filters/filter-values";
 import type { ChartFactory, ChartViewLoader } from "@/features/charts/renderer/ChartView";
 import type { ChartOption } from "@/features/charts/renderer/option-builder";
 import type { ChartViewResponse } from "@/features/charts/renderer/view-types";
@@ -76,7 +77,7 @@ interface LoaderCall {
   definitionId: string;
   start: string;
   end: string;
-  filters: Record<string, string>;
+  filters: FiltersSelection;
   signal: AbortSignal;
 }
 

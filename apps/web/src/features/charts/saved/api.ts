@@ -6,7 +6,9 @@ type Schemas = components["schemas"];
 export type SavedChart = Schemas["SavedChartResponse"];
 export type SavedDetail = Schemas["SavedChartDetailResponse"];
 export type SaveInput = Schemas["SavedChartCreateRequest"];
-const selectionSchema = z.object({ start: z.string(), end: z.string(), frequency: z.literal("day"), filters: z.record(z.string(), z.string()) });
+// NI-071: the API serializes every server-validated filter value as a
+// non-empty list of approved strings (the canonical form).
+const selectionSchema = z.object({ start: z.string(), end: z.string(), frequency: z.literal("day"), filters: z.record(z.string(), z.array(z.string())) });
 export const savedSchema: z.ZodType<SavedChart> = z.object({
   id: z.uuid(), label: z.string().nullable(), mode: z.enum(["live", "snapshot"]),
   chart_definition_version_id: z.uuid(), selection: selectionSchema,

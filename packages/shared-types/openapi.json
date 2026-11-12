@@ -399,9 +399,14 @@
           },
           "filters": {
             "additionalProperties": {
-              "maxLength": 200,
-              "minLength": 1,
-              "type": "string"
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
             },
             "maxProperties": 32,
             "propertyNames": {
@@ -3609,9 +3614,16 @@
       },
       "ResolvedSelectionFilters": {
         "additionalProperties": {
-          "type": "string"
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
         },
-        "description": "Chart-version-validated filters carried inside a resolved selection.\n\nRequest filters arrive as the urlencoded ``filters`` query parameter and\nare validated server-side against the resolved chart definition version's\nclosed ``filter_schema`` (the NI-031 versioned allowlist: string enums\nfrom approved source/recipient/price-basis mappings only). Unknown keys\nand unlisted values are rejected before any resolution happens, so this\npermissive container never serializes an unapproved filter value.",
+        "description": "Chart-version-validated filters carried inside a resolved selection.\n\nRequest filters arrive as the urlencoded ``filters`` query parameter and\nare validated server-side against the resolved chart definition version's\nclosed ``filter_schema`` (the NI-031 versioned allowlist: string enums\nfrom approved source/recipient/price-basis mappings only; NI-071 adds\nlist-valued multi-selections whose values fan out into one compared\nseries per selected value). Unknown keys and unlisted values are rejected\nbefore any resolution happens, so this permissive container never\nserializes an unapproved filter value. The canonical serialized form of\nevery value is a non-empty list of non-empty approved strings.",
         "properties": {},
         "title": "ResolvedSelectionFilters",
         "type": "object"
@@ -4252,9 +4264,14 @@
           },
           "filters": {
             "additionalProperties": {
-              "maxLength": 200,
-              "minLength": 1,
-              "type": "string"
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
             },
             "maxProperties": 32,
             "propertyNames": {

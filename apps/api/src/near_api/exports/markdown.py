@@ -191,13 +191,28 @@ def _context_lines(context) -> list[str]:
     if isinstance(context, ModelContext):
         return [f"model run `{context.model_run_id}`"]
     selection = context.selection
-    return [
+    lines = [
         f"chart definition version `{context.chart_definition_version_id}`",
         f"dataset version `{context.dataset_version_id}`",
         f"window {selection.start} to {selection.end} ({selection.frequency})",
+    ]
+    # NI-071: the resolved filters are part of the pinned coverage context —
+    # an exported card must show exactly which dimension values were selected
+    # (the server-validated canonical values, multi-value lists included).
+    filters = selection.filters
+    if filters:
+        parts = []
+        for key in sorted(filters):
+            values = filters[key]
+            if isinstance(values, str):
+                values = [values]
+            parts.append(f"{escape_text(key)}: {escape_text(', '.join(values))}")
+        lines.append("filters " + "; ".join(parts))
+    lines.extend([
         f"resolved at {context.resolved_at}",
         f"context hash `{context.context_hash}`",
-    ]
+    ])
+    return lines
 
 
 def _render_insight(block: ExportInsightBlock) -> list[str]:

@@ -1,7 +1,7 @@
 import { useId } from "react";
 import type { components } from "@near-intelligence/shared-types";
 import { Label } from "@/components/ui/label";
-import { CLASSIFICATIONS, INSIGHT_TYPES, MAX_BODY_PLAIN_CHARS, type CanonicalDocument, type RichFragment } from "../canonical";
+import { CLASSIFICATIONS, INSIGHT_TYPES, MAX_BODY_PLAIN_CHARS, type CanonicalDocument, type CanonicalResolvedContext, type RichFragment } from "../canonical";
 
 type InsightInput = components["schemas"]["InsightInput"];
 
@@ -74,7 +74,10 @@ export function InsightFields({ value, onChange, hypotheses = [] }: {
   </div>;
 }
 
-export function InsightPin({ context }: { context: InsightInput["context"] }) {
+// NI-071: a pin may come from the resolved view (canonical list filters)
+// or from a persisted revision (which preserves submitted values verbatim,
+// including pre-NI-071 bare strings); the display is value-form agnostic.
+export function InsightPin({ context }: { context: InsightInput["context"] | CanonicalResolvedContext }) {
   return "selection" in context ? <div className="space-y-1 text-metadata leading-metadata text-text-secondary">
     <p className="break-all">Dataset {context.dataset_version_id}</p>
     <p>{context.selection.start} through {context.selection.end} UTC, end exclusive</p>

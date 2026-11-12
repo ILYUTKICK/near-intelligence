@@ -105,7 +105,11 @@ const resolvedSelectionSchema = z.object({
   start: isoDate,
   end: isoDate,
   frequency: z.literal("day"),
-  filters: z.record(z.string(), z.string()),
+  // NI-071: the canonical serialized form of every server-validated filter
+  // value is a non-empty list of approved strings (one series per selected
+  // value in the resolved view); legacy stored selections are normalized to
+  // this form before the API responds.
+  filters: z.record(z.string(), z.array(z.string())),
 });
 
 export const seriesResponseSchema = z.object({
