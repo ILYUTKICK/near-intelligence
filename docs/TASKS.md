@@ -1395,6 +1395,8 @@ Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
 - **Delivery:** branch `feat/ni-044-snapshots` (worktree `/Users/ilyutkinn/Desktop/near-intelligence-a22`), PR opened against `main`.
 - **Completed at:** 2026-11-12.
 
+- **NI-080 repair handoff:** Codex /root/pr90_92_conflicts, coordinated by /root, 2026-11-12T20:13:32+03:00. Owner explicitly requested fixes for existing PR90–94, retaining main merge. Repair PR90 against pinned main 129262dc247e5bfaa60f902f180e74413aae0a5e in isolated worktree /Users/ilyutkinn/.codex/worktrees/pr-90-ci-fix/Near; preserve original feature claim/results and all unrelated active claims. The repair evidence below does not substitute full release acceptance.
+
 ### NI-045 — Implement template and public research duplication
 
 - **Epic:** 09 — Chart Embedding
