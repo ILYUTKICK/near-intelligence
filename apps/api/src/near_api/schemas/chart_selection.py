@@ -12,6 +12,16 @@ saved charts, document revisions and insight contexts keep loading unchanged
 while every newly stored selection is uniformly list-shaped. Single-value
 legacy context hashes stay stable because ``datasets.delivery._context_hash``
 hashes a single-element list back as the bare string.
+
+NI-071 canonical value order: a multi-value selection's per-key order is the
+dimension's declared option order (the same order every chart version's
+``filter_schema`` enum declares), never the request order. Reordering here —
+at the one model every persisted selection passes through — makes the
+document-context hash (``documents.context_resolver.build_resolved_context``)
+agree byte-exactly with the resolved view hash
+(``datasets.delivery.build_chart_view``, which canonicalizes against the
+chart schema) for any honest request order, so a saved multi-value block
+always reconstructs from its frozen evidence.
 """
 from typing import Annotated
 from pydantic import Field, StringConstraints, field_validator, model_validator
@@ -27,10 +37,21 @@ class ChartSelection(Selection):
     @field_validator("filters", mode="before")
     @classmethod
     def canonical_values(cls, value):
-        """Normalize legacy bare-string values to the list canonical form."""
+        """Normalize to the canonical list form in the declared option order."""
         if isinstance(value, dict):
-            value = {key: ([item] if isinstance(item, str) else item)
-                     for key, item in value.items()}
+            from near_api.charts.filter_registry import FILTER_DIMENSIONS
+            canonical: dict = {}
+            for key, item in value.items():
+                items = [item] if isinstance(item, str) else item
+                options = FILTER_DIMENSIONS[key].options \
+                    if isinstance(key, str) and key in FILTER_DIMENSIONS else ()
+                if isinstance(items, list):
+                    chosen = set(items)
+                    ordered = [option for option in options if option in chosen]
+                    ordered.extend(item for item in items if item not in ordered)
+                    items = ordered
+                canonical[key] = items
+            value = canonical
         return value
 
     @model_validator(mode="after")

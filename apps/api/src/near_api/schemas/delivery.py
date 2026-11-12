@@ -36,6 +36,9 @@ SHA256_HEX = Annotated[str, StringConstraints(strict=True, pattern=r"^[0-9a-f]{6
 
 AvailabilityCode = Literal["A", "P", "B", "G"]
 
+ResolvedFilterValue = Annotated[str, StringConstraints(strict=True, min_length=1,
+                                                       max_length=200)]
+
 
 class ResolvedSelectionFilters(ContractModel):
     """Chart-version-validated filters carried inside a resolved selection.
@@ -48,12 +51,12 @@ class ResolvedSelectionFilters(ContractModel):
     series per selected value). Unknown keys and unlisted values are rejected
     before any resolution happens, so this permissive container never
     serializes an unapproved filter value. The canonical serialized form of
-    every value is a non-empty list of approved strings.
+    every value is a non-empty list of non-empty approved strings.
     """
 
     model_config = ContractModel.model_config | {"extra": "allow"}
-    __pydantic_extra__: dict[str, Annotated[list[str], Field(min_length=1,
-                                                             max_length=32)]] = \
+    __pydantic_extra__: dict[str, Annotated[list[ResolvedFilterValue],
+                                            Field(min_length=1, max_length=32)]] = \
         Field(init=False)
 
     @model_validator(mode="before")

@@ -118,11 +118,16 @@ class ResolvedSelectionContractTests(unittest.TestCase):
         selection = ResolvedSelection(start="2026-01-01", end="2026-01-31",
                                       frequency="day", filters={"source": ["SRC-LLAMA"]})
         self.assertEqual(selection.filters.model_dump(), {"source": ["SRC-LLAMA"]})
+        # NI-071: resolved contexts persisted before the list canonical form
+        # carry a bare string per key; they keep loading unchanged.
+        legacy = ResolvedSelection(start="2026-01-01", end="2026-01-31",
+                                   frequency="day", filters={"source": "SRC-LLAMA"})
+        self.assertEqual(legacy.filters.model_dump(), {"source": ["SRC-LLAMA"]})
         for changes in ({"end": "2024-01-01"}, {"end": "2026-01-01"},
                         {"filters": {"source": 123}},
                         {"filters": {"source": ["SRC-LLAMA", 4]}},
                         {"filters": {"source": []}},
-                        {"filters": {"source": "SRC-LLAMA"}},
+                        {"filters": {"source": ["SRC-LLAMA", ""]}},
                         {"frequency": "week"}, {"owner_id": "synthetic"},
                         {"start": "2025-01-01", "end": "2027-01-01"}):
             with self.subTest(changes=changes):
