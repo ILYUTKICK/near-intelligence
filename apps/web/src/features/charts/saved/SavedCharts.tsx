@@ -25,13 +25,11 @@ function SavedChartPreview({ chartId, sessionSignal }: { chartId: string; sessio
   const [detail, setDetail] = useState<SavedDetail | null>(null);
   const [failed, setFailed] = useState(false);
   const [host, setHost] = useState<HTMLDivElement | null>(null);
-  const [visible, setVisible] = useState(false);
+  // Without the IntersectionObserver API the preview resolves immediately
+  // (same fallback as the shared renderer's lazy mount).
+  const [visible, setVisible] = useState(typeof IntersectionObserver === "undefined");
   useEffect(() => {
-    if (!host) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setVisible(true);
-      return;
-    }
+    if (!host || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
