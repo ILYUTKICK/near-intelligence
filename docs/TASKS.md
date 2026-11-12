@@ -2307,8 +2307,13 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0, explicit pre-deployment completion scope
 - **Dependencies:** NI-075, NI-076, NI-077
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode A-role implementation subagent, dispatched by coordinator session sess_9345ee4f-f534-4698-98d2-5809986ac4c3
 - **Execution role:** A
+- **Started at:** 2026-11-12T09:35:00Z
+- **Branch/worktree:** feat/ni-078-presentation; /Users/ilyutkinn/Desktop/near-intelligence-a31
+- **Authorization:** Owner handoff v2 (docs/FINISH_BEFORE_DEPLOY_PROMPT.md, 12 November 2026) commissions the five NI-076 findings' resolution and the custom-range verification; preserve the NI-075 design; PR #88 carries the updated registry.
+- **Dependency verification:** NI-075, NI-076, NI-077 are DONE in this registry; NI-064 stays IN_PROGRESS with its own owner — coordinate, do not take over its claim; verified on docs/ni-077-handoff-v2 at commit 2787fd5.
 
 **Description:** Preserve the largely completed NI-075 desktop design; resolve the five specific NI-076 presentation findings and investigate the unverified custom-range control. No new visual direction or wholesale redesign is commissioned.
 
