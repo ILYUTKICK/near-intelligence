@@ -438,6 +438,8 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/documents/{document_id}/exports",
             "/api/documents/{document_id}/exports/{job_id}",
             "/api/documents/{document_id}/exports/{job_id}/download",
+            "/api/documents/{document_id}/integrity",
+            "/api/documents/{document_id}/grounded-commentary",
             "/api/documents/{document_id}/insights",
             "/api/documents/{document_id}/insights/{insight_id}",
             "/api/documents/{document_id}/hypotheses",

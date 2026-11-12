@@ -41,6 +41,9 @@ class IntegrityOracleTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Te
 
     def setUp(self):
         super().setUp()  # the fixture already provides the TestClient
+        # Oracle cases assert only 200 paths; surfacing unexpected exceptions
+        # directly keeps a regression's real traceback in the test output.
+        self.client = TestClient(app, raise_server_exceptions=True)
 
     def fetch(self, document_id, *, subject=None, version_id=None):
         params = {} if version_id is None else {"version_id": str(version_id)}
@@ -82,10 +85,10 @@ class IntegrityOracleTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Te
         block_id = added.json()["value"]["block_id"]
         hypothesis = self.add_hypothesis(document_id, revision=2)
         evidence = self.add_evidence(document_id, revision=3,
-                                     hypothesis_id=hypothesis["value"]["hypothesis_id"],
+                                     hypothesis_id=hypothesis["value"]["id"],
                                      target_id=block_id)
         return {"document_id": document_id, "chart_block_id": block_id,
-                "hypothesis_id": hypothesis["value"]["hypothesis_id"],
+                "hypothesis_id": hypothesis["value"]["id"],
                 "evidence_id": evidence["value"]["id"],
                 "revision": evidence["document"]["revision"]}
 
@@ -142,12 +145,13 @@ class IntegrityOracleTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Te
             dataset_version_id=str(dataset.dataset_version_id)))
         assert added.status_code == 201, added.text
         block_id = added.json()["value"]["block_id"]
+        stored = self.stored_document(self.alice, detail.document.id)
         # Simulate stored corruption directly (the runtime role has no UPDATE
         # grant; the test admin does). Nothing in the service can do this.
         with self.admin.begin() as connection:
             connection.execute(text(
                 "UPDATE app.document_versions SET resolved_contexts = '{}'::jsonb "
-                "WHERE id = :id"), {"id": detail.document.current_version_id})
+                "WHERE id = :id"), {"id": stored["id"]})
         report = integrity_response_ok(self.fetch(detail.document.id))
         self.assertEqual({finding.check_id for finding in report.findings},
                          {"missing_chart_context", "uncited_pinned_chart"})
@@ -170,12 +174,15 @@ class IntegrityOracleTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Te
         detail = self.create_document(self.alice)
         hypothesis = self.add_hypothesis(detail.document.id, revision=1)
         evidence = self.add_evidence(detail.document.id, revision=2,
-                                     hypothesis_id=hypothesis["value"]["hypothesis_id"],
+                                     hypothesis_id=hypothesis["value"]["id"],
                                      target_id=artifact_id, target_kind="citation")
         before = integrity_response_ok(self.fetch(detail.document.id))
         self.assertEqual(before.findings, ())
-        # The registry drifts afterwards: the artifact is no longer public.
-        with self.operator.begin() as connection:
+        # The registry drifts afterwards. Artifacts are SELECT-only for both
+        # runtime roles (immutable by grant), so only the test admin (the
+        # initdb superuser) can simulate the out-of-band change the check
+        # exists to surface.
+        with self.admin.begin() as connection:
             connection.execute(text("UPDATE app.artifacts SET scope = 'internal' WHERE id = :id"),
                                {"id": artifact_id})
         report = integrity_response_ok(self.fetch(detail.document.id))
@@ -190,16 +197,25 @@ class IntegrityOracleTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Te
     def test_06_dataset_pin_leaving_approved_state_is_reported(self):
         dataset = self.publish_volume(self.dataset_key("integrity-revoke"), "12.5")
         fixtures = self.cited_chart_document(dataset_version_id=dataset.dataset_version_id)
-        with self.operator.begin() as connection:
+        # Approved dataset versions are immutable (the app guard trigger
+        # refuses any status change), so the admin simulates the out-of-band
+        # revocation with the trigger disabled for this transaction only.
+        with self.admin.begin() as connection:
+            connection.execute(text("SET LOCAL session_replication_role = replica"))
             updated = connection.execute(text(
                 "UPDATE app.dataset_versions SET status = 'rejected' WHERE id = :id"),
                 {"id": dataset.dataset_version_id})
             self.assertEqual(updated.rowcount, 1)
         report = integrity_response_ok(self.fetch(fixtures["document_id"]))
-        self.assertEqual([finding.check_id for finding in report.findings],
-                         ["dataset_pin_unavailable"])
-        self.assertEqual(report.findings[0].severity, "advisory")
-        self.assertEqual(report.findings[0].dataset_version_id, dataset.dataset_version_id)
+        # The revoked pin AND the now-different newest approved dataset (the
+        # shared cluster holds other approved datasets for this metric) are
+        # both honest findings of the same out-of-band change.
+        self.assertEqual({finding.check_id for finding in report.findings},
+                         {"dataset_pin_unavailable", "stale_chart_context"})
+        revoked = next(finding for finding in report.findings
+                       if finding.check_id == "dataset_pin_unavailable")
+        self.assertEqual(revoked.severity, "advisory")
+        self.assertEqual(revoked.dataset_version_id, dataset.dataset_version_id)
 
     def test_07_historical_check_is_labeled_non_acknowledged(self):
         dataset = self.publish_volume(self.dataset_key("integrity-history"), "12.5")
@@ -235,8 +251,8 @@ class IntegrityOracleTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Te
         integrity_response_ok(self.fetch(fixtures["document_id"],
                                          version_id=before["id"]))
         after = self.stored_document(self.alice, fixtures["document_id"])
-        self.assertEqual(json.dumps(before, sort_keys=True),
-                         json.dumps(after, sort_keys=True))
+        self.assertEqual(json.dumps(before, sort_keys=True, default=str),
+                         json.dumps(after, sort_keys=True, default=str))
 
 
 class IntegrityRouteContractTests(unittest.TestCase):

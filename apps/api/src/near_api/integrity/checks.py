@@ -17,6 +17,14 @@ would be dead weight. What remains advisory reality after a save:
 - pinned data (chart/table) carries no evidence link and no insight context
   citing it (uncited pinned data — never a save blocker, advisory only).
 
+Availability note (recorded honestly): approved dataset versions, public
+artifacts, published model runs and registered chart definitions are
+immutable under the runtime roles (grants + app guard triggers), so the
+drift findings can only fire after an out-of-band row change — exactly the
+divergence an integrity audit must surface instead of silently trusting a
+pin. The stale-context and uncited findings fire in the ordinary life of a
+document (a newer publication, a chart nobody cited).
+
 Read-only and deterministic: no state is written, no wall-clock enters the
 report, and a rerun is simply a new GET over the same immutable row. A check
 never mutates a pin, coefficient or document — the editor's refresh stays the
@@ -115,8 +123,10 @@ def build_integrity_report(connection: Connection, document: DocumentRow,
             "document is re-saved.", jump="none"))
 
     insight_pairs, insight_datasets = _insight_pins(canonical)
-    pinned_datasets = {UUID(chart.observed_dataset_version_id) for chart in canonical.live_charts}
-    pinned_datasets.update(UUID(table.dataset_version_id) for table in canonical.data_tables
+    # Canonical nodes already carry UUID objects; only the stored context JSON
+    # (a dict of strings) needs parsing.
+    pinned_datasets = {chart.observed_dataset_version_id for chart in canonical.live_charts}
+    pinned_datasets.update(table.dataset_version_id for table in canonical.data_tables
                            if table.dataset_version_id is not None)
     for insight in canonical.insights:
         pinned_datasets.add(UUID(insight.context["dataset_version_id"]))
@@ -186,7 +196,7 @@ def build_integrity_report(connection: Connection, document: DocumentRow,
                     chart_definition_version_id=chart.chart_definition_version_id,
                     dataset_version_id=chart.observed_dataset_version_id))
 
-        if UUID(chart.observed_dataset_version_id) in unapproved:
+        if chart.observed_dataset_version_id in unapproved:
             findings.append(_finding(
                 "dataset_pin_unavailable", "advisory",
                 f"The pinned dataset {chart.observed_dataset_version_id} is no "
