@@ -27,6 +27,7 @@ from near_api.models.routes import router as models_router
 from near_api.publications.routes import router as publications_router
 from near_api.schemas.common import ErrorResponse, HealthResponse
 from near_api.settings import SettingsError, get_settings
+from near_api.shares.routes import router as shares_router
 from near_api.users.routes import router as me_router
 from near_api.workspace.routes import router as workspace_router
 
@@ -63,6 +64,7 @@ app.include_router(documents_router)
 app.include_router(chart_blocks_router)
 app.include_router(model_blocks_router)
 app.include_router(exports_router)
+app.include_router(shares_router)
 app.include_router(insights_router)
 app.include_router(hypotheses_router)
 app.include_router(evidence_router)

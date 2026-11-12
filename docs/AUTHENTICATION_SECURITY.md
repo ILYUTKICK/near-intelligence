@@ -52,6 +52,8 @@ Private responses and server components no-store; include identity in any privat
 
 Content Security Policy with nonce-based script policy, frame-ancestors 'none', object-src 'none', restricted connect-src; HSTS in production, Referrer-Policy and nosniff. Validate chart tooltip HTML handling to avoid XSS; plain text formatted values preferred. Do not put private content or tokens in URLs/analytics/errors. Logs contain request IDs, resource IDs and operation outcomes, not notes or source credentials.
 
+Share capability tokens (NI-060, ADR-021) are the one deliberate URL-borne credential: a share link is a scoped capability for exactly one frozen publication, carried only as a PATH segment (never query/analytics/error text), returned once by the create response, stored server-side as a SHA-256 digest only and never logged (the static-sinks scan stays green). Every share response — owner plane and token plane, success and deny — is `Cache-Control: no-store` with `Referrer-Policy: no-referrer`; the public viewer adds `X-Robots-Tag: noindex` and robots noindex metadata. Unknown, revoked, expired, malformed and corrupt tokens answer with one generic 404 (no oracle). Revocation clears the stored bytes; every asset request re-checks live state server-side (no signed URLs, no immutable caching of share content).
+
 ## Secrets and operations
 
 Use environment/secret manager, separate production/dev credentials, least-privilege DB roles, restricted artifact volumes and TLS database connections. Exclude .env, raw auth headers and private exports from Git. Legacy research raw files require a secret/privacy/license scan before a public repository release. No credentials were needed or generated for this documentation phase.

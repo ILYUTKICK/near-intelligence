@@ -524,6 +524,69 @@ class ExportJob(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class DocumentShare(Base):
+    """One revocable read-only share of a frozen revision (NI-060).
+
+    Mirrors migration 0017 exactly (DATABASE_SCHEMA.md "document_shares", the
+    implemented shape, ADR-021): ``projection`` holds the FROZEN allowlisted
+    publication bytes (no owner id, no private UUID graph, no editorial
+    timestamps), ``token_hash`` stores only the SHA-256 digest of the share
+    token, and ``status`` carries the one-way active -> revoked transition that
+    structurally clears the bytes. Expiry is a live read-time property of
+    ``expires_at`` (NULL = no expiry); the RLS token policy and the service
+    both deny past-expiry rows on every request.
+    """
+
+    __tablename__ = "document_shares"
+    __table_args__ = (
+        CheckConstraint("status IN ('active','revoked')", name="status"),
+        CheckConstraint("revision > 0", name="revision"),
+        CheckConstraint(r"token_hash ~ '^[0-9a-f]{64}$'", name="token_hash"),
+        CheckConstraint(r"projection_sha256 ~ '^[0-9a-f]{64}$'", name="projection_hash"),
+        CheckConstraint("projection_byte_size >= 0 AND projection_byte_size <= 33554432",
+                        name="projection_size"),
+        CheckConstraint("(status = 'revoked') = (projection IS NULL) "
+                        "AND (projection IS NULL) = (projection_sha256 IS NULL) "
+                        "AND (projection IS NULL) = (projection_byte_size IS NULL) "
+                        "AND (status = 'revoked') = (revoked_at IS NOT NULL)",
+                        name="projection_pairing"),
+        UniqueConstraint("id", "owner_id", name="uq_document_shares_id_owner"),
+        UniqueConstraint("owner_id", "idempotency_key", name="uq_document_shares_owner_idempotency"),
+        ForeignKeyConstraint(["owner_id"], ["app.users.id"],
+                             name="fk_document_shares_owner", ondelete="CASCADE"),
+        ForeignKeyConstraint(["document_id", "owner_id"], ["app.documents.id", "app.documents.owner_id"],
+                             name="fk_document_shares_document", ondelete="CASCADE"),
+        ForeignKeyConstraint(["document_version_id", "document_id", "owner_id"],
+                             ["app.document_versions.id", "app.document_versions.document_id",
+                              "app.document_versions.owner_id"],
+                             name="fk_document_shares_version", ondelete="CASCADE"),
+        Index("ix_document_shares_token_hash", "token_hash", unique=True),
+        Index("ix_document_shares_owner_created", "owner_id", text("created_at DESC"), "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    owner_id: Mapped[UUID] = mapped_column(nullable=False)
+    document_id: Mapped[UUID] = mapped_column(nullable=False)
+    document_version_id: Mapped[UUID] = mapped_column(nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False,
+                                        server_default=text("'active'"))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    idempotency_key: Mapped[UUID | None]
+    # All three projection columns are nullable BY DESIGN (migration 0017):
+    # the pairing CHECK is the invariant — an active share always carries all
+    # three, a revoked one none — and revocation writes NULLs.
+    projection: Mapped[bytes | None]
+    projection_sha256: Mapped[str | None] = mapped_column(String(64))
+    projection_byte_size: Mapped[int | None] = mapped_column(BigInteger)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Source(Base):
     """Operator-managed source catalog (no secrets; public lineage metadata)."""
 
