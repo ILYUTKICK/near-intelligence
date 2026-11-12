@@ -7,6 +7,9 @@ async function handle(request: NextRequest, context: Context) {
   let allowed: string[] = [];
   const uuid = (value: string | undefined) => z.uuid().safeParse(value).success;
   const annotation = segments[1] === "insights" || segments[1] === "hypotheses" || segments[1] === "evidence";
+  // NI-072 document organization: the metadata-only PATCH (tags/favorite).
+  // The bare list GET's tag/favorite query filters flow through untouched.
+  const organization = segments[1] === "organization";
   // NI-058 export jobs: create (POST), owner poll (GET) and the ZIP download
   // (GET .../download) — the same document-nested implemented paths the API
   // serves; the download itself carries no query string.
@@ -14,6 +17,7 @@ async function handle(request: NextRequest, context: Context) {
   if (!segments.length) allowed = ["GET", "POST"];
   else if (uuid(segments[0])) {
     if (segments.length === 1) allowed = ["GET", "PATCH", "DELETE"];
+    if (segments.length === 2 && organization) allowed = ["PATCH"];
     if (segments.length === 2 && segments[1] === "versions") allowed = ["GET", "POST"];
     if (segments.length === 2 && segments[1] === "chart-blocks") allowed = ["POST"];
     if (segments.length === 2 && segments[1] === "chart-view") allowed = ["GET"];

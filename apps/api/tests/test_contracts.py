@@ -90,6 +90,7 @@ class ContractTests(TestCase):
                 "/api/snapshots", "/api/snapshots/{snapshot_id}",
                 "/api/snapshots/{snapshot_id}/compare-live",
                 "/api/documents", "/api/documents/{document_id}",
+                "/api/documents/{document_id}/organization",
                 "/api/documents/{document_id}/versions",
                 "/api/documents/{document_id}/versions/{version_id}",
                 "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/view",
