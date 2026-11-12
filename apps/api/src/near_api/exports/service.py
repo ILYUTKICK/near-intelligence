@@ -8,14 +8,6 @@ and the compositional checks make absent and not-owned ids the same generic
 404-equivalent — Bob can never create, poll, download or sweep Alice's
 export.
 
-The HTTP-facing service of the export pipeline. One row of
-``app.export_jobs`` is one job; every function here runs inside a
-transaction-local verified identity (:func:`near_api.db.security.
-principal_transaction` or the worker's per-job owner transaction), so RLS
-and the compositional checks make absent and not-owned ids the same generic
-404-equivalent — Bob can never create, poll, download or sweep Alice's
-export.
-
 Creation freezes the plan (the NI-056 rule): the export IR of the requested
 revision is built in the SAME transaction that inserts the job, and only
 while that revision is the document's acknowledged current version. The

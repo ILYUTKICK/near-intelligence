@@ -63,6 +63,7 @@ import hashlib
 import io
 import re
 import xml.etree.ElementTree as ElementTree
+from collections.abc import Iterable
 from importlib.util import find_spec
 from pathlib import Path
 from uuid import UUID
