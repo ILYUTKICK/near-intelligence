@@ -7,7 +7,7 @@
  * of rendering it.
  */
 import { axe } from "jest-axe";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ShareViewer } from "@/features/shares/ShareViewer";

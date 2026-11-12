@@ -14,7 +14,11 @@
  */
 import { axe } from "jest-axe";
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The thesis page carries the NI-045 duplication CTA (a client component
+// reading the Next.js router); the figures under test are pure server output.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined }) }));
 
 import ResearchPage from "@/app/(public)/research/page";
 import { SupplyScaleFigure, UsdWindowsFigure } from "@/features/public-research/ResearchFigures";

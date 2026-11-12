@@ -122,15 +122,10 @@ def main() -> int:
                     "test_home_aggregation.py", "test_archive_import.py",
                     "test_dataset_staging.py", "test_metrics.py",
                     "test_refresh_adapter.py", "test_chart_registry.py",
-<<<<<<< HEAD
                     "test_delivery_apis.py", "test_saved_charts.py", "test_snapshots.py",
                     "test_profile.py", "test_documents.py", "test_chart_blocks.py",
-                    "test_model_blocks.py", "test_publications.py", "test_document_insights.py",
-=======
-                    "test_delivery_apis.py", "test_saved_charts.py",
-                    "test_profile.py", "test_documents.py", "test_chart_blocks.py", "test_document_insights.py",
-                    "test_integrity.py",
->>>>>>> feat/ni-065-integrity
+                    "test_model_blocks.py", "test_publications.py", "test_integrity.py",
+                    "test_document_insights.py",
                     "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py",

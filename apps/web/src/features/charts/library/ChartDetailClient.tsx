@@ -150,7 +150,6 @@ export function ChartDetailClient({
               onChange={setFilters}
               idPrefix="chart-filter"
             />
-            {filterKeys.length === 0 ? <span className="text-metadata text-text-secondary">No filters are registered for this chart version.</span> : null}
             <div className="flex flex-wrap items-center gap-2">
               <Dialog open={rangeOpen} onOpenChange={(open) => {
                 setRangeOpen(open);
