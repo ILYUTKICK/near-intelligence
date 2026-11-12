@@ -255,3 +255,49 @@ apps/api/uv.lock
 `60a84ff5af9a8a11f05955efb66467f345bee5fafd6d9b490d26f6212fcf3bba`.
 Windows Docker, provider auth and production deployment remain unverified;
 the source archive is absent and no collection was started.
+
+### 12 November 2026 — PDF export renderer (NI-059)
+
+NI-059 adds a deterministic PDF export path. The renderer runs offline in the
+API worker environment (bare `python:3.13-slim` + node; no system font or
+Cairo/Pango packages, and the "no live screenshot fetching" rule forbids any
+browser/headless path), so the candidates were judged on license, system
+dependencies, pure-Python installability and SVG fidelity. Resolution kept the
+pinned cutoff (`exclude-newer = 2026-11-05T15:55:39Z`); the cutoff was NOT
+bumped. `uv lock` resolved inside it, the diff was reviewed, and
+`uv lock --check --project apps/api` passes.
+
+| Package | Version | Purpose | Declared license metadata | Alternatives considered / rejected |
+| --- | --- | --- | --- | --- |
+| [reportlab](https://pypi.org/project/reportlab/5.1.0/) | 5.1.0 (direct) | PDF document/layout engine: pages, fonts, tables, embedded vector charts | `License :: OSI Approved :: BSD License` (BSD, ReportLab Inc.) | [weasyprint](https://pypi.org/project/weasyprint/) (HTML/CSS engine; rejected: requires Pango/Cairo/GDK-PixBuf system libraries that the runtime image does not ship and this scope may not add); [fpdf2](https://pypi.org/project/fpdf2/) (rejected: LGPL-3.0 where a BSD engine was available, and no SVG/vector support); headless browser/screenshot rendering (forbidden: NI-059 acceptance explicitly forbids live screenshot fetching, and a browser runtime is a hostile dependency surface) |
+| [svglib](https://pypi.org/project/svglib/2.4.0/) | 2.4.0 (direct) | SVG → ReportLab vector drawing for embedding the NI-057 static chart SVGs (pure Python, with lxml/cssselect2/tinycss2 transitives) | **LGPL-3.0-or-later** (declared in installed metadata; note: the task brief expected BSD — recorded here as found) | Reimplementing the SVG subset by hand over ReportLab primitives (rejected: unmaintainable duplicate of a renderer); cairosvg (rejected: requires the Cairo C library) |
+| [pypdf](https://pypi.org/project/pypdf/6.21.4/) | 6.21.4 (dev group only) | Test-time structural reader of the generated PDFs: page count and text-extraction assertions (attribution, pins, appendix presence). Never imported by application code. | BSD-3-Clause | Raw-string scanning of PDF bytes (rejected: fragile across compression/stream encodings; a real reader asserts what a viewer actually shows) |
+
+License notes:
+
+- **svglib is LGPL-3.0-or-later, not the BSD the task brief assumed.** The
+  repository already ships an LGPL runtime dependency under the same
+  reasoning: psycopg (LGPL-3.0-only) has been a direct dependency since the
+  reviewed baseline. LGPL as a dynamically imported library carries no
+  copyleft obligation onto the application code that imports it; the choice
+  is recorded honestly here rather than silently swapped. A hand-written
+  SVG-to-ReportLab converter would trade a maintained LGPL library for a
+  larger unmaintained attack/maintenance surface, and fpdf2 (the other
+  candidate) is LGPL too, so the alternative set does not contain a
+  BSD-licensed SVG-capable renderer.
+- Transitive additions are recorded for completeness: lxml 6.1.3
+  (BSD-3-Clause), cssselect2 0.10.1 (BSD), tinycss2 1.5.1 (BSD),
+  webencodings 0.6.1 (BSD), charset-normalizer 3.5.2 (MIT) — pulled in by
+  svglib. All are pure-Python-installable (lxml ships binary wheels) and none
+  require system libraries beyond the existing baseline.
+- **Fonts:** the runtime container ships no system fonts. The PDF renderer
+  registers the DejaVu Sans / DejaVu Sans Mono TTFs bundled INSIDE the frozen
+  dependency set (`matplotlib/mpl-data/fonts/ttf/`) with ReportLab's
+  `TTFont` — deterministic embedding, no reliance on system or downloaded
+  fonts, no network. DejaVu covers Latin/Cyrillic/Greek and common symbols;
+  glyph coverage is checked fail-closed (a typed error, never a silently
+  degraded glyph) for every rendered text run.
+- **Determinism:** ReportLab's `invariant` mode (fixed document ID,
+  fixed PDF timestamps) plus fixed metadata and the registered fonts make the
+  PDF bytes a pure function of the frozen plan and chart assets; the NI-059
+  test suite enforces byte-identical double builds.

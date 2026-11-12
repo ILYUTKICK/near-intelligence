@@ -1,4 +1,4 @@
-"""Export job HTTP routes (NI-058): create, poll, download.
+"""Export job HTTP routes (NI-058 Markdown ZIP, NI-059 PDF).
 
 Implements the export rows of API_SPECIFICATION under the ``/api`` prefix,
 document-nested so every route resolves ownership through ONE compositional
@@ -8,15 +8,18 @@ cross-document ids the same generic 404 — Bob cannot create, poll, download
 or even distinguish Alice's jobs.
 
 - POST ``/documents/{document_id}/exports`` — create (idempotently) the
-  export job of the CURRENT acknowledged revision; the frozen plan is built
+  export job of the CURRENT acknowledged revision in the requested
+  documented format (``markdown_zip`` or ``pdf``); the frozen plan is built
   in the same transaction (NI-056 rule), a superseded revision is the typed
   409 ``REVISION_NOT_ACKNOWLEDGED`` and an unresolvable pin/reference is
-  the documented 422.
+  the documented 422. The format only selects the worker's renderer; plan
+  freezing, idempotency and the lifecycle are identical.
 - GET ``/documents/{document_id}/exports/{job_id}`` — the typed lifecycle
   state, computed at read time so a past-TTL artifact reports ``expired``.
-- GET ``/documents/{document_id}/exports/{job_id}/download`` — the ZIP
-  (``succeeded`` + unexpired only; queued/running 409, failed 409 with the
-  typed code, expired 410 — never a stale file). Private content: every
+- GET ``/documents/{document_id}/exports/{job_id}/download`` — the artifact
+  (``application/zip`` for Markdown ZIP jobs, ``application/pdf`` for PDF
+  jobs; ``succeeded`` + unexpired only; queued/running 409, failed 409 with
+  the typed code, expired 410 — never a stale file). Private content: every
   response is ``no-store`` and the bytes live owner-scoped in the job row,
   so there is no public or signed URL to leak.
 
@@ -72,9 +75,21 @@ _EXPORT_ERROR_RESPONSES = {
 def _job_response(job: service.ExportJobRow) -> ExportJobResponse:
     return ExportJobResponse(
         id=job.id, document_id=job.document_id,
-        document_version_id=job.document_version_id, format="markdown_zip",
+        document_version_id=job.document_version_id, format=job.format,
         status=job.reported_status(), error_code=job.error_code,
         download_path=job.download_path(), expires_at=job.expires_at)
+
+
+_DOWNLOAD_MEDIA_TYPES = {"markdown_zip": "application/zip", "pdf": "application/pdf"}
+"""The streamed media type per documented job format (the stored artifact
+bytes carry no self-describing header the route should trust)."""
+
+
+def _download_filename(job_id: UUID, format: str) -> str:
+    extension = {"markdown_zip": "zip", "pdf": "pdf"}.get(format)
+    if extension is None:
+        raise service.ExportFormatInvalid(f"Unknown export format {format!r}")
+    return f"near-export-{job_id}.{extension}"
 
 
 def _not_found(request: Request) -> JSONResponse:
@@ -85,34 +100,37 @@ def _not_found(request: Request) -> JSONResponse:
 
 @router.post("/documents/{document_id}/exports", response_model=ExportJobResponse,
              operation_id="createDocumentExport", status_code=202,
-             summary="Create (idempotently) the Markdown ZIP export job of the "
-                     "acknowledged revision",
+             summary="Create (idempotently) the export job of the acknowledged "
+                     "revision in the requested documented format",
              responses=_EXPORT_ERROR_RESPONSES)
 def create_document_export(
     request: Request, principal: PrincipalDependency, engine: RuntimeEngineDependency,
     response: Response, document_id: UUID, payload: DocumentExportRequest,
     idempotency_key: Annotated[str | None, Header()] = None,
 ) -> ExportJobResponse | JSONResponse:
-    """Queue one Markdown ZIP export of the owned document's current revision.
+    """Queue one export (Markdown ZIP or PDF) of the owned document's current
+    revision.
 
     The frozen export plan is built in the same transaction that inserts the
     job (NI-056): the requested revision must be the document's acknowledged
     current version — a valid but superseded revision is the typed 409
     ``REVISION_NOT_ACKNOWLEDGED`` (save/rename again and export the new
     current revision), and an unresolvable pin or reference is the typed 422.
-    With an ``Idempotency-Key: UUID`` a repeated identical owner/route/body
-    request replays the ORIGINAL job instead of creating a second one; the
-    same key with a different body is a 409 idempotency collision.
+    The format selects the worker's renderer only (``markdown_zip`` →
+    research.md + assets + manifest; ``pdf`` → the deterministic static
+    report); both formats freeze the SAME plan. With an ``Idempotency-Key:
+    UUID`` a repeated identical owner/route/body request replays the ORIGINAL
+    job instead of creating a second one; the same key with a different body
+    is a 409 idempotency collision.
     """
-    if payload.format == "pdf":
-        # P1 (NI-059): the single reliable MVP export is the Markdown bundle;
-        # PDF is refused typed instead of simulated.
-        return error_response(request, 422, "FEATURE_UNAVAILABLE",
-                              "PDF export is not available yet")
     try:
         outcome = service.create_export_job(
             engine, principal, document_id, payload.document_version_id,
-            idempotency_key=idempotency_key)
+            format=payload.format, idempotency_key=idempotency_key)
+    except service.ExportFormatInvalid as error:
+        return error_response(
+            request, 422, "VALIDATION_ERROR", str(error),
+            details=(ErrorDetail(path="format", reason="unsupported_format"),))
     except IdempotencyKeyInvalid:
         return error_response(
             request, 422, "VALIDATION_ERROR", "Idempotency-Key must be a UUID",
@@ -167,19 +185,24 @@ def get_document_export(request: Request, principal: PrincipalDependency,
 
 @router.get("/documents/{document_id}/exports/{job_id}/download",
             operation_id="downloadDocumentExport",
-            summary="Download the finished export ZIP (owner-only, unexpired)",
+            summary="Download the finished export artifact (owner-only, "
+                    "unexpired; ZIP or PDF by the job's format)",
             responses={**_EXPORT_ERROR_RESPONSES,
                        200: {"content": {"application/zip": {
-                           "schema": {"type": "string", "format": "binary"}}}}})
+                           "schema": {"type": "string", "format": "binary"}},
+                           "application/pdf": {
+                               "schema": {"type": "string", "format": "binary"}}}}})
 def download_document_export(
     request: Request, principal: PrincipalDependency, engine: RuntimeEngineDependency,
     document_id: UUID, job_id: UUID,
 ) -> Response:
-    """Stream the stored ZIP of one succeeded, unexpired export job.
+    """Stream the stored artifact of one succeeded, unexpired export job.
 
-    The bytes are re-verified against the job's recorded SHA-256 before they
-    are returned; anything else (queued/running, failed, expired, corrupt)
-    is a typed refusal — never a stale or altered file.
+    The media type follows the job's recorded format (``application/zip``
+    for Markdown ZIP bundles, ``application/pdf`` for the static PDF
+    report). The bytes are re-verified against the job's recorded SHA-256
+    before they are returned; anything else (queued/running, failed,
+    expired, corrupt) is a typed refusal — never a stale or altered file.
     """
     try:
         download = service.get_export_download(engine, principal, document_id, job_id)
@@ -202,7 +225,10 @@ def download_document_export(
     except (service.ExportJobNotFound, ResourceNotFound):
         return _not_found(request)
     return Response(
-        content=download.bundle, media_type="application/zip", headers={
+        content=download.bundle,
+        media_type=_DOWNLOAD_MEDIA_TYPES[download.job.format],
+        headers={
             "Cache-Control": "no-store",
-            "Content-Disposition": f'attachment; filename="near-export-{job_id}.zip"',
+            "Content-Disposition": f'attachment; filename="'
+                                   f'{_download_filename(job_id, download.job.format)}"',
         })

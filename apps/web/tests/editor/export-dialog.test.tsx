@@ -115,7 +115,14 @@ describe("ExportDialog lifecycle", () => {
     const downloadSpy = vi.spyOn(download, "downloadBlob").mockImplementation(() => {});
     render(<ExportDialog open onOpenChange={() => {}} documentId={DOC_ID} versionId={VERSION_ID} />);
 
-    expect(screen.getByTestId("export-starting")).toBeInTheDocument();
+    // The dialog first asks for the format (default Markdown ZIP) and never
+    // starts without the explicit choice.
+    expect(screen.getByTestId("export-choosing")).toBeInTheDocument();
+    expect(screen.queryByTestId("export-starting")).not.toBeInTheDocument();
+    expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
+    const markdownRadio = screen.getByTestId("export-format-markdown") as HTMLInputElement;
+    expect(markdownRadio.checked).toBe(true);
+    await userEvent.click(screen.getByTestId("export-start"));
 
     // First bounded poll after the interval; the finished job downloads
     // through the shared blob helper with a server-controlled filename.
@@ -140,8 +147,76 @@ describe("ExportDialog lifecycle", () => {
     await expectAccessible(screen.getByRole("dialog"));
   });
 
-  it("shows the typed failed state and retries with a NEW job and key", async () => {
+  it("exports as PDF when chosen: the create carries format pdf and the download uses .pdf", async () => {
     const calls = mockFetch([
+      CSRF_ROUTE,
+      { match: (m, p) => m === "POST" && p === EXPORT_PATH,
+        respond: () => Response.json(jobBody("queued", { format: "pdf" }), { status: 202 }) },
+      { match: (m, p) => m === "GET" && p === `${EXPORT_PATH}/${JOB_ID}`,
+        respond: () => Response.json(jobBody("succeeded", { format: "pdf" })) },
+      { match: (m, p) => m === "GET" && p === `${EXPORT_PATH}/${JOB_ID}/download`,
+        respond: () => new Response(new Blob([new Uint8Array([0x25, 0x50, 0x44, 0x46])],
+          { type: "application/pdf" }), { headers: { "content-type": "application/pdf" } }) },
+    ]);
+    const downloadSpy = vi.spyOn(download, "downloadBlob").mockImplementation(() => {});
+    render(<ExportDialog open onOpenChange={() => {}} documentId={DOC_ID} versionId={VERSION_ID} />);
+    await userEvent.click(screen.getByTestId("export-format-pdf"));
+    await userEvent.click(screen.getByTestId("export-start"));
+
+    expect(await screen.findByTestId("export-ready", {}, { timeout: 4000 })).toBeInTheDocument();
+    const create = calls.find((call) => call.method === "POST" && call.path === EXPORT_PATH);
+    expect(JSON.parse(String(create?.init.body))).toEqual({
+      document_version_id: VERSION_ID,
+      format: "pdf",
+    });
+    expect(downloadSpy).toHaveBeenCalledTimes(1);
+    expect(downloadSpy.mock.calls[0]?.[1]).toBe(`near-export-${JOB_ID}.pdf`);
+    // The ready copy is format-honest (the PDF report, not the ZIP contents).
+    expect(screen.getByTestId("export-ready")).toHaveTextContent(/PDF report was downloaded/);
+    expect(screen.getByTestId("export-ready")).toHaveTextContent(/no live data/i);
+  });
+
+  it("keeps the chosen format across a retry and resets it on a fresh dialog session", async () => {
+    const calls = mockFetch([
+      CSRF_ROUTE,
+      { match: (m, p) => m === "POST" && p === EXPORT_PATH,
+        respond: () => Response.json(jobBody("failed", { format: "pdf",
+          error_code: "chart_render_failed" }), { status: 202 }) },
+    ]);
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <ExportDialog open onOpenChange={onOpenChange} documentId={DOC_ID} versionId={VERSION_ID} />);
+    await userEvent.click(screen.getByTestId("export-format-pdf"));
+    await userEvent.click(screen.getByTestId("export-start"));
+    await screen.findByTestId("export-failed", {}, { timeout: 4000 });
+
+    // Retry keeps the per-session format choice (a NEW job, same format).
+    await userEvent.click(screen.getByTestId("export-retry"));
+    await waitFor(() => {
+      const creates = calls.filter((call) => call.method === "POST" && call.path === EXPORT_PATH);
+      expect(creates).toHaveLength(2);
+    });
+    const creates = calls.filter((call) => call.method === "POST" && call.path === EXPORT_PATH);
+    for (const create of creates) {
+      expect(JSON.parse(String(create.init.body)).format).toBe("pdf");
+    }
+    const keys = creates.map((call) => new Headers(call.init.headers).get("idempotency-key"));
+    expect(keys[0]).toBeTruthy();
+    expect(keys[0]).not.toBe(keys[1]);
+
+    // Closing and reopening starts a fresh dialog session: the choice is
+    // reset to the Markdown ZIP default (never persisted globally).
+    await userEvent.click(screen.getByTestId("export-close"));
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    rerender(<ExportDialog open={false} onOpenChange={onOpenChange} documentId={DOC_ID} versionId={VERSION_ID} />);
+    rerender(<ExportDialog open onOpenChange={onOpenChange} documentId={DOC_ID} versionId={VERSION_ID} />);
+    const radio = await screen.findByTestId("export-format-markdown") as HTMLInputElement;
+    expect(radio.checked).toBe(true);
+    expect(screen.getByTestId("export-format-pdf")).not.toBeChecked();
+  });
+
+  it("shows the typed failed state and allows returning to the format choice", async () => {
+    mockFetch([
       CSRF_ROUTE,
       { match: (m, p) => m === "POST" && p === EXPORT_PATH,
         respond: () => Response.json(jobBody("queued"), { status: 202 }) },
@@ -149,21 +224,16 @@ describe("ExportDialog lifecycle", () => {
         respond: () => Response.json(jobBody("failed", { error_code: "chart_render_failed" })) },
     ]);
     render(<ExportDialog open onOpenChange={() => {}} documentId={DOC_ID} versionId={VERSION_ID} />);
+    await userEvent.click(screen.getByTestId("export-start"));
     const alert = await screen.findByTestId("export-failed", {}, { timeout: 4000 });
-      expect(alert).toHaveTextContent(/failed on the server/);
-      expect(alert).toHaveTextContent("chart_render_failed");
+    expect(alert).toHaveTextContent(/failed on the server/);
+    expect(alert).toHaveTextContent("chart_render_failed");
     expect(screen.queryByTestId("export-ready")).not.toBeInTheDocument();
 
-    // Retrying starts a NEW create (the failed job is never re-run).
-    await userEvent.click(screen.getByTestId("export-retry"));
-    await waitFor(() => {
-      const creates = calls.filter((call) => call.method === "POST" && call.path === EXPORT_PATH);
-      expect(creates).toHaveLength(2);
-    });
-    const creates = calls.filter((call) => call.method === "POST" && call.path === EXPORT_PATH);
-    const keys = creates.map((call) => new Headers(call.init.headers).get("idempotency-key"));
-    expect(keys[0]).toBeTruthy();
-    expect(keys[0]).not.toBe(keys[1]);
+    // The format choice is reachable again without closing the dialog.
+    await userEvent.click(screen.getByTestId("export-failed-back"));
+    expect(screen.getByTestId("export-choosing")).toBeInTheDocument();
+    await expectAccessible(screen.getByRole("dialog"));
   });
 
   it("shows the honest expired state for a replayed expired job", async () => {
@@ -173,6 +243,7 @@ describe("ExportDialog lifecycle", () => {
         respond: () => Response.json(jobBody("expired"), { status: 202 }) },
     ]);
     render(<ExportDialog open onOpenChange={() => {}} documentId={DOC_ID} versionId={VERSION_ID} />);
+    await userEvent.click(screen.getByTestId("export-start"));
     expect(await screen.findByTestId("export-expired")).toHaveTextContent(/has expired/);
   });
 
@@ -190,6 +261,7 @@ describe("ExportDialog lifecycle", () => {
       },
     ]);
     render(<ExportDialog open onOpenChange={() => {}} documentId={DOC_ID} versionId={VERSION_ID} />);
+    await userEvent.click(screen.getByTestId("export-start"));
     expect(await screen.findByTestId("export-expired")).toBeInTheDocument();
   });
 
@@ -205,6 +277,7 @@ describe("ExportDialog lifecycle", () => {
       },
     ]);
     render(<ExportDialog open onOpenChange={() => {}} documentId={DOC_ID} versionId={VERSION_ID} />);
+    await userEvent.click(screen.getByTestId("export-start"));
     const alert = await screen.findByTestId("export-error");
     expect(alert).toHaveTextContent(/does not exist for your account/);
     await expectAccessible(screen.getByRole("dialog"));
@@ -226,6 +299,7 @@ describe("ExportDialog lifecycle", () => {
       },
     ]);
     render(<ExportDialog open onOpenChange={() => {}} documentId={DOC_ID} versionId={VERSION_ID} />);
+    await userEvent.click(screen.getByTestId("export-start"));
     const alert = await screen.findByTestId("export-error");
     expect(alert).toHaveTextContent(/no longer the document's current revision/);
     expect(alert).toHaveTextContent(/export the current revision/);
@@ -294,6 +368,9 @@ describe("Export trigger in the workbench", () => {
     await userEvent.click(screen.getByTestId("export-open"));
     const dialog = await screen.findByTestId("export-dialog");
     expect(dialog).toHaveAttribute("role", "dialog");
+    // The dialog first asks for the format; starting it posts the default
+    // Markdown ZIP choice.
+    await userEvent.click(screen.getByTestId("export-start"));
     expect(await screen.findByTestId("export-processing")).toBeInTheDocument();
     const create = calls.find((call) => call.method === "POST" && call.path === EXPORT_PATH);
     expect(create).toBeDefined();

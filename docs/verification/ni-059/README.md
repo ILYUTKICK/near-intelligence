@@ -1,0 +1,64 @@
+# NI-059 PDF export — visual verification artifacts
+
+Committed verification artifacts of the deterministic PDF export renderer
+(`apps/api/src/near_api/exports/pdf.py`). Every PDF is visibly synthetic
+("(fixture)" content) and was produced offline from the same fixtures the
+test suite uses (`apps/api/tests/test_exports_pdf.py`).
+
+| Artifact | Pages | Content |
+| --- | --- | --- |
+| `short-report.pdf` | 3 | Representative SHORT revision: every renderable block family once (paragraph/heading/bullet+ordered lists/hypothesis/risk/divider/authored table/evidence/chart) plus attribution block, registries, limitations, exact-value appendix and rendering provenance. |
+| `long-report.pdf` | 9 | Representative LONG revision: 8 repeated sections (tables split across pages under repeated header rows), 2 charts, insight cards with pinned contexts, appendix and provenance. |
+| `real-chart-report.pdf` | 3 | The REAL NI-057 Node ECharts SSR SVG (subprocess, byte-hashed request/script) embedded as vector art — grid, axes and the frozen series are visible on page 2; the provenance table carries the real renderer/script hashes. |
+
+## How the pages were inspected (2026-11-11, implementation claim)
+
+Every page of every artifact was rendered and viewed as a page image
+(a PDF viewer rendering of each file, all pages), checking: attribution and
+plan-identity block on page 1; pinned captions (chart definition version,
+dataset version, resolved-at) under every figure; no clipped charts or
+tables (tables split with repeated header rows; cells wrap, never truncate;
+figures scale to the printable width with aspect preserved); the exact-value
+appendix matches the CSV assets (missing values stay empty with their
+recorded reason; the 32-digit decimal renders unwrapped); the registries and
+limitations carry the recorded identities and reason codes.
+
+Inspection method (2026-11-12, implementation verification): every page of
+every artifact was rendered as a page image and inspected (a PDF rasterizing
+viewer over the exact committed bytes — `pdftoppm`/`gs`/`mutool` do not exist
+on the machine and the macOS command-line tools (`sips`, `qlmanage`) cover
+only page 1, so the pages were rendered with a PDF viewer that draws each
+page individually; 15/15 pages seen: short 3, long 9, real-chart 3). The
+findings are recorded in the NI-059 task card. The coordinator performs the
+final visual pass with a PDF viewer at acceptance; these artifacts make that
+possible directly.
+
+Regeneration (offline, disposable):
+
+```sh
+uv run --project apps/api python - <<'EOF'
+import sys
+sys.path.insert(0, "apps/api/tests")
+sys.path.insert(0, "apps/api/src")
+import test_exports_pdf as fx
+from near_api.exports.charts import chart_render_request, render_chart_assets
+from near_api.exports.pdf import render_pdf
+
+plan = fx.short_plan()
+open("docs/verification/ni-059/short-report.pdf", "wb").write(
+    render_pdf(plan, fx.synthetic_render(plan)))
+long_plan = fx.long_plan()
+open("docs/verification/ni-059/long-report.pdf", "wb").write(
+    render_pdf(long_plan, fx.synthetic_render(long_plan)))
+plan_real = fx.short_plan(chart=False).model_copy(update={"blocks": (
+    *fx.short_plan(chart=False).blocks, fx.renderer_fixtures.export_chart_block())})
+result = render_chart_assets(chart_render_request(
+    [b for b in plan_real.blocks if b.block_type == "liveChart"]), timeout=60.0)
+open("docs/verification/ni-059/real-chart-report.pdf", "wb").write(
+    render_pdf(plan_real, result))
+EOF
+```
+
+The renderer is deterministic: rebuilding with the same inputs reproduces
+byte-identical PDFs (test-enforced), so these artifacts equal what the
+worker stores for the same frozen plans.
