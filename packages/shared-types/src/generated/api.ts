@@ -315,17 +315,21 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create (idempotently) the Markdown ZIP export job of the acknowledged revision
-         * @description Queue one Markdown ZIP export of the owned document's current revision.
+         * Create (idempotently) the export job of the acknowledged revision in the requested documented format
+         * @description Queue one export (Markdown ZIP or PDF) of the owned document's current
+         *     revision.
          *
          *     The frozen export plan is built in the same transaction that inserts the
          *     job (NI-056): the requested revision must be the document's acknowledged
          *     current version — a valid but superseded revision is the typed 409
          *     ``REVISION_NOT_ACKNOWLEDGED`` (save/rename again and export the new
          *     current revision), and an unresolvable pin or reference is the typed 422.
-         *     With an ``Idempotency-Key: UUID`` a repeated identical owner/route/body
-         *     request replays the ORIGINAL job instead of creating a second one; the
-         *     same key with a different body is a 409 idempotency collision.
+         *     The format selects the worker's renderer only (``markdown_zip`` →
+         *     research.md + assets + manifest; ``pdf`` → the deterministic static
+         *     report); both formats freeze the SAME plan. With an ``Idempotency-Key:
+         *     UUID`` a repeated identical owner/route/body request replays the ORIGINAL
+         *     job instead of creating a second one; the same key with a different body
+         *     is a 409 idempotency collision.
          */
         post: operations["createDocumentExport"];
         delete?: never;
@@ -366,12 +370,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Download the finished export ZIP (owner-only, unexpired)
-         * @description Stream the stored ZIP of one succeeded, unexpired export job.
+         * Download the finished export artifact (owner-only, unexpired; ZIP or PDF by the job's format)
+         * @description Stream the stored artifact of one succeeded, unexpired export job.
          *
-         *     The bytes are re-verified against the job's recorded SHA-256 before they
-         *     are returned; anything else (queued/running, failed, expired, corrupt)
-         *     is a typed refusal — never a stale or altered file.
+         *     The media type follows the job's recorded format (``application/zip``
+         *     for Markdown ZIP bundles, ``application/pdf`` for the static PDF
+         *     report). The bytes are re-verified against the job's recorded SHA-256
+         *     before they are returned; anything else (queued/running, failed,
+         *     expired, corrupt) is a typed refusal — never a stale or altered file.
          */
         get: operations["downloadDocumentExport"];
         put?: never;
@@ -1578,9 +1584,10 @@ export interface components {
          * @description The typed lifecycle state of one owned export job.
          *
          *     ``download_path`` is the same-origin owner-checked download route and is
-         *     set only while the bundle is downloadable (``succeeded`` and unexpired);
-         *     ``error_code`` is set exactly when ``status`` is ``failed``. No field of
-         *     this response carries a server filesystem path or a credential.
+         *     set only while the artifact is downloadable (``succeeded`` and
+         *     unexpired); ``error_code`` is set exactly when ``status`` is ``failed``.
+         *     No field of this response carries a server filesystem path or a
+         *     credential.
          */
         ExportJobResponse: {
             /**
@@ -1604,9 +1611,9 @@ export interface components {
             expires_at: string;
             /**
              * Format
-             * @constant
+             * @enum {string}
              */
-            format: "markdown_zip";
+            format: "markdown_zip" | "pdf";
             /**
              * Id
              * Format: uuid
@@ -4365,6 +4372,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                    "application/pdf": string;
                     "application/zip": string;
                 };
             };

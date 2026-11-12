@@ -3,13 +3,15 @@ import { privateFetch } from "@/lib/auth/private-fetch";
 import { apiErrorResponseSchema } from "@/features/documents/list/documents-schema";
 
 /**
- * Same-origin client for the Markdown ZIP export routes (NI-058). The
- * contract lives in API_SPECIFICATION.md "Export": the create POST names the
- * exact acknowledged revision and carries a client `Idempotency-Key: UUID`
- * (a repeated identical request replays the SAME job instead of creating a
- * second one), polling returns the typed lifecycle state, and the download
- * streams the stored ZIP — owner-checked, never a stale file (expired is a
- * typed 410).
+ * Same-origin client for the export routes (NI-058 Markdown ZIP, NI-059
+ * PDF). The contract lives in API_SPECIFICATION.md "Export": the create POST
+ * names the exact acknowledged revision and the bundle format, and carries a
+ * client `Idempotency-Key: UUID` (a repeated identical request replays the
+ * SAME job instead of creating a second one), polling returns the typed
+ * lifecycle state, and the download streams the stored artifact —
+ * owner-checked, never a stale file (expired is a typed 410). The format is
+ * a job property end to end: the response carries it and the download
+ * streams the matching media type (`application/zip` or `application/pdf`).
  *
  * Render-boundary rule (NI-023 pattern): job responses are mirrored with the
  * generated contract types only (no second DTO), and error bodies are parsed
@@ -23,6 +25,12 @@ import { apiErrorResponseSchema } from "@/features/documents/list/documents-sche
 
 export type ExportJob = components["schemas"]["ExportJobResponse"];
 export type ExportJobStatus = NonNullable<ExportJob["status"]>;
+export type ExportFormat = NonNullable<ExportJob["format"]>;
+
+/** The server-controlled download filename of one export job. */
+export function exportFilename(job: Pick<ExportJob, "id" | "format">): string {
+  return `near-export-${job.id}.${job.format === "pdf" ? "pdf" : "zip"}`;
+}
 
 const api = () => createApiClient(window.location.origin, privateFetch);
 
@@ -56,12 +64,12 @@ export function newExportIdempotencyKey(): string {
 }
 
 export async function createExport(documentId: string, versionId: string,
-                                   idempotencyKey: string,
+                                   format: ExportFormat, idempotencyKey: string,
                                    signal: AbortSignal): Promise<ExportJob> {
   const { data, response, error } = await api().POST("/api/documents/{document_id}/exports", {
     params: { path: { document_id: documentId } },
     headers: { "Idempotency-Key": idempotencyKey },
-    body: { document_version_id: versionId, format: "markdown_zip" },
+    body: { document_version_id: versionId, format },
     signal,
   });
   if (!response.ok || !data) throw readError(response.status, error);
