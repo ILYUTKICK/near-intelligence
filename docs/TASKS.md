@@ -2421,7 +2421,14 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0, mandatory before remote deployment
 - **Dependencies:** NI-078, NI-064, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063, NI-044, NI-045, NI-055, NI-059, NI-071, NI-072, NI-060, NI-065
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator session sess_9345ee4f-f534-4698-98d2-5809986ac4c3 (implementation of the eight prerequisite cards via dispatched subagents; coordinator-executed acceptance)
+- **Execution role:** A (coordinator); B contributions delivered through NI-044/045/072/060 subagent claims
+- **Started at:** 2026-11-12T21:50:00Z
+- **Branch/worktree:** integration/p1-wave1; /Users/ilyutkinn/Desktop/near-intelligence-a25 (release candidate: docs/ni-077-handoff-v2 + NI-072 #89 + NI-044 #90 + NI-055 #91 + NI-045 #92 + NI-059 #93 + NI-071 #94 + NI-078 #95 + NI-060 #96 + NI-065 #97, migration chain linearized 0012→0014→0013→0015→0016→0017)
+- **Authorization:** Owner handoff v2 (docs/FINISH_BEFORE_DEPLOY_PROMPT.md, 12 November 2026) requires final integrated local acceptance of all P0/P1/P2 before any NI-067 rollout.
+- **Dependency verification:** NI-078, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063 and NI-044/045/055/059/071/072/060/065 are DONE in this registry; NI-064 stays IN_PROGRESS with its own owner — its local production-mode acceptance evidence is recorded here without transferring the claim. Verified on integration/p1-wave1.
+
 - **Execution role:** A (coordinator); B owns data/model/API acceptance contributions
 
 **Description:** Verify the integrated P0/P1/P2 release candidate locally after all eight formerly deferred features work; preserve the current design and prioritize actual charts. Earlier DONE cards or a design preview do not establish readiness.
