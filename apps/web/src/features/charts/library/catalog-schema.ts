@@ -101,11 +101,11 @@ export const chartListResponseSchema = z.object({
   next_cursor: z.string().nullable(),
 });
 
-const resolvedSelectionSchema = z.object({
+export const resolvedSelectionSchema = z.object({
   start: isoDate,
   end: isoDate,
   frequency: z.literal("day"),
-  filters: z.record(z.string(), z.string()),
+  filters: z.record(z.string(), z.union([z.string().min(1), z.array(z.string().min(1)).min(1).max(32)])),
 });
 
 export const seriesResponseSchema = z.object({

@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label";
 import { ChartView } from "@/features/charts/renderer/ChartView";
 import type { ChartDefinitionResponse, ChartViewResponse } from "@/features/charts/renderer/view-types";
 
-import { filterEnumOptions, filterLabel } from "./filter-controls";
 import { ChartAuthActions } from "./ChartAuthActions";
 import { chartObservation } from "../renderer/observation-context";
+import { ChartFilterControls } from "../filters/FilterControls";
 import {
   detailHrefFor,
   isIsoCalendarDate,
@@ -103,13 +103,7 @@ export function ChartDetailClient({
     setRangeOpen(false);
   }
 
-  function setFilter(key: string, value: string): void {
-    const filters = { ...selection.filters };
-    if (value === "") {
-      delete filters[key];
-    } else {
-      filters[key] = value;
-    }
+  function setFilters(filters: SerializedSelection["filters"]): void {
     applySelection({ filters });
   }
 
@@ -138,35 +132,20 @@ export function ChartDetailClient({
 
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         {filterKeys.length > 0 ? (
-          <div role="group" aria-label="Chart filters" className="flex flex-wrap gap-4">
-            {filterKeys.map((key) => {
-              const options = filterEnumOptions(properties, key);
-              return (
-                <div key={key} className="flex flex-col gap-1">
-                  <Label htmlFor={`chart-filter-${key}`}>{filterLabel(key)}</Label>
-                  <select
-                    id={`chart-filter-${key}`}
-                    value={selection.filters[key] ?? ""}
-                    onChange={(event) => setFilter(key, event.target.value)}
-                    className="h-11 rounded-control border border-control-border bg-surface px-3 font-ui text-ui leading-ui text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                  >
-                    <option value="">All — no filter</option>
-                    {options.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </div>
-              );
-            })}
-          </div>
+          <ChartFilterControls
+            definition={definition}
+            filters={selection.filters}
+            onChange={setFilters}
+            idPrefix="chart-filter"
+          />
         ) : <p className="text-metadata text-text-secondary">No filters are registered for this chart version.</p>}
         <ChartAuthActions
-          nextPath={detailHref({ ...selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
+          nextPath={detailHref({ ...selection, ...view?.selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
           chartTitle={definition.title}
           saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
-            selection: { ...view.selection, filters: selection.filters }, dataset_version_id: view.dataset.id, mode: "live" } : undefined}
+            selection: view.selection, dataset_version_id: view.dataset.id, mode: "live" } : undefined}
           freezeInput={view ? { chart_definition_version_id: definition.id, dataset_version_id: view.dataset.id,
-            selection: { ...view.selection, filters: selection.filters } } : undefined}
+            selection: view.selection } : undefined}
           insightContext={view ? chartObservation(view) : undefined}
           basePath={`${basePath}/`}
         />

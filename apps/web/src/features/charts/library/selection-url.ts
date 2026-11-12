@@ -18,7 +18,10 @@
  * - `filters` keys/values are validated against the definition version's
  *   closed `filter_schema` (the NI-031 registry allowlist); offending keys
  *   are dropped individually so the forwarded document only ever contains
- *   approved values.
+ *   approved values. NI-071: a schema property marked `multi_value` also
+ *   admits a non-empty JSON array of approved strings (the comparison
+ *   form); the stored per-key order is the schema's declared enum order,
+ *   never the request order.
  * - Serialization is deterministic (sorted filter keys), so the same
  *   selection always produces the same URL and the same request.
  *
@@ -28,6 +31,12 @@
  * CHART_SYSTEM.md "presets relative to the latest complete observation").
  */
 import type { ChartDefinitionResponse } from "../renderer/view-types";
+
+import {
+  canonicalValueOrder,
+  isMultiValueProperty,
+  type FiltersSelection,
+} from "../filters/filter-values";
 
 /** The only URL parameters this feature ever reads or forwards to the API. */
 export const APPROVED_SELECTION_PARAMS = [
@@ -60,7 +69,7 @@ export interface SelectionParse {
   /** Explicit range when the URL carried a valid one; null = caller resolves the default. */
   range: UrlRange | null;
   /** Filter values validated against the definition version's closed schema. */
-  filters: Record<string, string>;
+  filters: FiltersSelection;
   dropped: DroppedParam[];
 }
 
@@ -70,7 +79,7 @@ export interface SerializedSelection {
   end: string;
   /** "latest" or a pinned dataset version id. */
   datasetVersion: string;
-  filters: Record<string, string>;
+  filters: FiltersSelection;
 }
 
 const ISO_DATE_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
@@ -79,6 +88,8 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const MAX_FILTER_ENTRIES = 32;
 const MAX_FILTER_KEY_LENGTH = 120;
 const MAX_FILTER_VALUE_LENGTH = 120;
+/** NI-071 per-key multi-value bound (charts/filter_registry.py). */
+const MAX_FILTER_VALUES_PER_KEY = 32;
 
 /** True for a real ISO calendar date ("YYYY-MM-DD", calendar-valid, UTC). */
 export function isIsoCalendarDate(value: string): boolean {
@@ -140,7 +151,7 @@ function parseFiltersParam(
   raw: string,
   definition: ChartDefinitionResponse,
   dropped: DroppedParam[],
-): Record<string, string> {
+): FiltersSelection {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw) as unknown;
@@ -167,7 +178,7 @@ function parseFiltersParam(
     return {};
   }
   const properties = filterProperties(definition);
-  const accepted: Record<string, string> = {};
+  const accepted: FiltersSelection = {};
   for (const [key, value] of entries) {
     const property = properties[key];
     if (property === undefined) {
@@ -179,26 +190,54 @@ function parseFiltersParam(
       });
       continue;
     }
-    if (typeof value !== "string" || value.length === 0 || value.length > MAX_FILTER_VALUE_LENGTH) {
+    if (key.length > MAX_FILTER_KEY_LENGTH) {
+      dropped.push({ param: `filters.${key}`, reason: "filter keys are limited to 120 characters; this value was not used" });
+      continue;
+    }
+    const options = Array.isArray(property.enum) ? property.enum : [];
+    // NI-071: one approved string, or (for multi_value dimensions only) a
+    // non-empty list of approved strings. Duplicates collapse once and the
+    // stored order is the schema's declared enum order, never the request
+    // order — the same canonicalization the server applies.
+    const rawValues = Array.isArray(value) ? value : [value];
+    const invalidEntry = rawValues.some(
+      (item) => typeof item !== "string" || item.length === 0 || item.length > MAX_FILTER_VALUE_LENGTH,
+    );
+    if (invalidEntry || rawValues.length === 0) {
       dropped.push({
         param: `filters.${key}`,
         reason: "filter values must be non-empty strings of at most 120 characters; this value was not used",
       });
       continue;
     }
-    if (key.length > MAX_FILTER_KEY_LENGTH) {
-      dropped.push({ param: `filters.${key}`, reason: "filter keys are limited to 120 characters; this value was not used" });
-      continue;
-    }
-    const options = Array.isArray(property.enum) ? property.enum : [];
-    if (!options.includes(value)) {
+    if (Array.isArray(value) && !isMultiValueProperty(property)) {
       dropped.push({
         param: `filters.${key}`,
-        reason: `"${value}" is not an approved option for this filter; it was not used`,
+        reason: "this filter accepts one selected value only; the list was not used",
       });
       continue;
     }
-    accepted[key] = value;
+    if (rawValues.length > MAX_FILTER_VALUES_PER_KEY) {
+      dropped.push({
+        param: `filters.${key}`,
+        reason: `this filter accepts at most ${MAX_FILTER_VALUES_PER_KEY} selected values; it was not used`,
+      });
+      continue;
+    }
+    const unknown = rawValues.filter((item) => !options.includes(item));
+    if (unknown.length > 0) {
+      dropped.push({
+        param: `filters.${key}`,
+        reason: `"${unknown.join('", "')}" ${unknown.length === 1 ? "is not an approved option for this filter" : "are not approved options for this filter"}; ${unknown.length === 1 ? "it was" : "they were"} not used`,
+      });
+      continue;
+    }
+    if (!Array.isArray(value)) {
+      accepted[key] = value as string;
+      continue;
+    }
+    const unique = [...new Set(value as string[])];
+    accepted[key] = canonicalValueOrder(unique, options);
   }
   return accepted;
 }
@@ -329,7 +368,7 @@ export function parseSelectionUrl(
   }
 
   // filters: a JSON object validated against the closed schema.
-  let filters: Record<string, string> = {};
+  let filters: FiltersSelection = {};
   const rawFilters = valueOf("filters");
   if (rawFilters !== null && rawFilters !== "") {
     filters = parseFiltersParam(rawFilters, definition, dropped);
@@ -348,13 +387,23 @@ export function parseSelectionUrl(
   return { version, datasetVersion, range, filters, dropped };
 }
 
-/** Sorted-key canonical JSON filter document (server-canonical form). */
-export function serializeFilters(filters: Record<string, string>): string | null {
+/**
+ * Sorted-key canonical JSON filter document (the server's accepted wire
+ * form): one approved string per single selected value (a one-element list
+ * serializes as the bare string, the same convention the server's context
+ * hash uses) and the exact list for a genuine multi-value selection.
+ * Deterministic, so the same selection always produces the same URL and the
+ * same request.
+ */
+export function serializeFilters(filters: FiltersSelection): string | null {
   const keys = Object.keys(filters).sort();
   if (keys.length === 0) {
     return null;
   }
-  return JSON.stringify(Object.fromEntries(keys.map((key) => [key, filters[key]])));
+  return JSON.stringify(Object.fromEntries(keys.map((key) => {
+    const value = filters[key];
+    return [key, Array.isArray(value) && value.length === 1 ? value[0] : value];
+  })));
 }
 
 /**

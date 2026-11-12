@@ -76,7 +76,7 @@ registerHooks({
 // Registered hooks apply to these dynamic imports; the option builder stays
 // the single rendering implementation (NI-033), the ECharts runtime imports
 // are modular per ADR-019 and touch no browser global.
-const { buildChart } = await import("../src/features/charts/renderer/option-builder.ts");
+const { buildChart, describeSeries } = await import("../src/features/charts/renderer/option-builder.ts");
 const { utcDateLabel } = await import("../src/features/charts/renderer/format.ts");
 const { init, use: registerComponents } = await import("echarts/core");
 const charts = await import("echarts/charts");
@@ -125,6 +125,11 @@ const seriesSchema = z.object({
     id: z.string().min(1),
     title: z.string().min(1),
     unit: z.string().min(1),
+  }),
+  selection: z.object({
+    filters: z.record(z.string().min(1).max(80), z.union([
+      z.string().min(1).max(200), z.array(z.string().min(1).max(200)).min(1).max(32),
+    ])),
   }),
   points: z.array(observationSchema).max(MAX_POINTS),
 });
@@ -301,13 +306,14 @@ function csvField(value) {
  */
 function chartCsv(view) {
   const rows = [];
+  const labels = describeSeries(view);
   view.series.forEach((series, seriesIndex) => {
     series.points.forEach((point, pointIndex) => {
       rows.push({
         date: utcDateLabel(point.start),
         seriesIndex,
         pointIndex,
-        series: series.metric.title,
+        series: labels[seriesIndex].name,
         unit: series.metric.unit,
         value: point.value === null ? "" : point.value,
         valueKind: point.quality.bound_kind ?? "",

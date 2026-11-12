@@ -27,7 +27,7 @@ from sqlalchemy.pool import NullPool
 from near_api.datasets.service import publish, stage
 from near_api.metrics.emit import DatasetSpec, ManifestInputSpec, build_manifest
 from near_api.metrics.loaders import load_metric_inputs
-from near_api.metrics.registry import definition_by_metric_id, register_definitions
+from near_api.metrics.registry import definition_by_metric_id, definition_by_metric_id_version, register_definitions
 from test_delivery_apis import SOURCE_IDS, manifest_document, observation
 
 START, END = "2026-08-06", "2026-11-04"
@@ -144,7 +144,11 @@ class LandingIntegrationTests(unittest.TestCase):
                                  # provider variants, not only SRC-LLAMA.
                                  ManifestInputSpec("daily", daily, "normalized")))
             return document, hashes
-        metric_ids = [definition_by_metric_id(name).id for name in METRICS]
+        # Stage exactly the definition versions this test queries: the series
+        # requests pin definition_version 1, so the payout metric must stage
+        # its v1 aggregate id (NI-071 registered a v2 per-recipient version
+        # that the latest-pointer shortcut would otherwise bind instead).
+        metric_ids = [definition_by_metric_id_version(name, 1).id for name in METRICS]
         records = []
         for metric in metric_ids:
             # Exact precision beyond binary float; isolated regression data.

@@ -1178,7 +1178,7 @@ export interface components {
             end: string;
             /** Filters */
             filters: {
-                [key: string]: string;
+                [key: string]: string | string[];
             };
             /**
              * Frequency
@@ -2770,12 +2770,15 @@ export interface components {
          *     Request filters arrive as the urlencoded ``filters`` query parameter and
          *     are validated server-side against the resolved chart definition version's
          *     closed ``filter_schema`` (the NI-031 versioned allowlist: string enums
-         *     from approved source/recipient/price-basis mappings only). Unknown keys
-         *     and unlisted values are rejected before any resolution happens, so this
-         *     permissive container never serializes an unapproved filter value.
+         *     from approved source/recipient/price-basis mappings only; NI-071 adds
+         *     list-valued multi-selections whose values fan out into one compared
+         *     series per selected value). Unknown keys and unlisted values are rejected
+         *     before any resolution happens, so this permissive container never
+         *     serializes an unapproved filter value. Singletons serialize as strings
+         *     and comparisons as arrays, preserving historical selection hashes.
          */
         ResolvedSelectionFilters: {
-            [key: string]: string;
+            [key: string]: string | string[];
         };
         /** RichTextBoldMark */
         RichTextBoldMark: {
@@ -3052,7 +3055,7 @@ export interface components {
             end: string;
             /** Filters */
             filters: {
-                [key: string]: string;
+                [key: string]: string | string[];
             };
             /**
              * Frequency

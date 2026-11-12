@@ -43,6 +43,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
 from near_api.auth.principal import Principal
+from near_api.charts.registry import chart_by_chart_id
 from near_api.datasets import delivery as delivery_module
 from near_api.db.security import ResourceNotFound
 from near_api.db.session import create_runtime_engine, user_transaction
@@ -118,6 +119,36 @@ class ExportCellTests(unittest.TestCase):
 
 class ExportContractTests(unittest.TestCase):
     """Offline contract shapes of the frozen representation."""
+
+    def test_ni071_context_lines_print_resolved_filters(self):
+        """An exported insight card shows exactly which values were selected."""
+        import datetime as dt
+
+        from near_api.exports.markdown import _context_lines
+        from near_api.insights.schemas import ResolvedContext
+        from near_api.schemas.chart_selection import ChartSelection
+        from test_delivery_apis import RECIPIENTS
+
+        context = ResolvedContext(
+            chart_definition_version_id=uuid4(), dataset_version_id=uuid4(),
+            selection=ChartSelection.model_validate({
+                "start": "2026-01-01", "end": "2026-01-31", "frequency": "day",
+                "filters": {"recipient": [RECIPIENTS[0], RECIPIENTS[1]]}}),
+            context_hash="a" * 64, renderer_version="echarts-modular-svg@1",
+            metric_definition_versions=(uuid4(),),
+            resolved_at=dt.datetime.now(dt.UTC))
+        lines = _context_lines(context)
+        filters_lines = [line for line in lines if line.startswith("filters")]
+        self.assertEqual(len(filters_lines), 1)
+        self.assertEqual(filters_lines[0],
+                         f"filters recipient: {RECIPIENTS[0]}, {RECIPIENTS[1]}")
+        unfiltered = ResolvedContext.model_validate(context.model_dump(mode="json")
+                                                    | {"selection": {
+                                                        **context.selection.model_dump(
+                                                            mode="json"),
+                                                        "filters": {}}})
+        self.assertFalse(any(line.startswith("filters")
+                             for line in _context_lines(unfiltered)))
 
     def test_data_table_rows_and_dataset_reference_are_exclusive(self):
         columns = ({"key": "metric", "label": "Metric", "type": "string"},)
@@ -239,14 +270,18 @@ class ExportIrDatabaseTests(unittest.TestCase):
     def dataset_key(self, name: str) -> str:
         return f"synthetic.{uuid4().hex[:8]}.{name}"
 
-    def stage_volume(self, key: str, value: str) -> UUID:
-        """One published synthetic dataset version for the intents chart."""
+    def ensure_stage_directory(self) -> None:
+        """The lazily created staging root every stage_fixture call needs."""
         if not hasattr(self, "directory"):
             tmp = tempfile.TemporaryDirectory(prefix="ni056-",
                                               dir=os.environ["NI_TEST_TMP_DIR"])
             self.addCleanup(tmp.cleanup)
             self.directory = Path(tmp.name)
             self.storage_root = self.directory / "storage"
+
+    def stage_volume(self, key: str, value: str) -> UUID:
+        """One published synthetic dataset version for the intents chart."""
+        self.ensure_stage_directory()
         dimensions = {"source": "SRC-LLAMA"}
         result = data_fixture.DeliveryDatabaseTests.stage_fixture(
             self, key,
@@ -387,6 +422,92 @@ class ExportIrDatabaseTests(unittest.TestCase):
 
     def stored_chart_context(self, saved, block_id: UUID) -> dict:
         return saved.resolved_contexts[str(block_id)]
+
+
+    def test_ni071_multi_filter_chart_insight_export_round_trip(self):
+        """Save a compared chart + insight, export twice, byte-identical IR."""
+        import datetime as dt
+        from decimal import Decimal
+
+        from near_api.documents.context_resolver import build_resolved_context, \
+            load_chart_definition
+        from near_api.schemas.chart_selection import ChartSelection
+        from test_delivery_apis import (METRIC_PAYOUTS, METRIC_PAYOUTS_V2,
+                                        RECIPIENTS)
+
+        self.ensure_stage_directory()
+        filters = {"recipient": [RECIPIENTS[1], RECIPIENTS[0]]}
+        selection_input = {"start": "2026-01-01", "end": "2026-01-03",
+                           "frequency": "day", "filters": filters}
+        canonical_selection = ChartSelection.model_validate(
+            selection_input).model_dump(mode="json")
+        observations = []
+        for day, values_by_recipient in (
+                ("2026-01-01", {RECIPIENTS[0]: "3", RECIPIENTS[1]: "2.5",
+                                RECIPIENTS[2]: "0"}),
+                ("2026-01-02", {RECIPIENTS[0]: "4", RECIPIENTS[1]: "2",
+                                RECIPIENTS[2]: "0"})):
+            instant = dt.date.fromisoformat(day)
+            observations.append(data_fixture.observation(
+                METRIC_PAYOUTS, instant,
+                value=str(sum(Decimal(value)
+                              for value in values_by_recipient.values()))))
+            for account, value in values_by_recipient.items():
+                observations.append(data_fixture.observation(
+                    METRIC_PAYOUTS_V2, instant, value=value,
+                    dimensions={"recipient": account}))
+        dataset_id = data_fixture.DeliveryDatabaseTests.stage_fixture(
+            self, self.dataset_key("ni071export"), observations,
+            [METRIC_PAYOUTS, METRIC_PAYOUTS_V2],
+            window=("2026-01-01", "2026-01-03")).dataset_version_id
+        treasury_v2 = chart_by_chart_id("treasury-payouts")
+        with self.operator.connect() as connection:
+            definition = load_chart_definition(connection, treasury_v2.id,
+                                               error_path="fixture")
+        insight_context = build_resolved_context(
+            definition, dataset_id,
+            ChartSelection.model_validate(selection_input),
+            resolved_at=dt.datetime.now(dt.UTC)).model_dump(mode="json")
+        hypothesis = document_fixtures.hypothesis_attrs()
+        hypothesis_id = hypothesis["attrs"]["hypothesis_id"]
+        insight = document_fixtures.insight_attrs(hypothesis_id=hypothesis_id,
+                                                  context=insight_context)
+        chart_block_id = str(uuid4())
+        content = {"schema_version": 1, "type": "doc", "content": [
+            hypothesis,
+            insight,
+            document_fixtures.evidence_attrs(hypothesis_id, "insight",
+                                             insight["attrs"]["insight_id"]),
+            document_fixtures.block(
+                "liveChart", chart_block_id, mode="live",
+                selection=canonical_selection,
+                chart_definition_version_id=str(treasury_v2.id),
+                observed_dataset_version_id=str(dataset_id)),
+        ]}
+        created = service.create_document(self.engine, self.alice,
+                                          title="Compared payouts export")
+        saved = service.save_revision(self.engine, self.alice, created.document.id,
+                                      expected_revision=1, document_payload=content)
+        first = build_export_ir(self.engine, self.alice, created.document.id,
+                                saved.version.id)
+        second = build_export_ir(self.engine, self.alice, created.document.id,
+                                 saved.version.id)
+        self.assertEqual(export_ir_canonical_bytes(first),
+                         export_ir_canonical_bytes(second))
+        chart_block = next(block for block in first.blocks
+                           if block.block_type == "liveChart")
+        self.assertEqual(chart_block.selection.model_dump(mode="json")["filters"],
+                         {"recipient": [RECIPIENTS[0], RECIPIENTS[1]]})
+        self.assertEqual(chart_block.observed_dataset_version_id, dataset_id)
+        self.assertEqual([series.selection.filters.model_dump()["recipient"]
+                          for series in chart_block.view.series],
+                         [RECIPIENTS[0], RECIPIENTS[1]])
+        self.assertEqual([point.value for point in chart_block.view.series[0].points],
+                         ["3", "4"])
+        insight_block = next(block for block in first.blocks
+                             if block.block_type == "insight")
+        self.assertEqual(insight_block.context.selection.model_dump(mode="json")
+                         ["filters"], {"recipient": [RECIPIENTS[0], RECIPIENTS[1]]})
 
     # -- every block mapper -------------------------------------------------- #
 

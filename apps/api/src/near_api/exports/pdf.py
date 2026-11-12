@@ -91,7 +91,7 @@ from svglib.svglib import svg2rlg
 from near_api.exports.bundle import BundleError, model_manifest_files
 from near_api.exports.charts import ChartRenderResult
 from near_api.exports.ir import export_ir_canonical_bytes
-from near_api.exports.markdown import limitations_of, model_manifest_path
+from near_api.exports.markdown import filter_description, limitations_of, model_manifest_path
 from near_api.insights.schemas import (
     ModelContext,
     RichTextListItem,
@@ -456,13 +456,18 @@ def _context_lines(context) -> list[str]:
     if isinstance(context, ModelContext):
         return [f"model run {context.model_run_id}"]
     selection = context.selection
-    return [
+    lines = [
         f"chart definition version {context.chart_definition_version_id}",
         f"dataset version {context.dataset_version_id}",
         f"window {selection.start} to {selection.end} ({selection.frequency})",
+    ]
+    if selection.filters:
+        lines.append("filters " + filter_description(selection.filters))
+    lines.extend([
         f"resolved at {context.resolved_at}",
         f"context hash {context.context_hash}",
-    ]
+    ])
+    return lines
 
 
 # --------------------------------------------------------------------------- #
@@ -546,13 +551,15 @@ def _require_svg_text_coverage(svg: str, path: str) -> None:
 def _figure_flowables(block: ExportChartBlock, assets: _FigureAssets,
                       number: int, styles: dict[str, ParagraphStyle]) -> list[Flowable]:
     drawing = _embed_drawing(assets.svg, f"charts.{block.block_id}.svg")
-    caption = Paragraph(
+    filters = filter_description(block.selection.filters)
+    filter_note = f"Pinned filters {escape_text(filters)}. " if filters else ""
+    caption = _paragraph(
         f"<b>Figure {number}.</b> Frozen chart view of block "
         f"{block.block_id} — chart definition version "
         f"{block.chart_definition_version_id}, dataset version "
         f"{block.observed_dataset_version_id}, resolved {block.view.resolved_at}. "
-        f"Exact values: chart-data appendix, table {number}.",
-        styles["caption"])
+        f"{filter_note}Exact values: chart-data appendix, table {number}.",
+        styles["caption"], path=f"charts.{block.block_id}.caption")
     return [KeepTogether([drawing, caption])]
 
 

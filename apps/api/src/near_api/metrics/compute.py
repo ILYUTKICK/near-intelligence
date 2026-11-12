@@ -376,7 +376,10 @@ def formula_treasury_payouts_near_v1(inputs: MetricInputs, *, shape: str) -> lis
     require_daily_coverage(inputs)
     amounts, counts, payouts = _payout_views(inputs)
     quality = _payout_quality(payouts)
-    definition = metric_registry.definition_by_metric_id("treasury_payouts_near")
+    # The v1 formula must emit observations of the immutable v1 definition,
+    # never of a later version of the same metric id.
+    definition = metric_registry.definition_by_metric_id_version(
+        "treasury_payouts_near", 1)
     records: list[dict] = []
     for start, end in _shape_periods(inputs, shape):
         day = _day_of((start, end))
@@ -396,11 +399,51 @@ def formula_treasury_payouts_near_v1(inputs: MetricInputs, *, shape: str) -> lis
 
 
 @exact_arithmetic
+def formula_treasury_payouts_near_v2(inputs: MetricInputs, *, shape: str) -> list[dict]:
+    """Per-recipient payouts (NI-071): the v1 matcher run split by receiver.
+
+    Mechanically derived from the same matched pairs as the v1 aggregate:
+    one verified observation per day and per named treasury, with
+    ``dimensions.recipient`` carrying the verified transfer receiver. A day
+    with no matched payout for a recipient is a proven zero under the same
+    coverage proof as v1 — never a silent gap and never an invented value.
+    """
+    require_daily_coverage(inputs)
+    payouts = payout_aggregate(inputs)
+    amounts: dict[tuple[dt.date, str], Decimal] = {}
+    for withdrawal, transfer in payouts.matched_pairs:
+        key = (transfer.timestamp.date(), transfer.receiver)
+        amounts[key] = amounts.get(key, Decimal(0)) + transfer.amount_raw
+    quality = _payout_quality(payouts)
+    definition = metric_registry.definition_by_metric_id_version(
+        "treasury_payouts_near", 2)
+    records: list[dict] = []
+    for start, end in _shape_periods(inputs, shape):
+        day = _day_of((start, end))
+        for receiver in TREASURY_ACCOUNTS:
+            raw = amounts.get((day, receiver))
+            if raw is None:
+                raw, note = Decimal(0), {
+                    "verified_zero": "the extract covers this day and holds no matched "
+                                     f"payout withdrawal to {receiver}; zero payouts is "
+                                     "proven for the matched definition"}
+            else:
+                note = {}
+            records.append(observation_record(
+                definition, period_start=start, period_end=end,
+                dimensions={"recipient": receiver},
+                value=near_amount(raw), bound_kind="exact", quality_status="verified",
+                quality={**quality, **note, "recipient": receiver}))
+    return records
+
+
+@exact_arithmetic
 def formula_treasury_payout_count_v1(inputs: MetricInputs, *, shape: str) -> list[dict]:
     require_daily_coverage(inputs)
     amounts, counts, payouts = _payout_views(inputs)
     quality = _payout_quality(payouts)
-    definition = metric_registry.definition_by_metric_id("treasury_payout_count")
+    definition = metric_registry.definition_by_metric_id_version(
+        "treasury_payout_count", 1)
     records: list[dict] = []
     for start, end in _shape_periods(inputs, shape):
         day = _day_of((start, end))
@@ -917,6 +960,7 @@ FORMULA_REGISTRY: dict[str, Callable] = {
     "observed_near_purchases_v1": formula_observed_near_purchases_v1,
     "conversion_count_v1": formula_conversion_count_v1,
     "treasury_payouts_near_v1": formula_treasury_payouts_near_v1,
+    "treasury_payouts_near_v2": formula_treasury_payouts_near_v2,
     "treasury_payout_count_v1": formula_treasury_payout_count_v1,
     "near_price_usd_v1": formula_near_price_usd_v1,
     "estimated_purchase_usd_v1": formula_estimated_purchase_usd_v1,

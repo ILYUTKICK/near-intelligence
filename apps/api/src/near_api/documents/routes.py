@@ -534,13 +534,13 @@ def _chart_csv(view: ChartViewResponse) -> str:
         view.definition.id, view.dataset.id, view.dataset.content_sha256,
         view.definition.renderer_version, view.context_hash, view.selection.start,
         view.selection.end, view.selection.frequency,
-        dump_canonical(view.selection.filters.model_dump()).decode("utf-8"),
     )
     for series in view.series:
+        filters = dump_canonical(series.selection.filters.model_dump(mode="json")).decode("utf-8")
         metric = (series.metric.metric_id, series.metric.id, series.metric.unit)
         for point in series.points:
             writer.writerow((
-                *context, *metric, canonical_timestamp(point.start), canonical_timestamp(point.end),
+                *context, filters, *metric, canonical_timestamp(point.start), canonical_timestamp(point.end),
                 point.value, point.quality.status, point.quality.bound_kind,
                 dump_canonical(point.quality.reasons).decode("utf-8"),
                 point.quality.coverage.observed, point.quality.coverage.expected,

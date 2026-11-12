@@ -1,13 +1,12 @@
 import type { components } from "@near-intelligence/shared-types";
 import { z } from "zod";
-import { apiErrorResponseSchema, chartViewResponseSchema } from "../library/catalog-schema";
+import { apiErrorResponseSchema, chartViewResponseSchema, resolvedSelectionSchema } from "../library/catalog-schema";
 
 type Schemas = components["schemas"];
 export type Snapshot = Schemas["SnapshotResponse"];
 export type SnapshotDetail = Schemas["SnapshotDetailResponse"];
 export type SnapshotCompare = Schemas["SnapshotCompareResponse"];
 export type FreezeInput = Schemas["SnapshotCreateRequest"];
-const selectionSchema = z.object({ start: z.string(), end: z.string(), frequency: z.literal("day"), filters: z.record(z.string(), z.string()) });
 const calculationContextSchema = z.object({
   context_hash: z.string().regex(/^[0-9a-f]{64}$/),
   metric_definition_versions: z.array(z.string().min(1)).min(1),
@@ -15,7 +14,7 @@ const calculationContextSchema = z.object({
 });
 export const snapshotSchema: z.ZodType<Snapshot> = z.object({
   id: z.uuid(), chart_definition_version_id: z.uuid(), dataset_version_id: z.uuid(),
-  selection: selectionSchema, calculation_context: calculationContextSchema,
+  selection: resolvedSelectionSchema, calculation_context: calculationContextSchema,
   artifact_id: z.uuid().nullable(), content_sha256: z.string().regex(/^[0-9a-f]{64}$/),
   created_at: z.string(),
 });

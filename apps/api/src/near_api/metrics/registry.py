@@ -188,6 +188,39 @@ DEFINITIONS: tuple[MetricDefinition, ...] = (
         },
     ),
     _definition(
+        "treasury_payouts_near", version=2,
+        name="Treasury payouts from intents.near per recipient",
+        unit="NEAR", frequency="daily", source_id="SRC-BQ",
+        economic_scope="Native TRANSFER receipts from intents.near to the three named "
+                       "intents treasuries matched to DIP4 native_withdraw events; one "
+                       "observation per recipient, dimensions.recipient is the verified "
+                       "receiver",
+        formula_key="treasury_payouts_near_v2", availability="A",
+        description="Per-recipient variant of the v1 aggregate definition: the same "
+                    "matcher run, split by the verified transfer receiver into one "
+                    "series per named treasury. The three named wallets are the "
+                    "complete declared universe, so the per-recipient values must sum "
+                    "to the v1 aggregate value for the same period; delivery enforces "
+                    "the identity when the full universe is selected.",
+        limitations=(
+            "Cash transfers out of the intents contract, not accrual revenue or profit.",
+            "Internal treasury hops and inflows from other senders are excluded and "
+            "reported separately in observation quality metadata.",
+            "The recipient dimension is the verified transfer receiver only; no "
+            "integrator, customer or user classification exists in the source.",
+        ),
+        quality_rules={
+            "matcher": "amount + receiver + unique candidate within 300 s; single use",
+            "internal_hops": "transfers between treasury accounts are excluded from payouts",
+            "other_senders": "inflows from senders other than intents.near are excluded",
+            "failed_transfers": "only SUCCESS_VALUE execution establishes a transfer",
+            "unmatched": "an in-window withdrawal without exactly one candidate is an error",
+            "recipient_universe": "dimensions.recipient is exactly one of the three "
+                                  "named treasuries; the per-recipient values sum to "
+                                  "the v1 aggregate for the same period",
+        },
+    ),
+    _definition(
         "near_price_usd", version=1,
         name="Saved NEAR/USD provider price point",
         unit="USD/NEAR", frequency="daily", source_id="SRC-PRICE",
@@ -499,13 +532,31 @@ DEFINITIONS: tuple[MetricDefinition, ...] = (
 
 _DEFINITIONS_BY_METRIC_ID: dict[str, MetricDefinition] = {}
 for _definition_item in DEFINITIONS:
-    if _definition_item.metric_id in _DEFINITIONS_BY_METRIC_ID:
-        raise MetricRegistryError(f"duplicate metric_id in registry: {_definition_item.metric_id}")
+    _previous = _DEFINITIONS_BY_METRIC_ID.get(_definition_item.metric_id)
+    if _previous is not None:
+        # Superseding versions of one metric id coexist in the registry; the
+        # map holds the latest registered version. An exact (metric_id,
+        # version) repeat is a registry authoring error.
+        if _previous.version >= _definition_item.version:
+            raise MetricRegistryError(
+                f"metric versions must ascend in the registry: "
+                f"{_definition_item.metric_id} v{_definition_item.version} after "
+                f"v{_previous.version}")
     _DEFINITIONS_BY_METRIC_ID[_definition_item.metric_id] = _definition_item
 
 
 def definition_by_metric_id(metric_id: str) -> MetricDefinition:
+    """The latest registered definition version of one metric id."""
     return _DEFINITIONS_BY_METRIC_ID[metric_id]
+
+
+def definition_by_metric_id_version(metric_id: str, version: int) -> MetricDefinition:
+    """The exact registered definition version (registry lookups that must
+    never silently move to a newer version pin the version explicitly)."""
+    for definition in DEFINITIONS:
+        if definition.metric_id == metric_id and definition.version == version:
+            return definition
+    raise KeyError(f"{metric_id}:v{version}")
 
 
 def definition_by_id(definition_id: UUID) -> MetricDefinition:

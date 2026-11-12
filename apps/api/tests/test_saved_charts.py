@@ -150,6 +150,73 @@ class SavedChartsDatabaseTests(unittest.TestCase):
         self.assertEqual(detail["saved_chart"]["updated_at"], saved["updated_at"])
         self.assertEqual(detail["saved_chart"]["selection"], saved["selection"])
 
+    def test_ni071_multi_value_selection_round_trips_save_reopen_edit(self):
+        """The compared selection persists byte-exactly and re-resolves."""
+        from test_delivery_apis import METRIC_PAYOUTS, METRIC_PAYOUTS_V2, RECIPIENTS
+        days = ("2026-01-01", "2026-01-02")
+        observations = [
+            fixtures.observation(METRIC_PAYOUTS, dt.date.fromisoformat(days[0]),
+                                 value="5.5"),
+            fixtures.observation(METRIC_PAYOUTS_V2, dt.date.fromisoformat(days[0]),
+                                 value="3", dimensions={"recipient": RECIPIENTS[0]}),
+            fixtures.observation(METRIC_PAYOUTS_V2, dt.date.fromisoformat(days[0]),
+                                 value="2.5", dimensions={"recipient": RECIPIENTS[1]}),
+            fixtures.observation(METRIC_PAYOUTS_V2, dt.date.fromisoformat(days[0]),
+                                 value="0", dimensions={"recipient": RECIPIENTS[2]}),
+            fixtures.observation(METRIC_PAYOUTS, dt.date.fromisoformat(days[1]),
+                                 value="6"),
+            fixtures.observation(METRIC_PAYOUTS_V2, dt.date.fromisoformat(days[1]),
+                                 value="4", dimensions={"recipient": RECIPIENTS[0]}),
+            fixtures.observation(METRIC_PAYOUTS_V2, dt.date.fromisoformat(days[1]),
+                                 value="2", dimensions={"recipient": RECIPIENTS[1]}),
+            fixtures.observation(METRIC_PAYOUTS_V2, dt.date.fromisoformat(days[1]),
+                                 value="0", dimensions={"recipient": RECIPIENTS[2]}),
+        ]
+        dataset = fixtures.DeliveryDatabaseTests.stage_fixture(
+            self, f"ni071.saved.{uuid4().hex[:16]}", observations,
+            [METRIC_PAYOUTS, METRIC_PAYOUTS_V2], window=(days[0], "2026-01-03"))
+        body = {
+            "chart_definition_version_id": str(chart_by_chart_id("treasury-payouts").id),
+            "label": "Compared payouts", "mode": "live",
+            "dataset_version_id": str(dataset.dataset_version_id),
+            "selection": {"start": days[0], "end": "2026-01-03", "frequency": "day",
+                          "filters": {"recipient": [RECIPIENTS[2], RECIPIENTS[0]]}},
+        }
+        saved = self.create(body)
+        self.assertEqual(saved["selection"]["filters"],
+                         {"recipient": [RECIPIENTS[0], RECIPIENTS[2]]})
+        path = "/api/saved-charts/" + saved["id"]
+        detail = self.client.get(path).json()
+        self.assertEqual(detail["saved_chart"]["selection"]["filters"],
+                         {"recipient": [RECIPIENTS[0], RECIPIENTS[2]]})
+        self.assertEqual(len(detail["view"]["series"]), 2)
+        self.assertEqual([series["selection"]["filters"]["recipient"]
+                          for series in detail["view"]["series"]],
+                         [RECIPIENTS[0], RECIPIENTS[2]])
+        self.assertEqual([point["value"] for point in detail["view"]["series"][0]["points"]],
+                         ["3", "4"])
+        snapshot = self.freeze({key: body[key] for key in (
+            "chart_definition_version_id", "dataset_version_id", "selection")})
+        self.assertEqual(snapshot["selection"], detail["view"]["selection"])
+        self.assertEqual(snapshot["calculation_context"]["context_hash"],
+                         detail["view"]["context_hash"])
+        frozen = self.client.get("/api/snapshots/" + snapshot["id"])
+        self.assertEqual(frozen.status_code, 200, frozen.text)
+        self.assertEqual(frozen.json()["view"]["series"], detail["view"]["series"])
+        # editing the selection to the full declared universe resolves three
+        # compared series and persists the exact canonical multi-selection
+        patched = self.client.patch(path, json={
+            "selection": {**body["selection"],
+                          "filters": {"recipient": list(RECIPIENTS)}}})
+        self.assertEqual(patched.status_code, 200, patched.text)
+        reopened = self.client.get(path).json()
+        self.assertEqual(reopened["saved_chart"]["selection"]["filters"],
+                         {"recipient": list(RECIPIENTS)})
+        self.assertEqual(len(reopened["view"]["series"]), 3)
+        # the frozen insight context carries the exact multi-selection too
+        context = detail["view"]["selection"]
+        self.assertEqual(context["filters"], {"recipient": [RECIPIENTS[0], RECIPIENTS[2]]})
+
     def freeze(self, body=None):
         """NI-044 helper: freeze one snapshot for the current actor."""
         snapshot_body = {

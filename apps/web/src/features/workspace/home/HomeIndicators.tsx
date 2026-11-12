@@ -22,7 +22,9 @@ export function HomeIndicators({ indicators }: { indicators: Home["indicators"] 
         const href = series && indicator.chart_version !== null ? detailHrefFor("/charts", indicator.chart_id, {
           version: indicator.chart_version, datasetVersion: series.dataset.id,
           start: series.selection.start, end: series.selection.end,
-          filters: Object.fromEntries(Object.entries(series.selection.filters).filter((entry): entry is [string, string] => typeof entry[1] === "string")),
+          // The server-validated canonical values (lists included) travel
+          // through unchanged — the detail URL re-pins the exact selection.
+          filters: series.selection.filters,
         }) : "/charts";
         return <article key={indicator.chart_id} aria-label={indicator.title} className="min-w-0 rounded-surface border border-border p-4 [overflow-wrap:anywhere]">
           <h3 className="font-medium">{indicator.title}</h3>

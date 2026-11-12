@@ -47,6 +47,7 @@ from near_api.auth.principal import Principal
 from near_api.auth.verification import VerifiedToken
 from near_api.charts.registry import chart_by_chart_id
 from near_api.datasets import delivery
+from near_api.datasets.canonical import sha256_hex
 from near_api.datasets.delivery import _context_hash
 from near_api.db.session import create_runtime_engine, user_transaction
 from near_api.documents import service
@@ -56,7 +57,7 @@ from near_api.documents.context_resolver import (
     load_chart_definition,
     validate_selection_against_definition,
 )
-from near_api.documents.schema import canonical_context_json, parse_document
+from near_api.documents.schema import canonical_bytes, canonical_context_json, parse_document
 from near_api.insights.schemas import ResolvedContext
 from near_api.main import app
 from near_api.metrics.registry import definition_by_metric_id
@@ -154,7 +155,15 @@ class ChartBlockContractTests(unittest.TestCase):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(selection={"start": "2026-01-01", "end": "2026-01-08",
                                           "frequency": "day",
-                                          "filters": {"source": ["SRC-LLAMA"]}}))
+                                          "filters": {"source": []}}))
+        # The request may carry a singleton list, which serializes as a string.
+        listed = ChartBlockInsertRequest.model_validate(
+            insert_payload(selection={"start": "2026-01-01", "end": "2026-01-08",
+                                      "frequency": "day",
+                                      "filters": {"source": ["SRC-LLAMA"]}}))
+        self.assertEqual(listed.selection.filters, {"source": ("SRC-LLAMA",)})
+        self.assertEqual(listed.selection.model_dump(mode="json")["filters"],
+                         {"source": "SRC-LLAMA"})
         with self.assertRaises(ValidationError):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(block_id=str(uuid4()), owner_id=str(uuid4())))
@@ -453,7 +462,8 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
         detail = self.create_document(self.alice)
         dataset_id = self.insert_dataset_version(self.dataset_key("filtered"))
         selected = {**selection(), "filters": {"source": "SRC-LLAMA"}}
-        payload = insert_payload(dataset_version_id=str(dataset_id), selection=selected)
+        listed = {**selected, "filters": {"source": ["SRC-LLAMA"]}}
+        payload = insert_payload(dataset_version_id=str(dataset_id), selection=listed)
         response = self.add_chart(detail.document.id, payload)
         self.assertEqual(response.status_code, 201, response.text)
         stored = self.stored_document(self.alice, detail.document.id)
@@ -700,19 +710,23 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
                               str([detail.reason for detail in (error.details or ())]))
                 self.assertEqual(self.table_counts(detail.document.id),
                                  {"document_versions": 1, "document_blocks": 0})
-        # A non-empty filters object never reaches the service: the shared
-        # Selection contract rejects it (the P0 filter domain is empty).
+        # A filter value outside the chart version's closed schema never
+        # reaches storage: the resolved-context validation rejects it before
+        # any block row is written (NI-071 keeps the same fail-closed rule
+        # for the multi-value list form).
         with self.as_session(self.alice_id):
             filtered = self.client.post(
                 f"/api/documents/{detail.document.id}/chart-blocks",
                 json=insert_payload(selection={"start": "2026-01-01",
                                                "end": "2026-01-08",
                                                "frequency": "day",
-                                               "filters": {"source": ["SRC-LLAMA"]}}),
+                                               "filters": {"source": ["unapproved"]}}),
                 headers={"Authorization": "Bearer t.alice", "If-Match": '"1"'})
         self.assertEqual(filtered.status_code, 422)
         self.assertEqual(ErrorResponse.model_validate(filtered.json()).error.code,
-                         "VALIDATION_ERROR")
+                         "FILTER_UNSUPPORTED")
+        self.assertEqual(self.table_counts(detail.document.id),
+                         {"document_versions": 1, "document_blocks": 0})
 
     def test_08_inspected_evidence_survives_source_changes(self):
         detail = self.create_document(self.alice)
@@ -913,6 +927,12 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
         saved = self.save_document(document_id, content, revision=1, observed_contexts=[claim])
         self.assertEqual(saved.status_code, 201, saved.text)
         version = saved.json()["version"]
+        legacy_content = copy.deepcopy(content)
+        legacy_attrs = legacy_content["content"][0]["attrs"]
+        legacy_attrs["snapshot_id"] = None
+        legacy_attrs["selection"]["filters"] = {"source": "SRC-LLAMA"}
+        self.assertEqual(version["content"], legacy_content)
+        self.assertEqual(version["content_sha256"], sha256_hex(canonical_bytes(legacy_content)))
         frozen = version["resolved_contexts"][block_id]
         self.assertEqual({**frozen, "resolved_at": claim["resolved_at"]}, claim)
         self.assertNotEqual(frozen["resolved_at"], claim["resolved_at"])

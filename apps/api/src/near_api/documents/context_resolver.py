@@ -111,7 +111,7 @@ def load_chart_definition(connection: Connection, chart_definition_version_id: U
 
 def validate_selection_against_definition(definition: ChartDefinitionRow,
                                           start: date, end: date,
-                                          filters: Mapping[str, str]) -> None:
+                                          filters: Mapping[str, str | Sequence[str]]) -> None:
     """Range/filter rules of one chart version (the NI-032 view rules, reused).
 
     The definition can narrow the shared 366-day window and controls the
@@ -120,7 +120,7 @@ def validate_selection_against_definition(definition: ChartDefinitionRow,
     if (end - start).days > definition.max_days:
         raise DeliveryInvalidFilter(
             "the selection range exceeds this chart version's allowed maximum")
-    validate_filters_against_schema(dict(filters), definition.filter_schema)
+    validate_filters_against_schema(filters, definition.filter_schema)
 
 
 def require_metric_coverage(connection: Connection, definition: ChartDefinitionRow,
@@ -494,7 +494,11 @@ def reconstruct_revision_chart(connection: Connection, version: DocumentVersionR
         raise ReconstructionError("pinned_artifact_unavailable") from None
     if (view.context_hash != context.context_hash
             or view.definition.renderer_version != context.renderer_version
-            or sorted(series.metric.id for series in view.series)
+            # NI-071 fan-out: one bound metric version can resolve several
+            # compared series, so the pinned context lists each metric
+            # definition version exactly once while the view repeats it per
+            # series.
+            or sorted({series.metric.id for series in view.series})
             != sorted(context.metric_definition_versions)):
         raise ReconstructionError("chart_context_mismatch")
     return view.model_copy(update={"resolved_at": context.resolved_at})

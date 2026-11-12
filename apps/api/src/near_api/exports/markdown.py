@@ -191,18 +191,30 @@ def _render_body(body: RichTextBody, *, prefix: str = "") -> list[str]:
 # --------------------------------------------------------------------------- #
 
 
+def filter_description(filters: Mapping[str, str | list[str] | tuple[str, ...]]) -> str:
+    return "; ".join(
+        f"{key}: {values if isinstance(values, str) else ', '.join(values)}"
+        for key, values in sorted(filters.items())
+    )
+
+
 def _context_lines(context) -> list[str]:
     """The pinned-context provenance lines of an insight card."""
     if isinstance(context, ModelContext):
         return [f"model run `{context.model_run_id}`"]
     selection = context.selection
-    return [
+    lines = [
         f"chart definition version `{context.chart_definition_version_id}`",
         f"dataset version `{context.dataset_version_id}`",
         f"window {selection.start} to {selection.end} ({selection.frequency})",
+    ]
+    if selection.filters:
+        lines.append("filters " + escape_text(filter_description(selection.filters)))
+    lines.extend([
         f"resolved at {context.resolved_at}",
         f"context hash `{context.context_hash}`",
-    ]
+    ])
+    return lines
 
 
 def _render_insight(block: ExportInsightBlock) -> list[str]:
@@ -249,11 +261,13 @@ def _render_risk(block: ExportRiskBlock) -> list[str]:
 def _render_chart(block: ExportChartBlock, number: int,
                   assets: Mapping[UUID, ChartAssetFiles]) -> list[str]:
     asset = assets[block.block_id]
+    filters = filter_description(block.selection.filters)
+    filter_note = f"Pinned filters {escape_text(filters)}. " if filters else ""
     caption = (
         f"*Figure {number}. Frozen chart view of block `{block.block_id}` — "
         f"chart definition version `{block.chart_definition_version_id}`, dataset "
         f"version `{block.observed_dataset_version_id}`, resolved "
-        f"{block.view.resolved_at}. Exact values: "
+        f"{block.view.resolved_at}. {filter_note}Exact values: "
         f"[CSV]({_escape_link(asset.csv_name)}).*")
     return [
         f"![Chart {block.block_id}]({_escape_link(asset.svg_name)})",

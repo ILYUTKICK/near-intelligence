@@ -56,7 +56,8 @@ from near_api.documents.context_resolver import (
 from near_api.documents.schema import DocumentSchemaError, parse_document
 from near_api.main import app
 from near_api.metrics.emit import DatasetSpec, ManifestInputSpec, build_all_manifests
-from near_api.metrics.registry import definition_by_metric_id
+from near_api.metrics.registry import (TreasuryAccounts, definition_by_metric_id,
+                                       definition_by_metric_id_version)
 from near_api.repositories.documents import get_version as get_version_row
 from near_api.schemas.chart_selection import ChartSelection
 
@@ -291,7 +292,11 @@ class StagedDatasetInvariants(InvariantDatabaseFixture, unittest.TestCase):
             stored[(str(row["metric_definition_id"]), row["period_start"].date())] = \
                 row["value"]
         purchases = str(definition_by_metric_id("observed_near_purchases").id)
-        payouts = str(definition_by_metric_id("treasury_payouts_near").id)
+        # NI-071: the aggregate payout identity is the immutable v1
+        # definition; the v2 per-recipient rows are a separate declared
+        # universe and must reconcile with it (checked below).
+        payouts = str(definition_by_metric_id_version("treasury_payouts_near", 1).id)
+        payouts_v2 = str(definition_by_metric_id_version("treasury_payouts_near", 2).id)
         conversions = str(definition_by_metric_id("conversion_count").id)
         for day in fixtures.DAYS:
             self.assertEqual(Decimal(stored[(purchases, day)]) * YOCTO,
@@ -307,6 +312,32 @@ class StagedDatasetInvariants(InvariantDatabaseFixture, unittest.TestCase):
         stored_total = sum(Decimal(value) * YOCTO for (metric, _day), value in
                            stored.items() if metric == purchases)
         self.assertEqual(stored_total, self.oracle.purchase_total_yocto)
+
+        # NI-071 reconciliation identity in storage: exactly one v2 row per
+        # (day, named recipient), each carrying the verified recipient
+        # dimension, and the three per-recipient values sum to the v1
+        # aggregate row for the same day at exact Decimal precision.
+        with self.admin.connect() as connection:
+            recipient_rows = connection.execute(text("""
+                SELECT period_start, value::text AS value, dimensions
+                FROM app.metric_observations
+                WHERE dataset_version_id = :id
+                  AND metric_definition_id = :metric
+            """), {"id": flows_id, "metric": UUID(payouts_v2)}).mappings().all()
+        by_day: dict[dt.date, list[Decimal]] = {}
+        for row in recipient_rows:
+            dimensions = row["dimensions"] or {}
+            self.assertIn(dimensions.get("recipient"), TreasuryAccounts,
+                          "a v2 payout row carries a non-universe recipient")
+            by_day.setdefault(row["period_start"].date(), []).append(
+                Decimal(row["value"]))
+        for day in fixtures.DAYS:
+            self.assertEqual(len(by_day.get(day, [])), len(TreasuryAccounts),
+                             f"{day}: the v2 payout rows are not one per recipient")
+            self.assertEqual(sum(by_day.get(day, []), Decimal(0)) * YOCTO,
+                             self.oracle.payout_yocto_by_day.get(day, 0),
+                             f"{day}: per-recipient payout rows diverge from the "
+                             "aggregate oracle")
 
     def test_delivery_series_match_oracle_exactly(self):
         staged = self.emit_and_stage()

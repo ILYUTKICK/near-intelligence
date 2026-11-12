@@ -14,6 +14,7 @@ from near_api.auth.principal import Principal, get_principal
 from near_api.charts.registry import RENDERER_VERSION, chart_by_chart_id
 from near_api.db.session import user_transaction
 from near_api.datasets import delivery
+from near_api.datasets.canonical import dump_canonical, sha256_hex
 from near_api.main import app
 import test_delivery_apis as fixtures
 from test_delivery_apis import METRIC_VOLUME, observation
@@ -103,9 +104,14 @@ class SnapshotDatabaseTests(unittest.TestCase):
 
     def test_freeze_regenerates_identical_hash_and_distinct_selections_differ(self):
         first = self.freeze()
-        second = self.freeze()
+        second = self.freeze({**self.body, "selection": {**self.body["selection"],
+                                                         "filters": {"source": ["SRC-LLAMA"]}}})
         self.assertNotEqual(first["id"], second["id"])
         self.assertEqual(first["content_sha256"], second["content_sha256"])
+        self.assertEqual(second["selection"], self.body["selection"])
+        self.assertEqual(first["content_sha256"], sha256_hex(dump_canonical({
+            **self.body, "calculation_context": first["calculation_context"],
+        })))
         other = self.freeze({**self.body, "selection": {**self.body["selection"],
                                                         "filters": {"source": "SRC-DASHBOARD"}}})
         self.assertNotEqual(other["content_sha256"], first["content_sha256"])
