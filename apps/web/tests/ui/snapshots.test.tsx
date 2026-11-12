@@ -13,7 +13,7 @@ const snapshotId = "33333333-3333-4333-8333-333333333333";
 const definitionId = "44444444-4444-4444-8444-444444444444";
 const datasetId = "55555555-5555-4555-8555-555555555555";
 const liveDatasetId = "66666666-6666-4666-8666-666666666666";
-const selection = { start: "2026-11-01", end: "2026-11-06", frequency: "day" as const, filters: { source: "SRC-LLAMA" } };
+const selection = { start: "2026-11-01", end: "2026-11-06", frequency: "day" as const, filters: { source: ["SRC-LLAMA"] } };
 const snapshot = {
   id: snapshotId, chart_definition_version_id: definitionId, dataset_version_id: datasetId,
   selection,

@@ -7,7 +7,7 @@ export type Snapshot = Schemas["SnapshotResponse"];
 export type SnapshotDetail = Schemas["SnapshotDetailResponse"];
 export type SnapshotCompare = Schemas["SnapshotCompareResponse"];
 export type FreezeInput = Schemas["SnapshotCreateRequest"];
-const selectionSchema = z.object({ start: z.string(), end: z.string(), frequency: z.literal("day"), filters: z.record(z.string(), z.string()) });
+const selectionSchema = z.object({ start: z.string(), end: z.string(), frequency: z.literal("day"), filters: z.record(z.string(), z.array(z.string())) });
 const calculationContextSchema = z.object({
   context_hash: z.string().regex(/^[0-9a-f]{64}$/),
   metric_definition_versions: z.array(z.string().min(1)).min(1),

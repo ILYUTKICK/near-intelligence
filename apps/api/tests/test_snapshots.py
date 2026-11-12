@@ -68,7 +68,7 @@ class SnapshotDatabaseTests(unittest.TestCase):
             "chart_definition_version_id": self.definition_id,
             "dataset_version_id": str(self.dataset.dataset_version_id),
             "selection": {"start": "2026-01-01", "end": "2026-01-02", "frequency": "day",
-                          "filters": {"source": "SRC-LLAMA"}},
+                          "filters": {"source": ["SRC-LLAMA"]}},
         }
 
     def freeze(self, body=None, key=None):
