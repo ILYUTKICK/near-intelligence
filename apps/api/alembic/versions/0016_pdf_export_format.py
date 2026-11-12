@@ -23,7 +23,7 @@ and are linearized at integration; until they land, 0016 sits directly on
 from alembic import op
 
 revision = "0016_pdf_export_format"
-down_revision = "0012_export_jobs"
+down_revision = "0015_publications"
 branch_labels = None
 depends_on = None
 
