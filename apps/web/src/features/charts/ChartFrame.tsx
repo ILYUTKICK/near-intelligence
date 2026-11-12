@@ -63,11 +63,11 @@ export function ChartFrame({
   /** When true, shows the stale notice while retaining the last good values. */
   stale?: boolean;
   /**
-   * Compact context (NI-078, NI-076 D3/D4): the surrounding page or card
-   * already carries the title, so the frame repeats neither the title nor
-   * the exact-value table — the summary and table move into one accessible
-   * disclosure. Mode badge, quality, freshness metadata and the source
-   * drawer stay visible.
+   * Compact header (NI-078, NI-076 D3/D4): the surrounding page or card
+   * already carries the title, so the frame does not repeat it. Units, mode
+   * badge, quality, freshness metadata, the source drawer, the accessible
+   * summary and the equivalent data table all stay visible — compacting the
+   * header never removes provenance or hover-free exact values.
    */
   compact?: boolean;
   children: ReactNode;
@@ -120,39 +120,21 @@ export function ChartFrame({
 
       <div className="mt-4">{children}</div>
 
-      {compact ? (
-        tableRows ? (
-          <details className="mt-4 rounded-control border border-border bg-surface-muted p-4">
-            <summary className="text-ui leading-ui font-medium cursor-pointer">
-              Exact values and summary
-            </summary>
-            <p className="text-body leading-body text-text-secondary mt-2">{summary}</p>
-            <div className="mt-3">
-              <DataTable
-                caption={`${title} — equivalent data`}
-                rows={tableRows}
-                valueHeader={units ? `Value (${units})` : valueHeader}
-              />
-            </div>
-          </details>
-        ) : null
-      ) : (
-        <div className="mt-4 flex flex-col gap-3">
-          <details className="rounded-control border border-border bg-surface-muted p-4">
-            <summary className="text-ui leading-ui font-medium cursor-pointer">
-              Accessible summary
-            </summary>
-            <p className="text-body leading-body text-text-secondary mt-2">{summary}</p>
-          </details>
-          {tableRows ? (
-            <DataTable
-              caption={`${title} — equivalent data`}
-              rows={tableRows}
-              valueHeader={units ? `Value (${units})` : valueHeader}
-            />
-          ) : null}
-        </div>
-      )}
+      <div className="mt-4 flex flex-col gap-3">
+        <details className="rounded-control border border-border bg-surface-muted p-4">
+          <summary className="text-ui leading-ui font-medium cursor-pointer">
+            Accessible summary
+          </summary>
+          <p className="text-body leading-body text-text-secondary mt-2">{summary}</p>
+        </details>
+        {tableRows ? (
+          <DataTable
+            caption={`${title} — equivalent data`}
+            rows={tableRows}
+            valueHeader={units ? `Value (${units})` : valueHeader}
+          />
+        ) : null}
+      </div>
     </figure>
   );
 }

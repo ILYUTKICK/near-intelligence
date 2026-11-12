@@ -66,12 +66,19 @@ export interface ChartViewProps {
   width?: number;
   height?: number;
   /**
-   * Compact presentation (NI-078, NI-076 D3/D4): for detail pages and saved
-   * cards that already render the title/context above the frame. Hides the
-   * frame's repeated title and moves the exact-value table into an
-   * accessible disclosure.
+   * Compact header (NI-078, NI-076 D3/D4): for detail pages and saved cards
+   * that already render the title/context above the frame. Hides only the
+   * frame's repeated title — the exact-value table stays visible unless
+   * `discloseExactValues` is also set.
    */
   compact?: boolean;
+  /**
+   * Saved-card exact values (NI-078, NI-076 D4): the always-open table under
+   * the plot moves into one keyboard-accessible "Exact values and summary"
+   * disclosure. Only used where a card keeps the view short; the public
+   * detail page keeps the table visible (charts cannot require hover).
+   */
+  discloseExactValues?: boolean;
   /** Injectable ECharts mount (tests inject a recording fake). */
   factory?: ChartFactory;
   className?: string;
@@ -146,6 +153,7 @@ export function ChartView({
   width,
   height,
   compact = false,
+  discloseExactValues = false,
   factory = defaultChartFactory,
   className,
 }: ChartViewProps) {
@@ -335,8 +343,8 @@ export function ChartView({
       }
       return <EmptyState metadata={metadata} />;
     }
-    const exactValues = compact ? (
-      /* NI-076 D4: compact contexts keep exact data access one disclosure
+    const exactValues = discloseExactValues ? (
+      /* NI-076 D4: saved-card contexts keep exact data access one disclosure
          away instead of an always-open table under the plot. The values,
          bounds and missing-point reasons stay exactly as delivered. */
       <details className="rounded-control border border-border bg-surface-muted p-4">

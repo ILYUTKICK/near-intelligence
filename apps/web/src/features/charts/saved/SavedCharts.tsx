@@ -66,6 +66,7 @@ function SavedChartPreview({ chartId, sessionSignal }: { chartId: string; sessio
           mode={detail.saved_chart.mode === "snapshot" ? "historical" : "live"}
           height={208}
           compact
+          discloseExactValues
           className="border-0 bg-transparent p-0 shadow-none lg:p-0"
         />
       ) : null}

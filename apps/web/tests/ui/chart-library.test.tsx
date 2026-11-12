@@ -1143,14 +1143,12 @@ describe("Chart detail compact presentation (NI-076 D3)", () => {
     unmount();
   });
 
-  it("keeps exact values available through the compact disclosure", async () => {
-    renderCompactDetail();
-    const disclosure = await screen.findByText("Exact values and summary");
-    // The exact data table stays rendered inside the disclosure.
-    const details = disclosure.closest("details");
-    expect(details).not.toBeNull();
-    expect(within(details as HTMLElement).getByRole("region", { name: /exact data table/ })).toBeInTheDocument();
-    // Keyboard reachable: the summary element is natively focusable.
-    expect(details!.querySelector("summary")).not.toBeNull();
+  it("keeps exact values visible without hover under the compact header", async () => {
+    await renderCompactDetail();
+    // The compact header removes only the repeated title; the hover-free
+    // exact-value contract holds on the detail page (no disclosure here).
+    const table = await screen.findByRole("region", { name: /exact data table/ });
+    expect(table).toBeInTheDocument();
+    expect(screen.queryByText("Exact values and summary")).toBeNull();
   });
 });
