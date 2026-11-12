@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 
 from near_api import __version__
+from near_api.ai.routes import router as ai_router
 from near_api.charts.routes import router as charts_router
 from near_api.charts.saved_routes import router as saved_charts_router
 from near_api.contracts import error_response, install_contracts
@@ -20,6 +21,7 @@ from near_api.evidence.link_routes import router as evidence_router
 from near_api.evidence.routes import router as hypotheses_router
 from near_api.exports.routes import router as exports_router
 from near_api.insights.routes import router as insights_router
+from near_api.integrity.routes import router as integrity_router
 from near_api.metrics.routes import router as metrics_router
 from near_api.models.routes import router as models_router
 from near_api.schemas.common import ErrorResponse, HealthResponse
@@ -62,6 +64,8 @@ app.include_router(exports_router)
 app.include_router(insights_router)
 app.include_router(hypotheses_router)
 app.include_router(evidence_router)
+app.include_router(integrity_router)
+app.include_router(ai_router)
 app.include_router(me_router)
 app.include_router(metrics_router)
 app.include_router(charts_router)
