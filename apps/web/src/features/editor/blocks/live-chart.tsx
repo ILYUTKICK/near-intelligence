@@ -199,15 +199,23 @@ export function InteractiveChart({ attrs, context, onApply }: {
   const draftRangeError = definition && (!isIsoCalendarDate(selection.start) || !isIsoCalendarDate(selection.end)
     || windowDays(selection.start, selection.end) < 1 || windowDays(selection.start, selection.end) > definition.available_ranges.max_days);
 
+  /* NI-078 (NI-076 D5): the observed-dataset identifier shares the compact
+     status row instead of its own paragraph before the frame — full
+     technical identifiers stay in the Properties pane and the pinned-context
+     disclosure. Pin and save state stay visible in the same row, and the
+     explicit "Refresh to latest and save observation" stays a real button.
+     The buttons keep their own stable row so keyboard focus is never lost
+     when the chart view resolves. */
   return <div role="group" className="min-w-0 space-y-3" aria-label="Embedded chart controls">
-    <div className="flex flex-wrap gap-2 text-metadata leading-metadata">
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-metadata leading-metadata">
       <span>{attrs.mode === "live" ? "Live chart · saved observation" : "Snapshot chart · reconstruction unavailable"}</span>
       <span role="status">{context.saved ? "Saved in document revision" : "Changed — document has unsaved edits"}</span>
       {openedDataset !== attrs.observed_dataset_version_id ? <span>Changed dataset — explicit observation edit</span> : null}
       {context.ready && view?.latest_approved_dataset_version_id && view.latest_approved_dataset_version_id !== view.dataset.id
         ? <span role="status">Newer approved data available</span> : null}
+      <span className="min-w-0 break-all font-mono text-text-secondary">Observed dataset: {attrs.observed_dataset_version_id}</span>
     </div>
-    <p className="break-all text-metadata leading-metadata text-text-secondary">Observed dataset: {attrs.observed_dataset_version_id}. Opening or typing never refreshes this pin.</p>
+    <p className="text-metadata leading-metadata text-text-secondary">Opening or typing never refreshes this pin; identifiers and the pinned context are in Properties and the chart disclosure.</p>
     {!context.ready ? <p role="status">Chart controls are suspended while your document account is checked. Reopen the document after an account change.</p> : null}
     {attrs.mode !== "live" ? <p role="alert">Snapshot reconstruction requires snapshot storage; this block is retained without resolving latest.</p> : null}
     {loading && context.ready ? <p role="status">Loading chart context… {view ? "Showing the last loaded values." : ""}</p> : null}

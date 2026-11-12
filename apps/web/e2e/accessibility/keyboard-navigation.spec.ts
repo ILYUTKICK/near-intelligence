@@ -158,10 +158,12 @@ test("insert menu opens and inserts from the keyboard with a live announcement",
   // The polite live region announces the insertion (NI-039 contract).
   await expect(page.getByTestId("editor-announcement")).toContainText("Block inserted");
   // Radix returned focus to the trigger, so the undo must go back through
-  // the editor surface: refocus the paper, then undo the inserted divider
-  // so the fixture keeps its 200 blocks.
+  // the editor surface: refocus the paper on a deterministic prose block
+  // (a center click can land on a chart node control in the 200-block
+  // fixture), then undo the inserted divider so the fixture keeps its
+  // 200 blocks.
   await expect(editor.locator("hr[data-editor-divider]")).toHaveCount(1);
-  await editor.click();
+  await markerParagraph(page, PARAGRAPH_TWO).click();
   await page.keyboard.press(`${MOD}+z`);
   await expect(editor.locator("hr[data-editor-divider]")).toHaveCount(0);
 });

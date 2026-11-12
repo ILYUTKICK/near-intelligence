@@ -188,7 +188,10 @@ export async function ChartDetailScreen({
         ...(links.categoryHref ? [] : [category]),
         { label: definition.title },
       ]} />
-      <PageIntro className="mt-5" eyebrow={category.label} title={definition.title} description={definition.description} />
+      {/* NI-076 D3: one title and short visible metadata — the description
+          and full provenance stay available through "Sources & definitions"
+          and the definitions panel below. */}
+      <PageIntro className="mt-5" compact eyebrow={category.label} title={definition.title} />
       <p className="mt-2 max-w-prose text-metadata text-text-secondary">
         Definition version v{definition.version} (pinned in the URL); renderer{" "}
         <span className="font-mono">{definition.renderer_version}</span>.
@@ -228,6 +231,7 @@ export async function ChartDetailScreen({
               ? { start: selection.start, end: selection.end, filters: selection.filters }
               : { start: "", end: "" }}
             mode="live"
+            compact
           />
           {dropped.length > 0 ? <DroppedNotice dropped={dropped} /> : null}
         </div>

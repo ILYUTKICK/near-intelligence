@@ -131,84 +131,85 @@ export function ChartDetailClient({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        {filterKeys.length > 0 ? (
-          <ChartFilterControls
-            definition={definition}
-            filters={selection.filters}
-            onChange={setFilters}
-            idPrefix="chart-filter"
-          />
-        ) : <p className="text-metadata text-text-secondary">No filters are registered for this chart version.</p>}
-        <ChartAuthActions
-          nextPath={detailHref({ ...selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
-          chartTitle={definition.title}
-          saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
-            // The saved pin carries the exact current selection in the
-            // server-canonical list form.
-            selection: { ...view.selection, filters: asListDocument(selection.filters) },
-            dataset_version_id: view.dataset.id, mode: "live" } : undefined}
-          freezeInput={view ? { chart_definition_version_id: definition.id, dataset_version_id: view.dataset.id,
-            selection: { ...view.selection, filters: asListDocument(selection.filters) } } : undefined}
-          insightContext={view ? chartObservation(view) : undefined}
-          basePath={`${basePath}/`}
-        />
-      </div>
-
+      {/* NI-076 D3: one compact action/selection row inside the frame toolbar —
+          range presets, filters, custom range, refresh, private-action
+          continuations and sources share the same wrapped row so the plot
+          itself starts high on desktop. */}
       <ChartView
         definition={definition}
         view={view}
         selection={{ start: selection.start, end: selection.end, filters: selection.filters }}
         mode={live ? "live" : "historical"}
+        compact
         onSelectionChange={handleSelectionChange}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Dialog open={rangeOpen} onOpenChange={(open) => {
-              setRangeOpen(open);
-              if (!open) {
-                setDraft(null);
-                setRangeError(null);
-              }
-            }}>
-              <DialogTrigger asChild><Button variant="secondary">Custom range</Button></DialogTrigger>
-              <DialogContent>
-                <DialogTitle>Custom range</DialogTitle>
-                <DialogDescription>
-                  Dates use UTC and exclude the end date. This chart version allows up to {definition.available_ranges.max_days} days.
-                </DialogDescription>
-                <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); applyCustomRange(); }}>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="chart-range-start">Start date</Label>
-                      <input
-                        id="chart-range-start"
-                        type="date"
-                        value={customStart}
-                        onChange={(event) => setDraft({ start: event.target.value, end: customEnd })}
-                        className="h-11 min-w-0 rounded-control border border-control-border bg-surface px-3 text-ui"
-                      />
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+            <ChartFilterControls
+              definition={definition}
+              filters={selection.filters}
+              onChange={setFilters}
+              idPrefix="chart-filter"
+            />
+            {filterKeys.length === 0 ? <span className="text-metadata text-text-secondary">No filters are registered for this chart version.</span> : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <Dialog open={rangeOpen} onOpenChange={(open) => {
+                setRangeOpen(open);
+                if (!open) {
+                  setDraft(null);
+                  setRangeError(null);
+                }
+              }}>
+                <DialogTrigger asChild><Button variant="secondary">Custom range</Button></DialogTrigger>
+                <DialogContent>
+                  <DialogTitle>Custom range</DialogTitle>
+                  <DialogDescription>
+                    Dates use UTC and exclude the end date. This chart version allows up to {definition.available_ranges.max_days} days.
+                  </DialogDescription>
+                  <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); applyCustomRange(); }}>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="chart-range-start">Start date</Label>
+                        <input
+                          id="chart-range-start"
+                          type="date"
+                          value={customStart}
+                          onChange={(event) => setDraft({ start: event.target.value, end: customEnd })}
+                          className="h-11 min-w-0 rounded-control border border-control-border bg-surface px-3 text-ui"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="chart-range-end">End date</Label>
+                        <input
+                          id="chart-range-end"
+                          type="date"
+                          value={customEnd}
+                          onChange={(event) => setDraft({ start: customStart, end: event.target.value })}
+                          className="h-11 min-w-0 rounded-control border border-control-border bg-surface px-3 text-ui"
+                        />
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="chart-range-end">End date</Label>
-                      <input
-                        id="chart-range-end"
-                        type="date"
-                        value={customEnd}
-                        onChange={(event) => setDraft({ start: customStart, end: event.target.value })}
-                        className="h-11 min-w-0 rounded-control border border-control-border bg-surface px-3 text-ui"
-                      />
-                    </div>
-                  </div>
-                  {rangeError ? <p role="alert" className="text-ui font-medium text-danger">{rangeError}</p> : null}
-                  <Button type="submit">Apply range</Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-            {live ? (
-              <Button variant="quiet" onClick={() => router.refresh()}>
-                Refresh to latest
-              </Button>
-            ) : null}
+                    {rangeError ? <p role="alert" className="text-ui font-medium text-danger">{rangeError}</p> : null}
+                    <Button type="submit">Apply range</Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              {live ? (
+                <Button variant="quiet" onClick={() => router.refresh()}>
+                  Refresh to latest
+                </Button>
+              ) : null}
+            </div>
+            <ChartAuthActions
+              nextPath={detailHref({ ...selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
+              chartTitle={definition.title}
+              saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
+                selection: { ...view.selection, filters: asListDocument(selection.filters) },
+                dataset_version_id: view.dataset.id, mode: "live" } : undefined}
+              freezeInput={view ? { chart_definition_version_id: definition.id, dataset_version_id: view.dataset.id,
+                selection: { ...view.selection, filters: asListDocument(selection.filters) } } : undefined}
+              insightContext={view ? chartObservation(view) : undefined}
+              basePath={`${basePath}/`}
+            />
           </div>
         }
       />

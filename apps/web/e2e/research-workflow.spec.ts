@@ -230,7 +230,9 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   const editor = page.getByLabel("Research paper editor");
   await expect(editor).toBeVisible();
   await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
-  await expect(page.getByText("Opening or typing never refreshes this pin.")).toBeVisible();
+  // NI-078 compact chart block: the pin language stays visible next to the
+  // observed-dataset identifier.
+  await expect(page.getByText("Opening or typing never refreshes this pin")).toBeVisible();
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
   await waitForSavedRevision(page, 2);
   // Capture the pinned context hash from the chart node's own inspection.
