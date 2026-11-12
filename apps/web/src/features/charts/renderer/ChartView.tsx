@@ -65,6 +65,13 @@ export interface ChartViewProps {
   /** Explicit plot size; omit to let the container size the chart. */
   width?: number;
   height?: number;
+  /**
+   * Compact presentation (NI-078, NI-076 D3/D4): for detail pages and saved
+   * cards that already render the title/context above the frame. Hides the
+   * frame's repeated title and moves the exact-value table into an
+   * accessible disclosure.
+   */
+  compact?: boolean;
   /** Injectable ECharts mount (tests inject a recording fake). */
   factory?: ChartFactory;
   className?: string;
@@ -138,6 +145,7 @@ export function ChartView({
   onSelectionChange,
   width,
   height,
+  compact = false,
   factory = defaultChartFactory,
   className,
 }: ChartViewProps) {
@@ -327,6 +335,20 @@ export function ChartView({
       }
       return <EmptyState metadata={metadata} />;
     }
+    const exactValues = compact ? (
+      /* NI-076 D4: compact contexts keep exact data access one disclosure
+         away instead of an always-open table under the plot. The values,
+         bounds and missing-point reasons stay exactly as delivered. */
+      <details className="rounded-control border border-border bg-surface-muted p-4">
+        <summary className="text-ui leading-ui font-medium cursor-pointer">
+          Exact values and summary
+        </summary>
+        <p className="text-body leading-body text-text-secondary mt-2">{built.summary}</p>
+        <SeriesTable model={built.table} title={definition.title} className="mt-3" />
+      </details>
+    ) : (
+      <SeriesTable model={built.table} title={definition.title} />
+    );
     return (
       <div className="flex flex-col gap-3">
         {refreshing ? (
@@ -343,7 +365,7 @@ export function ChartView({
           className="w-full"
           style={{ height: height ?? 320, ...(width !== undefined ? { maxWidth: width } : {}) }}
         />
-        <SeriesTable model={built.table} title={definition.title} />
+        {exactValues}
       </div>
     );
   };
@@ -370,6 +392,7 @@ export function ChartView({
       }
       actions={actions}
       stale={activeView?.quality.status === "stale"}
+      compact={compact}
       className={className}
     >
       {plot()}

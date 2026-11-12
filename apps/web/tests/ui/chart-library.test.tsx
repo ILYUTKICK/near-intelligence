@@ -1084,3 +1084,73 @@ describe("ChartAuthActions — anonymous private-action continuation", () => {
     expect(screen.queryByRole("button", { name: "Sign in to save this chart" })).not.toBeInTheDocument();
   });
 });
+
+// -- NI-078 D3: compact detail presentation ------------------------------------ //
+
+describe("Chart detail compact presentation (NI-076 D3)", () => {
+  const definition = definitionFixture();
+  const viewPayload = viewFixture(definition, VIEW_WINDOW);
+
+  async function renderCompactDetail() {
+    const requests = installApiMock([
+      chartRoute("gross-fees", definition),
+      metricRoute(metricFixture(METRIC_FEES_ID, "provider_gross_fees_usd", "USD")),
+      viewRoute("gross-fees", () => jsonResponse(viewPayload)),
+      ANONYMOUS_SESSION,
+    ]);
+    const ui = await ChartDetailPage({
+      params: Promise.resolve({ chartId: "gross-fees" }),
+      searchParams: Promise.resolve({ version: "1", start: VIEW_WINDOW.start, end: VIEW_WINDOW.end }),
+    });
+    return { requests, ...render(ui) };
+  }
+
+  it("renders one title: the page h1, with no repeated title inside the frame", async () => {
+    renderCompactDetail();
+    await screen.findByRole("region", { name: /exact data table/ });
+    const headings = screen.getAllByRole("heading", { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent(definition.title);
+    // The frame no longer repeats the chart title in its figcaption.
+    const figure = document.querySelector("figure");
+    expect(figure).not.toBeNull();
+    expect(within(figure as HTMLElement).queryByText(definition.title, { exact: true })).toBeNull();
+  });
+
+  it("keeps visible metadata short and moves the description into Sources", async () => {
+    renderCompactDetail();
+    await screen.findByRole("region", { name: /exact data table/ });
+    expect(screen.getByText(/Definition version v1 \(pinned in the URL\)/)).toBeInTheDocument();
+    // The long description is not rendered as page prose; it stays available
+    // through the Sources & definitions drawer.
+    expect(screen.queryByText(definition.description)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sources & definitions" })).toBeInTheDocument();
+  });
+
+  it("places the selection and action controls inside the frame toolbar above the plot", async () => {
+    const { unmount } = await renderCompactDetail();
+    await screen.findByRole("region", { name: /exact data table/ });
+    const figure = document.querySelector("figure") as HTMLElement;
+    // Filters, custom range, refresh and the private-action continuations
+    // share the frame toolbar row with the range presets and sources.
+    expect(within(figure).getByRole("group", { name: "Chart filters" })).toBeInTheDocument();
+    expect(within(figure).getByRole("button", { name: "Custom range" })).toBeInTheDocument();
+    expect(within(figure).getByRole("button", { name: "Refresh to latest" })).toBeInTheDocument();
+    expect(within(figure).getByRole("button", { name: "Sign in to save this chart" })).toBeInTheDocument();
+    expect(within(figure).getByRole("group", { name: "Time range" })).toBeInTheDocument();
+    // The plot region renders inside the same frame, below the toolbar.
+    expect(within(figure).getByRole("img")).toBeInTheDocument();
+    unmount();
+  });
+
+  it("keeps exact values available through the compact disclosure", async () => {
+    renderCompactDetail();
+    const disclosure = await screen.findByText("Exact values and summary");
+    // The exact data table stays rendered inside the disclosure.
+    const details = disclosure.closest("details");
+    expect(details).not.toBeNull();
+    expect(within(details as HTMLElement).getByRole("region", { name: /exact data table/ })).toBeInTheDocument();
+    // Keyboard reachable: the summary element is natively focusable.
+    expect(details!.querySelector("summary")).not.toBeNull();
+  });
+});

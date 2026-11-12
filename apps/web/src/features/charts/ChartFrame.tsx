@@ -38,6 +38,7 @@ export function ChartFrame({
   rangeSlot,
   actions,
   stale,
+  compact = false,
   children,
   className,
 }: {
@@ -61,6 +62,14 @@ export function ChartFrame({
   actions?: ReactNode;
   /** When true, shows the stale notice while retaining the last good values. */
   stale?: boolean;
+  /**
+   * Compact context (NI-078, NI-076 D3/D4): the surrounding page or card
+   * already carries the title, so the frame repeats neither the title nor
+   * the exact-value table — the summary and table move into one accessible
+   * disclosure. Mode badge, quality, freshness metadata and the source
+   * drawer stay visible.
+   */
+  compact?: boolean;
   children: ReactNode;
   className?: string;
 }) {
@@ -69,7 +78,9 @@ export function ChartFrame({
       <figcaption className="flex flex-col gap-2">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-serif text-heading leading-heading font-medium text-text">{title}</p>
+            {compact ? null : (
+              <p className="font-serif text-heading leading-heading font-medium text-text">{title}</p>
+            )}
             {units ? (
               <p className="text-ui leading-ui text-text-secondary">
                 Units: <span className="font-medium">{units}</span>
@@ -109,21 +120,39 @@ export function ChartFrame({
 
       <div className="mt-4">{children}</div>
 
-      <div className="mt-4 flex flex-col gap-3">
-        <details className="rounded-control border border-border bg-surface-muted p-4">
-          <summary className="text-ui leading-ui font-medium cursor-pointer">
-            Accessible summary
-          </summary>
-          <p className="text-body leading-body text-text-secondary mt-2">{summary}</p>
-        </details>
-        {tableRows ? (
-          <DataTable
-            caption={`${title} — equivalent data`}
-            rows={tableRows}
-            valueHeader={units ? `Value (${units})` : valueHeader}
-          />
-        ) : null}
-      </div>
+      {compact ? (
+        tableRows ? (
+          <details className="mt-4 rounded-control border border-border bg-surface-muted p-4">
+            <summary className="text-ui leading-ui font-medium cursor-pointer">
+              Exact values and summary
+            </summary>
+            <p className="text-body leading-body text-text-secondary mt-2">{summary}</p>
+            <div className="mt-3">
+              <DataTable
+                caption={`${title} — equivalent data`}
+                rows={tableRows}
+                valueHeader={units ? `Value (${units})` : valueHeader}
+              />
+            </div>
+          </details>
+        ) : null
+      ) : (
+        <div className="mt-4 flex flex-col gap-3">
+          <details className="rounded-control border border-border bg-surface-muted p-4">
+            <summary className="text-ui leading-ui font-medium cursor-pointer">
+              Accessible summary
+            </summary>
+            <p className="text-body leading-body text-text-secondary mt-2">{summary}</p>
+          </details>
+          {tableRows ? (
+            <DataTable
+              caption={`${title} — equivalent data`}
+              rows={tableRows}
+              valueHeader={units ? `Value (${units})` : valueHeader}
+            />
+          ) : null}
+        </div>
+      )}
     </figure>
   );
 }

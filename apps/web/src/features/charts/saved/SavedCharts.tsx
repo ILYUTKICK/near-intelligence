@@ -12,10 +12,40 @@ import { ChartView } from "@/features/charts/renderer/ChartView";
 import { deleteSaved, getSaved, listSaved, renameSaved, type SavedChart, type SavedDetail } from "./api";
 import { useOwnedData } from "./use-owned-data";
 
+/**
+ * Saved-card preview (NI-078, NI-076 D4): every card carries the same
+ * bounded plot preview through the shared renderer. The detail fetch is
+ * lazy — it fires only when the card approaches the viewport (an
+ * IntersectionObserver; without the API it resolves immediately), so a long
+ * list never fetches off-screen cards, and every fetch honours the session
+ * signal (account changes abort stale previews). The saved frozen view is
+ * rendered through the controlled `view` prop — no re-resolve.
+ */
 function SavedChartPreview({ chartId, sessionSignal }: { chartId: string; sessionSignal: AbortSignal }) {
   const [detail, setDetail] = useState<SavedDetail | null>(null);
   const [failed, setFailed] = useState(false);
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
+    if (!host) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "240px" },
+    );
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [host]);
+  useEffect(() => {
+    if (!visible) return;
     const controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, sessionSignal]);
     void getSaved(chartId, signal).then((value) => {
@@ -24,19 +54,24 @@ function SavedChartPreview({ chartId, sessionSignal }: { chartId: string; sessio
       if (!signal.aborted) setFailed(true);
     });
     return () => controller.abort();
-  }, [chartId, sessionSignal]);
+  }, [chartId, sessionSignal, visible]);
 
-  if (failed) return <p className="text-metadata text-text-secondary">Open the saved chart to retry loading its data.</p>;
-  if (!detail) return <LoadingPanel label="Loading saved selection" />;
   return (
-    <ChartView
-      definition={detail.view.definition}
-      view={detail.view}
-      selection={detail.saved_chart.selection}
-      mode={detail.saved_chart.mode === "snapshot" ? "historical" : "live"}
-      height={208}
-      className="border-0 bg-transparent p-0 shadow-none lg:p-0"
-    />
+    <div ref={setHost} className="min-w-0">
+      {failed ? <p className="text-metadata text-text-secondary">Open the saved chart to retry loading its data.</p> : null}
+      {!failed && !detail ? <LoadingPanel label="Loading saved selection" /> : null}
+      {detail ? (
+        <ChartView
+          definition={detail.view.definition}
+          view={detail.view}
+          selection={detail.saved_chart.selection}
+          mode={detail.saved_chart.mode === "snapshot" ? "historical" : "live"}
+          height={208}
+          compact
+          className="border-0 bg-transparent p-0 shadow-none lg:p-0"
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -54,6 +89,7 @@ function SavedItem({ chart, reload, previewSignal }: { chart: SavedChart; reload
     } catch (error) { setError(error instanceof Error ? error.message : "The change failed."); }
     finally { setPending(false); }
   }
+  const filtersSummary = Object.entries(chart.selection.filters).map(([key, value]) => `${key}: ${value}`).join(" · ") || "No filters";
   return <li className="paper-panel min-w-0 space-y-3 p-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <h2 className="text-heading">
@@ -63,8 +99,11 @@ function SavedItem({ chart, reload, previewSignal }: { chart: SavedChart; reload
         {chart.mode === "snapshot" ? "Pinned snapshot" : "Live selection"}
       </span>
     </div>
-    <p className="text-ui text-text-secondary">{chart.selection.start} through {chart.selection.end} (UTC, end exclusive)</p>
-    <p className="text-ui text-text-secondary">{Object.entries(chart.selection.filters).map(([key, value]) => `${key}: ${value}`).join(" · ") || "No filters"}</p>
+    {/* One concise context line: period and filters; the plot preview and the
+        exact-value disclosure follow below (NI-076 D4). */}
+    <p className="text-ui text-text-secondary">
+      {chart.selection.start} – {chart.selection.end} (UTC, end exclusive) · {filtersSummary}
+    </p>
     {previewSignal ? <SavedChartPreview chartId={chart.id} sessionSignal={previewSignal} /> : null}
     <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
       <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); void mutate(false); }}>
@@ -116,8 +155,8 @@ export function SavedCharts() {
       </div>
     ) : null}
     {data?.items.length ? <ul className="grid items-start gap-5 lg:grid-cols-2">
-      {data.items.map((chart, index) => (
-        <SavedItem key={chart.id} chart={chart} reload={reload} previewSignal={index < 2 ? signal ?? undefined : undefined} />
+      {data.items.map((chart) => (
+        <SavedItem key={chart.id} chart={chart} reload={reload} previewSignal={signal ?? undefined} />
       ))}
     </ul> : null}
     {data?.next_cursor ? <Button variant="secondary" onClick={() => setCursor(data.next_cursor)}>Next page</Button> : null}

@@ -589,3 +589,28 @@ describe("ChartView — localized rendering failures", () => {
     expect(instance.dispose).toHaveBeenCalledOnce(); expect(screen.getByRole("region", { name: /exact data table/ })).toBeInTheDocument();
   });
 });
+
+describe("ChartView — compact presentation (NI-078, NI-076 D3/D4)", () => {
+  it("moves the exact-value table and summary into one disclosure when compact", () => {
+    render(<ChartView definition={definition()} view={resolvedView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" compact />);
+    // The always-open table is gone; the disclosure holds both.
+    const disclosure = screen.getByText("Exact values and summary").closest("details");
+    expect(disclosure).not.toBeNull();
+    const region = within(disclosure as HTMLElement).getByRole("region", { name: /exact data table/ });
+    expect(region).toBeInTheDocument();
+    expect(region.closest("details")).toBe(disclosure);
+    // The frame does not repeat the title in compact contexts.
+    const figure = disclosure!.closest("figure");
+    expect(within(figure as HTMLElement).queryByText(definition().title, { exact: true })).toBeNull();
+    // Units, mode badge and freshness metadata stay visible.
+    expect(within(figure as HTMLElement).getByText(/Units:/)).toBeInTheDocument();
+    expect(within(figure as HTMLElement).getByText("Historical — pinned version")).toBeInTheDocument();
+    expect(within(figure as HTMLElement).getByText(/Period:/)).toBeInTheDocument();
+  });
+
+  it("keeps the table always open outside compact contexts", () => {
+    render(<ChartView definition={definition()} view={resolvedView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" />);
+    expect(screen.getByRole("region", { name: /exact data table/ })).toBeInTheDocument();
+    expect(screen.queryByText("Exact values and summary")).toBeNull();
+  });
+});
