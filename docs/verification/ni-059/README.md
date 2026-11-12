@@ -82,3 +82,14 @@ including the frozen export and outage/owner-denial branches. Existing moderate
 editor landmark finding is not hidden. Final-head GitHub required checks and
 cross-PR migration-head integration are coordinated through NI-080; no deployed
 or real-data release readiness is claimed by this repair.
+
+## PR #93 repair verification (13 November 2026)
+
+Rebuilt five synthetic reports with the frozen ReportLab 5.1.0 and svglib 2.4.0
+runtime. Rendered and inspected all 20 pages with Poppler. The short and long
+reports have 3 and 9 pages, the report with the NI-057 SSR chart has 3, the
+model report has 2, and the wide table report has 3. The wide table starts on
+the first page and repeats its column group and headers on continuation pages.
+The model report puts the limitations ahead of the coefficients and prints the
+same manifest path and SHA-256 verified in the Markdown ZIP. These checks used
+temporary test outputs and synthetic source data.

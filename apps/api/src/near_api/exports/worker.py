@@ -208,11 +208,11 @@ def render_bundle(plan: ExportIr, *, format: str = "markdown_zip",
             chart_render_request(chart_blocks), timeout=timeout,
             node_bin=node_bin, renderer_script=renderer_script)
     if format == "pdf":
-        from near_api.exports.pdf import PdfRenderError, render_pdf
+        from near_api.exports.pdf import render_pdf
 
         try:
             pdf_bytes = render_pdf(plan, render_result)
-        except (ValueError, PdfRenderError) as error:
+        except ValueError as error:
             raise WorkerError("pdf_render_failed", str(error)) from error
         if len(pdf_bytes) > MAX_BUNDLE_BYTES:
             raise WorkerError("bundle_size_exceeded",

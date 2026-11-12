@@ -79,7 +79,7 @@ export interface ExportDialogProps {
 function describeError(error: unknown): string {
   if (error instanceof ExportApiError) {
     if (error.status === 401) {
-      return "Your session has expired. Sign in again and retry — nothing was exported yet.";
+      return "Your session has expired. Sign in again to access your exports.";
     }
     if (error.status === 404) {
       return "The document or export does not exist for your account.";
@@ -132,15 +132,18 @@ function ExportDialogSession({
   const [errorText, setErrorText] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const runRef = useRef(0);
+  const activeRequest = useRef<AbortController | null>(null);
+  const attemptKeys = useRef<Partial<Record<ExportFormat, string>>>({});
 
-  const deliver = useCallback(async (finished: ExportJob) => {
+  const deliver = useCallback(async (finished: ExportJob, signalRun: number, signal: AbortSignal) => {
     setJob(finished);
     try {
-      const blob = await downloadExportBundle(finished.document_id, finished.id,
-        new AbortController().signal);
+      const blob = await downloadExportBundle(finished.document_id, finished.id, signal);
+      if (signal.aborted || runRef.current !== signalRun) return;
       downloadBlob(blob, exportFilename(finished));
       setPhase("ready");
     } catch (error) {
+      if (signal.aborted || runRef.current !== signalRun) return;
       if (error instanceof ExportApiError
         && (error.status === 410 || error.code === "EXPORT_EXPIRED")) {
         setPhase("expired");
@@ -151,14 +154,16 @@ function ExportDialogSession({
   }, []);
 
   const run = useCallback((signalRun: number, exportFormat: ExportFormat) => {
+    activeRequest.current?.abort();
     const controller = new AbortController();
+    activeRequest.current = controller;
     return (async () => {
       try {
         setPhase("starting");
         setErrorText(null);
         setJob(null);
-        const created = await createExport(documentId, versionId, exportFormat,
-          newExportIdempotencyKey(), controller.signal);
+        const key = attemptKeys.current[exportFormat] ??= newExportIdempotencyKey();
+        const created = await createExport(documentId, versionId, exportFormat, key, controller.signal);
         if (runRef.current !== signalRun) return;
         if (created.status === "expired") {
           setJob(created);
@@ -166,6 +171,7 @@ function ExportDialogSession({
           return;
         }
         if (created.status === "failed") {
+          delete attemptKeys.current[exportFormat];
           setJob(created);
           setPhase("failed");
           return;
@@ -173,7 +179,7 @@ function ExportDialogSession({
         if (created.status === "succeeded") {
           // A replayed already-finished job downloads immediately too — the
           // ready state never claims a download that did not happen.
-          await deliver(created);
+          await deliver(created, signalRun, controller.signal);
           return;
         }
         setJob(created);
@@ -184,11 +190,12 @@ function ExportDialogSession({
           const polled = await pollExport(documentId, created.id, controller.signal);
           if (runRef.current !== signalRun) return;
           if (polled.status === "succeeded") {
-            await deliver(polled);
+            await deliver(polled, signalRun, controller.signal);
             return;
           }
           setJob(polled);
           if (polled.status === "failed") {
+            delete attemptKeys.current[exportFormat];
             setPhase("failed");
             return;
           }
@@ -209,6 +216,8 @@ function ExportDialogSession({
         }
         setErrorText(describeError(error));
         setPhase("error");
+      } finally {
+        if (activeRequest.current === controller) activeRequest.current = null;
       }
     })();
   }, [documentId, versionId, deliver]);
@@ -220,6 +229,7 @@ function ExportDialogSession({
     // the initial state above (choosing, Markdown ZIP default).
     return () => {
       runRef.current += 1;
+      activeRequest.current?.abort();
     };
   }, []);
 
@@ -232,12 +242,17 @@ function ExportDialogSession({
 
   const handleDownloadAgain = useCallback(async () => {
     if (!job) return;
+    const signalRun = runRef.current;
+    const controller = new AbortController();
+    activeRequest.current = controller;
     setDownloading(true);
     try {
-      const blob = await downloadExportBundle(documentId, job.id, new AbortController().signal);
+      const blob = await downloadExportBundle(documentId, job.id, controller.signal);
+      if (controller.signal.aborted || runRef.current !== signalRun) return;
       downloadBlob(blob, exportFilename(job));
       onAnnounce?.("The export was downloaded again.");
     } catch (error) {
+      if (controller.signal.aborted || runRef.current !== signalRun) return;
       if (error instanceof ExportApiError && (error.status === 410
         || error.code === "EXPORT_EXPIRED")) {
         setPhase("expired");
@@ -247,15 +262,16 @@ function ExportDialogSession({
         setPhase("error");
       }
     } finally {
-      setDownloading(false);
+      if (activeRequest.current === controller) activeRequest.current = null;
+      if (runRef.current === signalRun) setDownloading(false);
     }
   }, [documentId, job, onAnnounce]);
 
   const handleRetry = useCallback(() => {
-    onAnnounce?.("Starting a new export.");
+    onAnnounce?.(phase === "failed" ? "Starting a new export." : "Resuming the export.");
     runRef.current += 1;
     void run(runRef.current, format);
-  }, [format, onAnnounce, run]);
+  }, [format, onAnnounce, phase, run]);
 
   const handleBackToChoice = useCallback(() => {
     setPhase("choosing");
@@ -266,6 +282,7 @@ function ExportDialogSession({
   const handleClose = useCallback((next: boolean) => {
     if (!next) {
       runRef.current += 1;
+      activeRequest.current?.abort();
       onAnnounce?.(phase === "ready"
         ? "Export finished; it was downloaded."
         : phase === "choosing"
@@ -361,16 +378,17 @@ function ExportDialogSession({
         {phase === "processing" || phase === "slow" ? (
           <p role="status" data-testid="export-processing" className="text-ui leading-ui text-text mt-4">
             The export is being prepared on the server
-            {job?.status === "queued" ? " (queued)" : ""}. This dialog updates
-            automatically — you can also close it and reopen Export later.
+            {job?.status === "queued" ? " (queued)" : ""}.
           </p>
         ) : null}
 
         {phase === "slow" ? (
-          <p data-testid="export-slow" className="text-metadata leading-metadata text-text-secondary mt-2">
-            The export is taking longer than expected. It stays on the server;
-            reopening Export shows its current state.
-          </p>
+          <div className="mt-2 space-y-3">
+            <p data-testid="export-slow" className="text-metadata leading-metadata text-text-secondary">
+              The export is taking longer than expected.
+            </p>
+            <Button variant="secondary" onClick={handleRetry}>Check again</Button>
+          </div>
         ) : null}
 
         {phase === "ready" ? (

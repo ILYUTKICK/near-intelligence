@@ -251,6 +251,8 @@ describe("model result block", () => {
     expect(screen.getByTestId("context-pane")).toHaveTextContent(datasetId.slice(0, 8));
     await waitFor(() => expect(paperEditor).toHaveFocus());
     await user.click(screen.getByTestId("export-open"));
+    expect(onExport).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Start export" }));
     await waitFor(() => expect(onExport).toHaveBeenCalledWith({ document_version_id: insertedVersionId, format: "markdown_zip" }));
     await user.click(screen.getByTestId("export-close"));
   });

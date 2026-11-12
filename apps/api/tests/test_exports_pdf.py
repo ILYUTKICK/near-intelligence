@@ -19,6 +19,7 @@ network, no provider.
 
 import hashlib
 import io
+import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest import TestCase
@@ -26,6 +27,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 from pypdf import PdfReader
 
+from near_api.exports.bundle import BundleError, build_bundle, extract_bundle
 from near_api.exports.charts import (
     ChartRenderedChart,
     ChartRenderResult,
@@ -33,8 +35,9 @@ from near_api.exports.charts import (
     render_chart_assets,
 )
 from near_api.exports.ir import export_ir_canonical_bytes
+from near_api.exports.markdown import escape_text as escape_markdown_text, model_manifest_path
 from near_api.exports.pdf import PDF_FORMAT_VERSION, PdfRenderError, render_pdf
-from near_api.exports.worker import render_bundle
+from near_api.exports.worker import WorkerError, render_bundle
 from near_api.insights.schemas import RichTextListItem, RichTextRun
 from near_api.schemas.export import (
     ExportAuthor,
@@ -49,6 +52,9 @@ from near_api.schemas.export import (
     ExportInsightBlock,
     ExportIr,
     ExportListBlock,
+    ExportModelResultBlock,
+    ExportModelResultSummary,
+    ExportModelRunReference,
     ExportParagraphBlock,
     ExportRiskBlock,
 )
@@ -262,50 +268,40 @@ def _resolved_context():
     )
 
 
-def _stub_model_result():
-    """The NI-055 ``modelResult`` shape, duck-typed (guarded on this base).
-
-    On a tree without NI-055 the plan grammar cannot validate such a block
-    and its canonical bytes cannot be produced, so the branch is exercised
-    at the block renderer level (``_render_block``) — the same function
-    ``render_pdf`` dispatches through. The interpretation body uses the real
-    typed rich-text models.
-    """
-    from near_api.insights.schemas import RichTextParagraph
-
-    return SimpleNamespace(
-        block_type="modelResult",
-        block_id=uuid5(NAMESPACE_URL, f"{FIXTURE_NAMESPACE}/model-result"),
-        model_run_id=uuid5(NAMESPACE_URL, f"{FIXTURE_NAMESPACE}/run"),
-        dataset_version_id=uuid5(NAMESPACE_URL, f"{FIXTURE_NAMESPACE}/mdsv"),
-        spec_id="synthetic.ols (fixture)", spec_version=3,
-        interpretation=(RichTextParagraph(type="paragraph", content=(
-            _run("Synthetic model interpretation (fixture)"),)),),
-        summary=SimpleNamespace(
-            run_id=uuid5(NAMESPACE_URL, f"{FIXTURE_NAMESPACE}/run"),
-            model_id="synthetic-model", model_version="1",
-            gate_verdict="pass",
-            sample_start="2026-01-01", sample_end_exclusive="2026-02-01",
-            nobs=31,
-            coefficient_rtol="1e-8", coefficient_atol="1e-10",
-            manifest_url="https://example.test/model-manifest (fixture)",
-            coefficients=(
-                SimpleNamespace(name="intercept", estimate="2.5",
-                                std_error="0.125", t_stat="20",
-                                p_value="0.0001", ci95_low="2.25",
-                                ci95_high="2.75"),
-                SimpleNamespace(name="slope", estimate="0.5",
-                                std_error="0.0125", t_stat="40",
-                                p_value="0.00001", ci95_low="0.475",
-                                ci95_high="0.525"),),
-            diagnostics={"nobs_check": "ok", "r2": "0.98"}),
+def _model_result_plan(*, gate_limit_codes=("synthetic_short_sample",)) -> ExportIr:
+    """One model result and its synthetic manifest in the real NI-055 IR."""
+    run_id = uuid5(NAMESPACE_URL, f"{FIXTURE_NAMESPACE}/run")
+    spec_id, spec_version = "synthetic_ols", 3
+    summary = ExportModelResultSummary(
+        run_id=run_id, model_id=spec_id, model_version=spec_version,
+        gate_verdict="READY_WITH_LIMITS",
+        sample_start="2026-01-01", sample_end_exclusive="2026-02-01", nobs=31,
+        coefficient_rtol="0.00000001", coefficient_atol="0.0000000001",
+        manifest_url=f"/api/model-runs/{run_id}/manifest",
+        coefficients=({"name": "intercept", "estimate": 2.500000000000001,
+                       "std_error": 0.125, "t_stat": 20.0, "p_value": 0.0001,
+                       "ci95_low": 2.25, "ci95_high": 2.75},),
+        diagnostics={"residuals": {"z": 2, "a": 1}},
+        limitations={"spec_limitation_notes": ("Use the fixed sample only (fixture).",),
+                     "prohibited_labels": ("causal effect (fixture)",),
+                     "gate_limit_codes": gate_limit_codes},
     )
-
-
-def _stub_plan(blocks) -> ExportIr:
-    return ExportIr.model_construct(
-        ir_version=1, document=_meta(), blocks=tuple(blocks),
-        sources=(), model_runs=(), citations=())
+    block = ExportModelResultBlock(
+        block_type="modelResult", model_run_id=run_id,
+        block_id=uuid5(NAMESPACE_URL, f"{FIXTURE_NAMESPACE}/model-result"),
+        dataset_version_id=uuid5(NAMESPACE_URL, f"{FIXTURE_NAMESPACE}/mdsv"),
+        spec_id=spec_id, spec_version=spec_version, summary=summary,
+        interpretation=({"type": "paragraph", "content":
+                         [_run("Synthetic model interpretation (fixture)")]},),
+    )
+    reference = ExportModelRunReference(
+        run_id=run_id, spec_id=spec_id, spec_version=spec_version,
+        manifest_bundle={"bundle_type": "model_run_manifest_bundle", "bundle_version": 1,
+                         "run_id": str(run_id), "spec_id": spec_id,
+                         "manifests": {"fit_manifest": summary.model_dump(mode="json")}},
+    )
+    return ExportIr(ir_version=1, document=_meta(), blocks=(block,),
+                    sources=(), model_runs=(reference,), citations=())
 
 
 def _full_text(pdf_bytes: bytes) -> tuple[PdfReader, str]:
@@ -448,58 +444,94 @@ class LongDocumentTests(TestCase):
         self.assertIn(f"context hash {SHA256}", self.text)
 
 
+class AuthoredTableTests(TestCase):
+    def render_table(self, column_count, rows):
+        block = ExportDataTableBlock(
+            block_type="dataTable", block_id=uuid5(NAMESPACE_URL, f"{FIXTURE_NAMESPACE}/table"),
+            columns=tuple(ExportDataTableColumn(key=f"col{i}", label=f"Field {i}", type="string")
+                          for i in range(1, column_count + 1)),
+            rows=rows,
+        )
+        plan = ExportIr(ir_version=1, document=_meta(), blocks=(block,),
+                        sources=(), model_runs=(), citations=())
+        return _full_text(render_pdf(plan, None))
+
+    def test_wide_table_preserves_all_authored_cells(self):
+        rows = tuple(tuple(f"v{column:03d}{row}" for column in range(1, 101))
+                     for row in (1, 2))
+        _, text = self.render_table(100, rows)
+        self.assertIn("Table columns 1–10 of 100", text)
+        self.assertIn("Table columns 91–100 of 100", text)
+        rendered_words = set(text.split())
+        self.assertTrue(all(cell in rendered_words for row in rows for cell in row))
+
+    def test_row_taller_than_one_page_splits_with_its_header(self):
+        reader, text = self.render_table(12, (("W" * 500,) * 12,))
+        self.assertGreater(len(reader.pages), 1)
+        first_page = " ".join(reader.pages[0].extract_text().split())
+        self.assertIn("Table columns 1–10 of 12", first_page)
+        self.assertIn("Row Field 1 ", first_page)
+        self.assertGreater(text.count("Table columns 1–10 of 12"), 1)
+        self.assertEqual(text.count("W"), 6000)
+        last_page = " ".join(reader.pages[-1].extract_text().split())
+        self.assertIn("Rendering provenance", last_page)
+        self.assertIn("No live data, screenshot or network access", last_page)
+
+
 class ModelResultTests(TestCase):
-    """The NI-055 modelResult branch (duck-typed; guarded on this base).
+    def test_frozen_model_pins_limits_coefficients_and_manifest_match_zip(self):
+        plan = _model_result_plan()
+        frozen = ExportIr.model_validate_json(export_ir_canonical_bytes(plan))
+        pdf_bytes = render_bundle(frozen, format="pdf")
+        _, text = _full_text(pdf_bytes)
+        extracted = extract_bundle(render_bundle(frozen))
+        markdown = extracted["research.md"].decode("utf-8")
+        manifest = json.loads(extracted["manifest.json"])
+        block = frozen.blocks[0]
+        summary = block.summary
+        for value in (str(block.model_run_id), str(block.dataset_version_id),
+                      summary.gate_verdict, "2026-01-01 to 2026-02-01 (end exclusive)",
+                      "0.00000001", "0.0000000001", "intercept", "2.500000000000001",
+                      "0.125", "0.0001", "2.25", "2.75", '{"residuals":{"a":1,"z":2}}',
+                      "Synthetic model interpretation (fixture)"):
+            with self.subTest(value=value):
+                self.assertIn(value, text)
+                self.assertIn(escape_markdown_text(value), markdown)
+        self.assertIn("specification synthetic_ols version 3", text)
+        self.assertIn(summary.manifest_url, text)
+        for limitation in (*summary.limitations.spec_limitation_notes,
+                           *summary.limitations.prohibited_labels,
+                           *summary.limitations.gate_limit_codes):
+            self.assertLess(text.index(limitation), text.index("Recorded coefficients"))
+        self.assertLess(text.index("Recorded coefficients"),
+                        text.index("Synthetic model interpretation (fixture)"))
+        path = model_manifest_path(block.model_run_id)
+        self.assertIn(path, text)
+        self.assertIn(hashlib.sha256(extracted[path]).hexdigest(), text)
+        self.assertIn(manifest["plan_sha256"], text)
+        self.assertEqual(pdf_bytes, render_pdf(plan, None))
 
-    ``render_pdf`` dispatches through ``_render_block``, so the branch is
-    exercised exactly where the combined tree (with NI-055's real schema)
-    will hit it; the stub never reaches the canonical-bytes pin, which only
-    real validated plans produce.
-    """
+    def test_empty_optional_gate_codes_do_not_remove_recorded_limitations(self):
+        _, text = _full_text(render_pdf(_model_result_plan(gate_limit_codes=()), None))
+        self.assertIn("Use the fixed sample only (fixture).", text)
+        self.assertIn("Prohibited labels are causal effect (fixture).", text)
+        self.assertNotIn("Recorded gate limit codes", text)
 
-    def _pdf_text(self, block) -> str:
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.platypus import SimpleDocTemplate
-
-        from near_api.exports.pdf import _ensure_fonts, _render_block, _styles
-
-        _ensure_fonts()
-        styles = _styles()
-        flowables, _ = _render_block(block, chart_number=0, assets_by_id={},
-                                     styles=styles)
-        buffer = io.BytesIO()
-        document = SimpleDocTemplate(buffer, pagesize=_A4, invariant=1)
-        document.build(flowables)
-        return " ".join(PdfReader(io.BytesIO(buffer.getvalue()))
-                        .pages[0].extract_text().split())
-
-    def test_01_model_result_renders_summary_pins_and_coefficients(self):
-        block = _stub_model_result()
-        text = self._pdf_text(block)
-        self.assertIn("Model result", text)
-        self.assertIn(f"run {block.summary.run_id}", text)
-        self.assertIn("gate verdict pass", text)
-        self.assertIn("Specification synthetic.ols (fixture) version 3", text)
-        self.assertIn("sample 2026-01-01 to 2026-02-01 (nobs 31)", text)
-        self.assertIn("rtol 1e-8, atol 1e-10", text)
-        self.assertIn("Synthetic model interpretation (fixture)", text)
-        self.assertIn("Coefficients (exact values)", text)
-        self.assertIn("intercept", text)
-        self.assertIn("0.125", text)
-        self.assertIn("2.5", text)
-        self.assertIn("Manifest:", text)
-        self.assertIn("Diagnostics:", text)
-        self.assertIn("nobs_check: ok", text)
-        self.assertIn("r2: 0.98", text)
-
-    def test_02_diagnostics_absent_renders_nothing_extra(self):
-        block = _stub_model_result()
-        block.summary.diagnostics = None
-        block.summary.manifest_url = None
-        text = self._pdf_text(block)
-        self.assertIn("Model result", text)
-        self.assertNotIn("Diagnostics:", text)
-        self.assertNotIn("Manifest:", text)
+    def test_pdf_and_zip_refuse_the_same_invalid_manifests(self):
+        plan = _model_result_plan()
+        reference = plan.model_runs[0]
+        mismatched = {**reference.manifest_bundle, "run_id": str(UUID(int=1))}
+        for bundle, reason in ((None, "missing_model_manifest"),
+                               (mismatched, "model_manifest_mismatch")):
+            with self.subTest(reason=reason):
+                invalid_reference = reference.model_copy(update={"manifest_bundle": bundle})
+                broken = plan.model_copy(update={"model_runs": (invalid_reference,)})
+                with self.assertRaises(BundleError) as zip_error:
+                    build_bundle(broken, None)
+                with self.assertRaises(PdfRenderError) as pdf_error:
+                    render_pdf(broken, None)
+                self.assertEqual(pdf_error.exception.details, zip_error.exception.details)
+                self.assertEqual(pdf_error.exception.details[0][1], reason)
 
 
 class FailClosedTests(TestCase):
@@ -518,15 +550,13 @@ class FailClosedTests(TestCase):
         # validation (the worker parses plans through ExportIr first).
         from near_api.exports.ir import ExportIrError
 
-        import json as json_module
-
-        payload = json_module.loads(
+        payload = json.loads(
             export_ir_canonical_bytes(short_plan(chart=False)))
         payload["blocks"] = [{"block_type": "future_block", "block_id":
                               str(uuid5(NAMESPACE_URL,
                                         f"{FIXTURE_NAMESPACE}/future"))}]
         with self.assertRaises((ExportIrError, ValueError)):
-            ExportIr.model_validate_json(json_module.dumps(payload))
+            ExportIr.model_validate_json(json.dumps(payload))
 
     def test_03_unknown_block_type_fails_closed_at_dispatch(self):
         # Second line of defense (schema/renderer skew, e.g. a plan written
@@ -593,6 +623,24 @@ class FailClosedTests(TestCase):
                        "glyph_not_covered"),
                       [tuple(item) for item in caught.exception.details])
 
+    def test_uncovered_glyph_in_body_or_table_cell_fails_the_worker(self):
+        plan = short_plan(chart=False)
+        table = next(block for block in plan.blocks if isinstance(block, ExportDataTableBlock))
+        run = _run("Synthetic 中 (fixture)", [{"type": "bold"}])
+        for block in (
+            plan.blocks[0].model_copy(update={"runs": (run,)}),
+            table.model_copy(update={"rows": (("Synthetic 中 (fixture)", None),)}),
+        ):
+            with self.subTest(block=block.block_type):
+                broken = plan.model_copy(update={"blocks": (block,)})
+                with self.assertRaises(PdfRenderError) as renderer_error:
+                    render_pdf(broken, None)
+                self.assertEqual(renderer_error.exception.details,
+                                 ((f"blocks.{block.block_id}", "glyph_not_covered"),))
+                with self.assertRaises(WorkerError) as worker_error:
+                    render_bundle(broken, format="pdf")
+                self.assertEqual(worker_error.exception.code, "pdf_render_failed")
+
     def test_08_hostile_prose_never_injects_markup(self):
         plan = short_plan(chart=False).model_copy(update={
             "document": _meta(
@@ -630,6 +678,13 @@ class RealRendererEmbedTests(TestCase):
         self.assertGreater(len(reader.pages), 0)
         self.assertEqual(pdf_bytes, render_pdf(plan, result))
 
+    def test_single_quoted_svg_font_keeps_cyrillic_text(self):
+        plan = short_plan()
+        title = "Синтетический график (fixture)"
+        assets = synthetic_render(plan, svg_title=title)
+        _, text = _full_text(render_pdf(plan, assets))
+        self.assertIn(title, text)
+
 
 class WorkerDispatchTests(TestCase):
     """The worker's render_bundle dispatch (no charts: no subprocess)."""
@@ -643,8 +698,6 @@ class WorkerDispatchTests(TestCase):
         self.assertEqual(pdf_bytes, render_bundle(plan, format="pdf"))
 
     def test_02_markdown_zip_dispatch_unchanged(self):
-        from near_api.exports.bundle import extract_bundle
-
         plan = short_plan(chart=False)
         zip_bytes = render_bundle(plan, format="markdown_zip")
         extracted = extract_bundle(zip_bytes)
@@ -652,7 +705,6 @@ class WorkerDispatchTests(TestCase):
 
     def test_03_unknown_format_fails_typed(self):
         plan = short_plan(chart=False)
-        with self.assertRaises(Exception) as caught:
+        with self.assertRaises(WorkerError) as caught:
             render_bundle(plan, format="docx")
-        self.assertIn("unsupported_export_format",
-                      str(getattr(caught.exception, "code", "")) + str(caught.exception))
+        self.assertEqual(caught.exception.code, "unsupported_export_format")

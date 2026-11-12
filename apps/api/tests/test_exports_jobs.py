@@ -628,6 +628,13 @@ class ExportJobDatabaseTests(unittest.TestCase):
         # download route re-verifies the hash before streaming).
         row = self.job_row(created.document.id, UUID(pdf_job["id"]))
         self.assertEqual(row["status"], "succeeded")
+        with self.as_session(self.bob_id):
+            pdf_path = f"/api/documents/{created.document.id}/exports/{pdf_job['id']}"
+            for path in (pdf_path, f"{pdf_path}/download"):
+                denied = self.client.get(path, headers=self.bearer(self.bob_id))
+                self.assertEqual(denied.status_code, 404)
+                self.assertEqual(ErrorResponse.model_validate(denied.json()).error.code,
+                                 "NOT_FOUND")
 
         # A typed worker refusal marks the job failed: one more job is
         # failed through the owner-scoped worker path (the renderer failure
@@ -739,10 +746,10 @@ class ExportJobDatabaseTests(unittest.TestCase):
         self.assertEqual(row["error_code"], "export_plan_hash_mismatch")
 
     def test_09_migration_round_trip_and_mirror(self):
-        # NI-080: production may already have applied either independent
-        # branch. The no-op merge must complete the missing sibling without
-        # changing either historical parent or losing its schema changes.
-        for parent in ("0014_document_organization", "0016_pdf_export_format"):
+        # Preserve the independent parents and both heads that precede the
+        # final join. Upgrading each applies the missing schema changes.
+        for parent in ("0014_document_organization", "0016_pdf_export_format",
+                       "0015_publications", "0018_merge_pdf_organization"):
             with self.subTest(applied_parent=parent):
                 command.downgrade(self.config, "0011_saved_charts")
                 with self.admin.connect() as connection:
@@ -753,10 +760,15 @@ class ExportJobDatabaseTests(unittest.TestCase):
                     self.assertEqual(connection.scalar(text(
                         "SELECT version_num FROM app.alembic_version")), parent)
                 command.upgrade(self.config, "head")
-                command.check(self.config)  # the mirror includes both branches
+                command.check(self.config)
                 with self.admin.connect() as connection:
+                    self.assertEqual(connection.scalar(text(
+                        "SELECT version_num FROM app.alembic_version")),
+                        "0019_merge_pdf_publications")
                     self.assertIsNotNone(connection.scalar(text(
                         "SELECT to_regclass('app.document_organization')")))
+                    self.assertIsNotNone(connection.scalar(text(
+                        "SELECT to_regclass('app.research_publications')")))
                     format_check = connection.scalar(text(
                         "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
                         "WHERE conrelid = 'app.export_jobs'::regclass "

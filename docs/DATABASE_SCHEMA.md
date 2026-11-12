@@ -118,6 +118,9 @@ PR #93 keeps both independently applied parents unchanged: `0014_document_organi
 and `0016_pdf_export_format` each descend from `0012_export_jobs`. No-op merge
 `0018_merge_pdf_organization` joins them into one branch head. It has no schema
 operations; an environment already at either parent receives only the missing
-sibling before the merge. The export integration suite checks both upgrade paths,
-rollback/re-upgrade and the SQLAlchemy mirror. Later pending-feature integration
-may add another merge revision without rewriting these applied identities.
+sibling before the merge. `0019_merge_pdf_publications` joins that head with the
+integrated publication revision `0015_publications`. The export integration
+suite upgrades from each of the two heads and the original PDF and organization
+parents, checks the SQLAlchemy mirror, and repeats the downgrade and upgrade.
+Downgrading to the ZIP-only format constraint requires the PDF jobs to have
+cleared through the export retention lifecycle.

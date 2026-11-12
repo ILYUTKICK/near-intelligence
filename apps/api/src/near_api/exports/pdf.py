@@ -19,10 +19,9 @@ Honesty rules carried over from the Markdown renderer (``markdown.py``):
   hash and the revision's recorded creation time. Nothing is refreshed.
 - Unrenderable content does not exist here: every block the plan can carry
   is mapped exhaustively, and a block outside the renderer's knowledge fails
-  closed with a typed error — never a silent skip. (The ``modelResult``
-  branch of NI-055 is implemented duck-typed against that block's recorded
-  shape so the combined tree renders it; on a tree without it the branch is
-  simply unreachable.)
+  closed with a typed error — never a silent skip. Model results carry their
+  recorded limitations ahead of the coefficients and pin the same published
+  manifest bytes as the ZIP.
 - User text is rendered inert: text goes through ReportLab's Paragraph
   markup with ``&``/``<``/``>`` escaped, so prose can never inject markup,
   and the SVG chart assets were already static-safety-scanned by the NI-057
@@ -61,6 +60,7 @@ from __future__ import annotations
 import csv as csv_module
 import hashlib
 import io
+import json
 import re
 import xml.etree.ElementTree as ElementTree
 from collections.abc import Iterable
@@ -69,9 +69,10 @@ from pathlib import Path
 from uuid import UUID
 
 from reportlab.graphics import renderPDF
-from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.shapes import Drawing, Group, String
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
@@ -84,12 +85,13 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
-from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus.doctemplate import LayoutError
 from svglib.svglib import svg2rlg
 
+from near_api.exports.bundle import BundleError, model_manifest_files
 from near_api.exports.charts import ChartRenderResult
 from near_api.exports.ir import export_ir_canonical_bytes
-from near_api.exports.markdown import limitations_of
+from near_api.exports.markdown import limitations_of, model_manifest_path
 from near_api.insights.schemas import (
     ModelContext,
     RichTextListItem,
@@ -108,6 +110,7 @@ from near_api.schemas.export import (
     ExportInsightBlock,
     ExportIr,
     ExportListBlock,
+    ExportModelResultBlock,
     ExportParagraphBlock,
     ExportRiskBlock,
 )
@@ -163,7 +166,7 @@ class PdfRenderError(ValueError):
 
 
 def _refuse(message: str, path: str, reason: str) -> PdfRenderError:
-    return PdfRenderError(message, [(path, reason)])
+    return PdfRenderError(message, ((path, reason),))
 
 
 # --------------------------------------------------------------------------- #
@@ -171,7 +174,7 @@ def _refuse(message: str, path: str, reason: str) -> PdfRenderError:
 # --------------------------------------------------------------------------- #
 
 _FONTS_REGISTERED = False
-_COVERAGE: dict[str, frozenset[str]] = {}
+_COVERAGE: dict[str, frozenset[int]] = {}
 
 
 def _font_directory() -> Path:
@@ -208,7 +211,10 @@ def _ensure_fonts() -> None:
             raise _refuse(
                 f"The bundled DejaVu font file is unavailable: {path}",
                 "fonts", "fonts_unavailable")
-        pdfmetrics.registerFont(TTFont(name, str(path)))
+        font = TTFont(name, str(path))
+        pdfmetrics.registerFont(font)
+        _COVERAGE[name] = frozenset(code for code, glyph in font.face.charToGlyph.items()
+                                    if glyph)
         paths[name] = path
     pdfmetrics.registerFontFamily(
         _FONT_FAMILY, normal=_FONT_REGULAR, bold=_FONT_BOLD,
@@ -226,23 +232,12 @@ def _ensure_fonts() -> None:
     ):
         font_map.register_font(_SVG_FONT_FAMILY, font_path=str(paths[name]),
                                weight=weight, style=style, rlgFontName=name)
-    _COVERAGE[_FONT_REGULAR] = frozenset(
-        pdfmetrics.getFont(_FONT_REGULAR).face.charToGlyph)
-    _COVERAGE[_FONT_MONO] = frozenset(
-        pdfmetrics.getFont(_FONT_MONO).face.charToGlyph)
     _FONTS_REGISTERED = True
 
 
-def _require_glyphs(text: str, path: str, *, mono: bool = False) -> None:
-    """Fail closed on characters the export font does not cover.
-
-    A missing glyph would render as an invisible/box character — fabricated-
-    looking output. The export refuses typed instead, naming the first
-    uncovered codepoint (DejaVu's family coverage is uniform across the
-    regular/bold/italic faces, so the regular face is the reference; exact-
-    value tables use the mono face explicitly).
-    """
-    covered = _COVERAGE[_FONT_MONO if mono else _FONT_REGULAR]
+def _require_glyphs(text: str, path: str, *, font: str = _FONT_REGULAR) -> None:
+    """Refuse the first character that cannot be rendered with this face."""
+    covered = _COVERAGE[font]
     for char in text:
         if ord(char) not in covered:
             raise _refuse(
@@ -299,6 +294,17 @@ def _runs_markup(runs: Iterable[RichTextRun]) -> str:
     return "".join(parts)
 
 
+def _paragraph(markup: str, style: ParagraphStyle, *, path: str = "text",
+               bullet_text: str | None = None) -> Paragraph:
+    """Check the displayed text using the font selected for each parsed run."""
+    paragraph = Paragraph(markup, style, bulletText=bullet_text)
+    for fragment in paragraph.frags:
+        _require_glyphs(fragment.text, path, font=fragment.fontName)
+    if bullet_text is not None:
+        _require_glyphs(bullet_text, path, font=style.bulletFontName)
+    return paragraph
+
+
 # --------------------------------------------------------------------------- #
 # Layout constants and styles (fixed — no environment-dependent sizes)
 # --------------------------------------------------------------------------- #
@@ -307,7 +313,7 @@ _PAGE_WIDTH, _PAGE_HEIGHT = A4
 _MARGIN = 48
 _TOP_MARGIN = 60
 _BOTTOM_MARGIN = 56
-_FRAME_WIDTH = _PAGE_WIDTH - 2 * _MARGIN
+_FRAME_WIDTH = _PAGE_WIDTH - 2 * (_MARGIN + 6)  # SimpleDocTemplate's frame padding
 _FRAME_HEIGHT = _PAGE_HEIGHT - _TOP_MARGIN - _BOTTOM_MARGIN
 _MAX_FIGURE_HEIGHT = _FRAME_HEIGHT - 72
 """A figure never renders taller than this (leaving room for its caption);
@@ -391,17 +397,18 @@ def _styles() -> dict[str, ParagraphStyle]:
 # --------------------------------------------------------------------------- #
 
 
-def _body_flowables(body, styles: dict[str, ParagraphStyle]) -> list[Flowable]:
+def _body_flowables(body, styles: dict[str, ParagraphStyle], *,
+                    path: str) -> list[Flowable]:
     """Render an annotation body (paragraphs and nested lists)."""
     flowables: list[Flowable] = []
     for child in body:
         if isinstance(child, RichTextParagraph):
-            flowables.append(Paragraph(_runs_markup(child.content),
-                                       styles["card_body"]))
+            flowables.append(_paragraph(_runs_markup(child.content),
+                                        styles["card_body"], path=path))
         elif isinstance(child, RichTextList):
             flowables.extend(_list_flowables(
                 child.content, ordered=child.type == "ordered_list",
-                styles=styles, depth=1))
+                styles=styles, depth=1, path=path))
         else:  # pragma: no cover - the typed union is closed
             raise _refuse(
                 "The frozen plan contains an annotation body the PDF "
@@ -410,7 +417,8 @@ def _body_flowables(body, styles: dict[str, ParagraphStyle]) -> list[Flowable]:
 
 
 def _list_flowables(items: tuple[RichTextListItem, ...], *, ordered: bool,
-                    styles: dict[str, ParagraphStyle], depth: int) -> list[Flowable]:
+                    styles: dict[str, ParagraphStyle], depth: int,
+                    path: str) -> list[Flowable]:
     """Render list items recursively (the canonical nested-list grammar).
 
     A nested list flows under its parent item, indented one step further;
@@ -427,7 +435,7 @@ def _list_flowables(items: tuple[RichTextListItem, ...], *, ordered: bool,
             elif isinstance(child, RichTextList):
                 nested.extend(_list_flowables(
                     child.content, ordered=child.type == "ordered_list",
-                    styles=styles, depth=depth + 1))
+                    styles=styles, depth=depth + 1, path=path))
             else:  # pragma: no cover - the typed union is closed
                 raise _refuse(
                     "The frozen plan contains a list child the PDF renderer "
@@ -436,8 +444,8 @@ def _list_flowables(items: tuple[RichTextListItem, ...], *, ordered: bool,
             f"list-{depth}", parent=styles["list_item"],
             leftIndent=14 * depth, bulletIndent=14 * (depth - 1) + 4,
             bulletFontName=_FONT_REGULAR)
-        flowables.append(Paragraph(
-            " ".join(inline).rstrip(), style, bulletText=marker))
+        flowables.append(_paragraph(
+            " ".join(inline).rstrip(), style, path=path, bullet_text=marker))
         flowables.extend(nested)
     return flowables
 
@@ -482,8 +490,8 @@ def _embed_drawing(svg: str, path: str) -> Drawing:
     """
     _require_svg_text_coverage(svg, path)
     mapped = re.sub(r"font-family\s*:\s*[^;}\"]+", f"font-family:{_SVG_FONT_FAMILY}", svg)
-    mapped = re.sub(r"""font-family\s*=\s*"[^"]*""", f'font-family="{_SVG_FONT_FAMILY}"',
-                    mapped)
+    mapped = re.sub(r"""font-family\s*=\s*(['"]).*?\1""",
+                    f'font-family="{_SVG_FONT_FAMILY}"', mapped)
     try:
         drawing = svg2rlg(io.StringIO(mapped))
     except Exception as error:  # noqa: BLE001 - typed refusal, never a partial PDF
@@ -494,6 +502,7 @@ def _embed_drawing(svg: str, path: str) -> Drawing:
         raise _refuse(
             f"The chart asset at {path} is empty or degenerate and cannot be "
             "embedded", path, "chart_embed_failed")
+    _require_drawing_glyphs(drawing, path)
     scale = min(_FRAME_WIDTH / drawing.width, _MAX_FIGURE_HEIGHT / drawing.height, 1.0)
     drawing.scale(scale, scale)
     drawing.width *= scale
@@ -501,7 +510,16 @@ def _embed_drawing(svg: str, path: str) -> Drawing:
     return drawing
 
 
-_TEXT_TAGS = ("}text", "}tspan")
+def _require_drawing_glyphs(group: Group, path: str) -> None:
+    """Verify that the embedded drawing uses bundled fonts for its text."""
+    for shape in group.getContents():
+        if isinstance(shape, Group):
+            _require_drawing_glyphs(shape, path)
+        elif isinstance(shape, String):
+            if shape.fontName not in _COVERAGE:
+                raise _refuse("A chart label could not use a bundled PDF font",
+                              path, "chart_embed_failed")
+            _require_glyphs(shape.text, path, font=shape.fontName)
 
 
 def _svg_text_nodes(svg: str) -> str:
@@ -510,7 +528,7 @@ def _svg_text_nodes(svg: str) -> str:
     root = ElementTree.fromstring(svg)
     for element in root.iter():
         tag = element.tag
-        if isinstance(tag, str) and (tag.endswith("text") or tag.endswith("tspan")):
+        if isinstance(tag, str) and tag.rsplit("}", 1)[-1] in {"text", "tspan"}:
             texts.extend(element.itertext())
     return "".join(texts)
 
@@ -558,21 +576,19 @@ def _column_widths(token_lengths: list[int], *, char_width: float,
     token needs fit the printable width, every token renders on one line;
     when they cannot (physically too wide), the needs shrink proportionally
     and wrapping paragraph cells break long tokens across lines — values
-    stay complete and exact, never clipped, and tables still split across
-    pages under repeating header rows. Past ten columns the width is
-    distributed evenly.
+    stay complete and tables split under repeating header rows.
     """
     count = len(token_lengths)
-    if count > 10:
-        even = _FRAME_WIDTH / count
-        return [even] * count
-    needs = [min(length, 64) * char_width + padding for length in token_lengths]
+    minimum = 32.0  # padding and room for the authored table's Row label
+    needs = [max(min(length, 64) * char_width + padding, minimum)
+             for length in token_lengths]
     total = sum(needs)
     if total <= _FRAME_WIDTH:
         extra = (_FRAME_WIDTH - total) / count
         return [need + extra for need in needs]
-    factor = _FRAME_WIDTH / total
-    return [max(need * factor, 18.0) for need in needs]
+    baseline = count * minimum
+    factor = (_FRAME_WIDTH - baseline) / (total - baseline)
+    return [minimum + (need - minimum) * factor for need in needs]
 
 
 def _max_token_lengths(rows_of_text: list[list[str]]) -> list[int]:
@@ -588,19 +604,14 @@ def _max_token_lengths(rows_of_text: list[list[str]]) -> list[int]:
     return lengths
 
 
+_TABLE_COLUMNS_PER_SECTION = 10
+
+
 def _data_table_flowables(block: ExportDataTableBlock,
                           styles: dict[str, ParagraphStyle]) -> list[Flowable]:
-    header_text = [column.label + (f" ({column.unit})" if column.unit else "")
-                   for column in block.columns]
-    body_text: list[list[str]] = []
-    if block.rows is not None:
-        body_text = [[_cell_text(cell) for cell in row] for row in block.rows]
-    token_lengths = _max_token_lengths([header_text, *body_text])
-    header = [Paragraph(escape_text(text), styles["table_header"])
-              for text in header_text]
     count = len(block.columns)
-    token_lengths += [0] * (count - len(token_lengths))
-    widths = _column_widths(token_lengths, char_width=4.9)
+    grouped = count > _TABLE_COLUMNS_PER_SECTION
+    path = f"blocks.{block.block_id}"
     table_style = TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), _TABLE_HEADER_BACKGROUND),
         ("GRID", (0, 0), (-1, -1), 0.4, _GRID_COLOR),
@@ -610,24 +621,43 @@ def _data_table_flowables(block: ExportDataTableBlock,
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ])
+    section_style = TableStyle([
+        ("SPAN", (0, 0), (-1, 0)),
+        ("BACKGROUND", (0, 1), (-1, 1), _TABLE_HEADER_BACKGROUND),
+    ], parent=table_style)
     flowables: list[Flowable] = []
-    if block.rows is None:
+    for start in range(0, count, _TABLE_COLUMNS_PER_SECTION):
+        stop = min(start + _TABLE_COLUMNS_PER_SECTION, count)
+        header_text = [column.label + (f" ({column.unit})" if column.unit else "")
+                       for column in block.columns[start:stop]]
+        body_text = [[_cell_text(cell) for cell in row[start:stop]]
+                     for row in block.rows or ()]
+        if grouped and block.rows is not None:
+            header_text.insert(0, "Row")
+            for index, row in enumerate(body_text, start=1):
+                row.insert(0, str(index))
+        widths = _column_widths(_max_token_lengths([header_text, *body_text]),
+                                char_width=4.9)
+        header = [_paragraph(escape_text(text), styles["table_header"], path=path)
+                  for text in header_text]
+        rows = [[_paragraph(escape_text(text), styles["table_cell"], path=path)
+                 for text in row] for row in body_text]
+        table_rows = [header, *rows]
+        if grouped:
+            section = _paragraph(f"Table columns {start + 1}–{stop} of {count}",
+                                 styles["table_header"])
+            table_rows.insert(0, [section] + [""] * (len(header) - 1))
+        flowables.append(Table(table_rows, colWidths=widths,
+                               repeatRows=2 if grouped else 1, splitInRow=1,
+                               style=section_style if grouped else table_style))
+        flowables.append(Spacer(1, 6))
+    if block.dataset is not None:
         dataset = block.dataset
-        assert dataset is not None  # the export contract keeps exactly one payload
-        pin = Paragraph(
+        flowables.append(_paragraph(
             f"Projected from approved dataset {escape_text(dataset.dataset_key)} "
             f"version {dataset.version} (content {dataset.content_sha256}). "
             "The projection resolves through this immutable dataset version, "
-            "never a latest pointer.", styles["card_meta"])
-        flowables.append(KeepTogether([Table([header], colWidths=widths,
-                                              repeatRows=1, style=table_style),
-                                       pin]))
-    else:
-        rows = [[Paragraph(escape_text(text), styles["table_cell"])
-                 for text in row] for row in body_text]
-        flowables.append(Table([header, *rows], colWidths=widths,
-                               repeatRows=1, style=table_style))
-    flowables.append(Spacer(1, 6))
+            "never a latest pointer.", styles["card_meta"], path=path))
     return flowables
 
 
@@ -641,8 +671,8 @@ def _exact_value_table(csv_text: str, path: str,
     empty. Numbers are never reformatted.
     """
     rows = list(csv_module.reader(io.StringIO(csv_text)))
-    if not rows:
-        raise _refuse(f"The chart CSV asset at {path} is empty",
+    if not rows or not rows[0] or len(rows[0]) > _TABLE_COLUMNS_PER_SECTION:
+        raise _refuse(f"The chart CSV asset at {path} has an invalid column count",
                       path, "chart_embed_failed")
     count = len(rows[0])
     for row in rows[1:]:
@@ -651,11 +681,10 @@ def _exact_value_table(csv_text: str, path: str,
                 f"The chart CSV asset at {path} has a ragged row; the "
                 "exact-value table refuses instead of guessing",
                 path, "chart_embed_failed")
-    for text in (cell for row in rows for cell in row):
-        _require_glyphs(text, path, mono=True)
-    header = [Paragraph(escape_text(cell), styles["mono_header"])
+    header = [_paragraph(escape_text(cell), styles["mono_header"], path=path)
               for cell in rows[0]]
-    body = [[Paragraph(escape_text(cell), styles["mono_cell"]) for cell in row]
+    body = [[_paragraph(escape_text(cell), styles["mono_cell"], path=path)
+             for cell in row]
             for row in rows[1:]]
     widths = _column_widths(_max_token_lengths(rows), char_width=4.25, padding=8.0)
     return Table([header, *body], colWidths=widths, repeatRows=1, style=TableStyle([
@@ -669,89 +698,70 @@ def _exact_value_table(csv_text: str, path: str,
     ]))
 
 
-def _model_result_flowables(block, styles: dict[str, ParagraphStyle]) -> list[Flowable]:
-    """Render a ``modelResult`` block (NI-055) duck-typed.
-
-    The branch is written against the recorded ``ExportModelResultBlock``
-    shape (block: model_run_id, dataset_version_id, spec_id, spec_version,
-    interpretation, summary; summary: run_id, model_id, model_version,
-    gate_verdict, sample_start, sample_end_exclusive, nobs,
-    coefficient_rtol, coefficient_atol, manifest_url, coefficients,
-    diagnostics). Coefficients and diagnostics are rendered verbatim —
-    exact decimal strings are never reformatted.
-    """
+def _model_result_flowables(block: ExportModelResultBlock,
+                            styles: dict[str, ParagraphStyle]) -> list[Flowable]:
+    """Render the published run's limits and statistical values from the plan."""
     summary = block.summary
+    path = f"blocks.{block.block_id}"
     flowables: list[Flowable] = [
-        Paragraph(
-            f"<b>Model result</b> — run {escape_text(str(summary.run_id))} "
-            f"(model {escape_text(str(summary.model_id))} "
-            f"v{escape_text(str(summary.model_version))}), gate verdict "
-            f"{escape_text(str(summary.gate_verdict))}",
-            styles["card_label"]),
-        Paragraph(
-            f"Specification {escape_text(str(block.spec_id))} version "
-            f"{escape_text(str(block.spec_version))}; dataset version "
-            f"{escape_text(str(block.dataset_version_id))}; sample "
-            f"{escape_text(str(summary.sample_start))} to "
-            f"{escape_text(str(summary.sample_end_exclusive))} (nobs "
-            f"{escape_text(str(summary.nobs))}).",
-            styles["card_meta"]),
+        _paragraph(
+            f"<b>Model result</b> — pinned published run {summary.run_id} "
+            f"(specification {escape_text(block.spec_id)} version {block.spec_version}).",
+            styles["card_label"], path=path),
+        _paragraph(
+            f"Gate verdict {escape_text(summary.gate_verdict)}. "
+            f"Sample {escape_text(summary.sample_start)} to "
+            f"{escape_text(summary.sample_end_exclusive)} (end exclusive), "
+            f"{summary.nobs} observations.",
+            styles["card_meta"], path=path),
+        _paragraph(
+            f"Recorded reproduction tolerances are rtol "
+            f"{escape_text(summary.coefficient_rtol)} and atol "
+            f"{escape_text(summary.coefficient_atol)}.", styles["card_meta"], path=path),
+        _paragraph("The publication gate recorded these limitations.",
+                   styles["card_body"]),
     ]
-    flowables.extend(_body_flowables(block.interpretation, styles))
-    flowables.append(Paragraph(
-        f"Coefficient verification tolerance: rtol "
-        f"{escape_text(str(summary.coefficient_rtol))}, atol "
-        f"{escape_text(str(summary.coefficient_atol))}.",
-        styles["card_meta"]))
-    coefficients = getattr(summary, "coefficients", None)
-    if coefficients:
-        header = [Paragraph(escape_text(name), styles["mono_header"]) for name in
-                  ("name", "estimate", "std_error", "t_stat", "p_value",
-                   "ci95_low", "ci95_high")]
-        rows = []
-        coefficient_text = []
-        for coefficient in coefficients:
-            values = [str(getattr(coefficient, field))
-                      for field in ("name", "estimate", "std_error", "t_stat",
-                                    "p_value", "ci95_low", "ci95_high")]
-            for value in values:
-                _require_glyphs(value, f"modelResult.{summary.run_id}", mono=True)
-            coefficient_text.append(values)
-            rows.append([Paragraph(escape_text(value), styles["mono_cell"])
-                         for value in values])
-        flowables.append(Paragraph("Coefficients (exact values):",
-                                   styles["card_body"]))
-        flowables.append(Table([header, *rows],
-                               colWidths=_column_widths(
-                                   _max_token_lengths(
-                                       [["name", "estimate", "std_error",
-                                         "t_stat", "p_value", "ci95_low",
-                                         "ci95_high"], *coefficient_text]),
-                                   char_width=4.25, padding=8.0),
-                               repeatRows=1, style=TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), _TABLE_HEADER_BACKGROUND),
-            ("GRID", (0, 0), (-1, -1), 0.4, _GRID_COLOR),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 3),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-            ("TOPPADDING", (0, 0), (-1, -1), 2),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-        ])))
-    manifest_url = getattr(summary, "manifest_url", None)
-    if manifest_url:
-        flowables.append(Paragraph(
-            f"Manifest: {escape_text(str(manifest_url))}",
-            styles["card_meta"]))
-    diagnostics = getattr(summary, "diagnostics", None)
-    if diagnostics is not None:
-        if isinstance(diagnostics, dict):
-            lines = "; ".join(
-                f"{key}: {escape_text(str(diagnostics[key]))}"
-                for key in sorted(diagnostics))
-        else:
-            lines = escape_text(str(diagnostics))
-        flowables.append(Paragraph(f"Diagnostics: {lines}",
-                                   styles["card_meta"]))
+    limitations = summary.limitations
+    notes = [*limitations.spec_limitation_notes,
+             "Prohibited labels are " + ", ".join(limitations.prohibited_labels) + "."]
+    if limitations.gate_limit_codes:
+        notes.append("Recorded gate limit codes are "
+                     + ", ".join(limitations.gate_limit_codes) + ".")
+    flowables.extend(_paragraph(escape_text(note), styles["list_item"],
+                                path=path, bullet_text="•")
+                     for note in notes)
+
+    fields = ["name", "estimate", "std_error", "t_stat", "p_value", "ci95_low", "ci95_high"]
+    coefficient_text = [[str(getattr(coefficient, field)) for field in fields]
+                        for coefficient in summary.coefficients]
+    header = [_paragraph(name, styles["mono_header"]) for name in fields]
+    rows = [[_paragraph(escape_text(value), styles["mono_cell"], path=path)
+             for value in row]
+            for row in coefficient_text]
+    flowables.append(_paragraph("Recorded coefficients", styles["appendix_label"]))
+    flowables.append(Table([header, *rows],
+                           colWidths=_column_widths(
+                               _max_token_lengths([fields, *coefficient_text]),
+                               char_width=4.25, padding=8.0),
+                           repeatRows=1, style=TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), _TABLE_HEADER_BACKGROUND),
+        ("GRID", (0, 0), (-1, -1), 0.4, _GRID_COLOR),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ])))
+    diagnostics = json.dumps(summary.diagnostics, sort_keys=True,
+                             separators=(",", ":"), default=str)
+    flowables.extend([
+        _paragraph(f"Recorded diagnostics {escape_text(diagnostics)}", styles["card_meta"],
+                   path=path),
+        _paragraph(f"Published run manifest at {escape_text(summary.manifest_url)}. "
+                   f"The interpretation pins dataset version {block.dataset_version_id}.",
+                   styles["card_meta"], path=path),
+    ])
+    flowables.extend(_body_flowables(block.interpretation, styles, path=path))
     return flowables
 
 
@@ -759,24 +769,20 @@ def _render_block(block: ExportBlock, *, chart_number: int,
                   assets_by_id: dict[UUID, _FigureAssets],
                   styles: dict[str, ParagraphStyle],
                   ) -> tuple[list[Flowable], int]:
-    """Render one plan block; returns the flowables and the chart counter.
-
-    The ``modelResult`` branch (NI-055) runs first, duck-typed: on a tree
-    without NI-055 the plan grammar cannot produce such a block, so the
-    branch is unreachable there and the typed union below stays exhaustive.
-    """
-    if getattr(block, "block_type", None) == "modelResult":
+    """Render one plan block; returns the flowables and the chart counter."""
+    path = f"blocks.{getattr(block, 'block_id', '?')}"
+    if isinstance(block, ExportModelResultBlock):
         return _card_flowables(
             _model_result_flowables(block, styles), styles), chart_number
     if isinstance(block, ExportParagraphBlock):
-        return [Paragraph(_runs_markup(block.runs), styles["body"])], chart_number
+        return [_paragraph(_runs_markup(block.runs), styles["body"], path=path)], chart_number
     if isinstance(block, ExportHeadingBlock):
         style = styles[f"heading{min(block.level, 3)}"]
-        return [Paragraph(_runs_markup(block.runs), style)], chart_number
+        return [_paragraph(_runs_markup(block.runs), style, path=path)], chart_number
     if isinstance(block, ExportListBlock):
         return _list_flowables(block.items,
                                ordered=block.block_type == "ordered_list",
-                               styles=styles, depth=1), chart_number
+                               styles=styles, depth=1, path=path), chart_number
     if isinstance(block, ExportChartBlock):
         chart_number += 1
         assets = assets_by_id[block.block_id]
@@ -786,17 +792,17 @@ def _render_block(block: ExportBlock, *, chart_number: int,
         return _data_table_flowables(block, styles), chart_number
     if isinstance(block, ExportInsightBlock):
         flowables = [
-            Paragraph(
+            _paragraph(
                 f"<b>Insight ({escape_text(str(block.insight_type))}, "
                 f"{escape_text(block.classification)})</b> — authored "
                 f"{block.authored_at}",
-                styles["card_label"]),
+                styles["card_label"], path=path),
         ]
-        flowables.extend(_body_flowables(block.body, styles))
-        flowables.append(Paragraph(
+        flowables.extend(_body_flowables(block.body, styles, path=path))
+        flowables.append(_paragraph(
             "Pinned context: " + "; ".join(escape_text(line)
                                            for line in _context_lines(block.context))
-            + ".", styles["card_meta"]))
+            + ".", styles["card_meta"], path=path))
         if block.hypothesis_id is not None:
             flowables.append(Paragraph(
                 f"Related hypothesis: {block.hypothesis_id}.",
@@ -804,11 +810,11 @@ def _render_block(block: ExportBlock, *, chart_number: int,
         return _card_flowables(flowables, styles), chart_number
     if isinstance(block, ExportHypothesisBlock):
         flowables = [
-            Paragraph(
+            _paragraph(
                 f"<b>Hypothesis ({escape_text(block.assessment)})</b> — "
                 f"authored {block.authored_at}",
-                styles["card_label"]),
-            Paragraph(escape_text(block.statement), styles["card_body"]),
+                styles["card_label"], path=path),
+            _paragraph(escape_text(block.statement), styles["card_body"], path=path),
         ]
         return _card_flowables(flowables, styles), chart_number
     if isinstance(block, ExportEvidenceBlock):
@@ -820,17 +826,17 @@ def _render_block(block: ExportBlock, *, chart_number: int,
             target = f"published model run {block.target_id}"
         else:
             target = f"public citation artifact {block.target_id}"
-        flowables = [Paragraph(
+        flowables = [_paragraph(
             f"<b>Evidence ({escape_text(block.classification)})</b> → "
             f"{escape_text(target)} — {escape_text(block.explanation)}",
-            styles["card_label"])]
+            styles["card_label"], path=path)]
         return _card_flowables(flowables, styles), chart_number
     if isinstance(block, ExportRiskBlock):
         flowables = [
-            Paragraph(f"<b>Risk: {escape_text(block.title)}</b>",
-                      styles["card_label"]),
+            _paragraph(f"<b>Risk: {escape_text(block.title)}</b>",
+                       styles["card_label"], path=path),
         ]
-        flowables.extend(_body_flowables(block.body, styles))
+        flowables.extend(_body_flowables(block.body, styles, path=path))
         if block.related_hypothesis_id is not None:
             flowables.append(Paragraph(
                 f"Related hypothesis: {block.related_hypothesis_id}.",
@@ -846,7 +852,7 @@ def _render_block(block: ExportBlock, *, chart_number: int,
         return [Spacer(1, 4), table, Spacer(1, 8)], chart_number
     raise _refuse(
         "The frozen plan contains a block the PDF renderer does not support",
-        f"blocks.{getattr(block, 'block_id', '?')}", "unsupported_block_type")
+        path, "unsupported_block_type")
 
 
 def _card_flowables(flowables: list[Flowable],
@@ -869,13 +875,13 @@ def _front_matter(plan: ExportIr, plan_sha256: str,
     author = escape_text(meta.author.display_name) if meta.author.display_name \
         else str(meta.author.owner_id)
     return [
-        Paragraph(escape_text(meta.title), styles["title"]),
-        Paragraph(
+        _paragraph(escape_text(meta.title), styles["title"], path="document.title"),
+        _paragraph(
             f"Exported revision {meta.revision} of document "
             f"{meta.document_id} (version {meta.version_id}, content "
             f"{meta.content_sha256}, schema version {meta.schema_version}) "
             f"authored by {author}, created {meta.created_at}.",
-            styles["attribution"]),
+            styles["attribution"], path="document.author"),
         Paragraph(
             "This PDF is the frozen export of exactly this revision; later "
             "edits, renames or newer dataset publications do not change it. "
@@ -890,17 +896,15 @@ def _front_matter(plan: ExportIr, plan_sha256: str,
     ]
 
 
-def _registries_flowables(plan: ExportIr,
+def _registries_flowables(plan: ExportIr, model_manifest_hashes: dict[str, str],
                           styles: dict[str, ParagraphStyle]) -> list[Flowable]:
     flowables: list[Flowable] = [
         Paragraph("Sources", styles["heading1"]),
     ]
     if plan.sources:
         flowables.extend(
-            Paragraph(f"{escape_text(source.source_id)} — "
-                      f"{escape_text(source.name)}",
-                      ParagraphStyle("source_item", parent=styles["list_item"]),
-                      bulletText="•")
+            _paragraph(f"{escape_text(source.source_id)} — {escape_text(source.name)}",
+                       styles["list_item"], path="sources", bullet_text="•")
             for source in plan.sources)
     else:
         flowables.append(Paragraph(
@@ -908,12 +912,17 @@ def _registries_flowables(plan: ExportIr,
             styles["body"]))
     flowables.append(Paragraph("Model runs", styles["heading1"]))
     if plan.model_runs:
-        flowables.extend(
-            Paragraph(f"{run.run_id} — specification "
-                      f"{escape_text(run.spec_id)} version {run.spec_version}",
-                      ParagraphStyle("run_item", parent=styles["list_item"]),
-                      bulletText="•")
-            for run in plan.model_runs)
+        for run in plan.model_runs:
+            flowables.append(_paragraph(
+                f"{run.run_id} — specification {escape_text(run.spec_id)} "
+                f"version {run.spec_version}", styles["list_item"],
+                path="model_runs", bullet_text="•"))
+            path = model_manifest_path(run.run_id)
+            digest = model_manifest_hashes.get(path)
+            if digest is not None:
+                flowables.append(Paragraph(
+                    f"Frozen run manifest in the Markdown ZIP at {escape_text(path)} "
+                    f"with SHA-256 {digest}.", styles["attribution"]))
     else:
         flowables.append(Paragraph(
             "No published model runs are referenced by this revision.",
@@ -932,9 +941,7 @@ def _registries_flowables(plan: ExportIr,
             styles["body"]))
     flowables.append(Paragraph("Limitations", styles["heading1"]))
     flowables.extend(
-        Paragraph(escape_text(item), ParagraphStyle("limitation_item",
-                                                    parent=styles["list_item"]),
-                  bulletText="•")
+        _paragraph(escape_text(item), styles["list_item"], path="limitations", bullet_text="•")
         for item in limitations_of(plan))
     return flowables
 
@@ -978,8 +985,8 @@ def _provenance_flowables(plan: ExportIr, plan_sha256: str,
             ("renderer script SHA-256", assets.script_sha256),
         ]
         flowables.append(Table(
-            [[Paragraph(escape_text(label), styles["mono_header"]),
-              Paragraph(escape_text(value), styles["mono_cell"])]
+            [[_paragraph(escape_text(label), styles["mono_header"], path="renderer"),
+              _paragraph(escape_text(value), styles["mono_cell"], path="renderer")]
              for label, value in rows],
             colWidths=[_FRAME_WIDTH * 0.3, _FRAME_WIDTH * 0.7],
             style=TableStyle([
@@ -990,8 +997,6 @@ def _provenance_flowables(plan: ExportIr, plan_sha256: str,
                 ("TOPPADDING", (0, 0), (-1, -1), 2),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
             ])))
-        for chart in assets.charts:
-            _require_glyphs(str(chart.chart_id), "renderer.chart_id")
     else:
         flowables.append(Paragraph(
             "This revision carries no chart blocks; no chart renderer ran.",
@@ -1001,7 +1006,7 @@ def _provenance_flowables(plan: ExportIr, plan_sha256: str,
         "export: every figure is the static SVG asset rendered from the "
         "frozen chart view, and every value comes from the plan pinned "
         "above.", styles["body"]))
-    return flowables
+    return [KeepTogether(flowables)]
 
 
 # --------------------------------------------------------------------------- #
@@ -1048,16 +1053,16 @@ def render_pdf(plan: ExportIr, assets: ChartRenderResult | None) -> bytes:
                 "exactly", "charts", "chart_set_mismatch")
     assets_by_id = ({chart.chart_id: _FigureAssets(chart)
                      for chart in assets.charts} if assets is not None else {})
+    try:
+        model_manifests = model_manifest_files(plan)
+    except BundleError as error:
+        raise PdfRenderError(str(error), error.details) from error
+    model_manifest_hashes = {item.path: hashlib.sha256(item.data).hexdigest()
+                             for item in model_manifests}
 
     styles = _styles()
     plan_bytes = export_ir_canonical_bytes(plan)
     plan_sha256 = hashlib.sha256(plan_bytes).hexdigest()
-    # The attribution strings render on every page's parent flow; check the
-    # fixed header text and the document meta once up front.
-    _require_glyphs(plan.document.title, "document.title")
-    _require_glyphs(str(plan.document.author.display_name or
-                        plan.document.author.owner_id), "document.author")
-
     story: list[Flowable] = []
     story.extend(_front_matter(plan, plan_sha256, styles))
     chart_number = 0
@@ -1067,7 +1072,7 @@ def render_pdf(plan: ExportIr, assets: ChartRenderResult | None) -> bytes:
             assets_by_id=assets_by_id, styles=styles)
         story.extend(rendered)
         story.append(Spacer(1, 4))
-    story.extend(_registries_flowables(plan, styles))
+    story.extend(_registries_flowables(plan, model_manifest_hashes, styles))
     appendix = _chart_data_appendix(plan, assets_by_id, styles)
     if appendix:
         story.append(Paragraph("Chart data (exact values)", styles["heading1"]))
@@ -1084,5 +1089,9 @@ def render_pdf(plan: ExportIr, assets: ChartRenderResult | None) -> bytes:
         subject=(f"Frozen export of revision {plan.document.revision} "
                  f"(content {plan.document.content_sha256})"),
         creator=f"near-api export renderer (NI-059), layout v{PDF_FORMAT_VERSION}")
-    document.build(story, onFirstPage=_footer, onLaterPages=_footer)
+    try:
+        document.build(story, onFirstPage=_footer, onLaterPages=_footer)
+    except LayoutError as error:
+        raise _refuse("The report could not be laid out within the printable area",
+                      "layout", "layout_failed") from error
     return buffer.getvalue()

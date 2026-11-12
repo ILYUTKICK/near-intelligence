@@ -7,7 +7,7 @@
  * terminal state honestly.
  */
 import { axe } from "jest-axe";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as download from "@/features/editor/persistence/download";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -213,6 +213,37 @@ describe("ExportDialog lifecycle", () => {
     const radio = await screen.findByTestId("export-format-markdown") as HTMLInputElement;
     expect(radio.checked).toBe(true);
     expect(screen.getByTestId("export-format-pdf")).not.toBeChecked();
+  });
+
+  it("resumes the same PDF request after an interrupted response and ignores a download after closing", async () => {
+    let posts = 0;
+    let finishDownload!: (response: Response) => void;
+    const pendingDownload = new Promise<Response>(resolve => { finishDownload = resolve; });
+    const downloadBlob = vi.spyOn(download, "downloadBlob").mockImplementation(() => {});
+    const calls = mockFetch([
+      CSRF_ROUTE,
+      { match: (method, path) => method === "POST" && path === EXPORT_PATH,
+        respond: () => ++posts === 1 ? new Response(null, { status: 503 })
+          : Response.json(jobBody("succeeded", { format: "pdf" }), { status: 202 }) },
+      { match: (method, path) => method === "GET" && path === `${EXPORT_PATH}/${JOB_ID}/download`,
+        respond: () => pendingDownload },
+    ]);
+    const { unmount } = render(<ExportDialog open onOpenChange={() => {}} documentId={DOC_ID} versionId={VERSION_ID} />);
+    await userEvent.click(screen.getByTestId("export-format-pdf"));
+    await userEvent.click(screen.getByTestId("export-start"));
+    await screen.findByTestId("export-error");
+    await userEvent.click(screen.getByTestId("export-error-retry"));
+    await waitFor(() => expect(calls.some(call => call.path.endsWith("/download"))).toBe(true));
+    const requests = calls.filter(call => call.method === "POST");
+    expect(requests).toHaveLength(2);
+    expect(JSON.parse(String(requests[0].init.body))).toEqual({ document_version_id: VERSION_ID, format: "pdf" });
+    expect(requests[1].init.body).toBe(requests[0].init.body);
+    const key = new Headers(requests[0].init.headers).get("idempotency-key");
+    expect(key).toBeTruthy();
+    expect(new Headers(requests[1].init.headers).get("idempotency-key")).toBe(key);
+    unmount();
+    await act(async () => finishDownload(new Response("%PDF-1.4\n", { headers: { "content-type": "application/pdf" } })));
+    expect(downloadBlob).not.toHaveBeenCalled();
   });
 
   it("shows the typed failed state and allows returning to the format choice", async () => {
