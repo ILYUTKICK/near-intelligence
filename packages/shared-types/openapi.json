@@ -10433,7 +10433,113 @@
         ]
       }
     },
-<<<<<<< HEAD
+    "/api/documents/{document_id}/integrity": {
+      "get": {
+        "description": "Report advisory integrity findings for one immutable revision.\n\nRead-only and deterministic per revision content: findings carry exact\nblock/entity/context/dataset/definition references and advisory severities\n(never a truth score), and no finding can change a pin, coefficient or\ndocument \u2014 refresh and citation remain explicit author actions.",
+        "operationId": "getDocumentIntegrity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrityReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "Run the deterministic advisory integrity checks on an owned document's acknowledged (or requested historical) revision",
+        "tags": [
+          "integrity"
+        ]
+      }
+    },
     "/api/documents/{document_id}/model-blocks": {
       "post": {
         "description": "Append one valid modelResult block with its frozen model context.\n\nWith an ``Idempotency-Key`` the response snapshot is stored in the write\ntransaction (NI-037 store), so a repeated identical owner/route/body\nrequest replays the original 201 (same revision, no second block)\ninstead of a spurious 409 against the advanced document.",
@@ -10730,12 +10836,6 @@
       "get": {
         "description": "List the owned document's share records, newest first.\n\nThe lifecycle state is computed at read time (``expired`` the moment the\nconsent window passes), and no record ever carries the token or its hash.",
         "operationId": "listDocumentShares",
-=======
-    "/api/documents/{document_id}/integrity": {
-      "get": {
-        "description": "Report advisory integrity findings for one immutable revision.\n\nRead-only and deterministic per revision content: findings carry exact\nblock/entity/context/dataset/definition references and advisory severities\n(never a truth score), and no finding can change a pin, coefficient or\ndocument \u2014 refresh and citation remain explicit author actions.",
-        "operationId": "getDocumentIntegrity",
->>>>>>> feat/ni-065-integrity
         "parameters": [
           {
             "in": "path",
@@ -10748,26 +10848,6 @@
             }
           },
           {
-<<<<<<< HEAD
-=======
-            "in": "query",
-            "name": "version_id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Version Id"
-            }
-          },
-          {
->>>>>>> feat/ni-065-integrity
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -10789,11 +10869,7 @@
             "content": {
               "application/json": {
                 "schema": {
-<<<<<<< HEAD
                   "$ref": "#/components/schemas/DocumentShareListResponse"
-=======
-                  "$ref": "#/components/schemas/IntegrityReport"
->>>>>>> feat/ni-065-integrity
                 }
               }
             },
@@ -10829,7 +10905,6 @@
             },
             "description": "Referenced target does not exist for this owner"
           },
-<<<<<<< HEAD
           "409": {
             "content": {
               "application/json": {
@@ -10840,8 +10915,6 @@
             },
             "description": "The consented revision or preview is not current, or the Idempotency-Key was reused with a different request"
           },
-=======
->>>>>>> feat/ni-065-integrity
           "422": {
             "content": {
               "application/json": {
@@ -10853,7 +10926,6 @@
             "description": "Request failed validation or references an unavailable target"
           }
         },
-<<<<<<< HEAD
         "summary": "List an owned document's shares (never the token)",
         "tags": [
           "shares"
@@ -11184,11 +11256,6 @@
         "summary": "Revoke one owned share (denies on the next request)",
         "tags": [
           "shares"
-=======
-        "summary": "Run the deterministic advisory integrity checks on an owned document's acknowledged (or requested historical) revision",
-        "tags": [
-          "integrity"
->>>>>>> feat/ni-065-integrity
         ]
       }
     },
