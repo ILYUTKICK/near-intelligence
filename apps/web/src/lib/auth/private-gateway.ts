@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { loadServerAuthConfig } from "./config";
-import { CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE, decodeSessionCookie, verifyCsrfPair } from "./session";
+import { CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE, decodeSessionCookie, sessionSubject, verifyCsrfPair } from "./session";
 import { loadServerEnv } from "@/lib/env";
 
 /** Fixed internal API paths only; never forward browser cookies/Authorization. */
-export async function forwardPrivate(request: NextRequest, apiPath: string) {
+export async function forwardPrivate(request: NextRequest, apiPath: string, options: { expectedSubject?: string | null } = {}) {
   const fail = (status: number, message: string) => NextResponse.json({ error: message },
     { status, headers: { "cache-control": "no-store" } });
   try {
@@ -15,6 +15,10 @@ export async function forwardPrivate(request: NextRequest, apiPath: string) {
     if (mutation && (!config.AUTH_ALLOWED_REDIRECT_ORIGINS.includes(request.headers.get("origin") ?? "") ||
       !verifyCsrfPair(request.cookies.get(CSRF_COOKIE)?.value, request.headers.get(CSRF_HEADER)))) {
       return fail(403, "Request origin or CSRF token is invalid.");
+    }
+    if (options.expectedSubject !== undefined
+      && (!options.expectedSubject || sessionSubject(session) !== options.expectedSubject)) {
+      return fail(409, "The signed-in account changed. Reopen the form to continue.");
     }
     const headers = new Headers({ accept: "application/json", authorization: `Bearer ${session.accessToken}` });
     for (const key of ["content-type", "idempotency-key", "if-match"]) {

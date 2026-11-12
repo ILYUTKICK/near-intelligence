@@ -18,9 +18,17 @@ NI-037 adds the Idempotency-Key replay store (idempotency_records) for the
 document write routes.
 NI-035 adds the owner-scoped saved chart instances (saved_charts) that pin
 canonical analytical contexts to immutable chart definition versions.
+NI-044 adds the owner-scoped immutable research snapshot registry
+(research_snapshots) that saved-charts snapshot mode references through a
+same-owner composite foreign key.
 NI-058 adds the owner-scoped Markdown ZIP export jobs (export_jobs): the
 queued/leased/TTL-bounded job rows that freeze the NI-056 export IR and hold
 the finished owner-private ZIP bytes.
+NI-045 adds the public research publication zone (research_publications,
+publication_model_runs): operator-seeded immutable (slug, version) releases
+whose canonical content the public read route serves and the duplicate flow
+clones into private IDs, plus the documents.source_publication_id
+attribution pin recorded on private duplicates.
 NI-072 adds the private document organization metadata (document_organization):
 per-document private tags and favorite flag, separate from the immutable
 research chain — tagging never touches document_versions or documents.
@@ -107,6 +115,11 @@ class Document(Base):
     revision: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("1"))
     current_version_id: Mapped[UUID | None]
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    # NI-045 one-time attribution: the public release this document was
+    # duplicated from (NULL for ordinary documents; never updated after insert).
+    source_publication_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("app.research_publications.id", ondelete="RESTRICT",
+                   name="fk_documents_source_publication"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -331,17 +344,20 @@ class IdempotencyRecord(Base):
 
 
 class SavedChart(Base):
-    """NI-035 private context; P0 snapshot writes are database-gated.
+    """NI-035 private context; snapshot mode pins an owned research snapshot.
 
     Context/label edits bump recency, resolution-only telemetry does not.
     Definition and dataset foreign keys are RESTRICT; owner deletion cascades.
+    A ``snapshot`` context must carry exactly one snapshot reference and the
+    composite same-owner FK (migration 0013) guarantees the referenced
+    snapshot is the owner's own and cannot disappear while referenced.
     """
 
     __tablename__ = "saved_charts"
     __table_args__ = (
         CheckConstraint("label IS NULL OR label <> ''", name="label_nonempty"),
-        CheckConstraint("mode = 'live'", name="mode"),
-        CheckConstraint("snapshot_id IS NULL",
+        CheckConstraint("mode IN ('live', 'snapshot')", name="mode"),
+        CheckConstraint("(mode = 'live') = (snapshot_id IS NULL)",
                         name="snapshot_pairing"),
         CheckConstraint("selection ? 'start' AND selection ? 'end' "
                         "AND selection ? 'frequency' AND selection ? 'filters'",
@@ -354,6 +370,9 @@ class SavedChart(Base):
                              name="fk_saved_charts_chart_definition", ondelete="RESTRICT"),
         ForeignKeyConstraint(["last_resolved_dataset_version_id"], ["app.dataset_versions.id"],
                              name="fk_saved_charts_dataset", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["snapshot_id", "owner_id"],
+                             ["app.research_snapshots.id", "app.research_snapshots.owner_id"],
+                             name="fk_saved_charts_snapshot", ondelete="RESTRICT"),
         Index("ix_saved_charts_owner_updated_at", "owner_id", text("updated_at DESC"), "id"),
         Index("ix_saved_charts_chart_definition", "chart_definition_version_id"),
     )
@@ -369,6 +388,58 @@ class SavedChart(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
                                                  server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+
+
+class ResearchSnapshot(Base):
+    """NI-044 owner-scoped immutable research snapshot.
+
+    Mirrors migration 0013 exactly (DATABASE_SCHEMA.md "research_snapshots"):
+    one frozen public input set — an approved dataset version plus a canonical
+    selection against an immutable chart definition version — with the
+    calculation context (resolved context hash, pinned metric definition
+    versions, renderer version) and a deterministic content hash over those
+    frozen inputs. No UPDATE grant or policy exists for any role, so a row
+    can never change after commit; operator purge flows through the users
+    cascade only. ``artifact_id`` stays reserved for a future rendered/data
+    artifact reference (nullable; RESTRICT).
+    """
+
+    __tablename__ = "research_snapshots"
+    __table_args__ = (
+        CheckConstraint("selection ? 'start' AND selection ? 'end' "
+                        "AND selection ? 'frequency' AND selection ? 'filters'",
+                        name="selection_keys"),
+        CheckConstraint("octet_length(selection::text) <= 4096", name="selection_size"),
+        CheckConstraint("octet_length(calculation_context::text) <= 8192", name="context_size"),
+        CheckConstraint("calculation_context ? 'context_hash' "
+                        "AND calculation_context ? 'metric_definition_versions' "
+                        "AND calculation_context ? 'renderer_version'",
+                        name="context_keys"),
+        CheckConstraint(r"content_sha256 ~ '^[0-9a-f]{64}$'", name="content_hash"),
+        UniqueConstraint("id", "owner_id", name="uq_research_snapshots_id_owner"),
+        ForeignKeyConstraint(["owner_id"], ["app.users.id"],
+                             name="fk_research_snapshots_owner", ondelete="CASCADE"),
+        ForeignKeyConstraint(["chart_definition_version_id"], ["app.chart_definitions.id"],
+                             name="fk_research_snapshots_chart_definition", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["dataset_version_id"], ["app.dataset_versions.id"],
+                             name="fk_research_snapshots_dataset", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["artifact_id"], ["app.artifacts.id"],
+                             name="fk_research_snapshots_artifact", ondelete="RESTRICT"),
+        Index("ix_research_snapshots_owner_created_at", "owner_id",
+              text("created_at DESC"), "id"),
+        Index("ix_research_snapshots_chart_definition", "chart_definition_version_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    owner_id: Mapped[UUID] = mapped_column(nullable=False)
+    chart_definition_version_id: Mapped[UUID] = mapped_column(nullable=False)
+    dataset_version_id: Mapped[UUID] = mapped_column(nullable=False)
+    selection: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    calculation_context: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    artifact_id: Mapped[UUID | None]
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
                                                  server_default=func.now())
 
 
@@ -1011,3 +1082,67 @@ class ModelRun(Base):
     published_by: Mapped[str] = mapped_column(String(120), nullable=False)
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
                                                    nullable=False, server_default=func.now())
+
+
+class ResearchPublication(Base):
+    """One operator-seeded public research release (NI-045).
+
+    Mirrors migration 0015 exactly (DATABASE_SCHEMA.md "research_publications",
+    the implemented shape): an immutable (slug, version) row whose ``content``
+    is the canonical editor document JSON the public read route serves and the
+    duplicate flow clones into fresh private IDs. Only published rows exist
+    (CHECK ``status = 'published'``); near_app reads them with no owner
+    predicate, near_operator seeds and deletes, and no role can UPDATE —
+    a correction appends a new version or removes the row.
+    """
+
+    __tablename__ = "research_publications"
+    __table_args__ = (
+        CheckConstraint(r"slug ~ '^[a-z0-9][a-z0-9-]{0,79}$'", name="slug"),
+        CheckConstraint("version >= 1", name="version"),
+        CheckConstraint("title <> ''", name="title_nonempty"),
+        CheckConstraint("status = 'published'", name="status"),
+        CheckConstraint(r"content_sha256 ~ '^[0-9a-f]{64}$'", name="content_sha256_format"),
+        CheckConstraint("octet_length(content::text) <= 2097152", name="content_size"),
+        CheckConstraint("octet_length(evidence_manifest::text) <= 65536",
+                        name="manifest_size"),
+        UniqueConstraint("slug", "version", name="uq_research_publications_slug_version"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(80), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    evidence_manifest: Mapped[dict] = mapped_column(JSONB, nullable=False,
+                                                    server_default=text("'[]'::jsonb"))
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False,
+                                        server_default=text("'published'"))
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+                                                   nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+                                                 nullable=False, server_default=func.now())
+
+
+class PublicationModelRun(Base):
+    """Binding of one published model run into one publication (NI-045).
+
+    Both sides are published rows; the run FK is RESTRICT because published
+    runs are immutable (migration 0010). near_app may read a binding only
+    while its publication is published (RLS policy of migration 0015).
+    """
+
+    __tablename__ = "publication_model_runs"
+    __table_args__ = (
+        ForeignKeyConstraint(["publication_id"], ["app.research_publications.id"],
+                             name="fk_publication_model_runs_publication",
+                             ondelete="CASCADE"),
+        ForeignKeyConstraint(["model_run_id"], ["app.model_runs.run_id"],
+                             name="fk_publication_model_runs_model_run",
+                             ondelete="RESTRICT"),
+    )
+
+
+    publication_id: Mapped[UUID] = mapped_column(primary_key=True)
+    model_run_id: Mapped[UUID] = mapped_column(primary_key=True)

@@ -92,6 +92,7 @@ from near_api.datasets.service import publish, stage  # noqa: E402
 from near_api.documents import service as document_service  # noqa: E402
 from near_api.main import app  # noqa: E402
 from near_api.metrics.registry import definition_by_metric_id  # noqa: E402
+from near_api.publications.seed import seed_publication  # noqa: E402
 
 import test_chart_blocks as chart_fixtures  # noqa: E402
 
@@ -332,6 +333,14 @@ def main() -> int:
             command.upgrade(config, "head")
             chart_fixtures.register_test_chart_catalog(operator)
             log("migrations applied, synthetic chart catalog registered")
+            seed_publication(
+                environment["NI_TEST_OPERATOR_URL"], slug="near-thesis-2026-11", version=1,
+                title="Synthetic NI-045 public research",
+                content={"schema_version": 1, "type": "doc", "content": [{
+                    "type": "heading", "attrs": {"block_id": str(uuid4()), "level": 1},
+                    "content": [{"type": "text", "text": "Synthetic publication heading"}],
+                }]}, evidence_manifest=[],
+            )
 
             # ---- NI-064 performance dataset first: the NI-063 journey ---- #
             # ---- dataset is published LAST and stays the "latest" one ---- #

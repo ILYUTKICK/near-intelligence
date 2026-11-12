@@ -4,6 +4,7 @@ import type {
   ModelRunDetail as ModelRunDetailData,
 } from "@/features/models/models-schema";
 import { templateInterpretationSchema as templateInterpretation } from "@/features/models/models-schema";
+import { AddModelToResearch } from "@/features/models/add-to-research/AddModelToResearch";
 import {
   gateVerdictWording,
   recordedFloat,
@@ -228,7 +229,7 @@ export function ModelRunDetail({
           with a run-id ETag and downloads as an attachment; the same bytes are what the
           publication gate verified.
         </p>
-        <p className="mt-4">
+        <div className="mt-4 flex flex-wrap items-start gap-3">
           <a
             href={run.manifest_url}
             download
@@ -236,7 +237,9 @@ export function ModelRunDetail({
           >
             Download the manifest bundle
           </a>
-        </p>
+          <AddModelToResearch run={{ run_id: run.run_id, model_id: run.model_id,
+            model_version: run.model_version, gate_verdict: run.gate_verdict }} />
+        </div>
         <p className="mt-4 text-body leading-body text-text-secondary">
           A reviewer re-verifies the downloaded bundle offline — no operator tooling, no
           network, no re-fit — with:

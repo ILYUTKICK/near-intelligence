@@ -150,12 +150,65 @@ class SavedChartsDatabaseTests(unittest.TestCase):
         self.assertEqual(detail["saved_chart"]["updated_at"], saved["updated_at"])
         self.assertEqual(detail["saved_chart"]["selection"], saved["selection"])
 
-    def test_snapshot_storage_is_closed_until_real_ownership_contract_exists(self):
-        saved = self.create()
-        with self.assertRaises(DBAPIError):
-            with user_transaction(self.runtime, self.alice.id) as connection:
-                connection.execute(text("UPDATE app.saved_charts SET mode='snapshot', snapshot_id=:snapshot WHERE id=:id"),
-                                   {"snapshot": uuid4(), "id": saved["id"]})
+    def freeze(self, body=None):
+        """NI-044 helper: freeze one snapshot for the current actor."""
+        snapshot_body = {
+            "chart_definition_version_id": self.body["chart_definition_version_id"],
+            "dataset_version_id": str(self.dataset.dataset_version_id),
+            "selection": self.body["selection"],
+        }
+        response = self.client.post("/api/snapshots", json=body or snapshot_body)
+        self.assertEqual(response.status_code, 201, response.text)
+        return response.json()
+
+    def test_snapshot_mode_save_reopen_keeps_frozen_evidence_and_validates_references(self):
+        snapshot = self.freeze()
+        pinned = self.create({**self.body, "mode": "snapshot", "snapshot_id": snapshot["id"]})
+        self.assertEqual(pinned["mode"], "snapshot")
+        self.assertEqual(pinned["snapshot_id"], snapshot["id"])
+        path = "/api/saved-charts/" + pinned["id"]
+        document = self.client.get(path).json()
+        self.assertEqual(document["view"]["dataset"]["id"], snapshot["dataset_version_id"])
+        self.assertFalse(document["dataset_changed"])
+        # A later publication never moves a snapshot context off its pin.
+        fixtures.DeliveryDatabaseTests.stage_fixture(
+            self, f"ni035.{uuid4().hex[:16]}",
+            [observation(METRIC_VOLUME, dt.date(2026, 1, 1), value="999",
+                         dimensions={"source": "SRC-LLAMA"})], [METRIC_VOLUME],
+            window=("2026-01-01", "2026-01-02"))
+        delivery.reset_delivery_caches()
+        frozen = self.client.get(path).json()
+        self.assertEqual(frozen["view"]["dataset"]["id"], snapshot["dataset_version_id"])
+        self.assertFalse(frozen["dataset_changed"])
+        # Invalid/foreign/absent references stay typed 422 REFERENCE_INVALID.
+        for body in ({**self.body, "mode": "snapshot", "snapshot_id": str(uuid4())},
+                     {**self.body, "mode": "snapshot", "snapshot_id": None},
+                     {**self.body, "mode": "live", "snapshot_id": snapshot["id"]}):
+            response = self.client.post("/api/saved-charts", json=body)
+            self.assertEqual(response.status_code, 422, response.text)
+            self.assertEqual(response.json()["error"]["code"], "REFERENCE_INVALID")
+        # Context edits must keep the frozen snapshot's dataset and selection.
+        drifted = {**self.body["selection"], "end": "2026-01-03"}
+        self.assertEqual(self.client.patch(path, json={"selection": drifted}).status_code, 422)
+        self.assertEqual(self.client.patch(path, json={
+            "dataset_version_id": str(uuid4())}).status_code, 422)
+        self.assertEqual(self.client.get(path).json()["saved_chart"]["selection"], pinned["selection"])
+        # An explicit un-pin returns the context to live resolution.
+        released = self.client.patch(path, json={"mode": "live", "snapshot_id": None})
+        self.assertEqual(released.status_code, 200, released.text)
+        self.assertIsNone(released.json()["snapshot_id"])
+        self.assertEqual(self.client.get(path).json()["dataset_changed"], True)
+
+    def test_foreign_snapshot_reference_is_typed_422_never_a_dangling_pin(self):
+        self.actor = self.bob
+        snapshot = self.freeze()
+        self.actor = self.alice
+        response = self.client.post("/api/saved-charts", json={
+            **self.body, "mode": "snapshot", "snapshot_id": snapshot["id"]})
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(response.json()["error"]["code"], "REFERENCE_INVALID")
+
+    def test_unauthenticated_reads_stay_401_no_store(self):
         app.dependency_overrides.pop(get_principal)
         response = self.client.get("/api/saved-charts")
         self.assertEqual(response.status_code, 401)

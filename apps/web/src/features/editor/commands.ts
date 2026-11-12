@@ -53,6 +53,7 @@ const BLOCK_LABELS: Record<CanonicalBlock["type"], string> = {
   hypothesis: "Hypothesis",
   evidence: "Evidence",
   risk: "Risk",
+  modelResult: "Model result",
   divider: "Divider",
 };
 
@@ -128,7 +129,9 @@ export function findDependentBlocks(
  * One canonical copy of a single block (NI-039 duplicate semantics for a
  * one-block copy set): new block_id, new entity id for the annotation
  * families, every reference preserved — the targets still exist in the same
- * document, so the copy stays valid.
+ * document, so the copy stays valid. A duplicated modelResult keeps its run
+ * and dataset pins (the same immutable published result) and only its
+ * interpretation travels with the copy.
  */
 export function duplicateBlock(
   block: CanonicalBlock,
@@ -150,7 +153,7 @@ export function duplicateBlock(
 // --------------------------------------------------------------------------- */
 
 const ATOMIC_TYPES = new Set([
-  "liveChart", "dataTable", "insight", "hypothesis", "evidence", "risk", "divider",
+  "liveChart", "dataTable", "insight", "hypothesis", "evidence", "risk", "modelResult", "divider",
 ]);
 
 export interface CurrentBlock {

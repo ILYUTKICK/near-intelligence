@@ -20,6 +20,9 @@ async function handle(request: NextRequest, context: Context) {
     if (segments.length === 2 && organization) allowed = ["PATCH"];
     if (segments.length === 2 && segments[1] === "versions") allowed = ["GET", "POST"];
     if (segments.length === 2 && segments[1] === "chart-blocks") allowed = ["POST"];
+    // NI-055 model-result insertion: one POST per confirmed Add Model choice,
+    // same owner-checked forward as the chart-block segment.
+    if (segments.length === 2 && segments[1] === "model-blocks") allowed = ["POST"];
     if (segments.length === 2 && segments[1] === "chart-view") allowed = ["GET"];
     if (segments.length === 2 && annotation) allowed = ["GET", "POST"];
     if (segments.length === 3 && annotation && uuid(segments[2])) allowed = ["PATCH", "DELETE"];

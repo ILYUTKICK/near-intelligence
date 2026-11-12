@@ -46,6 +46,7 @@ from near_api.insights.schemas import (
 from near_api.schemas.chart_selection import ChartSelection
 from near_api.schemas.common import ContractModel
 from near_api.schemas.delivery import ChartViewResponse
+from near_api.schemas.models import CoefficientResponse, GateVerdict, LimitationsResponse, SPEC_ID_PATTERN
 
 EXPORT_IR_VERSION = 1
 """The only frozen-representation version this builder emits. A future
@@ -108,12 +109,15 @@ class ExportModelRunReference(ContractModel):
     """One published model run referenced by the plan (NI-054 catalog).
 
     Only published runs resolve; an unpublished run id can never appear here
-    because the builder refuses it, and a published run is immutable.
+    because the builder refuses it, and a published run is immutable. A run
+    used by a model-result block carries one verified manifest for the ZIP.
     """
 
     run_id: UUID
     spec_id: Annotated[str, StringConstraints(min_length=3, max_length=80)]
     spec_version: int = Field(strict=True, ge=1)
+    manifest_bundle: dict[str, object] | None = Field(
+        default=None, exclude_if=lambda bundle: bundle is None)
 
 
 class ExportCitationReference(ContractModel):
@@ -283,6 +287,50 @@ class ExportRiskBlock(ContractModel):
     related_hypothesis_id: UUID | None
 
 
+class ExportModelResultSummary(ContractModel):
+    """The frozen projection of the pinned published run (NI-054/NI-055).
+
+    Projected from the immutable ``app.model_runs`` row at IR build time with
+    the same mechanical rules as the public run detail (values verbatim,
+    nothing re-run, nothing fabricated): the coefficient table, the gate
+    verdict, sample window, reproduction tolerances and recorded limitations.
+    The plan carries these so the renderer stays a pure function of the plan.
+    """
+
+    run_id: UUID
+    model_id: Annotated[str, StringConstraints(pattern=SPEC_ID_PATTERN)]
+    model_version: int = Field(strict=True, ge=1)
+    gate_verdict: GateVerdict
+    sample_start: Annotated[str, StringConstraints(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")]
+    sample_end_exclusive: Annotated[str, StringConstraints(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")]
+    nobs: int = Field(strict=True, ge=1)
+    coefficient_rtol: Annotated[str, StringConstraints(pattern=r"^[0-9]+(\.[0-9]+)?$")]
+    coefficient_atol: Annotated[str, StringConstraints(pattern=r"^[0-9]+(\.[0-9]+)?$")]
+    manifest_url: Annotated[str, StringConstraints(min_length=1)]
+    coefficients: tuple[CoefficientResponse, ...] = Field(min_length=1)
+    diagnostics: dict[str, object]
+    limitations: LimitationsResponse
+
+
+class ExportModelResultBlock(ContractModel):
+    """A ``modelResult`` block: pinned published run + authored interpretation.
+
+    The block stores only identities and the editable narrative (never
+    coefficients); ``spec_id``/``spec_version`` are the published catalog
+    identity snapshot for attribution and ``summary`` is the projection of
+    the immutable run row re-verified published at build time.
+    """
+
+    block_type: Literal["modelResult"]
+    block_id: UUID
+    model_run_id: UUID
+    dataset_version_id: UUID
+    spec_id: Annotated[str, StringConstraints(pattern=SPEC_ID_PATTERN)]
+    spec_version: int = Field(strict=True, ge=1)
+    interpretation: RichTextBody
+    summary: ExportModelResultSummary
+
+
 class ExportDividerBlock(ContractModel):
     block_type: Literal["divider"]
     block_id: UUID
@@ -291,14 +339,15 @@ class ExportDividerBlock(ContractModel):
 ExportBlock = Annotated[
     ExportParagraphBlock | ExportHeadingBlock | ExportListBlock | ExportChartBlock
     | ExportDataTableBlock | ExportInsightBlock | ExportHypothesisBlock
-    | ExportEvidenceBlock | ExportRiskBlock | ExportDividerBlock,
+    | ExportEvidenceBlock | ExportRiskBlock | ExportModelResultBlock
+    | ExportDividerBlock,
     Field(discriminator="block_type"),
 ]
-"""Every P0 block type of the canonical taxonomy (paragraph, heading,
-bullet_list, ordered_list, liveChart, dataTable, insight, hypothesis,
-evidence, risk, divider). The builder's dispatch covers exactly this union —
-a block type outside it fails closed with a typed error instead of being
-silently skipped."""
+"""Every P0/P1-exportable block type of the canonical taxonomy (paragraph,
+heading, bullet_list, ordered_list, liveChart, dataTable, insight,
+hypothesis, evidence, risk, modelResult, divider). The builder's dispatch
+covers exactly this union — a block type outside it fails closed with a
+typed error instead of being silently skipped."""
 
 
 class ExportIr(ContractModel):

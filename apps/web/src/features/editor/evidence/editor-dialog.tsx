@@ -20,7 +20,7 @@ export function EditorEvidenceDialog({ intent, onClose, onSaved, onReload, resto
   intent: { action: EvidenceAction; content: CanonicalDocument; revision: number };
   onClose: () => void;
   onSaved: (result: AnnotationSave) => void;
-  onReload: (content: CanonicalDocument, revision: number, savedAt: string) => void;
+  onReload: (content: CanonicalDocument, revision: number, savedAt: string, versionId: string | null) => void;
   restoreFocus: () => void;
 }) {
   const account = useChartEditorContext();
@@ -101,7 +101,7 @@ export function EditorEvidenceDialog({ intent, onClose, onSaved, onReload, resto
         throw new Error("This evidence link changed. Copy your explanation and reopen its current revision.");
       }
       signal.throwIfAborted();
-      onReload(next, document.revision, document.updated_at);
+      onReload(next, document.revision, document.updated_at, document.current_version_id);
       const hypothesis = hypothesisOptions(next).some(option => option.id === draft.hypothesis_id) ? draft.hypothesis_id : "";
       const nextTarget = isDelete || publicKind || samePrivateEvidenceTarget(content, next, kind, draft.target_id) ? draft.target_id : "";
       setDraft({ ...draft, hypothesis_id: hypothesis, target_id: nextTarget });

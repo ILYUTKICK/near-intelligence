@@ -97,10 +97,12 @@ class HomeContractTests(unittest.TestCase):
         # NI-036 added the document revision routes, NI-037 added the version
         # detail route, NI-032 added the public
         # metrics/chart/dataset/source delivery routes, NI-054 added the
-        # public model definition/readiness/run routes and NI-041 added the
-        # chart-block insertion route.
+        # public model definition/readiness/run routes, NI-041 added the
+        # chart-block insertion route and NI-044 added the snapshot routes.
         self.assertEqual(set(schema["paths"]), {"/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
+                "/api/snapshots", "/api/snapshots/{snapshot_id}",
+                "/api/snapshots/{snapshot_id}/compare-live",
                                                 "/api/documents",
                                                 "/api/documents/{document_id}",
                                                 "/api/documents/{document_id}/organization",
@@ -132,9 +134,12 @@ class HomeContractTests(unittest.TestCase):
                                                 "/api/model-runs",
                                                 "/api/model-runs/{run_id}",
                                                 "/api/model-runs/{run_id}/manifest",
+                                                "/api/publications/{slug}",
+                                                "/api/publications/{slug}/duplicate",
                                                 "/api/documents/{document_id}/exports",
                                                 "/api/documents/{document_id}/exports/{job_id}",
-                                                "/api/documents/{document_id}/exports/{job_id}/download"})
+                                                "/api/documents/{document_id}/exports/{job_id}/download",
+                                            "/api/documents/{document_id}/model-blocks"})
         self.assertEqual(schema["paths"]["/api/home"]["get"]["operationId"], "getWorkspaceHome")
         response_schema = schema["components"]["schemas"]["HomeResponse"]
         # Every documented field is always present: empty arrays stay explicit
