@@ -1701,6 +1701,181 @@
         "title": "ExportJobResponse",
         "type": "object"
       },
+      "GroundedCommentaryItem": {
+        "additionalProperties": false,
+        "description": "One advisory commentary item bound to its selected source block.",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "context_hash": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Hash"
+          },
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "context_hash",
+          "text"
+        ],
+        "title": "GroundedCommentaryItem",
+        "type": "object"
+      },
+      "GroundedCommentaryRequest": {
+        "additionalProperties": false,
+        "description": "The explicitly selected context for one grounded commentary request.\n\nOnly block ids of the acknowledged revision may be selected; everything\nelse the prompt contains is authored by the server. No provider, model or\nendpoint field exists on the request \u2014 external transmission happens only\nthrough server configuration.",
+        "properties": {
+          "block_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Block Ids",
+            "type": "array"
+          },
+          "question": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_ids",
+          "question"
+        ],
+        "title": "GroundedCommentaryRequest",
+        "type": "object"
+      },
+      "GroundedCommentaryResponse": {
+        "additionalProperties": false,
+        "description": "Advisory commentary over the selected context \u2014 or the typed absence.\n\n``advisory`` is contractually ``true``: this endpoint never returns a\nresult the client could mistake for a data source. When the adapter is\ndisabled or fails, ``state`` names it and ``items`` is empty; a fake\nsuccessful commentary is impossible by construction.",
+        "properties": {
+          "advisory": {
+            "const": true,
+            "title": "Advisory",
+            "type": "boolean"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GroundedCommentaryItem"
+            },
+            "maxItems": 10,
+            "title": "Items",
+            "type": "array"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "notice": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Notice",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "adapter_disabled",
+                  "adapter_misconfigured",
+                  "no_acknowledged_revision",
+                  "unknown_block_reference",
+                  "unresolved_block_context",
+                  "context_too_large",
+                  "provider_http_status",
+                  "provider_unreachable",
+                  "response_too_large",
+                  "unsupported_provider_response",
+                  "ungrounded_commentary"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "unavailable",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          }
+        },
+        "required": [
+          "document_id",
+          "version_id",
+          "revision",
+          "state",
+          "advisory",
+          "notice",
+          "items"
+        ],
+        "title": "GroundedCommentaryResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2609,6 +2784,239 @@
           }
         },
         "title": "InsightPatchRequest",
+        "type": "object"
+      },
+      "IntegrityCheckCount": {
+        "additionalProperties": false,
+        "description": "Summary count of one check id present in the report.",
+        "properties": {
+          "check_id": {
+            "enum": [
+              "invalid_revision_content",
+              "missing_chart_context",
+              "invalid_chart_context",
+              "stale_chart_context",
+              "chart_definition_unavailable",
+              "dataset_pin_unavailable",
+              "evidence_target_unavailable",
+              "insight_context_unavailable",
+              "uncited_pinned_chart",
+              "uncited_pinned_dataset_table"
+            ],
+            "title": "Check Id",
+            "type": "string"
+          },
+          "count": {
+            "minimum": 1,
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "check_id",
+          "count"
+        ],
+        "title": "IntegrityCheckCount",
+        "type": "object"
+      },
+      "IntegrityFinding": {
+        "additionalProperties": false,
+        "description": "One deterministic advisory finding with exact references.",
+        "properties": {
+          "block_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Id"
+          },
+          "chart_definition_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart Definition Version Id"
+          },
+          "check_id": {
+            "enum": [
+              "invalid_revision_content",
+              "missing_chart_context",
+              "invalid_chart_context",
+              "stale_chart_context",
+              "chart_definition_unavailable",
+              "dataset_pin_unavailable",
+              "evidence_target_unavailable",
+              "insight_context_unavailable",
+              "uncited_pinned_chart",
+              "uncited_pinned_dataset_table"
+            ],
+            "title": "Check Id",
+            "type": "string"
+          },
+          "context_hash": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Hash"
+          },
+          "dataset_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Version Id"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "jump": {
+            "enum": [
+              "block",
+              "none"
+            ],
+            "title": "Jump",
+            "type": "string"
+          },
+          "latest_dataset_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Dataset Version Id"
+          },
+          "message": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "advisory",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "target_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "insight",
+                  "chart_block",
+                  "model_run",
+                  "citation"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Kind"
+          }
+        },
+        "required": [
+          "check_id",
+          "severity",
+          "message",
+          "jump"
+        ],
+        "title": "IntegrityFinding",
+        "type": "object"
+      },
+      "IntegrityReport": {
+        "additionalProperties": false,
+        "description": "The deterministic integrity report of one revision.\n\nDeterministic content only: no wall-clock field, because a rerun is a new\nGET over the same immutable row and must produce the same report. A\nhistorical (non-acknowledged) check carries ``is_acknowledged:false`` and\nstays read-only advisory \u2014 it is never refused.",
+        "properties": {
+          "counts": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrityCheckCount"
+            },
+            "title": "Counts",
+            "type": "array"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrityFinding"
+            },
+            "maxItems": 400,
+            "title": "Findings",
+            "type": "array"
+          },
+          "is_acknowledged": {
+            "title": "Is Acknowledged",
+            "type": "boolean"
+          },
+          "revision": {
+            "minimum": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          }
+        },
+        "required": [
+          "document_id",
+          "version_id",
+          "revision",
+          "is_acknowledged",
+          "findings",
+          "counts"
+        ],
+        "title": "IntegrityReport",
         "type": "object"
       },
       "LimitationsResponse": {
@@ -7077,6 +7485,106 @@
         ]
       }
     },
+    "/api/documents/{document_id}/grounded-commentary": {
+      "post": {
+        "description": "Advisory commentary over the explicitly selected context \u2014 or the typed absence.\n\nOwnership is checked before anything else (one generic 404). With the\nadapter disabled the typed unavailable state is returned without reading\nany provider secret; when enabled, exactly one bounded provider call is\nmade over the selected context and every returned item is marked advisory.",
+        "operationId": "createGroundedCommentary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroundedCommentaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroundedCommentaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "Request bounded advisory commentary over explicitly selected blocks of the acknowledged revision (requires enabled server configuration)",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/api/documents/{document_id}/hypotheses": {
       "get": {
         "operationId": "listDocumentHypotheses",
@@ -8292,6 +8800,113 @@
         "summary": "Edit an insight in the current owned document revision",
         "tags": [
           "insights"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/integrity": {
+      "get": {
+        "description": "Report advisory integrity findings for one immutable revision.\n\nRead-only and deterministic per revision content: findings carry exact\nblock/entity/context/dataset/definition references and advisory severities\n(never a truth score), and no finding can change a pin, coefficient or\ndocument \u2014 refresh and citation remain explicit author actions.",
+        "operationId": "getDocumentIntegrity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrityReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "Run the deterministic advisory integrity checks on an owned document's acknowledged (or requested historical) revision",
+        "tags": [
+          "integrity"
         ]
       }
     },
