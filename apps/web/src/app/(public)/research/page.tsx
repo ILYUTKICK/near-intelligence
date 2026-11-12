@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 
 import { PageIntro } from "@/components/layout/PageIntro";
 import { ClaimCard } from "@/features/public-research/ClaimCard";
+import { DuplicateReleaseAction } from "@/features/public-research/DuplicateReleaseAction";
 import { MechanismFlow } from "@/features/public-research/MechanismFlow";
 import { RecordedPurchases } from "@/features/public-research/RecordedPurchases";
 import {
   claimRegistry,
   thesis,
+  thesisReleaseSlug,
   thesisToc,
   type ClaimEvidenceLink,
   type ThesisClaim,
@@ -84,6 +86,10 @@ function ThesisBody() {
       <p className="mt-4 rounded-surface bg-sage px-5 py-4 text-ui text-text">
         {thesis.evidenceStatus}
       </p>
+
+      {/* NI-045 duplication CTA: rendered only when a published release
+          exists for the thesis slug; otherwise it renders nothing. */}
+      <DuplicateReleaseAction slug={thesisReleaseSlug} nextPath="/research" />
 
       <MechanismFlow />
 

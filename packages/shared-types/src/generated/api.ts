@@ -162,7 +162,14 @@ export interface paths {
         put?: never;
         /**
          * Create an owned document with its first revision
-         * @description Create an owned document whose first revision is the empty document.
+         * @description Create an owned document whose first revision is empty or templated.
+         *
+         *     With ``template_id: "investment-v1"`` the first revision carries the
+         *     template's eight section headings and nothing else (EDITOR_SPECIFICATION:
+         *     no fabricated paragraphs or numerical placeholder claims). Unknown
+         *     template ids are rejected by the request contract (typed 422) before any
+         *     write. ``template_id`` is part of the idempotent request fingerprint, so
+         *     a replayed creation with a template returns the SAME document.
          *
          *     With an ``Idempotency-Key`` header the created result is stored in the
          *     write transaction and a repeated identical owner/route/body request
@@ -830,6 +837,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One published public research release
+         * @description Return the published release; unpublished identities are the same 404.
+         */
+        get: operations["getPublication"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/{slug}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clone a published release into a new private document
+         * @description Clone one pinned release into a new private document with attribution.
+         *
+         *     The clone allocates fresh private IDs, rebuilds and re-verifies every
+         *     chart context from its immutable pins (an unavailable pinned dataset or
+         *     chart definition is an explicit typed 422, never a latest substitution),
+         *     keeps public data/model pins verbatim and records the source release as
+         *     retained attribution. The publication itself is immutable and unchanged.
+         */
+        post: operations["duplicatePublication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/saved-charts": {
         parameters: {
             query?: never;
@@ -1323,7 +1376,9 @@ export interface components {
         };
         /**
          * DocumentCreateRequest
-         * @description POST /documents body. `template_id` is P1: providing it is a typed 422.
+         * @description POST /documents body. `template_id` selects the starting structure:
+         *     the P1 `investment-v1` eight-heading template (NI-045) or the empty
+         *     default. Unknown ids are a typed 422.
          */
         DocumentCreateRequest: {
             /** Template Id */
@@ -2563,6 +2618,71 @@ export interface components {
             display_name: string;
             /** Display Timezone */
             display_timezone: string;
+        };
+        /**
+         * PublicationDuplicateRequest
+         * @description POST /publications/{slug}/duplicate body.
+         *
+         *     ``publication_version`` pins the cloned release (never "latest" by
+         *     accident — the client states the version it read); ``title`` defaults to
+         *     the publication's title when omitted.
+         */
+        PublicationDuplicateRequest: {
+            /** Publication Version */
+            publication_version: number;
+            /** Title */
+            title?: string | null;
+        };
+        /**
+         * PublicationEvidenceRef
+         * @description One public evidence reference inside a publication's manifest.
+         */
+        PublicationEvidenceRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "model_run" | "citation";
+            /** Label */
+            label?: string | null;
+        };
+        /**
+         * PublicationResponse
+         * @description GET /publications/{slug} response: one published release projection.
+         */
+        PublicationResponse: {
+            /** Content */
+            content: {
+                [key: string]: unknown;
+            };
+            /** Content Sha256 */
+            content_sha256: string;
+            /**
+             * Evidence Manifest
+             * @default []
+             */
+            evidence_manifest: components["schemas"]["PublicationEvidenceRef"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Version */
+            version: number;
         };
         Reason: string;
         /**
@@ -6503,6 +6623,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getPublication: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationResponse"];
+                };
+            };
+            /** @description Published release not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicatePublication: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicationDuplicateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Published release not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Idempotency-Key reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or a public pin is unavailable */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

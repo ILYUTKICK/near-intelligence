@@ -112,7 +112,8 @@ def main() -> int:
         # RLS matrix), the NI-036 document revision suites, the NI-041
         # chart-block insertion suites, the NI-055 model-result block
         # insertion suites, the NI-056 frozen export representation suite,
-        # the NI-058 export job lifecycle suite, the NI-061 integration
+        # the NI-058 export job lifecycle suite, the NI-045
+        # template/publication duplicate suites, the NI-061 integration
         # invariant suite (independent oracles across DB/API/editor
         # boundaries) and the NI-062 security audit suites (HTTP ownership
         # matrix, direct RLS probes).
@@ -122,7 +123,7 @@ def main() -> int:
                     "test_refresh_adapter.py", "test_chart_registry.py",
                     "test_delivery_apis.py", "test_saved_charts.py", "test_snapshots.py",
                     "test_profile.py", "test_documents.py", "test_chart_blocks.py",
-                    "test_model_blocks.py", "test_document_insights.py",
+                    "test_model_blocks.py", "test_publications.py", "test_document_insights.py",
                     "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py",
