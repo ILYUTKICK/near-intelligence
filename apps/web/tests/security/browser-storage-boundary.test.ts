@@ -159,19 +159,24 @@ describe("Public surface carries no private transport", () => {
   });
 
   it("the auth-change signal consumers cover the workspace data surfaces", () => {
-    // Recorded NI-062 inventory: WorkspaceHome, owned saved-chart data,
-    // chart library auth actions, the editor chart provider re-check AND the
-    // full-workbench identity guard (the closed NI-042 gap) on auth change.
+    // NI-062 inventory of direct listeners, including the hook shared by
+    // published chart and model actions.
     const consumers = [
       "features/workspace/home/WorkspaceHome.tsx",
       "features/charts/saved/use-owned-data.ts",
-      "features/charts/library/ChartAuthActions.tsx",
+      "lib/auth/use-public-session.ts",
       "features/editor/blocks/chart-context.tsx",
       "features/editor/persistence/session-owner.ts",
     ];
     for (const consumer of consumers) {
       const content = readFileSync(path.join(SRC_ROOT, consumer), "utf8");
       expect(content, consumer).toContain("AUTH_CHANGE");
+    }
+    for (const consumer of ["features/charts/library/ChartAuthActions.tsx",
+      "features/models/add-to-research/AddModelToResearch.tsx"]) {
+      const content = readFileSync(path.join(SRC_ROOT, consumer), "utf8");
+      expect(content, consumer).toContain('from "@/lib/auth/use-public-session"');
+      expect(content, consumer).toContain("usePublicSession()");
     }
   });
 });
