@@ -2307,7 +2307,7 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0, explicit pre-deployment completion scope
 - **Dependencies:** NI-075, NI-076, NI-077
 - **Complexity:** L
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode A-role implementation subagent, dispatched by coordinator session sess_9345ee4f-f534-4698-98d2-5809986ac4c3
 - **Execution role:** A
 - **Started at:** 2026-11-12T09:35:00Z
@@ -2324,6 +2324,10 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 **Acceptance criteria:** D1–D5 in the NI-076 report have actual before/after desktop evidence and a recorded disposition; meaningful plots appear in the first chart viewport at the documented desktop sizes; saved cards are compact and use the shared renderer; the editor prioritizes the paper. Public figures trace to historical claim/definition/dataset/calculation and stay labeled historical/estimated where appropriate. Purchases are never subtracted from supply. Custom range is verified end to end or its reproducible blocker prevents DONE. No data/auth/version/export regression.
 
 **Testing requirements:** Focused meaningful chart/selection/editor regressions; lint/typecheck/build/contrast; real browser navigation/range/save/reopen and source/table access; desktop keyboard/accessibility; affected pin/export and two-user checks when behavior changes. No mobile pass.
+
+- **Result (2026-11-12):** All five NI-076 findings resolved with the NI-075 design preserved. D1: compact H1–H4 assessment beside the opening evidence (real #h1–#h4 links, statuses verbatim; all 15 sections intact). D2: CL-004 USD-window and CL-007 supply-scale figures render only typed claim-registry values, one unit per figure, estimates labeled, purchases never subtracted from supply. D3: chart detail has one title, short metadata and one action/selection row — plot top at y662 at 1440×900 and 1280×800 (was ~y703 at a taller viewport); the exact-value table stays visible without hover. D4: saved cards are compact (one title, one context line, plot at y593, card 717px) with lazy bounded previews for every card through the shared renderer and exact values in an accessible disclosure. D5: duplicate breadcrumb removed, one compact header, paper at y351/text y408 (was 386/442), full technical identifiers under Properties, pin/save state and explicit refresh retained. Custom range verified END TO END on the real stack with no defect confirmed (dialog → Apply → URL → re-resolved view → reload → sign-in continuation → save → reopen → compact card); the NI-076 failed automation is explained as an input-event artifact, nothing "fixed". [Verification, measurements, and after-screenshots](verification/ni-078/README.md)
+- **Verification (2026-11-12):** 551 web unit/interaction tests (new D1–D5 regression suites; one transient parallel-load flake rerun serially green), lint, strict TypeScript, production build, check:contracts, check:doc-links (807 links), check:contrast (22 pairs) all pass. Real-stack E2E 22/22 passed in 3.1m: full NI-063 journey (save/reopen/outage/export), two-user denial, NI-064 axe surfaces (200-block editor) and keyboard suites, plus the two new NI-078 specs (custom range, evidence captures). Before evidence: the NI-076 review set at 0b80bf2; after: docs/verification/ni-078/screens/ (7 JPEGs ≤150KB + measurements.json). Only two pre-existing e2e steps were updated where the commissioned layout changed deterministic locators (undo refocus target; pin-language wording) — recorded in the verification README.
+- **Acceptance:** D1–D5 dispositions with actual before/after desktop evidence recorded above; the coordinator performs the final visual pass on this branch before merge.
 
 ### NI-079 — Pass final integrated local release acceptance
 

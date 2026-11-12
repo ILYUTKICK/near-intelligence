@@ -102,13 +102,14 @@ test("D4 evidence: Saved Charts cards are compact and render through the shared 
   await page.goto(`${state.session_alice}?next=${encodeURIComponent("/workspace/saved-charts")}`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   // The custom-range test saved a card; its compact context line is present.
-  const cardLink = page.locator("li h2 a").first();
-  await expect(cardLink).toBeVisible();
-  const card = page.locator("li").first();
+  // Card list items are the only `li` elements carrying an h2 heading link
+  // (breadcrumbs also render li elements).
+  const card = page.locator("li:has(h2 a)").first();
+  await expect(card).toBeVisible();
   const cardPlot = card.locator("figure [role='img']").first();
   await expect(cardPlot).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(500);
-  measurements.saved_card_plot_y_1440 = await documentY(page, "li figure [role='img']");
+  measurements.saved_card_plot_y_1440 = await documentY(page, "li:has(h2 a) figure [role='img']");
   measurements.saved_card_height = await card.evaluate((element) => element.getBoundingClientRect().height);
   await shoot(page, "saved-charts-after-1440.jpg");
   expect(measurements.saved_card_plot_y_1440 as number).toBeLessThan(900);
