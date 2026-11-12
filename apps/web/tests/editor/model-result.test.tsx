@@ -57,9 +57,12 @@ const researchPath = `/api/documents/${documentId}`;
 
 function stubFetch(state: {
   document: () => { revision: number; content: unknown[] };
+  savedVersionId?: string;
+  version?: () => { revision: number; content: unknown[] };
   runs?: unknown;
   onInsert?: (request: Request) => Response;
   onSave?: (body: unknown) => Response;
+  onExport?: (body: unknown) => Response;
 }) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(input instanceof Request ? input.url : String(input), location.origin).pathname;
@@ -77,6 +80,15 @@ function stubFetch(state: {
     }
     if (path === `${researchPath}/versions`) {
       return state.onSave?.(JSON.parse(String(init?.body))) ?? new Response(null, { status: 500 });
+    }
+    const savedId = state.savedVersionId ?? versionId;
+    if (path === `${researchPath}/versions/${savedId}`) {
+      const saved = (state.version ?? state.document)();
+      return Response.json({ id: savedId, document_id: documentId, revision: saved.revision, schema_version: 1,
+        created_at: time, content_sha256: "a".repeat(64), content: paper(saved.content), resolved_contexts: {} });
+    }
+    if (path === `${researchPath}/exports` && state.onExport && input instanceof Request) {
+      return state.onExport(await input.json());
     }
     throw new Error(`Unexpected synthetic request ${path}`);
   }));
@@ -193,21 +205,26 @@ describe("model result block", () => {
   });
 
   it("inserts a pinned model result through the Add Model chooser and reopens it", async () => {
-    const inserts: Array<{ ifMatch: string | null; key: string | null; body: unknown }> = [];
+    const insertedVersionId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const onExport = vi.fn<(body: unknown) => Response>(() => Response.json({ id: blockId, document_id: documentId,
+      document_version_id: insertedVersionId, format: "markdown_zip", status: "queued" }, { status: 202 }));
+    const inserts: Array<{ ifMatch: string | null; key: string | null }> = [];
     let inserted = false;
     const insertedPaper = [modelBlock];
     stubFetch({
       document: () => ({ revision: inserted ? 3 : doc.revision, content: inserted ? insertedPaper : [] }),
+      savedVersionId: insertedVersionId,
+      onExport,
       onInsert: (request) => {
-        inserts.push({ ifMatch: request.headers.get("if-match"), key: request.headers.get("idempotency-key"), body: null });
+        inserts.push({ ifMatch: request.headers.get("if-match"), key: request.headers.get("idempotency-key") });
         inserted = true;
-        return Response.json({ document: { ...doc, revision: 3, updated_at: "2026-11-12T14:00:00Z" },
+        return Response.json({ document: { ...doc, revision: 3, current_version_id: insertedVersionId, updated_at: "2026-11-12T14:00:00Z" },
           value: { block_id: blockId } }, { status: 201, headers: { etag: '"3"' } });
       },
     });
     const user = userEvent.setup();
     render(<ResearchDocumentEditor documentId={documentId} />);
-    await screen.findByRole("textbox", { name: "Research paper editor" });
+    const paperEditor = await screen.findByRole("textbox", { name: "Research paper editor" });
     await user.click(screen.getByRole("button", { name: "Insert block" }));
     await user.click(screen.getByRole("menuitem", { name: /Model result/ }));
     const dialog = await screen.findByRole("dialog");
@@ -232,6 +249,56 @@ describe("model result block", () => {
     expect(within(card).getAllByText(/gross_fee_activity_v1/).length).toBeGreaterThan(0);
     // The context pane shows the pinned identities of the selected block.
     expect(screen.getByTestId("context-pane")).toHaveTextContent(datasetId.slice(0, 8));
+    await waitFor(() => expect(paperEditor).toHaveFocus());
+    await user.click(screen.getByTestId("export-open"));
+    await waitFor(() => expect(onExport).toHaveBeenCalledWith({ document_version_id: insertedVersionId, format: "markdown_zip" }));
+    await user.click(screen.getByTestId("export-close"));
+  });
+
+  it("reloads after a stale revision and retries a lost confirmation using the exact saved revision", async () => {
+    const external = { type: "paragraph", attrs: { block_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+      content: [{ type: "text", text: "An edit from another tab.", marks: [] }] };
+    const attempts: Array<{ revision: string | null; key: string | null }> = [];
+    let current = { revision: 2, content: [] as unknown[] };
+    stubFetch({
+      document: () => current,
+      version: () => ({ revision: 4, content: [external, modelBlock] }),
+      onInsert: ({ headers }) => {
+        attempts.push({ revision: headers.get("if-match"), key: headers.get("idempotency-key") });
+        if (attempts.length === 1) {
+          current = { revision: 3, content: [external] };
+          return Response.json({ error: { code: "REVISION_CONFLICT", message: "Synthetic stale revision",
+            request_id: "synthetic", retryable: false, details: [] } }, { status: 409 });
+        }
+        if (attempts.length === 2) {
+          current = { revision: 5, content: [modelBlock] };
+          throw new Error("Synthetic connection loss");
+        }
+        return Response.json({ document: { ...doc, revision: 4 }, value: { block_id: blockId } }, { status: 201 });
+      },
+    });
+    const user = userEvent.setup();
+    render(<ResearchDocumentEditor documentId={documentId} />);
+    await screen.findByRole("textbox", { name: "Research paper editor" });
+    await user.click(screen.getByRole("button", { name: "Insert block" }));
+    await user.click(screen.getByRole("menuitem", { name: /Model result/ }));
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.selectOptions(await dialog.findByLabelText("Published run"), runId);
+    await user.type(dialog.getByLabelText("Approved dataset version (UUID)"), datasetId);
+    const prose = dialog.getByLabelText("Interpretation of the pinned model result");
+    await user.type(prose, "Authored interpretation.");
+    await user.click(dialog.getByRole("button", { name: "Confirm Add Model" }));
+    await user.click(await dialog.findByRole("button", { name: "Reload and review" }));
+    await dialog.findByText(/The current revision is loaded/);
+    expect(prose).toHaveValue("Authored interpretation.");
+    await user.click(dialog.getByRole("button", { name: "Confirm Add Model" }));
+    await dialog.findByText("Synthetic connection loss");
+    await user.click(dialog.getByRole("button", { name: "Retry confirmed insertion" }));
+    await screen.findByText("Model result added with its pinned run and dataset.");
+    expect(attempts.map(({ revision }) => revision)).toEqual(['"2"', '"3"', '"3"']);
+    expect(attempts[1].key).toBe(attempts[2].key);
+    expect(screen.getByText("An edit from another tab.")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Model result block" })).toBeInTheDocument();
   });
 
   it("shows an honest typed failure when the chosen run is not published (zero side effects)", async () => {
@@ -254,5 +321,8 @@ describe("model result block", () => {
     // The dialog stays open with the draft intact; nothing was inserted.
     expect(within(dialog).getByLabelText("Interpretation of the pinned model result")).toHaveValue("Never stored");
     expect(screen.queryByRole("group", { name: "Model result block" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Research paper editor" })).toHaveFocus());
   });
 });

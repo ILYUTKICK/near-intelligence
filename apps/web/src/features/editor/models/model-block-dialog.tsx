@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { getDocument, DocumentApiError } from "@/features/documents/list/documents-api";
 import { MAX_BODY_PLAIN_CHARS, validateCanonicalDocument, type CanonicalDocument } from "../canonical";
 import { newIdempotencyKey } from "../persistence/save-transport";
+import { getRevision } from "../revision-api";
 import { useChartEditorContext } from "../blocks/chart-context";
 import { fetchPublishedRuns } from "@/features/editor/blocks/model-run-api";
-import { insertModel } from "@/features/models/add-to-research/api";
+import { insertModel, interpretationLines } from "@/features/models/add-to-research/api";
 import type { ModelRunSummary } from "@/features/models/models-schema";
 
 /**
@@ -28,20 +29,14 @@ import type { ModelRunSummary } from "@/features/models/models-schema";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CONTROL_CLASS = "w-full min-h-11 rounded-control border border-control-border bg-surface px-3 py-2 text-body text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
-/** Lines to canonical rich-text paragraphs (the NI-046 dialog precedent). */
-function interpretationLines(text: string) {
-  return text.split(/\r?\n/).map((line) => ({
-    type: "paragraph" as const,
-    content: line ? [{ type: "text" as const, text: line, marks: [] }] : [],
-  }));
-}
-
-export function EditorModelBlockDialog({ documentId, revision, onClose, onInserted }: {
+export function EditorModelBlockDialog({ documentId, revision, onClose, onInserted, onReload, restoreFocus }: {
   documentId: string;
   revision: number;
   onClose: () => void;
   /** Adopt the acknowledged revision into the paper after a 201. */
-  onInserted: (content: CanonicalDocument, revision: number, savedAt: string) => void;
+  onInserted: (content: CanonicalDocument, revision: number, savedAt: string, versionId: string, blockId: string) => void;
+  onReload: (content: CanonicalDocument, revision: number, savedAt: string, versionId: string | null) => void;
+  restoreFocus: () => void;
 }) {
   const account = useChartEditorContext();
   const [runs, setRuns] = useState<ModelRunSummary[]>([]);
@@ -49,49 +44,54 @@ export function EditorModelBlockDialog({ documentId, revision, onClose, onInsert
   const [cursor, setCursor] = useState<string | null>(null);
   const [runsLoading, setRunsLoading] = useState(true);
   const [runsError, setRunsError] = useState<string | null>(null);
+  const [runsAttempt, setRunsAttempt] = useState(0);
   const [runId, setRunId] = useState<string>("");
   const [datasetVersionId, setDatasetVersionId] = useState<string>("");
   const [interpretation, setInterpretation] = useState("");
   const [pending, setPending] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const busy = useRef(false);
   const attempt = useRef<{ key: string; runId: string; datasetVersionId: string; interpretation: string } | null>(null);
   const signal = account?.signal;
+  const ready = Boolean(account?.ready && account.saved && account.revision === revision && signal && !signal.aborted);
 
   useEffect(() => {
     if (!signal) return;
     const controller = new AbortController();
+    const loadSignal = AbortSignal.any([signal, controller.signal]);
     async function load() {
       setRunsLoading(true);
       setRunsError(null);
       try {
-        const page = await fetchPublishedRuns(cursor ? { cursor } : {}, controller.signal);
-        if (controller.signal.aborted) return;
+        const page = await fetchPublishedRuns(cursor ? { cursor } : {}, loadSignal);
+        if (loadSignal.aborted) return;
         setRuns((previous) => cursor ? [...previous, ...page.items] : page.items);
         setNextCursor(page.next_cursor);
         setRunsLoading(false);
         setRunId((current) => current || page.items[0]?.run_id || "");
       } catch (cause) {
-        if (controller.signal.aborted) return;
+        if (loadSignal.aborted) return;
         setRunsLoading(false);
         setRunsError(cause instanceof Error ? cause.message : "The published runs could not be loaded.");
       }
     }
     void load();
     return () => controller.abort();
-  }, [signal, cursor]);
+  }, [signal, cursor, runsAttempt]);
 
   const frozen = pending || confirmed;
 
   async function submit() {
-    if (!signal || signal.aborted || busy.current || !UUID_PATTERN.test(runId)
-      || !UUID_PATTERN.test(datasetVersionId) || !interpretation.trim()) return;
+    if (!signal || signal.aborted || !canConfirm || stale || busy.current) return;
     busy.current = true;
     setPending(true);
     setConfirmed(true);
     setError(null);
-    attempt.current ??= { key: newIdempotencyKey(), runId, datasetVersionId, interpretation };
+    setNotice(null);
+    attempt.current ??= { key: newIdempotencyKey(), runId: runId.toLowerCase(), datasetVersionId: datasetVersionId.toLowerCase(), interpretation };
     const current = attempt.current;
     try {
       const inserted = await insertModel(documentId, revision, {
@@ -101,19 +101,47 @@ export function EditorModelBlockDialog({ documentId, revision, onClose, onInsert
       }, current.key, signal);
 
       signal.throwIfAborted();
+      const versionId = inserted.document.current_version_id;
+      if (!versionId) throw new Error("The insertion response did not identify a saved revision.");
+      const saved = await getRevision(documentId, versionId, signal);
+      signal.throwIfAborted();
+      const content = validateCanonicalDocument(saved.content);
+      const blockId = inserted.value.block_id;
+      const block = content.content.find(candidate => candidate.attrs.block_id === blockId);
+      if (saved.revision !== inserted.document.revision || block?.type !== "modelResult"
+        || block.attrs.model_run_id !== current.runId || block.attrs.dataset_version_id !== current.datasetVersionId) {
+        throw new Error("The saved revision did not match the confirmed model result.");
+      }
+      onInserted(content, saved.revision, inserted.document.updated_at, saved.id, blockId);
+    } catch (cause) {
+      if (cause instanceof DocumentApiError && cause.code === "REVISION_CONFLICT") setStale(true);
+      if (cause instanceof DocumentApiError && cause.status === 422 && cause.code !== "UNKNOWN_ERROR") {
+        attempt.current = null;
+        setConfirmed(false);
+      }
+      setError(signal.aborted ? "The request was interrupted. Retry the same insertion."
+        : cause instanceof Error ? cause.message : "The insertion failed. Try again.");
+    } finally {
+      busy.current = false;
+      setPending(false);
+    }
+  }
+
+  async function reloadForReview() {
+    if (!signal || signal.aborted || !ready || busy.current) return;
+    busy.current = true;
+    setPending(true);
+    try {
       const document = await getDocument(documentId, signal);
       signal.throwIfAborted();
-      if (document.id !== documentId || document.revision !== inserted.document.revision) {
-        throw new Error("The inserted revision could not be verified. Reload the document.");
-      }
-      onInserted(validateCanonicalDocument(document.content), document.revision, document.updated_at);
+      onReload(validateCanonicalDocument(document.content), document.revision, document.updated_at, document.current_version_id);
+      attempt.current = null;
+      setConfirmed(false);
+      setStale(false);
+      setError(null);
+      setNotice("The current revision is loaded. Review your retained interpretation before confirming.");
     } catch (cause) {
-      if (cause instanceof DocumentApiError && cause.status === 409) {
-        setError("The research changed. Save your editor state, then retry the insertion against its current revision.");
-      } else {
-        setError(signal.aborted ? "The request was interrupted. Retry the same insertion."
-          : cause instanceof Error ? cause.message : "The insertion failed. Try again.");
-      }
+      setError(cause instanceof Error ? cause.message : "The current revision could not be loaded.");
     } finally {
       busy.current = false;
       setPending(false);
@@ -121,10 +149,10 @@ export function EditorModelBlockDialog({ documentId, revision, onClose, onInsert
   }
 
   const canConfirm = UUID_PATTERN.test(runId) && UUID_PATTERN.test(datasetVersionId)
-    && interpretation.trim().length > 0 && Boolean(signal) && account?.ready;
+    && interpretation.trim().length > 0 && ready;
   return (
     <Dialog open onOpenChange={(next) => { if (!next && !busy.current) onClose(); }}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto" onCloseAutoFocus={event => { event.preventDefault(); restoreFocus(); }}>
         <DialogTitle>Add model result</DialogTitle>
         <DialogDescription>
           Choose a published model run and the approved dataset version your interpretation reads
@@ -136,7 +164,7 @@ export function EditorModelBlockDialog({ documentId, revision, onClose, onInsert
           {runsError ? (
             <div role="alert">
               <p>{runsError}</p>
-              <Button variant="secondary" onClick={() => { setCursor(null); setRunsLoading(true); setRunsError(null); setRuns([]); }}>
+              <Button variant="secondary" onClick={() => setRunsAttempt(value => value + 1)}>
                 Try loading again
               </Button>
             </div>
@@ -181,10 +209,12 @@ export function EditorModelBlockDialog({ documentId, revision, onClose, onInsert
             <p className="mt-1 text-metadata text-text-secondary">Required. Each line becomes one paragraph.</p>
           </div>
           {error ? <p role="alert" className="text-danger text-ui">{error}</p> : null}
+          {notice ? <p role="status" className="text-ui">{notice}</p> : null}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void submit()} pending={pending} disabled={!canConfirm || frozen}>
+            <Button onClick={() => void submit()} pending={pending} disabled={!canConfirm || stale}>
               {confirmed ? "Retry confirmed insertion" : "Confirm Add Model"}
             </Button>
+            {stale ? <Button variant="secondary" disabled={pending || !ready} onClick={() => void reloadForReview()}>Reload and review</Button> : null}
             <Button variant="quiet" disabled={pending} onClick={onClose}>Cancel</Button>
           </div>
         </div>

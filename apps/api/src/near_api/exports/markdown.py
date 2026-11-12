@@ -81,6 +81,11 @@ class ChartAssetFiles(NamedTuple):
     csv_name: str
 
 
+def model_manifest_path(run_id: UUID) -> str:
+    """Archive-relative filename of one immutable published run manifest."""
+    return f"assets/model-run-{run_id}-manifest.json"
+
+
 # --------------------------------------------------------------------------- #
 # Inert text rendering (sanitize exports)
 # --------------------------------------------------------------------------- #
@@ -272,6 +277,7 @@ def _render_model_result(block: ExportModelResultBlock) -> list[str]:
     recorded limitations of the run always precede the coefficients.
     """
     summary = block.summary
+    limitations = summary.limitations
     lines = [
         f"> **Model result** — pinned published run `{summary.run_id}` "
         f"(specification `{escape_text(block.spec_id)}` version {block.spec_version}).",
@@ -282,15 +288,22 @@ def _render_model_result(block: ExportModelResultBlock) -> list[str]:
         f"> Recorded reproduction tolerances: rtol {escape_text(summary.coefficient_rtol)} / "
         f"atol {escape_text(summary.coefficient_atol)}.",
         ">",
-        f"> Recorded limitations apply to every value below; the run's own limitation "
-        f"notes travel in the published bundle. Coefficients are associations recorded "
-        f"by the publication gate — never causal effects.",
+        "> The publication gate recorded these limitations.",
+        ">",
+    ]
+    lines.extend(f"> - {escape_text(note)}" for note in limitations.spec_limitation_notes)
+    lines.append("> - Prohibited labels are "
+                 + ", ".join(escape_text(label) for label in limitations.prohibited_labels) + ".")
+    if limitations.gate_limit_codes:
+        lines.append("> - Recorded gate limit codes are "
+                     + ", ".join(escape_text(code) for code in limitations.gate_limit_codes) + ".")
+    lines.extend([
         ">",
         "> Recorded coefficients:",
         ">",
         "> | Term | Estimate | Std. error | t | p | 95% CI |",
         "> | --- | --- | --- | --- | --- | --- |",
-    ]
+    ])
     for coefficient in summary.coefficients:
         cells = (
             escape_text(coefficient.name), _recorded_number(coefficient.estimate),
@@ -305,10 +318,9 @@ def _render_model_result(block: ExportModelResultBlock) -> list[str]:
                  + escape_text(json.dumps(summary.diagnostics, sort_keys=True,
                                           separators=(",", ":"), default=str)) + ".")
     lines.append(">")
-    lines.append(f"> Source: the recorded manifest bundle of this run "
-                 f"([{escape_text(summary.manifest_url)}]({_escape_link(summary.manifest_url)})) "
-                 f"— verify offline with the bundle's hashes; the block pins run "
-                 f"`{summary.run_id}` and dataset version `{block.dataset_version_id}`.")
+    lines.append(f"> [Published run manifest]({model_manifest_path(block.model_run_id)}) "
+                 f"for offline verification. The interpretation pins dataset version "
+                 f"`{block.dataset_version_id}`.")
     lines.append(">")
     lines.extend(_render_body(block.interpretation, prefix="> "))
     return lines

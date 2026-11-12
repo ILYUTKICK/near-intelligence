@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
 import type { components } from "@near-intelligence/shared-types";
 
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { AddChartToResearch } from "../add-to-research/AddChartToResearch";
 import { FreezeSnapshotButton } from "../snapshots/FreezeSnapshotButton";
 import type { SaveInput } from "../saved/api";
 import type { FreezeInput } from "../snapshots/api";
-import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
+import { usePublicSession } from "@/lib/auth/use-public-session";
 import { AddInsightToResearch } from "@/features/editor/insights/public-insight";
 
 /**
@@ -54,44 +54,8 @@ export function ChartAuthActions({
   insightContext?: components["schemas"]["ResolvedContext"];
 }) {
   const router = useRouter();
-  const [session, setSession] = useState<{
-    status: "checking" | "anonymous" | "authenticated" | "unknown";
-    subject: string | null;
-  }>({ status: "checking", subject: null });
+  const { session } = usePublicSession();
   const [pending, setPending] = useState(false);
-
-  useEffect(() => {
-    let controller = new AbortController();
-    function check(resetIdentity = false) {
-      controller.abort(); controller = new AbortController();
-      const signal = controller.signal;
-      setSession((previous) => ({ status: "checking", subject: resetIdentity ? null : previous.subject }));
-      fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store", signal })
-        .then(async (response) => {
-          if (response.status === 401) {
-            if (!signal.aborted) setSession({ status: "anonymous", subject: null });
-            return;
-          }
-          if (!response.ok) throw new Error("Session unavailable");
-          const value: unknown = await response.json();
-          if (!value || typeof value !== "object" || !("subject" in value)
-            || typeof value.subject !== "string" || !value.subject || value.subject === "unknown") {
-            throw new Error("Session identity unavailable");
-          }
-          if (!signal.aborted) setSession({ status: "authenticated", subject: value.subject });
-        })
-        .catch(() => { if (!signal.aborted) setSession((previous) => ({ ...previous, status: "unknown" })); });
-    }
-    const authChange = () => check(true);
-    const focus = () => check();
-    const storage = (event: StorageEvent) => { if (event.key === AUTH_CHANGE_STORAGE) check(true); };
-    check();
-    window.addEventListener(AUTH_CHANGE, authChange);
-    window.addEventListener("focus", focus);
-    window.addEventListener("storage", storage);
-    return () => { controller.abort(); window.removeEventListener(AUTH_CHANGE, authChange);
-      window.removeEventListener("focus", focus); window.removeEventListener("storage", storage); };
-  }, []);
 
   function continueToSignIn(): void {
     // Defense in depth: the payload is constructed internally, but never

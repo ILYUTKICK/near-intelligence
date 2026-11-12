@@ -1,10 +1,11 @@
 /** NI-055 destination confirmation for the Add Model picker; synthetic only. */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "jest-axe";
 
 import { AddModelToResearch } from "@/features/models/add-to-research/AddModelToResearch";
+import { AUTH_CHANGE } from "@/lib/auth/change";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
@@ -39,17 +40,17 @@ describe("NI-055 destination confirmation", () => {
       if ((url === "/api/documents" || url.startsWith("/api/documents?"))) return response({ items: [], next_cursor: null });
       return response({ ...summary, content: {}, resolved_contexts: {} });
     }));
-    const user = userEvent.setup(); render(<AddModelToResearch run={run} datasetVersionId={datasetId} />);
-    await user.click(screen.getByRole("button", { name: "Add to research" }));
+    const user = userEvent.setup(); render(<AddModelToResearch run={run} />);
+    await user.click(await screen.findByRole("button", { name: "Add to research" }));
     const dialog = await screen.findByRole("dialog");
     await screen.findByText(/No existing research matches/);
     expect(await axe(dialog)).toHaveNoViolations();
     expect(mutations).toHaveLength(0);
-    // The pinned run and dataset are shown verbatim; the interpretation is
-    // the only authored input.
+    // The route supplies the exact published run. The author selects the dataset.
     expect(dialog).toHaveTextContent(runId);
-    expect(dialog).toHaveTextContent(datasetId);
+    expect(screen.getByLabelText("Approved dataset version (UUID)")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Confirm Add Model" })).toBeDisabled();
+    await user.type(screen.getByLabelText("Approved dataset version (UUID)"), datasetId);
     await user.type(screen.getByLabelText("Interpretation of the pinned model result"), "Recorded result reads as association only.");
     await user.click(screen.getByRole("button", { name: "Confirm Add Model" }));
     expect(await screen.findByRole("link", { name: "Open research" })).toHaveAttribute("href", `/workspace/research/${id}`);
@@ -78,13 +79,16 @@ describe("NI-055 destination confirmation", () => {
       if ((url === "/api/documents" || url.startsWith("/api/documents?"))) return response({ items: [summary], next_cursor: null });
       return response({ ...summary, revision, content: {}, resolved_contexts: {} });
     }));
-    const user = userEvent.setup(); render(<AddModelToResearch run={run} datasetVersionId={datasetId} />);
-    await user.click(screen.getByRole("button", { name: "Add to research" }));
+    const user = userEvent.setup(); render(<AddModelToResearch run={run} />);
+    await user.click(await screen.findByRole("button", { name: "Add to research" }));
     await screen.findByRole("option", { name: summary.title });
     await user.selectOptions(screen.getByLabelText("Destination"), id);
+    await user.type(screen.getByLabelText("Approved dataset version (UUID)"), datasetId);
     await user.type(screen.getByLabelText("Interpretation of the pinned model result"), "Synthetic interpretation");
     await user.click(screen.getByRole("button", { name: "Confirm Add Model" }));
     await screen.findByRole("alert");
+    expect(screen.getByLabelText("Approved dataset version (UUID)")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Confirm Add Model" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry confirmed insertion" }));
     await screen.findByRole("link", { name: "Open research" });
     expect(inserts).toHaveLength(2);
@@ -97,26 +101,67 @@ describe("NI-055 destination confirmation", () => {
     expect(inserts[1].ifMatch).toBe('"4"');
   });
 
-  it("surfaces the typed server refusal for an unapproved dataset pin and keeps the draft", async () => {
+  it("keeps the draft and the created destination when the dataset pin needs correction", async () => {
+    let creates = 0;
+    let inserts = 0;
     vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {
       if (url === "/api/auth/session") return response({ subject: "synthetic-alice" });
       if (url === "/api/auth/csrf") return response({ token: "synthetic-csrf" });
       if (options.method === "POST") {
-        if (url === "/api/documents") return response({ ...summary, content: {}, resolved_contexts: {} }, 201);
+        if (url === "/api/documents") {
+          creates++;
+          return response({ ...summary, content: {}, resolved_contexts: {} }, 201);
+        }
+        inserts++;
+        if (inserts === 2) return response({ document: { ...summary, revision: 4 }, value: { block_id: id } }, 201);
         return response({ error: { code: "REFERENCE_INVALID", message: "Referenced dataset version does not exist or is not an approved public dataset",
           request_id: "synthetic", retryable: false, details: [{ path: "dataset_version_id", reason: "dangling_dataset_reference" }] } }, 422);
       }
       if ((url === "/api/documents" || url.startsWith("/api/documents?"))) return response({ items: [], next_cursor: null });
       return response({ ...summary, content: {}, resolved_contexts: {} });
     }));
-    const user = userEvent.setup(); render(<AddModelToResearch run={run} datasetVersionId={datasetId} />);
-    await user.click(screen.getByRole("button", { name: "Add to research" }));
+    const user = userEvent.setup(); render(<AddModelToResearch run={run} />);
+    await user.click(await screen.findByRole("button", { name: "Add to research" }));
     await screen.findByText(/No existing research matches/);
-    await user.type(screen.getByLabelText("Interpretation of the pinned model result"), "Never stored prose");
+    const dataset = screen.getByLabelText("Approved dataset version (UUID)");
+    await user.type(dataset, datasetId);
+    await user.type(screen.getByLabelText("Interpretation of the pinned model result"), "Retained synthetic prose");
     await user.click(screen.getByRole("button", { name: "Confirm Add Model" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("not an approved public dataset");
-    expect(screen.getByLabelText("Interpretation of the pinned model result")).toHaveValue("Never stored prose");
-    // A failed attempt stores nothing: the same key stays retryable.
-    expect(screen.getByRole("button", { name: "Start a different insertion" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Interpretation of the pinned model result")).toHaveValue("Retained synthetic prose");
+    expect(screen.getByLabelText("Destination")).toHaveValue(id);
+    await user.clear(dataset);
+    await user.type(dataset, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    await user.click(screen.getByRole("button", { name: "Confirm Add Model" }));
+    expect(await screen.findByRole("link", { name: "Open research" })).toHaveAttribute("href", `/workspace/research/${id}`);
+    expect(creates).toBe(1);
+  });
+
+  it("suspends an open draft until the account is verified and clears it after a switch", async () => {
+    let subject = "synthetic-alice";
+    let available = true;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/auth/session") return available ? response({ subject }) : response({}, 503);
+      if (url === "/api/documents") return response({ items: [{ ...summary, title: subject }], next_cursor: null });
+      throw new Error(`Unexpected synthetic request ${url}`);
+    }));
+    const user = userEvent.setup();
+    render(<AddModelToResearch run={run} />);
+    await user.click(await screen.findByRole("button", { name: "Add to research" }));
+    const prose = "Only Alice's draft";
+    await user.type(screen.getByLabelText("Interpretation of the pinned model result"), prose);
+    available = false;
+    fireEvent.focus(window);
+    const retry = await screen.findByRole("button", { name: "Retry sign-in check" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    available = true;
+    await user.click(retry);
+    expect(await screen.findByLabelText("Interpretation of the pinned model result")).toHaveValue(prose);
+    subject = "synthetic-bob";
+    fireEvent(window, new Event(AUTH_CHANGE));
+    await user.click(await screen.findByRole("button", { name: "Add to research" }));
+    expect(await screen.findByRole("option", { name: "synthetic-bob" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "synthetic-alice" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Interpretation of the pinned model result")).toHaveValue("");
   });
 });

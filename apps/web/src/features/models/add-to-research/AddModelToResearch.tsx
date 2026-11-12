@@ -6,36 +6,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { createDocument, getDocument, listDocuments } from "@/features/documents/list/documents-api";
+import { createDocument, DocumentApiError, getDocument, listDocuments } from "@/features/documents/list/documents-api";
 import { MAX_BODY_PLAIN_CHARS } from "@/features/editor/canonical";
 import { useOwnedData } from "@/features/charts/saved/use-owned-data";
-import { insertModel, type InsertModelInput } from "./api";
+import { usePublicSession } from "@/lib/auth/use-public-session";
+import { insertModel, interpretationLines, type InsertModelInput } from "./api";
 import type { ModelRunSummary } from "../models-schema";
 
-/**
- * NI-055 Add Model picker (the published-run counterpart of the NI-041
- * AddChartToResearch flow): one confirmed choice appends ONE pinned
- * `modelResult` block to the chosen owned destination. The published run
- * identity and the approved dataset version are pinned server-side (the
- * server rejects an unknown run or an unapproved dataset version with a
- * typed 422 — never substitutes); the interpretation is the author's own
- * prose and the ONLY thing they can edit afterwards. The block never
- * carries coefficients: the document JSON stores ids + narrative only.
- */
+type RunIdentity = Pick<ModelRunSummary, "run_id" | "model_id" | "model_version" | "gate_verdict">;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Lines to canonical rich-text paragraphs (the NI-046 dialog precedent). */
-export function interpretationLines(text: string): InsertModelInput["interpretation"] {
-  return text.split(/\r?\n/).map((line) => ({
-    type: "paragraph",
-    content: line ? [{ type: "text", text: line, marks: [] }] : [],
-  }));
+export function AddModelToResearch({ run }: { run: RunIdentity }) {
+  const { session, recheck } = usePublicSession();
+  if (session.status === "anonymous") {
+    const next = `/models/${encodeURIComponent(run.run_id)}`;
+    return <Button variant="secondary" asChild>
+      <Link href={`/login?next=${encodeURIComponent(next)}`}>Sign in to add this model result</Link>
+    </Button>;
+  }
+  return <>
+    {session.subject ? <ModelDestinationPicker key={`${session.subject}:${run.run_id}`} run={run}
+      accountSignal={session.status === "authenticated" ? session.signal : null} /> : null}
+    {session.status === "unknown" ? <div className="flex items-center gap-2">
+      <p role="status">The sign-in state could not be checked.</p>
+      <Button variant="quiet" onClick={recheck}>Retry sign-in check</Button>
+    </div> : null}
+  </>;
 }
 
-export function AddModelToResearch({ run, datasetVersionId, suspended = false }: {
-  run: ModelRunSummary;
-  datasetVersionId: string;
-  suspended?: boolean;
-}) {
+function ModelDestinationPicker({ run, accountSignal }: { run: RunIdentity; accountSignal: AbortSignal | null }) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const [documentId, setDocumentId] = useState<string | null>(null);
@@ -43,15 +42,18 @@ export function AddModelToResearch({ run, datasetVersionId, suspended = false }:
   const [draft, setDraft] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
   const [destination, setDestination] = useState("new");
+  const [createdDestination, setCreatedDestination] = useState<{ id: string; title: string } | null>(null);
   const [title, setTitle] = useState("Research with model result");
+  const [datasetVersionId, setDatasetVersionId] = useState("");
   const [interpretation, setInterpretation] = useState("");
   const [pending, setPending] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const request = useRef<{ key: string; createKey: string; title: string; documentId: string | null; interpretation: string } | null>(null);
+  const request = useRef<{ key: string; createKey: string; title: string; documentId: string | null; input: InsertModelInput } | null>(null);
   const busy = useRef(false);
-  const loader = useCallback((signal: AbortSignal) => open && !suspended
-    ? listDocuments({ query, cursor, signal }) : Promise.resolve({ items: [], nextCursor: null }), [open, suspended, query, cursor]);
+  const loader = useCallback((signal: AbortSignal) => open && accountSignal
+    ? listDocuments({ query, cursor, signal: AbortSignal.any([signal, accountSignal]) })
+    : Promise.resolve({ items: [], nextCursor: null }), [open, accountSignal, query, cursor]);
   const { data, loading, error: loadError, reload, signal } = useOwnedData(loader, "research documents");
 
   function resetAttempt() {
@@ -63,35 +65,41 @@ export function AddModelToResearch({ run, datasetVersionId, suspended = false }:
     setOpen(next);
   }
   async function confirm() {
-    if (suspended || busy.current || !signal || signal.aborted || !interpretation.trim()) return;
+    if (!accountSignal || !signal || accountSignal.aborted || signal.aborted || busy.current || !canConfirm) return;
+    const operationSignal = AbortSignal.any([signal, accountSignal]);
     busy.current = true; setPending(true); setConfirmed(true); setError(null);
     request.current ??= { key: crypto.randomUUID(), createKey: crypto.randomUUID(),
       title: title.trim(), documentId: destination === "new" ? null : destination,
-      interpretation };
+      input: { model_run_id: run.run_id, dataset_version_id: datasetVersionId.trim().toLowerCase(), interpretation: interpretationLines(interpretation) } };
     const attempt = request.current;
     try {
       if (!attempt.documentId) {
-        attempt.documentId = (await createDocument({ title: attempt.title, idempotencyKey: attempt.createKey, signal })).id;
+        const created = await createDocument({ title: attempt.title, idempotencyKey: attempt.createKey, signal: operationSignal });
+        operationSignal.throwIfAborted();
+        attempt.documentId = created.id;
+        setCreatedDestination({ id: created.id, title: created.title });
+        setDestination(created.id);
       }
-      signal.throwIfAborted();
-      const current = await getDocument(attempt.documentId, signal);
-      signal.throwIfAborted();
-      const payload: InsertModelInput = {
-        model_run_id: run.run_id,
-        dataset_version_id: datasetVersionId,
-        interpretation: interpretationLines(attempt.interpretation),
-      };
-      const inserted = await insertModel(attempt.documentId, current.revision, payload, attempt.key, signal);
-      signal.throwIfAborted();
+      const current = await getDocument(attempt.documentId, operationSignal);
+      operationSignal.throwIfAborted();
+      const inserted = await insertModel(attempt.documentId, current.revision, attempt.input, attempt.key, operationSignal);
+      operationSignal.throwIfAborted();
       setDocumentId(inserted.document.id);
       setOpen(false);
-    } catch (error) { setError(signal.aborted ? "The request was interrupted. Retry the same insertion."
-      : error instanceof Error ? error.message : "The insertion failed. Try again."); }
+    } catch (error) {
+      if (!operationSignal.aborted && error instanceof DocumentApiError && error.status === 422 && error.code !== "UNKNOWN_ERROR") {
+        request.current = null;
+        setConfirmed(false);
+      }
+      setError(operationSignal.aborted ? "The request was interrupted. Retry the same insertion."
+        : error instanceof Error ? error.message : "The insertion failed. Try again.");
+    }
     finally { busy.current = false; setPending(false); }
   }
   const frozen = pending || confirmed;
-  const canConfirm = Boolean(run.run_id) && /^[0-9a-f-]{36}$/i.test(datasetVersionId) && interpretation.trim().length > 0;
-  if (suspended) return null;
+  const canConfirm = UUID_PATTERN.test(datasetVersionId.trim()) && interpretation.trim().length > 0
+    && (destination !== "new" || title.trim().length > 0);
+  if (!accountSignal) return null;
   return <div className="flex flex-col gap-2">
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild><Button variant="secondary">Add to research</Button></DialogTrigger>
@@ -106,9 +114,14 @@ export function AddModelToResearch({ run, datasetVersionId, suspended = false }:
             <dd>{run.model_id} · v{run.model_version}</dd>
             <dt className="text-text-secondary">Gate verdict</dt>
             <dd>{run.gate_verdict}</dd>
-            <dt className="text-text-secondary">Pinned dataset version</dt>
-            <dd className="break-all">{datasetVersionId}</dd>
           </dl>
+          <div>
+            <Label htmlFor={`${id}-dataset`}>Approved dataset version (UUID)</Label>
+            <Input id={`${id}-dataset`} value={datasetVersionId} maxLength={36} disabled={frozen}
+              onChange={event => setDatasetVersionId(event.target.value)}
+              aria-invalid={datasetVersionId.length > 0 && !UUID_PATTERN.test(datasetVersionId.trim())} />
+            <p className="mt-1 text-metadata text-text-secondary">Choose the approved dataset version your interpretation reads against.</p>
+          </div>
           <div>
             <Label htmlFor={`${id}-interpretation`}>Interpretation (your own prose)</Label>
             <textarea id={`${id}-interpretation`} aria-label="Interpretation of the pinned model result"
@@ -126,6 +139,8 @@ export function AddModelToResearch({ run, datasetVersionId, suspended = false }:
           <div><Label htmlFor={`${id}-destination`}>Destination</Label>
             <select id={`${id}-destination`} className="w-full min-h-11 rounded-control border border-control-border bg-surface px-3 text-body" value={destination} disabled={frozen} onChange={(event) => setDestination(event.target.value)}>
               <option value="new">Create new research</option>
+              {createdDestination && !data?.items.some(document => document.id === createdDestination.id)
+                ? <option value={createdDestination.id}>{createdDestination.title}</option> : null}
               {data?.items.map((document) => <option key={document.id} value={document.id}>{document.title}</option>)}
             </select>
           </div>
@@ -134,10 +149,8 @@ export function AddModelToResearch({ run, datasetVersionId, suspended = false }:
           {destination === "new" ? <div><Label htmlFor={`${id}-title`}>New research title</Label><Input id={`${id}-title`} value={title} maxLength={200} disabled={frozen} onChange={(event) => setTitle(event.target.value)} /></div> : null}
           {data?.items.length === 0 ? <p className="text-ui text-text-secondary">No existing research matches. You can create a new document above.</p> : null}
           {error ? <p role="alert" className="text-danger text-ui">{error}</p> : null}
-          <Button onClick={() => void confirm()} pending={pending} aria-disabled={!canConfirm || !signal || loading || Boolean(loadError) || (destination === "new" && !title.trim())}
-            disabled={!canConfirm || !signal || loading || Boolean(loadError) || (destination === "new" && !title.trim())}>
+          <Button onClick={() => void confirm()} pending={pending} disabled={!canConfirm || !signal || loading || Boolean(loadError)}>
             {confirmed ? "Retry confirmed insertion" : "Confirm Add Model"}</Button>
-          {error && !pending ? <Button variant="quiet" onClick={resetAttempt}>Start a different insertion</Button> : null}
         </div>
       </DialogContent>
     </Dialog>
