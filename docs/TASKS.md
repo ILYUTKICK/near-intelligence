@@ -2008,8 +2008,13 @@ Specification: [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 - **Priority:** P2
 - **Dependencies:** NI-062, NI-063, NI-050
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode implementation subagent, dispatched by coordinator session sess_9345ee4f-f534-4698-98d2-5809986ac4c3
 - **Execution role:** A with B typed evidence-tool/API handoff
+- **Started at:** 2026-11-12T16:54:30Z
+- **Branch/worktree:** feat/ni-065-integrity; /Users/ilyutkinn/Desktop/near-intelligence-a30
+- **Authorization:** Owner handoff v2 (docs/FINISH_BEFORE_DEPLOY_PROMPT.md, 12 November 2026) supersedes the former plan-only card and requires working tools; PR #88 carries the updated registry. External model use remains optional and separately configured/authorized.
+- **Dependency verification:** NI-062, NI-063 and NI-050 are DONE in this registry; verified on docs/ni-077-handoff-v2 at commit 2787fd5.
 - **Scope update:** Owner 2026-11-12 requires working tools before deployment; the former plan-only card is superseded. External model use remains optional and separately configured/authorized.
 
 **Description:** Deliver local evidence assistance that verifies metadata deterministically and keeps interpretive suggestions advisory.
