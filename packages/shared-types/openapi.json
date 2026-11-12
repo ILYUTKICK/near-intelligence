@@ -1001,6 +1001,78 @@
         "title": "DocumentListResponse",
         "type": "object"
       },
+      "DocumentOrganizationResponse": {
+        "additionalProperties": false,
+        "description": "The verified owner's organization metadata for one document.",
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "favorite": {
+            "title": "Favorite",
+            "type": "boolean"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "tags",
+          "favorite",
+          "updated_at"
+        ],
+        "title": "DocumentOrganizationResponse",
+        "type": "object"
+      },
+      "DocumentOrganizationUpdateRequest": {
+        "additionalProperties": false,
+        "description": "PATCH /documents/{id}/organization body.\n\nPATCH semantics: an absent field is left unchanged, so a favorite toggle\nnever resends tags and a tag edit never resends the favorite. Raw tags\nare normalized server-side (trim + lower + dedupe) and re-bounded to\nMAX_TAG_LENGTH/MAX_TAGS_PER_DOCUMENT after normalization.",
+        "properties": {
+          "favorite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Favorite"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          }
+        },
+        "title": "DocumentOrganizationUpdateRequest",
+        "type": "object"
+      },
       "DocumentProgress": {
         "additionalProperties": false,
         "description": "Per-document work-completion counters (`{headings,charts,insights}`).\n\nBlock projection regeneration is owned by the document revision service\n(NI-036) and the chart/insight block taxonomy by NI-041/NI-046/NI-047.\nHome counts the canonical current-version heading/liveChart/insight\nprojection types. The counter semantics measure work completion only.",
@@ -1072,6 +1144,11 @@
             ],
             "title": "Current Version Id"
           },
+          "favorite": {
+            "default": false,
+            "title": "Favorite",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1094,6 +1171,15 @@
             "minimum": 1.0,
             "title": "Schema Version",
             "type": "integer"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tags",
+            "type": "array"
           },
           "title": {
             "maxLength": 200,
@@ -1173,7 +1259,7 @@
       },
       "DocumentSummary": {
         "additionalProperties": false,
-        "description": "Current-revision summary of an owned document.\n\n`revision`/`current_version_id` come from the live app.documents row, so\na summary always reflects the document's current revision. A document\nthat has no saved revision yet carries `current_version_id: null`.",
+        "description": "Current-revision summary of an owned document.\n\n`revision`/`current_version_id` come from the live app.documents row, so\na summary always reflects the document's current revision. A document\nthat has no saved revision yet carries `current_version_id: null`.\n\n`tags`/`favorite` (NI-072) are private organization metadata from\napp.document_organization, separate from the immutable research chain:\nthey carry defaults so every producer stays honest \u2014 a document without\norganization rows has no tags and is not favorited, never fabricated\nmetadata. Editing them never changes `revision`/`updated_at` or the list\norder.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -1192,6 +1278,11 @@
             ],
             "title": "Current Version Id"
           },
+          "favorite": {
+            "default": false,
+            "title": "Favorite",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1209,6 +1300,15 @@
             "minimum": 1.0,
             "title": "Schema Version",
             "type": "integer"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tags",
+            "type": "array"
           },
           "title": {
             "maxLength": 200,
@@ -5009,7 +5109,7 @@
     },
     "/api/documents": {
       "get": {
-        "description": "List the verified principal's documents, newest first, owner-scoped.",
+        "description": "List the verified principal's documents, newest first, owner-scoped.\n\nOptional private organization filters (NI-072): ``tag`` may repeat (AND\nsemantics \u2014 a document matches when it carries EVERY listed normalized\ntag; at most :data:`MAX_FILTER_TAGS` values), ``favorite`` filters to\nfavorited (``true``) or non-favorited (``false``) documents. Filters\ncompose with ``q`` and pagination inside one owner-scoped query; a tag\nno document carries is an honest empty page, never an error.",
         "operationId": "listDocuments",
         "parameters": [
           {
@@ -5027,6 +5127,42 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 40,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          },
+          {
+            "in": "query",
+            "name": "favorite",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Favorite"
             }
           },
           {
@@ -8544,6 +8680,136 @@
           }
         },
         "summary": "Append one pinned model-result block to an owned document (compare-and-set via If-Match)",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/organization": {
+      "patch": {
+        "description": "Merge private organization metadata on the owned document (NI-072).\n\nPATCH semantics: absent fields stay unchanged; ``tags`` normalizes\nserver-side (trim + lower + dedupe) and ``tags: []`` clears them. This is\nmetadata-only \u2014 no revision is created, no content hash changes and\n``documents.updated_at`` (the list order) is untouched, so no If-Match\nprecondition applies. The document must exist and be owned (one generic\n404 otherwise).",
+        "operationId": "updateDocumentOrganization",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentOrganizationUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOrganizationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Revision conflict (document moved) or Idempotency-Key reused with a different request"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Document exceeds a hard size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "If-Match precondition is required"
+          }
+        },
+        "summary": "Update an owned document's private tags and favorite flag",
         "tags": [
           "documents"
         ]
