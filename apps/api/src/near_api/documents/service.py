@@ -165,6 +165,11 @@ def create_document_in_transaction(connection: Connection, principal: Principal,
         revision=1, schema_version=SCHEMA_VERSION,
         content=canonical.canonical, resolved_contexts={},
         content_sha256=canonical.content_sha256))
+    # Non-empty first revisions (the NI-045 template headings) carry the same
+    # validated projections as any other revision; an empty document inserts
+    # no projection rows.
+    write_projections(connection, principal, document_id=document_id,
+                      version_id=version_id, projections=build_projections(canonical))
     connection.execute(update(Document)
                        .where(Document.id == document_id,
                               owner_scope(Document.owner_id, principal.id))

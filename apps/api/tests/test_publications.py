@@ -381,8 +381,7 @@ class PublicationDatabaseTests(unittest.TestCase):
         return result.id
 
     def duplicate(self, slug: str, *, version: int = 1, title: str | None = None,
-                  subject: Principal | None = None, key: str | None = None,
-                  headers_only: bool = False):
+                  subject: Principal | None = None, key: str | None = None):
         subject = subject or self.alice
         headers = {"Authorization": f"Bearer t.{subject.id}"}
         if title is not None:
@@ -391,7 +390,7 @@ class PublicationDatabaseTests(unittest.TestCase):
             body = {"publication_version": version}
         if key is not None:
             headers["Idempotency-Key"] = key
-        with self.as_session(subject):
+        with self.as_session(subject.id):
             return self.client.post(f"/api/publications/{slug}/duplicate",
                                     json=body, headers=headers)
 
@@ -416,7 +415,7 @@ class PublicationDatabaseTests(unittest.TestCase):
             row = connection.execute(text(
                 "SELECT id, revision, content, resolved_contexts, content_sha256 "
                 "FROM app.document_versions WHERE document_id = :id AND revision = :r"),
-                {"id": document_id, "revision": revision}).mappings().one()
+                {"id": document_id, "r": revision}).mappings().one()
         return dict(row)
 
     def user_document_count(self, owner_id: UUID) -> int:
