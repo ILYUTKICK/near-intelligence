@@ -142,7 +142,8 @@ describe("Saved Charts compact cards (NI-078, NI-076 D4)", () => {
   it("renders every card with the shared renderer preview and one concise context line", async () => {
       const second = { ...saved, id: "33333333-3333-4333-8333-333333333333", label: "Second synthetic saved chart", selection: { ...selection, filters: {} as Record<string, string> } };
     const chartView = view(definition(), []);
-    const detailFor = (item: typeof saved) => ({ saved_chart: item, view: chartView, dataset_changed: false });
+    type SavedItem = typeof saved;
+  const detailFor = (item: SavedItem) => ({ saved_chart: item, view: chartView, dataset_changed: false });
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       if (url === "/api/auth/session") return json({ subject: "synthetic-alice" });
       if (url === "/api/saved-charts" || url.startsWith("/api/saved-charts?")) {
@@ -150,7 +151,7 @@ describe("Saved Charts compact cards (NI-078, NI-076 D4)", () => {
       }
       if (url.startsWith("/api/saved-charts/")) {
         const chartId = url.split("/").pop();
-        return json(detailFor(chartId === saved.id ? saved : second));
+        return json(detailFor((chartId === saved.id ? saved : second) as SavedItem));
       }
       throw new Error(`unexpected fetch ${url}`);
     }));
