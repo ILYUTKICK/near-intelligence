@@ -1116,6 +1116,8 @@ Specification: [CHART_SYSTEM.md](CHART_SYSTEM.md).
 
 **Testing requirements:** Filter schema/API mismatch rejected; dimension sum/reconciliation; source-version mismatch; range/filter/save/reopen/export journey.
 
+- **PR #94 repair handoff (2026-11-13T01:56:53+03:00):** Codex `/root`, chat `01a1bd1f-f988-7c82-9339-80fb05e336c0`, role A/B integration, on `feat/ni-071-filters` at `7e10e5b` in `D:/хахатон/near-intelligence`. The owner requested the next PR after accepting #93. NI-035, NI-043 and NI-058 are DONE on `main` at `351619a`. `/root/pr94_review` independently checks the filter registry, Decimal reconciliation and frozen evidence paths.
+
 ## EPIC 08 — Research Documents
 
 Specification: [EDITOR_SPECIFICATION.md](EDITOR_SPECIFICATION.md).
