@@ -19,8 +19,7 @@ Implements the API_SPECIFICATION ``/publications/{slug}`` rows:
   the same key with a different body is a 409 IDEMPOTENCY_CONFLICT. If-Match
   does not apply: the request does not address an existing private resource.
 
-Response/replay helpers are shared with the documents routes (one
-implementation of the document envelope, ETag and replay shapes).
+The document envelope and revision ETag are shared with the documents routes.
 """
 
 from __future__ import annotations
@@ -33,8 +32,8 @@ from sqlalchemy.engine import Engine
 from near_api.auth.principal import Principal, get_principal, get_runtime_engine
 from near_api.contracts import error_response
 from near_api.documents import idempotency
-from near_api.documents.routes import _document_response, _etag, _replay_response, _schema_error
-from near_api.documents.schema import DocumentSchemaError
+from near_api.documents.routes import _document_response, _etag, _schema_error
+from near_api.documents.schema import DocumentSchemaError, canonical_bytes
 from near_api.db.session import user_transaction
 from near_api.publications import duplicate, store
 from near_api.publications.schemas import (
@@ -142,11 +141,14 @@ def duplicate_publication_route(request: Request, principal: PrincipalDependency
         except DocumentSchemaError as error:
             # Nothing was stored: a failed duplicate stays retryable.
             return _schema_error(request, error)
-        if outcome.replay:
-            return _replay_response(outcome, etag_revision_path=("revision",))
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["ETag"] = _etag(int(outcome.body["revision"]))
-        return DocumentResponse.model_validate(outcome.body)
+        # The stored JSONB response can return its keys in a different order.
+        # Serialize fresh and replayed snapshots identically.
+        return Response(
+            content=canonical_bytes(outcome.body),
+            status_code=outcome.status,
+            media_type="application/json",
+            headers={"Cache-Control": "no-store", "ETag": _etag(outcome.body["revision"])},
+        )
     try:
         detail = duplicate.duplicate_publication(
             engine, principal, slug=slug, version=payload.publication_version,

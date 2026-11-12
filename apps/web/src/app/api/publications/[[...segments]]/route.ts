@@ -37,6 +37,7 @@ async function handle(request: NextRequest, context: Context) {
     const version = query.get("version");
     if (request.nextUrl.search.length > 100
       || [...query.keys()].some((key) => key !== "version")
+      || query.getAll("version").length > 1
       || (version !== null && !/^[1-9][0-9]{0,8}$/.test(version))) {
       return NextResponse.json(
         { error: "Unsupported publication query." },
@@ -50,14 +51,14 @@ async function handle(request: NextRequest, context: Context) {
         headers: { accept: "application/json" },
         cache: "no-store",
         redirect: "error",
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]),
       });
       const headers = new Headers({ "cache-control": response.headers.get("cache-control") ?? "no-store" });
       for (const key of ["content-type", "etag", "x-request-id"]) {
         const value = response.headers.get(key);
         if (value) headers.set(key, value);
       }
-      return new NextResponse(await response.arrayBuffer(), {
+      return new NextResponse(response.body, {
         status: response.status, headers,
       });
     } catch {
@@ -74,7 +75,12 @@ async function handle(request: NextRequest, context: Context) {
         headers: { allow: "POST", "cache-control": "no-store" },
       });
     }
-    return forwardPrivate(request, `/api/publications/${segments[0]}/duplicate`);
+    if (request.nextUrl.search) return NextResponse.json({ error: "Unsupported publication query." }, {
+      status: 422, headers: { "cache-control": "no-store" },
+    });
+    return forwardPrivate(request, `/api/publications/${segments[0]}/duplicate`, {
+      expectedSubject: request.headers.get("x-session-subject"),
+    });
   }
   return NextResponse.json({ error: "Not found." }, { status: 404, headers: { "cache-control": "no-store" } });
 }

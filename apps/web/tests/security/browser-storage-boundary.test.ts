@@ -173,7 +173,7 @@ describe("Public surface carries no private transport", () => {
       expect(content, consumer).toContain("AUTH_CHANGE");
     }
     for (const consumer of ["features/charts/library/ChartAuthActions.tsx",
-      "features/models/add-to-research/AddModelToResearch.tsx"]) {
+      "features/models/add-to-research/AddModelToResearch.tsx", "features/public-research/DuplicateReleaseAction.tsx"]) {
       const content = readFileSync(path.join(SRC_ROOT, consumer), "utf8");
       expect(content, consumer).toContain('from "@/lib/auth/use-public-session"');
       expect(content, consumer).toContain("usePublicSession()");

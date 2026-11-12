@@ -24,6 +24,7 @@ never research data.
 """
 
 import copy
+import json
 import os
 import unittest
 from contextlib import ExitStack
@@ -43,7 +44,9 @@ from near_api.auth import principal as principal_module
 from near_api.auth.principal import Principal, get_runtime_engine
 from near_api.db.session import create_runtime_engine, user_transaction
 from near_api.documents.schema import (
+    MAX_TOP_LEVEL_BLOCKS,
     DocumentSchemaError,
+    DocumentTooLarge,
     ReferenceInvalid,
     empty_document,
     parse_document,
@@ -56,6 +59,7 @@ from near_api.documents.templates import (
 from near_api.main import app
 from near_api.publications.duplicate import (
     ATTRIBUTION_TEXT,
+    parse_publication_content,
     remap_publication_content,
 )
 from near_api.publications.seed import (
@@ -227,6 +231,24 @@ class RemapGraphTests(unittest.TestCase):
         second_ids = {node["attrs"]["block_id"] for node in second["content"]}
         self.assertFalse(first_ids & second_ids)
 
+    def test_public_shape_refuses_snapshot_pins(self):
+        document = publication_document()
+        document["content"][1]["attrs"].update(mode="snapshot", snapshot_id=str(uuid4()))
+        parse_document(document)
+        with self.assertRaises(ReferenceInvalid) as failure:
+            parse_publication_content(document)
+        self.assertIn(("content", "private_snapshot_reference"), failure.exception.details)
+
+    def test_seed_leaves_room_for_attribution(self):
+        content = {**empty_document(), "content": [
+            text_paragraph("Synthetic") for _ in range(MAX_TOP_LEVEL_BLOCKS)
+        ]}
+        parse_document(content)
+        with self.assertRaises(DocumentTooLarge):
+            seed_publication("unused", slug="synthetic-full-release", version=1,
+                             title="Synthetic full release", content=content,
+                             evidence_manifest=[])
+
 
 class TemplateShapeTests(unittest.TestCase):
     """The investment-v1 template: eight headings, nothing else (offline)."""
@@ -322,15 +344,15 @@ class PublicationDatabaseTests(unittest.TestCase):
         cls.admin.dispose()
 
     @classmethod
-    def _insert_artifact(cls, scope: str) -> UUID:
+    def _insert_artifact(cls, scope: str, *, owner_id: UUID | None = None) -> UUID:
         artifact_id = uuid4()
         with cls.operator.begin() as connection:
             connection.execute(text("""
                 INSERT INTO app.artifacts(id, relative_storage_key, sha256, byte_size,
                        media_type, scope, owner_id, license_status)
-                VALUES (:id, :key, :sha, 10, 'application/pdf', :scope, NULL, 'unverified')
+                VALUES (:id, :key, :sha, 10, 'application/pdf', :scope, :owner, 'unverified')
             """), {"id": artifact_id, "key": f"synthetic/{artifact_id}.pdf",
-                   "sha": SHA256, "scope": scope})
+                   "sha": SHA256, "scope": scope, "owner": owner_id})
         return artifact_id
 
     def setUp(self):
@@ -379,6 +401,17 @@ class PublicationDatabaseTests(unittest.TestCase):
                                   evidence_manifest=manifest)
         self.assertFalse(result.already_published)
         return result.id
+
+    def insert_legacy_release(self, slug: str, content: dict) -> None:
+        """Simulate a synthetic row seeded before the content pin gate."""
+        canonical = parse_document(content)
+        with self.operator.begin() as connection:
+            connection.execute(text("""
+                INSERT INTO app.research_publications
+                    (id, slug, version, title, content, content_sha256)
+                VALUES (:id, :slug, 1, 'Synthetic legacy release', CAST(:content AS jsonb), :sha256)
+            """), {"id": uuid4(), "slug": slug, "content": json.dumps(canonical.canonical),
+                   "sha256": canonical.content_sha256})
 
     def duplicate(self, slug: str, *, version: int = 1, title: str | None = None,
                   subject: Principal | None = None, key: str | None = None):
@@ -499,7 +532,11 @@ class PublicationDatabaseTests(unittest.TestCase):
 
     def test_03_seed_gate_and_reseed_behavior(self):
         slug = f"synthetic-release-{uuid4().hex[:8]}"
-        content = publication_document()
+        content = publication_document(
+            chart_definition_version_id=self.chart_id,
+            dataset_version_id=str(self.approved_dataset_id),
+            insight_context=self.chart_context,
+        )
         manifest = [{"kind": "citation", "id": str(self.citation_id)}]
         seeded = seed_publication(os.environ["NI_TEST_OPERATOR_URL"], slug=slug,
                                   version=1, title="Synthetic release", content=content,
@@ -740,7 +777,7 @@ class PublicationDatabaseTests(unittest.TestCase):
         # Lost-response retry: identical owner/route/body replays the original.
         retry = self.duplicate(slug, title="Synthetic idempotent", key=key)
         self.assertEqual(retry.status_code, 201)
-        self.assertEqual(retry.json(), first.json())
+        self.assertEqual(retry.content, first.content)
         self.assertEqual(UUID(retry.json()["id"]), UUID(first.json()["id"]))
         self.assertEqual(retry.headers["ETag"], '"2"')
         self.assertEqual(self.user_document_count(self.alice_id), 1)
@@ -776,9 +813,7 @@ class PublicationDatabaseTests(unittest.TestCase):
         self.assertEqual(self.user_document_count(self.alice_id), 0)
 
     def test_11_unapproved_pinned_dataset_fails_explicitly_never_latest(self):
-        # The release pins a dataset version that was never approved: the seed
-        # gate parses canonical content (pins are not existence-checked there),
-        # but the duplicate must fail closed instead of substituting latest.
+        # The seed refuses the pin; older rows still fail closed on duplication.
         slug = f"synthetic-unapproved-{uuid4().hex[:8]}"
         staged_dataset = chart_fixtures.ChartBlockDatabaseFixture.insert_dataset_version(
             self, f"synthetic.{uuid4().hex[:8]}.staged", status="staged")
@@ -786,9 +821,12 @@ class PublicationDatabaseTests(unittest.TestCase):
             chart_definition_version_id=self.chart_id,
             dataset_version_id=str(staged_dataset),
             insight_context=copy.deepcopy(self.chart_context))
-        seed_publication(os.environ["NI_TEST_OPERATOR_URL"], slug=slug, version=1,
-                         title="Synthetic staged pin", content=content,
-                         evidence_manifest=[])
+        with self.assertRaises(ReferenceInvalid) as rejected:
+            self.seed_release(slug, content=content, manifest=[])
+        self.assertIn("dangling_dataset_reference",
+                      {reason for _, reason in rejected.exception.details})
+        self.assertEqual(self.publication_row(slug), {})
+        self.insert_legacy_release(slug, content)
         response = self.duplicate(slug)
         self.assertEqual(response.status_code, 422)
         failure = ErrorResponse.model_validate(response.json()).error
@@ -807,14 +845,73 @@ class PublicationDatabaseTests(unittest.TestCase):
             chart_definition_version_id=self.chart_id,
             dataset_version_id=str(self.approved_dataset_id),
             insight_context=context)
-        seed_publication(os.environ["NI_TEST_OPERATOR_URL"], slug=slug, version=1,
-                         title="Synthetic bad context", content=content,
-                         evidence_manifest=[])
+        with self.assertRaises(ReferenceInvalid):
+            self.seed_release(slug, content=content, manifest=[])
+        self.assertEqual(self.publication_row(slug), {})
+        self.insert_legacy_release(slug, content)
         response = self.duplicate(slug)
         self.assertEqual(response.status_code, 422)
         failure = ErrorResponse.model_validate(response.json()).error
         self.assertEqual(failure.code, "REFERENCE_INVALID")
         self.assertEqual(self.user_document_count(self.alice_id), 0)
+
+    def test_seed_refuses_private_content_evidence_outside_manifest(self):
+        artifact = self._insert_artifact(scope="private", owner_id=self.alice_id)
+        hypothesis = document_fixtures.hypothesis_attrs()
+        evidence = document_fixtures.evidence_attrs(
+            hypothesis["attrs"]["hypothesis_id"], "citation", str(artifact))
+        slug = f"synthetic-private-{uuid4().hex[:8]}"
+        with self.assertRaises(ReferenceInvalid) as rejected:
+            self.seed_release(slug, content={**empty_document(), "content": [hypothesis, evidence]},
+                              manifest=[])
+        self.assertIn(("content", "dangling_citation_target"), rejected.exception.details)
+        self.assertEqual(self.client.get(f"/api/publications/{slug}").status_code, 404)
+
+    def test_copy_keeps_model_run_dataset_and_release_version(self):
+        from near_api.research.publication import (
+            MANIFEST_KEYS, canonical_artifact_hash, derive_run_id, verify_bundle,
+        )
+        from near_api.research.publish_store import publish_run
+        from test_models_publication import valid_bundle
+
+        bundle = valid_bundle()
+        self.assertTrue(verify_bundle(bundle).passed)
+        run_id = derive_run_id({key: canonical_artifact_hash(bundle[key]) for key in MANIFEST_KEYS})
+        publish_run(os.environ["NI_TEST_OPERATOR_URL"], bundle, run_id)
+        hypothesis = document_fixtures.hypothesis_attrs()
+        model = document_fixtures.block(
+            "modelResult", model_run_id=str(run_id), dataset_version_id=str(self.approved_dataset_id),
+            interpretation=[{"type": "paragraph", "content": [
+                {"type": "text", "text": "Synthetic model interpretation"},
+            ]}],
+        )
+        evidence = document_fixtures.evidence_attrs(
+            hypothesis["attrs"]["hypothesis_id"], "model_run", str(run_id))
+        content = {**empty_document(), "content": [hypothesis, model, evidence]}
+        slug = f"synthetic-model-{uuid4().hex[:8]}"
+        publication_id = self.seed_release(slug, content=content, manifest=[])
+        self.seed_release(slug, version=2, content=empty_document(), manifest=[])
+        with user_transaction(self.engine, None) as connection:
+            self.assertEqual(connection.scalars(text("""
+                SELECT model_run_id FROM app.publication_model_runs WHERE publication_id = :id
+            """), {"id": publication_id}).all(), [run_id])
+
+        response = self.duplicate(slug, version=1, key=str(uuid4()))
+        self.assertEqual(response.status_code, 201, response.text)
+        body = response.json()
+        copied = parse_document(body["content"])
+        model_copy, = copied.model_results
+        evidence_copy, = copied.evidence
+        self.assertNotEqual(str(model_copy.block_id), model["attrs"]["block_id"])
+        self.assertNotEqual(str(evidence_copy.evidence_id), evidence["attrs"]["evidence_id"])
+        self.assertEqual(evidence_copy.hypothesis_id, copied.hypotheses[0].hypothesis_id)
+        self.assertEqual(evidence_copy.target_id, run_id)
+        self.assertEqual(model_copy.model_run_id, run_id)
+        self.assertEqual(model_copy.dataset_version_id, self.approved_dataset_id)
+        context = body["resolved_contexts"][str(model_copy.block_id)]
+        self.assertEqual(context["model_run_id"], str(run_id))
+        self.assertEqual(context["dataset_version_id"], str(self.approved_dataset_id))
+        self.assertEqual(self.document_row(UUID(body["id"]))["source_publication_id"], publication_id)
 
     def test_13_duplicate_ownership_matrix_alice_and_bob(self):
         slug = f"synthetic-matrix-{uuid4().hex[:8]}"

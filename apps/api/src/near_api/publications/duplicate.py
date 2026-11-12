@@ -18,12 +18,8 @@ Mechanics, in one transaction per duplicate:
    insight ``hypothesis_id``, risk ``related_hypothesis_id``). A missing
    reference is a typed 422, never a partial rewrite. Public immutable
    references are carried VERBATIM: evidence ``model_run``/``citation``
-   targets, liveChart pins (chart definition version, dataset version,
-   selection, mode, snapshot id) and dataTable dataset pins — the shared
-   scientific identity the copy must keep. Unknown-to-this-module pinned ids
-   inside block attrs are untouched by construction (only documented
-   identity fields are rewritten), so future pinned block shapes integrate
-   without a remap change.
+   targets, liveChart pins, dataTable dataset pins and modelResult run/dataset
+   pins. The public projection rejects owner-scoped snapshot references.
 3. The retained attribution is written two ways, deliberately:
    ``documents.source_publication_id`` (migration 0015) records the release
    structurally (RESTRICT — the provenance cannot be orphaned), and a
@@ -60,6 +56,7 @@ from near_api.auth.principal import Principal
 from near_api.db.security import ResourceNotFound, principal_transaction
 from near_api.documents import service
 from near_api.documents.schema import (
+    CanonicalDocument,
     ReferenceInvalid,
     parse_document,
 )
@@ -79,7 +76,7 @@ class PublicationIdRemapping:
     evidence_ids: dict[str, str] = field(default_factory=dict)
 
 
-def _new_id(mapping: dict[str, str], old: str, path: str) -> str:
+def _new_id(mapping: dict[str, str], old: str) -> str:
     new = str(uuid4())
     mapping[old] = new
     return new
@@ -104,6 +101,20 @@ def attribution_paragraph(attribution_text: str) -> dict:
     }
 
 
+def parse_publication_content(content: dict) -> CanonicalDocument:
+    """Validate the editor shape and the references allowed in a public release."""
+    canonical = parse_document(content)
+    if any(chart.snapshot_id is not None for chart in canonical.live_charts):
+        raise ReferenceInvalid(
+            "Public releases cannot reference owner-scoped chart snapshots",
+            [("content", "private_snapshot_reference")])
+    if any("model_run_id" in insight.context for insight in canonical.insights):
+        raise ReferenceInvalid(
+            "Public release insights must use chart contexts",
+            [("content", "unsupported_insight_context")])
+    return canonical
+
+
 def remap_publication_content(content: dict, *,
                               attribution_text: str | None = None,
                               ) -> tuple[dict, PublicationIdRemapping]:
@@ -123,19 +134,18 @@ def remap_publication_content(content: dict, *,
     # Pass one: allocate every new identity up front so references can be
     # rewritten regardless of node order (an evidence may target an insight
     # or chart block defined later in the document).
-    for position, node in enumerate(nodes):
+    for node in nodes:
         attrs = node["attrs"]
-        path = f"content[{position}]"
-        attrs["block_id"] = _new_id(remapping.block_ids, attrs["block_id"], path)
+        attrs["block_id"] = _new_id(remapping.block_ids, attrs["block_id"])
         if node["type"] == "insight":
             attrs["insight_id"] = _new_id(remapping.insight_ids,
-                                          attrs["insight_id"], path)
+                                          attrs["insight_id"])
         elif node["type"] == "hypothesis":
             attrs["hypothesis_id"] = _new_id(remapping.hypothesis_ids,
-                                             attrs["hypothesis_id"], path)
+                                             attrs["hypothesis_id"])
         elif node["type"] == "evidence":
             attrs["evidence_id"] = _new_id(remapping.evidence_ids,
-                                           attrs["evidence_id"], path)
+                                           attrs["evidence_id"])
 
     # Pass two: rewrite every in-document reference through the maps.
     for position, node in enumerate(nodes):
@@ -168,8 +178,7 @@ def remap_publication_content(content: dict, *,
                 attrs["related_hypothesis_id"] = _mapped(
                     remapping.hypothesis_ids, attrs["related_hypothesis_id"],
                     f"{path}.attrs.related_hypothesis_id", "hypothesis")
-        # liveChart/dataTable/paragraph/heading/list/divider carry only their
-        # rewritten block_id; every pinned id in their attrs stays verbatim.
+        # The remaining nodes, including modelResult, change only block_id.
 
     output_nodes = ([attribution_paragraph(attribution_text)] if attribution_text else []) \
         + nodes
@@ -188,11 +197,11 @@ def duplicate_publication_in_transaction(connection: Connection, principal: Prin
     revision 2 through the shared save pipeline, so an invalid pin anywhere
     leaves zero rows.
     """
-    parse_document(publication.content)
+    canonical = parse_publication_content(publication.content)
     attribution = ATTRIBUTION_TEXT.format(title=publication.title,
                                           slug=publication.slug,
                                           version=publication.version)
-    remapped, _mapping = remap_publication_content(publication.content,
+    remapped, _mapping = remap_publication_content(canonical.canonical,
                                                    attribution_text=attribution)
     created = service.create_document_in_transaction(
         connection, principal, title=title if title is not None else publication.title,
@@ -232,5 +241,6 @@ __all__ = [
     "duplicate_publication",
     "duplicate_publication_in_transaction",
     "load_and_duplicate_in_transaction",
+    "parse_publication_content",
     "remap_publication_content",
 ]

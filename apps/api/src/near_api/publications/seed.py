@@ -12,16 +12,16 @@ Fail-closed seed gate (the database CHECK constraints are defense in depth,
 not the gate):
 
 - the ``content`` file MUST parse as a canonical editor document through
-  :func:`near_api.documents.schema.parse_document` (the public projection is
-  exactly the editor grammar; a projection carrying unknown block types
-  cannot be seeded);
+  :func:`near_api.documents.schema.parse_document` and fit in a copy with
+  its attribution paragraph. Structured pins must resolve to public inputs;
+  owner-scoped snapshots cannot be published;
 - ``content_sha256`` is the canonical content hash the API serves, computed
   over the canonical rendering;
 - every ``evidence_manifest`` entry MUST be a typed public reference:
-  ``model_run`` ids must reference PUBLISHED ``app.model_runs`` rows (bound
-  into ``app.publication_model_runs``) and ``citation`` ids must reference
-  ``scope='public'`` artifacts — "Public dataset/artifact references
-  reviewed for license and access" (DATABASE_SCHEMA.md);
+  ``model_run`` ids must reference PUBLISHED ``app.model_runs`` rows and
+  ``citation`` ids must reference ``scope='public'`` artifacts. Model runs
+  referenced in the content or manifest are bound into
+  ``app.publication_model_runs``;
 - the slug grammar is the one the public route and the idempotency route-key
   bound accept.
 
@@ -46,6 +46,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -53,21 +54,40 @@ from pydantic import ValidationError
 from sqlalchemy import select, text
 from sqlalchemy.engine import Connection, Engine
 
+from near_api.datasets.delivery import DeliveryInvalidFilter
 from near_api.db.models import Artifact, ModelRun
-from near_api.documents.schema import parse_document
+from near_api.documents.context_resolver import (
+    load_chart_definition,
+    require_approved_dataset,
+    require_metric_coverage,
+    validate_selection_against_definition,
+    verify_chart_context,
+    verify_model_result_pins,
+)
+from near_api.documents.schema import (
+    CanonicalDocument,
+    DocumentSchemaError,
+    canonical_bytes,
+    parse_document,
+)
+from near_api.evidence.targets import validate_public_targets
+from near_api.insights.schemas import ResolvedContext
 from near_api.ingestion.archive import (
     OperatorDatabaseError,
     _assert_operator,
     create_operator_engine,
+)
+from near_api.publications.duplicate import (
+    ATTRIBUTION_TEXT,
+    attribution_paragraph,
+    parse_publication_content,
 )
 from near_api.publications.schemas import (
     MAX_MANIFEST_ENTRIES,
     SLUG_PATTERN,
     PublicationEvidenceRef,
 )
-
-MAX_CONTENT_BYTES = 2 * 1024 * 1024
-"""The stored public projection bound (mirrors the migration CHECK)."""
+from near_api.schemas.chart_selection import ChartSelection
 
 SLUG_RE = re.compile(SLUG_PATTERN)
 
@@ -108,12 +128,12 @@ def seed_publication(database_url: str, *, slug: str, version: int, title: str,
         raise PublicationSeedError(
             f"evidence_manifest must be a list of at most {MAX_MANIFEST_ENTRIES} entries")
 
-    canonical = parse_document(content)
-    content_json = json.dumps(canonical.canonical, ensure_ascii=False,
-                              sort_keys=True, separators=(",", ":"))
-    if len(content_json.encode("utf-8")) > MAX_CONTENT_BYTES:
-        raise PublicationSeedError(
-            "the canonical content exceeds the stored public projection bound")
+    canonical = parse_publication_content(content)
+    attribution = ATTRIBUTION_TEXT.format(title=title, slug=slug, version=version)
+    parse_document({**canonical.canonical, "content": [
+        attribution_paragraph(attribution), *canonical.canonical["content"],
+    ]})
+    content_json = canonical_bytes(canonical.canonical).decode("utf-8")
 
     manifest_refs: list[PublicationEvidenceRef] = []
     for index, entry in enumerate(evidence_manifest):
@@ -142,8 +162,9 @@ def seed_publication(database_url: str, *, slug: str, version: int, title: str,
                 if not same:
                     raise PublicationSeedConflict(
                         f"Publication {slug} v{version} already exists with different "
-                        "content; published releases are immutable — seed a new "
-                        "version or delete the row first")
+                        "content; published releases are immutable — seed a new version")
+            _verify_content_pins(connection, canonical)
+            if existing is not None:
                 return SeededPublication(id=existing["id"], slug=slug, version=version,
                                          content_sha256=existing["content_sha256"],
                                          already_published=True)
@@ -158,12 +179,15 @@ def seed_publication(database_url: str, *, slug: str, version: int, title: str,
                 "title": title, "content": content_json, "manifest": manifest_json,
                 "sha256": canonical.content_sha256,
             })
-            for ref in manifest_refs:
-                if ref.kind == "model_run":
-                    connection.execute(text(
-                        "INSERT INTO app.publication_model_runs (publication_id, model_run_id) "
-                        "VALUES (:publication, :run)"),
-                        {"publication": str(publication_id), "run": str(ref.id)})
+            run_ids = {ref.id for ref in manifest_refs if ref.kind == "model_run"}
+            run_ids.update(model.model_run_id for model in canonical.model_results)
+            run_ids.update(item.target_id for item in canonical.evidence
+                           if item.target_kind == "model_run")
+            for run_id in sorted(run_ids):
+                connection.execute(text(
+                    "INSERT INTO app.publication_model_runs (publication_id, model_run_id) "
+                    "VALUES (:publication, :run)"),
+                    {"publication": str(publication_id), "run": str(run_id)})
             return SeededPublication(id=publication_id, slug=slug, version=version,
                                      content_sha256=canonical.content_sha256,
                                      already_published=False)
@@ -185,6 +209,30 @@ def _manifest_equivalent(stored_manifest_text: str,
         return False
     return sorted((ref.kind, str(ref.id), ref.label or "") for ref in parsed) == \
         sorted((ref.kind, str(ref.id), ref.label or "") for ref in refs)
+
+
+def _verify_content_pins(connection: Connection, canonical: CanonicalDocument) -> None:
+    """Resolve public pins without consulting the latest pointers or private tables."""
+    for chart in canonical.live_charts:
+        definition = load_chart_definition(connection, chart.chart_definition_version_id,
+                                           error_path="liveChart.chart_definition_version_id")
+        selection = ChartSelection.model_validate(chart.selection)
+        validate_selection_against_definition(definition, selection.start, selection.end,
+                                              selection.filters)
+        require_approved_dataset(connection, chart.observed_dataset_version_id,
+                                 "liveChart.observed_dataset_version_id")
+        require_metric_coverage(connection, definition, chart.observed_dataset_version_id,
+                                error_path="liveChart.observed_dataset_version_id")
+    for table in canonical.data_tables:
+        if table.dataset_version_id is not None:
+            require_approved_dataset(connection, table.dataset_version_id,
+                                     "dataTable.dataset_version_id")
+    for insight in canonical.insights:
+        context = ResolvedContext.model_validate(insight.context)
+        verify_chart_context(connection, context, resolved_at=datetime.now(UTC))
+    for model in canonical.model_results:
+        verify_model_result_pins(connection, model, error_path="modelResult")
+    validate_public_targets(connection, canonical)
 
 
 def _verify_manifest_targets(connection: Connection,
@@ -236,6 +284,7 @@ def main(argv: list[str] | None = None) -> int:
                                   version=args.version, title=args.title,
                                   content=content, evidence_manifest=manifest)
     except (PublicationSeedError, PublicationSeedConflict, OperatorDatabaseError,
+            DocumentSchemaError, DeliveryInvalidFilter, ValidationError,
             json.JSONDecodeError, OSError) as error:
         print(f"Publication seed refused: {error}", file=sys.stderr)
         return 4
