@@ -166,14 +166,22 @@ describe("canonical validator — valid P0 documents", () => {
     expect(graph.chartBlockIds).toContain("66666666-6666-4666-8666-666666666666");
   });
 
-  it("preserves inspected source filters in chart blocks and rejects non-string values", () => {
+  it("preserves inspected filter values verbatim in chart blocks and rejects malformed shapes", () => {
     const block = { type: "liveChart", attrs: { block_id: UUID_A,
       chart_definition_version_id: UUID_C, observed_dataset_version_id: UUID_D,
       mode: "live", snapshot_id: null, selection: { ...SELECTION, filters: { source: "SRC-LLAMA" } } } };
     const parsed = validateCanonicalDocument(doc([block]));
     expect(parsed.content[0].attrs).toMatchObject({ selection: { filters: { source: "SRC-LLAMA" } } });
-    expect(() => validateCanonicalDocument(doc([{ ...block, attrs: { ...block.attrs,
-      selection: { ...SELECTION, filters: { source: ["SRC-LLAMA"] } } } }]))).toThrow(CanonicalDocumentError);
+    // NI-071: the multi-value comparison form is the canonical list shape
+    // and is preserved verbatim too; genuinely malformed values are refused.
+    const multi = validateCanonicalDocument(doc([{ ...block, attrs: { ...block.attrs,
+      selection: { ...SELECTION, filters: { source: ["SRC-LLAMA", "SRC-DASHBOARD"] } } } }]));
+    expect(multi.content[0].attrs).toMatchObject({
+      selection: { filters: { source: ["SRC-LLAMA", "SRC-DASHBOARD"] } } });
+    for (const invalid of [{ source: [] }, { source: [42] }, { source: [""] }]) {
+      expect(() => validateCanonicalDocument(doc([{ ...block, attrs: { ...block.attrs,
+        selection: { ...SELECTION, filters: invalid } } }]))).toThrow(CanonicalDocumentError);
+    }
   });
 
   it("accepts an empty paragraph with an empty inline content array", () => {

@@ -18,6 +18,8 @@ import type { components } from "@near-intelligence/shared-types";
 
 import { loadServerEnv } from "@/lib/env";
 
+import type { FiltersSelection } from "../filters/filter-values";
+
 import {
   apiErrorResponseSchema,
   chartDefinitionResponseSchema,
@@ -155,8 +157,12 @@ export interface ChartViewRequest {
   end: string;
   /** "latest" or a pinned immutable dataset version id. */
   datasetVersion: string;
-  /** Values already validated against the definition version's filter schema. */
-  filters: Record<string, string>;
+  /**
+   * Values already validated against the definition version's filter
+   * schema: one approved string, or a list for a `multi_value` dimension
+   * (NI-071 comparison form; the server fans out one series per value).
+   */
+  filters: FiltersSelection;
 }
 
 /** GET /api/charts/{chart_id}/view — resolved ChartView for one selection. */

@@ -42,6 +42,7 @@ import type {
   TooltipComponentOption,
 } from "echarts/components";
 
+import { asValueList } from "../filters/filter-values";
 import { boundPrefix, compactAxisNumber, formatDecimal, utcDateLabel } from "./format";
 import { rendererSupports } from "./view-types";
 import type { ChartViewResponse, Observation, SeriesResponse } from "./view-types";
@@ -260,6 +261,33 @@ function buildSummary(
   return parts.join(" ");
 }
 
+
+/**
+ * NI-071: one display name per series. A multi-value comparison fan-out
+ * resolves several series of the same bound metric; they are distinguished
+ * by their exact-match filter values (the server echoes one selected value
+ * per series), while every other view keeps the bare metric title.
+ */
+function seriesDisplayNames(view: ChartViewResponse): string[] {
+  const repeated = new Set<string>();
+  const seen = new Set<string>();
+  for (const series of view.series) {
+    if (seen.has(series.metric.id)) {
+      repeated.add(series.metric.id);
+    }
+    seen.add(series.metric.id);
+  }
+  return view.series.map((series) => {
+    if (!repeated.has(series.metric.id)) {
+      return series.metric.title;
+    }
+    const suffix = Object.entries(series.selection.filters).sort()
+      .map(([key, values]) => `${key}: ${asValueList(values).join(", ")}`)
+      .join("; ");
+    return suffix ? `${series.metric.title} — ${suffix}` : series.metric.title;
+  });
+}
+
 function seriesColor(index: number): string {
   return CHART_SERIES_COLORS[index % CHART_SERIES_COLORS.length];
 }
@@ -278,11 +306,13 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
   const legendSpace = view.series.length > 1 ? 10 : 0;
   const layout = panelLayout(groups.length, legendSpace);
 
+  // NI-071: compared fan-out series carry their distinguishing filter values.
+  const displayNames = seriesDisplayNames(view);
   // Exact-value lookup per series/grid index for the tooltip formatter.
-  const exactSeries: ExactCell[][] = view.series.map((seriesResponse) => {
+  const exactSeries: ExactCell[][] = view.series.map((seriesResponse, index) => {
     const byDate = pointsByDate(seriesResponse);
     return gridDates.map((date) =>
-      exactCell(byDate.get(date), seriesResponse.metric.title, seriesResponse.metric.unit, date),
+      exactCell(byDate.get(date), displayNames[index], seriesResponse.metric.unit, date),
     );
   });
 
@@ -302,7 +332,7 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
       if (isBar) {
         series.push({
           id: seriesResponse.metric.id,
-          name: seriesResponse.metric.title,
+          name: displayNames[seriesIndex],
           type: "bar",
           xAxisIndex: gridIndex,
           yAxisIndex: gridIndex,
@@ -313,7 +343,7 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
       } else {
         series.push({
           id: seriesResponse.metric.id,
-          name: seriesResponse.metric.title,
+          name: displayNames[seriesIndex],
           type: "line",
           xAxisIndex: gridIndex,
           yAxisIndex: gridIndex,
@@ -515,6 +545,8 @@ export function buildChart(view: ChartViewResponse, options: BuildOptions = {}):
 
   const gridDates = unionGrid(view.series);
   const isScatter = view.definition.visualization_type === "scatter";
+  // NI-071: compared fan-out series carry their distinguishing filter values.
+  const displayNames = seriesDisplayNames(view);
 
   // The accessible exact-value table.
   let table: TableModel;
@@ -545,7 +577,7 @@ export function buildChart(view: ChartViewResponse, options: BuildOptions = {}):
     };
   } else {
     table = {
-      columns: view.series.map((s) => ({ label: s.metric.title, unit: s.metric.unit })),
+      columns: view.series.map((s, index) => ({ label: displayNames[index], unit: s.metric.unit })),
       rows: gridDates.map((date) => ({
         date,
         cells: view.series.map((seriesResponse) => {

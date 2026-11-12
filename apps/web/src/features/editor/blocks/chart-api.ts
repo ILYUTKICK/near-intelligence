@@ -3,6 +3,7 @@ import type { components } from "@near-intelligence/shared-types";
 import { z } from "zod";
 import { privateFetch } from "@/lib/auth/private-fetch";
 import { chartViewResponseSchema } from "@/features/charts/library/catalog-schema";
+import { canonicalFilters } from "@/features/charts/filters/filter-values";
 import type { ChartSelection } from "@/features/charts/renderer/ChartView";
 
 export type DocumentChartView = Omit<components["schemas"]["DocumentChartViewResponse"], "latest_approved_dataset_version_id">
@@ -22,7 +23,7 @@ export async function loadDocumentChart(documentId: string, definitionId: string
   const view = documentChartViewSchema.parse(result.data) as DocumentChartView;
   if (view.definition.id !== definitionId || (datasetVersion !== "latest" && view.dataset.id !== datasetVersion)
     || view.selection.start !== selection.start || view.selection.end !== selection.end
-    || JSON.stringify(Object.entries(view.selection.filters).sort()) !== JSON.stringify(Object.entries(selection.filters ?? {}).sort())) {
+    || JSON.stringify(canonicalFilters(view.selection.filters)) !== JSON.stringify(canonicalFilters(selection.filters ?? {}))) {
     throw new Error("The returned chart context does not match the requested inspection. Nothing was changed.");
   }
   return view;

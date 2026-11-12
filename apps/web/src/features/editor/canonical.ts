@@ -21,6 +21,8 @@
 import type { JSONContent } from "@tiptap/core";
 import type { components } from "@near-intelligence/shared-types";
 
+import type { FilterValue } from "@/features/charts/filters/filter-values";
+
 export const CANONICAL_SCHEMA_VERSION = 1;
 export const MAX_TOP_LEVEL_BLOCKS = 200;
 export const MAX_RICH_DEPTH = 3;
@@ -105,7 +107,15 @@ export interface CanonicalRichList {
 
 export type RichFragment = Array<CanonicalParagraph | CanonicalRichList>;
 
-export type CanonicalSelection = components["schemas"]["ChartSelection"];
+/**
+ * NI-071: document content preserves the submitted filter values verbatim
+ * (byte-exact revisions), so the canonical mirror accepts both the
+ * pre-NI-071 bare-string values and the canonical list form instead of
+ * silently rewriting persisted content.
+ */
+export type CanonicalSelection = Omit<components["schemas"]["ChartSelection"], "filters"> & {
+  filters: Record<string, FilterValue>;
+};
 
 /** Frozen chart inspection record (API_SPECIFICATION ResolvedContext). */
 export interface CanonicalResolvedContext {
@@ -409,14 +419,22 @@ function parseSelection(value: unknown, path: string, issues: IssueCollector): C
   requireEnum(selection.frequency, `${path}.frequency`, ["day"], issues);
   const filters = requireObject(selection.filters, `${path}.filters`, issues);
   if (Object.keys(filters).length > 32) issues.add(`${path}.filters`, "too_many_filters");
-  const checked: Array<[string, string]> = [];
+  // NI-071: one value is a non-empty string of at most 200 characters; a
+  // multi-value selection is a non-empty list of such strings (at most 32).
+  // Values are preserved exactly — the API checks the immutable definition's
+  // domain, and persisted revisions stay byte-identical.
+  const isFilterValue = (value: unknown): boolean =>
+    typeof value === "string" && value.length > 0 && value.length <= 200;
+  const checked: Array<[string, FilterValue]> = [];
   for (const [key, value] of Object.entries(filters)) {
-    if (!key || key.length > 80 || typeof value !== "string" || !value || value.length > 200) {
+    const shapeOk = isFilterValue(value)
+      || (Array.isArray(value) && value.length > 0 && value.length <= 32
+        && value.every(isFilterValue));
+    if (!key || key.length > 80 || !shapeOk) {
       issues.add(`${path}.filters`, "invalid_filter_shape");
     }
-    checked.push([key, value as string]);
+    checked.push([key, value as FilterValue]);
   }
-  // Values are preserved exactly; the API checks the immutable definition's domain.
   return { start, end, frequency: "day", filters: Object.fromEntries(checked) };
 }
 

@@ -18,6 +18,7 @@ import { SeriesTable } from "./SeriesTable";
 import { buildChart, displayUnits } from "./option-builder";
 import type { ChartFactory, EChartsLike } from "./chart-factory";
 import { defaultChartFactory } from "./chart-factory";
+import type { FiltersSelection } from "../filters/filter-values";
 import type { ChartDefinitionResponse, ChartViewResponse } from "./view-types";
 import { RENDERER_VERSION } from "./view-types";
 
@@ -25,8 +26,12 @@ import { RENDERER_VERSION } from "./view-types";
 export interface ChartSelection {
   start: string;
   end: string;
-  /** Values already validated against the definition's closed filter schema. */
-  filters?: Record<string, string>;
+  /**
+   * Values already validated against the definition's closed filter schema:
+   * one approved string, or a list for a `multi_value` dimension (NI-071
+   * comparison form; the resolved view carries one series per value).
+   */
+  filters?: FiltersSelection;
 }
 
 /**
@@ -39,7 +44,7 @@ export type ChartViewLoader = (args: {
   definitionId: string;
   start: string;
   end: string;
-  filters: Record<string, string>;
+  filters: FiltersSelection;
   signal: AbortSignal;
 }) => Promise<ChartViewResponse>;
 
