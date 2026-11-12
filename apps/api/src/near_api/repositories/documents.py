@@ -13,15 +13,16 @@ projection regeneration belong to the document revision service (NI-036);
 delete cascades and scientific-data retention follow DATABASE_SCHEMA.md.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Connection, and_, delete, insert, select, update
+from sqlalchemy import Connection, and_, delete, false, func, insert, or_, select, update
 from sqlalchemy.sql.elements import ColumnElement
 
 from near_api.auth.principal import Principal
-from near_api.db.models import Document, DocumentBlock, DocumentVersion
+from near_api.db.models import Document, DocumentBlock, DocumentOrganization, DocumentVersion
 from near_api.db.security import (
     Page,
     ResourceNotFound,
@@ -42,6 +43,11 @@ class DocumentRow:
     current_version_id: UUID | None
     created_at: datetime
     updated_at: datetime
+    # NI-072 organization metadata, joined from app.document_organization.
+    # Honest defaults for callers that select only the base columns: a
+    # document without an organization row has no tags and is not favorited.
+    tags: tuple[str, ...] = ()
+    favorite: bool = False
 
 
 @dataclass(frozen=True)
@@ -70,7 +76,12 @@ class DocumentBlockRow:
 
 
 def _document_row(mapping) -> DocumentRow:
-    return DocumentRow(**mapping)
+    data = dict(mapping)
+    # Organization columns (when selected) carry the LEFT JOIN's NULL for a
+    # document without metadata; map them to the honest empty defaults.
+    data["tags"] = tuple(data.pop("org_tags", None) or ())
+    data["favorite"] = bool(data.pop("org_favorite", None) or False)
+    return DocumentRow(**data)
 
 
 def _version_row(mapping) -> DocumentVersionRow:
@@ -124,16 +135,41 @@ def get_document(connection: Connection, principal: Principal,
 
 
 def list_documents(connection: Connection, principal: Principal, *, search: str | None = None,
+                   tags: Sequence[str] | None = None, favorite: bool | None = None,
                    limit: int | None = None, offset: int | None = None) -> Page:
     """List/search the principal's documents, newest first, owner-scoped.
 
     ``search`` is a case-insensitive substring match; wildcard characters in
     the caller's text are escaped so the pattern stays a literal substring.
-    Owner scoping is applied before pagination inside :func:`scoped_page`.
+    ``tags`` (NI-072) narrows to documents carrying EVERY listed tag — the
+    normalized values are exact array elements, never a substring match.
+    ``favorite`` filters to favorited (True) or non-favorited (False)
+    documents; a document without an organization row is never favorited.
+    Owner scoping and every filter are applied before pagination inside
+    :func:`scoped_page`, so the count and the page share one scope.
+
+    The list order stays ``updated_at DESC, id`` and the organization LEFT
+    JOIN never reorders or multiplies rows (at most one metadata row per
+    document via its primary key); metadata edits write only
+    ``app.document_organization``, so tagging cannot move a document's
+    position or recency.
     """
-    query = select(*_DOCUMENT_COLUMNS)
+    query = select(*_DOCUMENT_COLUMNS,
+                   DocumentOrganization.tags.label("org_tags"),
+                   DocumentOrganization.favorite.label("org_favorite")).outerjoin(
+        DocumentOrganization, DocumentOrganization.document_id == Document.id)
     if search is not None:
         query = query.where(Document.title.ilike(_literal_substring(search), escape="\\"))
+    if tags:
+        for tag in tags:
+            query = query.where(DocumentOrganization.tags.contains([tag]))
+    if favorite is not None:
+        if favorite:
+            query = query.where(DocumentOrganization.favorite.is_(True))
+        else:
+            # "Not favorited" includes documents without any metadata row.
+            query = query.where(or_(DocumentOrganization.document_id.is_(None),
+                                    DocumentOrganization.favorite.is_(false())))
     page = scoped_page(connection,
                        query.order_by(Document.updated_at.desc(), Document.id),
                        owner_scope(Document.owner_id, principal.id),

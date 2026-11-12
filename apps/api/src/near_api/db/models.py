@@ -21,6 +21,9 @@ canonical analytical contexts to immutable chart definition versions.
 NI-058 adds the owner-scoped Markdown ZIP export jobs (export_jobs): the
 queued/leased/TTL-bounded job rows that freeze the NI-056 export IR and hold
 the finished owner-private ZIP bytes.
+NI-072 adds the private document organization metadata (document_organization):
+per-document private tags and favorite flag, separate from the immutable
+research chain — tagging never touches document_versions or documents.
 Remaining domain tables belong to their owning tasks and must keep these
 declarations in sync for the Alembic metadata drift check.
 """
@@ -46,7 +49,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -106,6 +109,40 @@ class Document(Base):
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class DocumentOrganization(Base):
+    """NI-072 private per-document organization metadata (tags + favorite).
+
+    Mirrors migration 0014 exactly (DATABASE_SCHEMA.md "document_organization").
+    Exactly one optional row per owned document: the composite FK cascades
+    with the document, so deleting a document removes its organization state
+    without touching the immutable revision chain. Tags are bounded private
+    text — the database CHECK re-validates the documented bounds (<= 20
+    tags/document, 1..40 chars, normalized lowercase form, duplicate-free) on
+    every write. Organization writes never UPDATE app.documents, so tagging
+    neither creates a revision nor reorders the updated_at-DESC list; this
+    table's own updated_at carries metadata recency only.
+    """
+
+    __tablename__ = "document_organization"
+    __table_args__ = (
+        CheckConstraint("app.is_valid_tag_set(tags)", name="tags"),
+        UniqueConstraint("document_id", "owner_id", name="uq_document_organization_id_owner"),
+        ForeignKeyConstraint(["document_id", "owner_id"],
+                             ["app.documents.id", "app.documents.owner_id"],
+                             name="fk_document_organization_document", ondelete="CASCADE"),
+    )
+
+    document_id: Mapped[UUID] = mapped_column(primary_key=True)
+    owner_id: Mapped[UUID] = mapped_column(nullable=False)
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]"))
+    favorite: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                 server_default=func.now())
 
 
 class DocumentVersion(Base):
