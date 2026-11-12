@@ -81,8 +81,9 @@ class ContractTests(TestCase):
             # NI-036 added the document revision routes, NI-037 added the
             # version detail route, NI-032 added the public
             # metrics/chart/dataset/source delivery routes, NI-054 added
-            # the public model definition/readiness/run routes and NI-041
-            # added the chart-block insertion route.
+            # the public model definition/readiness/run routes, NI-041
+            # added the chart-block insertion route and NI-060 added the
+            # share capability routes.
             self.assertEqual(set(schema["paths"]), {
                 "/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
@@ -112,6 +113,12 @@ class ContractTests(TestCase):
                 "/api/documents/{document_id}/exports",
                 "/api/documents/{document_id}/exports/{job_id}",
                 "/api/documents/{document_id}/exports/{job_id}/download",
+                "/api/documents/{document_id}/shares",
+                "/api/documents/{document_id}/shares/preview",
+                "/api/documents/{document_id}/shares/{share_id}",
+                "/api/shares/{token}",
+                "/api/shares/{token}/charts/{block_id}/view",
+                "/api/shares/{token}/charts/{block_id}/csv",
             })
             self.assertIn("DecimalString", schema["components"]["schemas"])
             self.assertFalse(schema["components"]["schemas"]["Selection"]["additionalProperties"])

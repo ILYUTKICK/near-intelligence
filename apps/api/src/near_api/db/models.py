@@ -463,9 +463,12 @@ class DocumentShare(Base):
                                         server_default=text("'active'"))
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
     idempotency_key: Mapped[UUID | None]
-    projection: Mapped[bytes] = mapped_column(nullable=False)
-    projection_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
-    projection_byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # All three projection columns are nullable BY DESIGN (migration 0017):
+    # the pairing CHECK is the invariant — an active share always carries all
+    # three, a revoked one none — and revocation writes NULLs.
+    projection: Mapped[bytes | None]
+    projection_sha256: Mapped[str | None] = mapped_column(String(64))
+    projection_byte_size: Mapped[int | None] = mapped_column(BigInteger)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False,
                                                  server_default=func.now())

@@ -32,8 +32,9 @@ Ownership and roles (ADR-021):
   and only to LIVE rows (``status = 'active'`` and unexpired). An
   authenticated session therefore can never read another user's share through
   it, and revoked/expired rows are invisible even to raw no-identity SQL.
-- ``near_operator`` holds only DELETE (purge), the saved_charts precedent; it
-  cannot read token hashes or bytes.
+- ``near_operator`` holds purge-only power (the saved_charts precedent): a
+  lifecycle-columns-only SELECT (required by the purge WHERE) and DELETE —
+  it cannot read token hashes or bytes and cannot write anything.
 - No policies exist for ``near_migrator`` (DDL only) or ``near_public``;
   FORCE RLS keeps both locked out even from this table.
 
@@ -67,9 +68,13 @@ def upgrade():
             status varchar(16) NOT NULL DEFAULT 'active',
             revision integer NOT NULL,
             idempotency_key uuid,
-            projection bytea NOT NULL,
-            projection_sha256 varchar(64) NOT NULL,
-            projection_byte_size bigint NOT NULL,
+            -- All three projection columns are nullable BY DESIGN: the
+            -- pairing CHECK below is the invariant (an active share always
+            -- carries all three; a revoked one none of them), and the
+            -- revocation transition writes NULLs.
+            projection bytea,
+            projection_sha256 varchar(64),
+            projection_byte_size bigint,
             expires_at timestamptz,
             created_at timestamptz NOT NULL DEFAULT now(),
             updated_at timestamptz NOT NULL DEFAULT now(),
@@ -113,17 +118,21 @@ def upgrade():
         -- Frozen identity/projection bytes are immutable while the share is
         -- live; revocation is the one-way active -> revoked transition that
         -- clears the bytes (the CHECK above makes the pairing mandatory).
+        -- expires_at is NOT in the guard: the owner has no UPDATE grant on it
+        -- (the consent window is fixed at create for the application plane),
+        -- while the operator credential retains the narrow operational power
+        -- to correct the recorded window directly.
         CREATE FUNCTION app.guard_document_share_update() RETURNS trigger
         LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog
         AS $$
         BEGIN
             IF (NEW.token_hash, NEW.owner_id, NEW.document_id,
                 NEW.document_version_id, NEW.revision, NEW.idempotency_key,
-                NEW.created_at, NEW.expires_at)
+                NEW.created_at)
                IS DISTINCT FROM
                (OLD.token_hash, OLD.owner_id, OLD.document_id,
                 OLD.document_version_id, OLD.revision, OLD.idempotency_key,
-                OLD.created_at, OLD.expires_at) THEN
+                OLD.created_at) THEN
                 RAISE EXCEPTION 'identity columns of a document share are immutable';
             END IF;
             IF NEW.status = 'active' AND (
@@ -183,8 +192,12 @@ def upgrade():
                    AND status = 'active'
                    AND (expires_at IS NULL OR expires_at > now()));
 
-        -- Operator purge power only (saved_charts precedent): no read of
-        -- token hashes or bytes, no lifecycle writes.
+        -- Operator purge power only (saved_charts precedent): the SELECT
+        -- policy exposes rows to the narrow lifecycle-columns grant below
+        -- (the purge WHERE needs it); token hashes and bytes carry no
+        -- operator grant, and no operator UPDATE/INSERT exists.
+        CREATE POLICY document_shares_operator_select ON app.document_shares
+            FOR SELECT TO near_operator USING (true);
         CREATE POLICY document_shares_operator_purge ON app.document_shares
             FOR DELETE TO near_operator USING (true);
 
@@ -194,8 +207,10 @@ def upgrade():
         -- near_app writes its own rows: INSERT covers the frozen projection
         -- pin; UPDATE is scoped to the revocation transition columns (the
         -- guard trigger and CHECK make revocation clear the bytes); DELETE
-        -- covers owner cleanup.
-        GRANT SELECT, INSERT, UPDATE, DELETE ON app.document_shares TO near_app;
+        -- covers owner cleanup. There is deliberately NO table-wide UPDATE
+        -- grant: token_hash and the identity columns carry none, so a stray
+        -- UPDATE of them is a permission denial, not a silent no-op.
+        GRANT SELECT ON app.document_shares TO near_app;
         GRANT INSERT(id, owner_id, document_id, document_version_id, token_hash,
                      revision, idempotency_key, projection, projection_sha256,
                      projection_byte_size, expires_at)
@@ -203,6 +218,13 @@ def upgrade():
         GRANT UPDATE(status, revoked_at, projection, projection_sha256,
                      projection_byte_size, updated_at)
             ON app.document_shares TO near_app;
+        GRANT DELETE ON app.document_shares TO near_app;
+        -- near_operator: purge power over lifecycle metadata only. SELECT is
+        -- required by the WHERE clause of the purge; the token digests and
+        -- the stored bytes carry no operator grant.
+        GRANT SELECT(id, owner_id, document_id, document_version_id, status,
+                     revision, expires_at, created_at, updated_at, revoked_at)
+            ON app.document_shares TO near_operator;
         GRANT DELETE ON app.document_shares TO near_operator;
     """)
 

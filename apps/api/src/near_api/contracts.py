@@ -48,6 +48,13 @@ def install_contracts(app: FastAPI) -> None:
         response.headers["X-Request-ID"] = str(request.state.request_id)
         if request.url.path == "/api/saved-charts" or request.url.path.startswith("/api/saved-charts/"):
             response.headers["Cache-Control"] = "no-store"
+        if "/shares" in request.url.path:
+            # NI-060 (ADR-021): EVERY share response — owner plane and token
+            # plane, success AND typed deny — is never cacheable and never
+            # leaks the capability token through a referrer. setdefault keeps
+            # the route-set headers authoritative.
+            response.headers.setdefault("Cache-Control", "no-store")
+            response.headers.setdefault("Referrer-Policy", "no-referrer")
         return response
 
     @app.exception_handler(RequestValidationError)

@@ -1171,6 +1171,63 @@
         "title": "DocumentSaveResponse",
         "type": "object"
       },
+      "DocumentShareCreateRequest": {
+        "additionalProperties": false,
+        "description": "The explicit consent to publish one frozen revision.\n\n``acknowledged_revision`` and ``visible_scope`` name the revision and the\nvisible scope; ``preview_sha256`` binds the consent to the exact preview\nbytes (server-verified).",
+        "properties": {
+          "acknowledged_revision": {
+            "minimum": 1.0,
+            "title": "Acknowledged Revision",
+            "type": "integer"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "preview_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Sha256",
+            "type": "string"
+          },
+          "visible_scope": {
+            "$ref": "#/components/schemas/ShareScopeSummary"
+          }
+        },
+        "required": [
+          "acknowledged_revision",
+          "visible_scope",
+          "preview_sha256"
+        ],
+        "title": "DocumentShareCreateRequest",
+        "type": "object"
+      },
+      "DocumentShareListResponse": {
+        "additionalProperties": false,
+        "description": "The owned document's shares, newest first (bounded, no pagination).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ShareSummaryResponse"
+            },
+            "maxItems": 100,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "DocumentShareListResponse",
+        "type": "object"
+      },
       "DocumentSummary": {
         "additionalProperties": false,
         "description": "Current-revision summary of an owned document.\n\n`revision`/`current_version_id` come from the live app.documents row, so\na summary always reflects the document's current revision. A document\nthat has no saved revision yet carries `current_version_id: null`.",
@@ -4236,6 +4293,1003 @@
           "sources"
         ],
         "title": "SeriesResponse",
+        "type": "object"
+      },
+      "ShareChartBlock": {
+        "additionalProperties": false,
+        "description": "A liveChart block with its fully resolved frozen evidence.\n\n``view`` is the embedded NI-043 reconstruction (the pinned\n``ChartViewResponse``); the public chart routes serve it and its derived\nCSV verbatim from the stored projection bytes. Unlike the export IR, no\nsnapshot id is carried.",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "liveChart",
+            "title": "Block Type",
+            "type": "string"
+          },
+          "chart_definition_version_id": {
+            "format": "uuid",
+            "title": "Chart Definition Version Id",
+            "type": "string"
+          },
+          "mode": {
+            "const": "live",
+            "title": "Mode",
+            "type": "string"
+          },
+          "observed_dataset_version_id": {
+            "format": "uuid",
+            "title": "Observed Dataset Version Id",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/ChartSelection"
+          },
+          "view": {
+            "$ref": "#/components/schemas/ChartViewResponse"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "chart_definition_version_id",
+          "mode",
+          "selection",
+          "observed_dataset_version_id",
+          "view"
+        ],
+        "title": "ShareChartBlock",
+        "type": "object"
+      },
+      "ShareCitationReference": {
+        "additionalProperties": false,
+        "description": "One public citation artifact referenced by an evidence block.",
+        "properties": {
+          "artifact_id": {
+            "format": "uuid",
+            "title": "Artifact Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "title": "ShareCitationReference",
+        "type": "object"
+      },
+      "ShareCreatedResponse": {
+        "additionalProperties": false,
+        "description": "The owner's share record after create (or idempotent replay).\n\n``share_token`` is returned exactly ONCE \u2014 the first (non-replay) create.\nA replay identifies the same share but cannot re-emit the unrecoverable\ntoken; the owner revokes and creates a new share to obtain a new link.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_version_id": {
+            "format": "uuid",
+            "title": "Document Version Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "share_path": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Path"
+          },
+          "share_token": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Token"
+          },
+          "status": {
+            "const": "active",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "document_id",
+          "document_version_id",
+          "revision",
+          "status",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "ShareCreatedResponse",
+        "type": "object"
+      },
+      "ShareDataTableBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "dataTable",
+            "title": "Block Type",
+            "type": "string"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ShareDataTableColumn"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Columns",
+            "type": "array"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShareDataTableDatasetReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "columns"
+        ],
+        "title": "ShareDataTableBlock",
+        "type": "object"
+      },
+      "ShareDataTableColumn": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "string",
+              "number",
+              "date"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "type"
+        ],
+        "title": "ShareDataTableColumn",
+        "type": "object"
+      },
+      "ShareDataTableDatasetReference": {
+        "additionalProperties": false,
+        "description": "The approved dataset version an authored table projects from.",
+        "properties": {
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "dataset_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Dataset Key",
+            "type": "string"
+          },
+          "dataset_version_id": {
+            "format": "uuid",
+            "title": "Dataset Version Id",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dataset_version_id",
+          "dataset_key",
+          "version",
+          "content_sha256"
+        ],
+        "title": "ShareDataTableDatasetReference",
+        "type": "object"
+      },
+      "ShareDividerBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "divider",
+            "title": "Block Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id"
+        ],
+        "title": "ShareDividerBlock",
+        "type": "object"
+      },
+      "ShareDocumentMeta": {
+        "additionalProperties": false,
+        "description": "Revision attribution of the published projection.\n\n``title`` is the document row's title read in the same transaction as the\nrevision content while that revision was the acknowledged current version.\nNo author identity is carried: the share publishes content, not its\nowner's identity.",
+        "properties": {
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "limitations": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Limitations",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "schema_version": {
+            "minimum": 1.0,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "revision",
+          "schema_version",
+          "content_sha256",
+          "created_at",
+          "limitations"
+        ],
+        "title": "ShareDocumentMeta",
+        "type": "object"
+      },
+      "ShareEvidenceBlock": {
+        "additionalProperties": false,
+        "description": "An evidence relationship without its private explanation.\n\n``target_ref`` is the resolvable public reference of the target: the\nin-revision target BLOCK id for ``insight``/``chart_block`` targets, the\npublished run id for ``model_run`` and the public artifact id for\n``citation``. The private evidence/hypothesis ids are excluded.",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "evidence",
+            "title": "Block Type",
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "supporting",
+              "contradicting",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "target_kind": {
+            "enum": [
+              "insight",
+              "chart_block",
+              "model_run",
+              "citation"
+            ],
+            "title": "Target Kind",
+            "type": "string"
+          },
+          "target_ref": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Ref"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "classification",
+          "target_kind",
+          "target_ref"
+        ],
+        "title": "ShareEvidenceBlock",
+        "type": "object"
+      },
+      "ShareHeadingBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "heading",
+            "title": "Block Type",
+            "type": "string"
+          },
+          "level": {
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Level",
+            "type": "integer"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/RichTextRun"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "level",
+          "runs"
+        ],
+        "title": "ShareHeadingBlock",
+        "type": "object"
+      },
+      "ShareHypothesisBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment": {
+            "enum": [
+              "untested",
+              "supported",
+              "mixed",
+              "weakened",
+              "insufficient_data"
+            ],
+            "title": "Assessment",
+            "type": "string"
+          },
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "hypothesis",
+            "title": "Block Type",
+            "type": "string"
+          },
+          "statement": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Statement",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "statement",
+          "assessment"
+        ],
+        "title": "ShareHypothesisBlock",
+        "type": "object"
+      },
+      "ShareInsightBlock": {
+        "additionalProperties": false,
+        "description": "A structured observation card without its private editorial metadata.\n\nThe insight's internal id, authorship timestamps and hypothesis link are\nexcluded; ``context`` keeps only public-safe pins (chart definition /\ndataset version / selection / resolved-at, or the published run\nreference).",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "insight",
+            "title": "Block Type",
+            "type": "string"
+          },
+          "body": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList-Output",
+                  "ordered_list": "#/components/schemas/RichTextList-Output",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList-Output"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Body",
+            "type": "array"
+          },
+          "classification": {
+            "enum": [
+              "supporting",
+              "contradicting",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedContext"
+              },
+              {
+                "$ref": "#/components/schemas/ModelContext"
+              }
+            ],
+            "title": "Context"
+          },
+          "insight_type": {
+            "enum": [
+              "observation",
+              "hypothesis",
+              "risk",
+              "conclusion"
+            ],
+            "title": "Insight Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "insight_type",
+          "classification",
+          "body",
+          "context"
+        ],
+        "title": "ShareInsightBlock",
+        "type": "object"
+      },
+      "ShareListBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "enum": [
+              "bullet_list",
+              "ordered_list"
+            ],
+            "title": "Block Type",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RichTextListItem-Output"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "items"
+        ],
+        "title": "ShareListBlock",
+        "type": "object"
+      },
+      "ShareModelRunReference": {
+        "additionalProperties": false,
+        "description": "One published model run referenced by the projection (NI-054).",
+        "properties": {
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "spec_id": {
+            "maxLength": 80,
+            "minLength": 3,
+            "title": "Spec Id",
+            "type": "string"
+          },
+          "spec_version": {
+            "minimum": 1.0,
+            "title": "Spec Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "spec_id",
+          "spec_version"
+        ],
+        "title": "ShareModelRunReference",
+        "type": "object"
+      },
+      "ShareParagraphBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "paragraph",
+            "title": "Block Type",
+            "type": "string"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/RichTextRun"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "runs"
+        ],
+        "title": "ShareParagraphBlock",
+        "type": "object"
+      },
+      "SharePreviewResponse": {
+        "additionalProperties": false,
+        "description": "The exact projection that would be published, with its identity.",
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/ShareProjection"
+          },
+          "projection_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Projection Sha256",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ShareScopeSummary"
+          }
+        },
+        "required": [
+          "document_id",
+          "revision",
+          "projection",
+          "projection_sha256",
+          "scope"
+        ],
+        "title": "SharePreviewResponse",
+        "type": "object"
+      },
+      "ShareProjection": {
+        "additionalProperties": false,
+        "description": "The complete public payload of one share (stored bytes = this).",
+        "properties": {
+          "blocks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/ShareListBlock",
+                  "dataTable": "#/components/schemas/ShareDataTableBlock",
+                  "divider": "#/components/schemas/ShareDividerBlock",
+                  "evidence": "#/components/schemas/ShareEvidenceBlock",
+                  "heading": "#/components/schemas/ShareHeadingBlock",
+                  "hypothesis": "#/components/schemas/ShareHypothesisBlock",
+                  "insight": "#/components/schemas/ShareInsightBlock",
+                  "liveChart": "#/components/schemas/ShareChartBlock",
+                  "ordered_list": "#/components/schemas/ShareListBlock",
+                  "paragraph": "#/components/schemas/ShareParagraphBlock",
+                  "risk": "#/components/schemas/ShareRiskBlock"
+                },
+                "propertyName": "block_type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ShareParagraphBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareHeadingBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareListBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareChartBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareDataTableBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareInsightBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareHypothesisBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareEvidenceBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareRiskBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareDividerBlock"
+                }
+              ]
+            },
+            "maxItems": 200,
+            "title": "Blocks",
+            "type": "array"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/ShareCitationReference"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "document": {
+            "$ref": "#/components/schemas/ShareDocumentMeta"
+          },
+          "model_runs": {
+            "items": {
+              "$ref": "#/components/schemas/ShareModelRunReference"
+            },
+            "title": "Model Runs",
+            "type": "array"
+          },
+          "share_projection_version": {
+            "const": 1,
+            "title": "Share Projection Version",
+            "type": "integer"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ShareSourceReference"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "share_projection_version",
+          "document",
+          "blocks",
+          "sources",
+          "model_runs",
+          "citations"
+        ],
+        "title": "ShareProjection",
+        "type": "object"
+      },
+      "ShareRiskBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "risk",
+            "title": "Block Type",
+            "type": "string"
+          },
+          "body": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList-Output",
+                  "ordered_list": "#/components/schemas/RichTextList-Output",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList-Output"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Body",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "title",
+          "body"
+        ],
+        "title": "ShareRiskBlock",
+        "type": "object"
+      },
+      "ShareScopeSummary": {
+        "additionalProperties": false,
+        "description": "The bounded visible-scope restatement the owner consents to.\n\nThe counts are validated against the rebuilt projection at create time,\nso a stale preview (content edited after it was shown) is refused instead\nof silently publishing something else.",
+        "properties": {
+          "chart_blocks": {
+            "minimum": 0.0,
+            "title": "Chart Blocks",
+            "type": "integer"
+          },
+          "data_table_blocks": {
+            "minimum": 0.0,
+            "title": "Data Table Blocks",
+            "type": "integer"
+          },
+          "insight_blocks": {
+            "minimum": 0.0,
+            "title": "Insight Blocks",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "frozen_revision_allowlist",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_references": {
+            "minimum": 0.0,
+            "title": "Source References",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "chart_blocks",
+          "data_table_blocks",
+          "insight_blocks",
+          "source_references"
+        ],
+        "title": "ShareScopeSummary",
+        "type": "object"
+      },
+      "ShareSourceReference": {
+        "additionalProperties": false,
+        "description": "One data source referenced by the published charts (id + name only).",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "source_id": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "name"
+        ],
+        "title": "ShareSourceReference",
+        "type": "object"
+      },
+      "ShareSummaryResponse": {
+        "additionalProperties": false,
+        "description": "One owner-visible share record (never the token or its hash).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_version_id": {
+            "format": "uuid",
+            "title": "Document Version Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "expired",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "document_id",
+          "document_version_id",
+          "revision",
+          "status",
+          "created_at",
+          "expires_at",
+          "revoked_at"
+        ],
+        "title": "ShareSummaryResponse",
         "type": "object"
       },
       "TolerancesResponse": {
@@ -8295,6 +9349,433 @@
         ]
       }
     },
+    "/api/documents/{document_id}/shares": {
+      "get": {
+        "description": "List the owned document's share records, newest first.\n\nThe lifecycle state is computed at read time (``expired`` the moment the\nconsent window passes), and no record ever carries the token or its hash.",
+        "operationId": "listDocumentShares",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentShareListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The consented revision or preview is not current, or the Idempotency-Key was reused with a different request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "List an owned document's shares (never the token)",
+        "tags": [
+          "shares"
+        ]
+      },
+      "post": {
+        "description": "Publish one read-only share of the owned document's current revision.\n\nThe request is the recorded consent: it names the acknowledged revision\nand the visible scope and carries the preview hash shown to the owner;\nthe server rebuilds the frozen projection in the same transaction and\nrefuses any divergence. The share token appears in this response exactly\nonce (a replay cannot re-emit it) and is never stored \u2014 only its digest.",
+        "operationId": "createDocumentShare",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentShareCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareCreatedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The consented revision or preview is not current, or the Idempotency-Key was reused with a different request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "Publish the acknowledged revision after explicit consent (the share token is returned once)",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/shares/preview": {
+      "get": {
+        "description": "Build the publication projection of the owned acknowledged revision.\n\nThe response IS the exact payload a consented create of the same revision\nwould store (same builder, same canonical bytes); the owner dialog renders\nit before any consent, and the create request must carry its SHA-256.",
+        "operationId": "previewDocumentShare",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharePreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The consented revision or preview is not current, or the Idempotency-Key was reused with a different request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "Preview exactly what publishing this revision would expose",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/shares/{share_id}": {
+      "delete": {
+        "description": "Revoke the owned share; the stored bytes are cleared with the transition.",
+        "operationId": "revokeDocumentShare",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "share_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Share Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The consented revision or preview is not current, or the Idempotency-Key was reused with a different request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          }
+        },
+        "summary": "Revoke one owned share (denies on the next request)",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
     "/api/documents/{document_id}/versions": {
       "get": {
         "description": "Page the owned document's revisions over the stable revision DESC order.",
@@ -10395,6 +11876,191 @@
         "summary": "Update Saved",
         "tags": [
           "saved-charts"
+        ]
+      }
+    },
+    "/api/shares/{token}": {
+      "get": {
+        "description": "Return the published projection behind one share link.\n\nEvery request re-checks the live share state; revoked, expired and\nunknown links are the same generic 404.",
+        "operationId": "getSharedRevision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareProjection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The share link is unknown, revoked or expired (one generic deny)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation"
+          }
+        },
+        "summary": "Read one shared frozen revision by token (read-only)",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/api/shares/{token}/charts/{block_id}/csv": {
+      "get": {
+        "description": "Return the exact-value CSV derived from the frozen chart view.",
+        "operationId": "getSharedChartCsv",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "block_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Block Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The share link is unknown, revoked or expired (one generic deny)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation"
+          }
+        },
+        "summary": "Download the exact chart data of a shared revision",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/api/shares/{token}/charts/{block_id}/view": {
+      "get": {
+        "description": "Return the pinned chart view stored in the shared projection.",
+        "operationId": "getSharedChartView",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "block_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Block Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartViewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The share link is unknown, revoked or expired (one generic deny)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation"
+          }
+        },
+        "summary": "Read one frozen chart view of a shared revision",
+        "tags": [
+          "shares"
         ]
       }
     },

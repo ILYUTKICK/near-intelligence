@@ -245,8 +245,14 @@ def create_share(engine: Engine, principal: Principal, document_id: UUID,
 
 def list_shares(engine: Engine, principal: Principal,
                 document_id: UUID) -> tuple[ShareRow, ...]:
-    """List the owned document's shares, newest first (bounded)."""
+    """List the owned document's shares, newest first (bounded).
+
+    The document must belong to the principal (the same compositional rule as
+    every private read): a foreign document id is the generic 404-equivalent,
+    never an empty list.
+    """
     with principal_transaction(engine, principal) as connection:
+        get_document(connection, principal, document_id)
         rows = connection.execute(
             select(*_SHARE_COLUMNS)
             .where(DocumentShare.document_id == document_id,

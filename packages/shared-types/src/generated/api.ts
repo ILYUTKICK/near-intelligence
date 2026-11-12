@@ -454,6 +454,83 @@ export interface paths {
         patch: operations["updateDocumentInsight"];
         trace?: never;
     };
+    "/api/documents/{document_id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an owned document's shares (never the token)
+         * @description List the owned document's share records, newest first.
+         *
+         *     The lifecycle state is computed at read time (``expired`` the moment the
+         *     consent window passes), and no record ever carries the token or its hash.
+         */
+        get: operations["listDocumentShares"];
+        put?: never;
+        /**
+         * Publish the acknowledged revision after explicit consent (the share token is returned once)
+         * @description Publish one read-only share of the owned document's current revision.
+         *
+         *     The request is the recorded consent: it names the acknowledged revision
+         *     and the visible scope and carries the preview hash shown to the owner;
+         *     the server rebuilds the frozen projection in the same transaction and
+         *     refuses any divergence. The share token appears in this response exactly
+         *     once (a replay cannot re-emit it) and is never stored — only its digest.
+         */
+        post: operations["createDocumentShare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/shares/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview exactly what publishing this revision would expose
+         * @description Build the publication projection of the owned acknowledged revision.
+         *
+         *     The response IS the exact payload a consented create of the same revision
+         *     would store (same builder, same canonical bytes); the owner dialog renders
+         *     it before any consent, and the create request must carry its SHA-256.
+         */
+        get: operations["previewDocumentShare"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/shares/{share_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke one owned share (denies on the next request)
+         * @description Revoke the owned share; the stored bytes are cleared with the transition.
+         */
+        delete: operations["revokeDocumentShare"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{document_id}/versions": {
         parameters: {
             query?: never;
@@ -800,6 +877,69 @@ export interface paths {
         head?: never;
         /** Update Saved */
         patch: operations["updateSavedChart"];
+        trace?: never;
+    };
+    "/api/shares/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one shared frozen revision by token (read-only)
+         * @description Return the published projection behind one share link.
+         *
+         *     Every request re-checks the live share state; revoked, expired and
+         *     unknown links are the same generic 404.
+         */
+        get: operations["getSharedRevision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shares/{token}/charts/{block_id}/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download the exact chart data of a shared revision
+         * @description Return the exact-value CSV derived from the frozen chart view.
+         */
+        get: operations["getSharedChartCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shares/{token}/charts/{block_id}/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one frozen chart view of a shared revision
+         * @description Return the pinned chart view stored in the shared projection.
+         */
+        get: operations["getSharedChartView"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/health": {
@@ -1333,6 +1473,31 @@ export interface components {
         DocumentSaveResponse: {
             document: components["schemas"]["DocumentSummary"];
             version: components["schemas"]["VersionDetailResponse"];
+        };
+        /**
+         * DocumentShareCreateRequest
+         * @description The explicit consent to publish one frozen revision.
+         *
+         *     ``acknowledged_revision`` and ``visible_scope`` name the revision and the
+         *     visible scope; ``preview_sha256`` binds the consent to the exact preview
+         *     bytes (server-verified).
+         */
+        DocumentShareCreateRequest: {
+            /** Acknowledged Revision */
+            acknowledged_revision: number;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Preview Sha256 */
+            preview_sha256: string;
+            visible_scope: components["schemas"]["ShareScopeSummary"];
+        };
+        /**
+         * DocumentShareListResponse
+         * @description The owned document's shares, newest first (bounded, no pagination).
+         */
+        DocumentShareListResponse: {
+            /** Items */
+            items: components["schemas"]["ShareSummaryResponse"][];
         };
         /**
          * DocumentSummary
@@ -2767,6 +2932,460 @@ export interface components {
             selection: components["schemas"]["ResolvedSelection"];
             /** Sources */
             sources: components["schemas"]["DataSourceResponse"][];
+        };
+        /**
+         * ShareChartBlock
+         * @description A liveChart block with its fully resolved frozen evidence.
+         *
+         *     ``view`` is the embedded NI-043 reconstruction (the pinned
+         *     ``ChartViewResponse``); the public chart routes serve it and its derived
+         *     CSV verbatim from the stored projection bytes. Unlike the export IR, no
+         *     snapshot id is carried.
+         */
+        ShareChartBlock: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "liveChart";
+            /**
+             * Chart Definition Version Id
+             * Format: uuid
+             */
+            chart_definition_version_id: string;
+            /**
+             * Mode
+             * @constant
+             */
+            mode: "live";
+            /**
+             * Observed Dataset Version Id
+             * Format: uuid
+             */
+            observed_dataset_version_id: string;
+            selection: components["schemas"]["ChartSelection"];
+            view: components["schemas"]["ChartViewResponse"];
+        };
+        /**
+         * ShareCitationReference
+         * @description One public citation artifact referenced by an evidence block.
+         */
+        ShareCitationReference: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+        };
+        /**
+         * ShareCreatedResponse
+         * @description The owner's share record after create (or idempotent replay).
+         *
+         *     ``share_token`` is returned exactly ONCE — the first (non-replay) create.
+         *     A replay identifies the same share but cannot re-emit the unrecoverable
+         *     token; the owner revokes and creates a new share to obtain a new link.
+         */
+        ShareCreatedResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Document Version Id
+             * Format: uuid
+             */
+            document_version_id: string;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revision */
+            revision: number;
+            /** Share Path */
+            share_path?: string | null;
+            /** Share Token */
+            share_token?: string | null;
+            /**
+             * Status
+             * @constant
+             */
+            status: "active";
+        };
+        /** ShareDataTableBlock */
+        ShareDataTableBlock: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "dataTable";
+            /** Columns */
+            columns: components["schemas"]["ShareDataTableColumn"][];
+            dataset?: components["schemas"]["ShareDataTableDatasetReference"] | null;
+            /** Rows */
+            rows?: (string | boolean | null)[][] | null;
+        };
+        /** ShareDataTableColumn */
+        ShareDataTableColumn: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "string" | "number" | "date";
+            /** Unit */
+            unit?: string | null;
+        };
+        /**
+         * ShareDataTableDatasetReference
+         * @description The approved dataset version an authored table projects from.
+         */
+        ShareDataTableDatasetReference: {
+            /** Content Sha256 */
+            content_sha256: string;
+            /** Dataset Key */
+            dataset_key: string;
+            /**
+             * Dataset Version Id
+             * Format: uuid
+             */
+            dataset_version_id: string;
+            /** Version */
+            version: number;
+        };
+        /** ShareDividerBlock */
+        ShareDividerBlock: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "divider";
+        };
+        /**
+         * ShareDocumentMeta
+         * @description Revision attribution of the published projection.
+         *
+         *     ``title`` is the document row's title read in the same transaction as the
+         *     revision content while that revision was the acknowledged current version.
+         *     No author identity is carried: the share publishes content, not its
+         *     owner's identity.
+         */
+        ShareDocumentMeta: {
+            /** Content Sha256 */
+            content_sha256: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Limitations */
+            limitations: string;
+            /** Revision */
+            revision: number;
+            /** Schema Version */
+            schema_version: number;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ShareEvidenceBlock
+         * @description An evidence relationship without its private explanation.
+         *
+         *     ``target_ref`` is the resolvable public reference of the target: the
+         *     in-revision target BLOCK id for ``insight``/``chart_block`` targets, the
+         *     published run id for ``model_run`` and the public artifact id for
+         *     ``citation``. The private evidence/hypothesis ids are excluded.
+         */
+        ShareEvidenceBlock: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "evidence";
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "supporting" | "contradicting" | "uncertain";
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "insight" | "chart_block" | "model_run" | "citation";
+            /** Target Ref */
+            target_ref: string | null;
+        };
+        /** ShareHeadingBlock */
+        ShareHeadingBlock: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "heading";
+            /** Level */
+            level: number;
+            /** Runs */
+            runs: components["schemas"]["RichTextRun"][];
+        };
+        /** ShareHypothesisBlock */
+        ShareHypothesisBlock: {
+            /**
+             * Assessment
+             * @enum {string}
+             */
+            assessment: "untested" | "supported" | "mixed" | "weakened" | "insufficient_data";
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "hypothesis";
+            /** Statement */
+            statement: string;
+        };
+        /**
+         * ShareInsightBlock
+         * @description A structured observation card without its private editorial metadata.
+         *
+         *     The insight's internal id, authorship timestamps and hypothesis link are
+         *     excluded; ``context`` keeps only public-safe pins (chart definition /
+         *     dataset version / selection / resolved-at, or the published run
+         *     reference).
+         */
+        ShareInsightBlock: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "insight";
+            /** Body */
+            body: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList-Output"])[];
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "supporting" | "contradicting" | "uncertain";
+            /** Context */
+            context: components["schemas"]["ResolvedContext"] | components["schemas"]["ModelContext"];
+            /**
+             * Insight Type
+             * @enum {string}
+             */
+            insight_type: "observation" | "hypothesis" | "risk" | "conclusion";
+        };
+        /** ShareListBlock */
+        ShareListBlock: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "bullet_list" | "ordered_list";
+            /** Items */
+            items: components["schemas"]["RichTextListItem-Output"][];
+        };
+        /**
+         * ShareModelRunReference
+         * @description One published model run referenced by the projection (NI-054).
+         */
+        ShareModelRunReference: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Spec Id */
+            spec_id: string;
+            /** Spec Version */
+            spec_version: number;
+        };
+        /** ShareParagraphBlock */
+        ShareParagraphBlock: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "paragraph";
+            /** Runs */
+            runs: components["schemas"]["RichTextRun"][];
+        };
+        /**
+         * SharePreviewResponse
+         * @description The exact projection that would be published, with its identity.
+         */
+        SharePreviewResponse: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            projection: components["schemas"]["ShareProjection"];
+            /** Projection Sha256 */
+            projection_sha256: string;
+            /** Revision */
+            revision: number;
+            scope: components["schemas"]["ShareScopeSummary"];
+        };
+        /**
+         * ShareProjection
+         * @description The complete public payload of one share (stored bytes = this).
+         */
+        ShareProjection: {
+            /** Blocks */
+            blocks: (components["schemas"]["ShareParagraphBlock"] | components["schemas"]["ShareHeadingBlock"] | components["schemas"]["ShareListBlock"] | components["schemas"]["ShareChartBlock"] | components["schemas"]["ShareDataTableBlock"] | components["schemas"]["ShareInsightBlock"] | components["schemas"]["ShareHypothesisBlock"] | components["schemas"]["ShareEvidenceBlock"] | components["schemas"]["ShareRiskBlock"] | components["schemas"]["ShareDividerBlock"])[];
+            /** Citations */
+            citations: components["schemas"]["ShareCitationReference"][];
+            document: components["schemas"]["ShareDocumentMeta"];
+            /** Model Runs */
+            model_runs: components["schemas"]["ShareModelRunReference"][];
+            /**
+             * Share Projection Version
+             * @constant
+             */
+            share_projection_version: 1;
+            /** Sources */
+            sources: components["schemas"]["ShareSourceReference"][];
+        };
+        /** ShareRiskBlock */
+        ShareRiskBlock: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            block_type: "risk";
+            /** Body */
+            body: (components["schemas"]["RichTextParagraph"] | components["schemas"]["RichTextList-Output"])[];
+            /** Title */
+            title: string;
+        };
+        /**
+         * ShareScopeSummary
+         * @description The bounded visible-scope restatement the owner consents to.
+         *
+         *     The counts are validated against the rebuilt projection at create time,
+         *     so a stale preview (content edited after it was shown) is refused instead
+         *     of silently publishing something else.
+         */
+        ShareScopeSummary: {
+            /** Chart Blocks */
+            chart_blocks: number;
+            /** Data Table Blocks */
+            data_table_blocks: number;
+            /** Insight Blocks */
+            insight_blocks: number;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "frozen_revision_allowlist";
+            /** Source References */
+            source_references: number;
+        };
+        /**
+         * ShareSourceReference
+         * @description One data source referenced by the published charts (id + name only).
+         */
+        ShareSourceReference: {
+            /** Name */
+            name: string;
+            /** Source Id */
+            source_id: string;
+        };
+        /**
+         * ShareSummaryResponse
+         * @description One owner-visible share record (never the token or its hash).
+         */
+        ShareSummaryResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Document Version Id
+             * Format: uuid
+             */
+            document_version_id: string;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revision */
+            revision: number;
+            /** Revoked At */
+            revoked_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "expired" | "revoked";
         };
         /**
          * TolerancesResponse
@@ -5110,6 +5729,286 @@ export interface operations {
             };
         };
     };
+    listDocumentShares: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentShareListResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The consented revision or preview is not current, or the Idempotency-Key was reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createDocumentShare: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentShareCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareCreatedResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The consented revision or preview is not current, or the Idempotency-Key was reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    previewDocumentShare: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharePreviewResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The consented revision or preview is not current, or the Idempotency-Key was reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    revokeDocumentShare: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The consented revision or preview is not current, or the Idempotency-Key was reused with a different request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     listDocumentVersions: {
         parameters: {
             query?: {
@@ -6375,6 +7274,128 @@ export interface operations {
             };
             /** @description Service Unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSharedRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareProjection"];
+                };
+            };
+            /** @description The share link is unknown, revoked or expired (one generic deny) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSharedChartCsv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+                block_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description The share link is unknown, revoked or expired (one generic deny) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSharedChartView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+                block_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChartViewResponse"];
+                };
+            };
+            /** @description The share link is unknown, revoked or expired (one generic deny) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
