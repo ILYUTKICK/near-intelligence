@@ -919,7 +919,7 @@
       },
       "DocumentCreateRequest": {
         "additionalProperties": false,
-        "description": "POST /documents body. `template_id` is P1: providing it is a typed 422.",
+        "description": "POST /documents body. `template_id` selects the starting structure:\nthe P1 `investment-v1` eight-heading template (NI-045) or the empty\ndefault. Unknown ids are a typed 422.",
         "properties": {
           "template_id": {
             "anyOf": [
@@ -3290,6 +3290,134 @@
         "title": "ProfileUpdateRequest",
         "type": "object"
       },
+      "PublicationDuplicateRequest": {
+        "additionalProperties": false,
+        "description": "POST /publications/{slug}/duplicate body.\n\n``publication_version`` pins the cloned release (never \"latest\" by\naccident \u2014 the client states the version it read); ``title`` defaults to\nthe publication's title when omitted.",
+        "properties": {
+          "publication_version": {
+            "minimum": 1.0,
+            "title": "Publication Version",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "publication_version"
+        ],
+        "title": "PublicationDuplicateRequest",
+        "type": "object"
+      },
+      "PublicationEvidenceRef": {
+        "additionalProperties": false,
+        "description": "One public evidence reference inside a publication's manifest.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "model_run",
+              "citation"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "PublicationEvidenceRef",
+        "type": "object"
+      },
+      "PublicationResponse": {
+        "additionalProperties": false,
+        "description": "GET /publications/{slug} response: one published release projection.",
+        "properties": {
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "evidence_manifest": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PublicationEvidenceRef"
+            },
+            "maxItems": 200,
+            "title": "Evidence Manifest",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "slug": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+            "title": "Slug",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "version",
+          "title",
+          "content",
+          "content_sha256",
+          "published_at"
+        ],
+        "title": "PublicationResponse",
+        "type": "object"
+      },
       "Reason": {
         "maxLength": 200,
         "minLength": 1,
@@ -5077,7 +5205,7 @@
         ]
       },
       "post": {
-        "description": "Create an owned document whose first revision is the empty document.\n\nWith an ``Idempotency-Key`` header the created result is stored in the\nwrite transaction and a repeated identical owner/route/body request\nreplays the original 201 response (24h) instead of creating a second\ndocument; the same key with a different body is a 409 idempotency\ncollision.",
+        "description": "Create an owned document whose first revision is empty or templated.\n\nWith ``template_id: \"investment-v1\"`` the first revision carries the\ntemplate's eight section headings and nothing else (EDITOR_SPECIFICATION:\nno fabricated paragraphs or numerical placeholder claims). Unknown\ntemplate ids are rejected by the request contract (typed 422) before any\nwrite. ``template_id`` is part of the idempotent request fingerprint, so\na replayed creation with a template returns the SAME document.\n\nWith an ``Idempotency-Key`` header the created result is stored in the\nwrite transaction and a repeated identical owner/route/body request\nreplays the original 201 response (24h) instead of creating a second\ndocument; the same key with a different body is a 409 idempotency\ncollision.",
         "operationId": "createDocument",
         "parameters": [
           {
@@ -9777,6 +9905,196 @@
         "summary": "Downloadable manifest bundle of one published run",
         "tags": [
           "models"
+        ]
+      }
+    },
+    "/api/publications/{slug}": {
+      "get": {
+        "description": "Return the published release; unpublished identities are the same 404.",
+        "operationId": "getPublication",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Published release not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One published public research release",
+        "tags": [
+          "publications"
+        ]
+      }
+    },
+    "/api/publications/{slug}/duplicate": {
+      "post": {
+        "description": "Clone one pinned release into a new private document with attribution.\n\nThe clone allocates fresh private IDs, rebuilds and re-verifies every\nchart context from its immutable pins (an unavailable pinned dataset or\nchart definition is an explicit typed 422, never a latest substitution),\nkeeps public data/model pins verbatim and records the source release as\nretained attribution. The publication itself is immutable and unchanged.",
+        "operationId": "duplicatePublication",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicationDuplicateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Published release not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Idempotency-Key reused with a different request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or a public pin is unavailable"
+          }
+        },
+        "summary": "Clone a published release into a new private document",
+        "tags": [
+          "publications"
         ]
       }
     },
