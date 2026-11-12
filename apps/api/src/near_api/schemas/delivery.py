@@ -24,21 +24,17 @@ ChartView) with the implemented additions recorded in API_SPECIFICATION.md:
 """
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import Field, StringConstraints, model_validator
-from typing import Annotated
 
+from near_api.schemas.chart_selection import FilterValues
 from near_api.schemas.common import ContractModel, DataQuality, Observation, Selection
 
 SHA256_HEX = Annotated[str, StringConstraints(strict=True, pattern=r"^[0-9a-f]{64}$")]
 
 AvailabilityCode = Literal["A", "P", "B", "G"]
-
-ResolvedFilterValue = Annotated[str, StringConstraints(strict=True, min_length=1,
-                                                       max_length=200)]
-
 
 class ResolvedSelectionFilters(ContractModel):
     """Chart-version-validated filters carried inside a resolved selection.
@@ -50,30 +46,12 @@ class ResolvedSelectionFilters(ContractModel):
     list-valued multi-selections whose values fan out into one compared
     series per selected value). Unknown keys and unlisted values are rejected
     before any resolution happens, so this permissive container never
-    serializes an unapproved filter value. The canonical serialized form of
-    every value is a non-empty list of non-empty approved strings.
+    serializes an unapproved filter value. Singletons serialize as strings
+    and comparisons as arrays, preserving historical selection hashes.
     """
 
     model_config = ContractModel.model_config | {"extra": "allow"}
-    __pydantic_extra__: dict[str, Annotated[list[ResolvedFilterValue],
-                                            Field(min_length=1, max_length=32)]] = \
-        Field(init=False)
-
-    @model_validator(mode="before")
-    @classmethod
-    def legacy_single_values(cls, value):
-        """Normalize pre-NI-071 bare-string filter values to the list form.
-
-        Resolved contexts persisted before NI-071 carry ``"key": "value"``
-        filter entries; they keep loading (and re-pinning) unchanged — the
-        canonicalized single-element list serializes identically to the
-        pre-NI-071 hash payload because ``datasets.delivery._context_hash``
-        hashes a single-element list back as the bare string.
-        """
-        if isinstance(value, dict):
-            value = {key: ([item] if isinstance(item, str) else item)
-                     for key, item in value.items()}
-        return value
+    __pydantic_extra__: dict[str, FilterValues] = Field(init=False)
 
 
 class ResolvedSelection(Selection):

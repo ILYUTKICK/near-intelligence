@@ -62,6 +62,7 @@ from sqlalchemy import Connection, text
 from near_api.charts.filter_registry import (
     MAX_FILTER_SERIES,
     MAX_FILTER_VALUES_PER_KEY,
+    RECONCILIATION_INCOMPLETE_REASON,
     RECONCILIATION_MISMATCH_REASON,
 )
 from near_api.charts.registry import SERIES_ROLES
@@ -78,6 +79,7 @@ from near_api.datasets.service import (
     list_observations,
     verify_stored_digest,
 )
+from near_api.metrics.events import exact_arithmetic
 from near_api.schemas.common import DataQuality, Observation
 from near_api.schemas.delivery import (
     AvailableRanges,
@@ -285,7 +287,7 @@ def parse_filters_document(raw: str | None) -> dict[str, list[str]]:
     return dict(sorted(canonical.items()))
 
 
-def validate_filters_against_schema(filters: Mapping[str, "str | Sequence[str]"],
+def validate_filters_against_schema(filters: Mapping[str, str | Sequence[str]],
                                     filter_schema: Mapping) -> dict[str, tuple[str, ...]]:
     """Validate filters against one chart version's closed filter schema.
 
@@ -323,7 +325,7 @@ def validate_filters_against_schema(filters: Mapping[str, "str | Sequence[str]"]
         if unknown:
             raise DeliveryInvalidFilter(
                 "filters must be a JSON object of approved string values")
-        if len(values) > 1 and not bound.get("multi_value"):
+        if len(selected) > 1 and not bound.get("multi_value"):
             raise DeliveryInvalidFilter(
                 "filters must be a JSON object of approved string values")
         ordered = tuple(option for option in options if option in selected)
@@ -933,19 +935,6 @@ def _series_sources(connection: Connection, metric_source_id: str | None,
     return source_responses(connection, tuple(ids), include_checkpoint=include_checkpoint)
 
 
-def _hashable_filters(filters: Mapping[str, Sequence[str]]) -> dict:
-    """The canonical hash payload of a multi-value filter selection.
-
-    NI-071 canonical stored form is a list per key. A single-element list is
-    hashed as the bare string, so every context hash computed before NI-071
-    (whose stored selections carried bare strings) stays byte-identical, while
-    a genuine multi-value selection is hashed as the exact list in its
-    canonical order.
-    """
-    return {key: (values[0] if len(values) == 1 else list(values))
-            for key, values in sorted(filters.items())}
-
-
 def _context_hash(chart_row: Mapping, dataset_version_id: UUID,
                   selection: ResolvedSelection,
                   metric_definition_ids: tuple[UUID, ...]) -> str:
@@ -955,7 +944,7 @@ def _context_hash(chart_row: Mapping, dataset_version_id: UUID,
         "selection": {"start": selection.start.isoformat(),
                       "end": selection.end.isoformat(),
                       "frequency": selection.frequency,
-                      "filters": _hashable_filters(selection.filters.model_dump())},
+                      "filters": selection.filters.model_dump(mode="json")},
         "metric_definition_versions": sorted(str(item) for item in metric_definition_ids),
     }
     return sha256_hex(dump_canonical(payload))
@@ -993,6 +982,13 @@ def _reconciliation_dimension(chart_row: Mapping) -> tuple[str, dict, list[str]]
     return None
 
 
+def _is_exact_point(point: Mapping) -> bool:
+    return (point["quality"]["status"] == "ok"
+            and point["quality"]["bound_kind"] == "exact"
+            and point["value"] is not None)
+
+
+@exact_arithmetic
 def _apply_reconciliation(dimension: tuple[str, dict, list[str]],
                           resolved: Mapping[str, Sequence[str]],
                           version_row: Mapping, content: Mapping,
@@ -1004,10 +1000,11 @@ def _apply_reconciliation(dimension: tuple[str, dict, list[str]],
     universe: then the selected per-value series must sum to the declared
     aggregate definition's value for the same period, at exact Decimal
     precision, from the SAME immutable dataset version. A period whose values
-    disagree is replaced with explicit unavailable points carrying a reason —
-    inconsistent values are withheld, never shown and never silently averaged
-    or picked. Periods where either side is not fully verified keep their own
-    explicit missing/unavailable reasons.
+    disagree or cannot be checked with exact values is unavailable. Points
+    already missing or unavailable retain their original reason.
+
+    The shared 100-digit arithmetic context covers all 32 possible series
+    of NUMERIC(78,30) values without rounding.
     """
     key, spec, universe = dimension
     if sorted(resolved.get(key, ())) != sorted(universe):
@@ -1017,36 +1014,36 @@ def _apply_reconciliation(dimension: tuple[str, dict, list[str]],
         aggregate = definition_by_metric_id_version(spec["aggregate_metric_id"],
                                                     spec["aggregate_metric_version"])
     except KeyError:
-        return
-    aggregate_points = build_series_points(version_row, content, aggregate.id,
-                                           start, end, {})
-    for aggregate_point in aggregate_points:
-        if aggregate_point["quality"]["status"] != "ok" \
-                or aggregate_point["value"] is None:
+        raise DeliveryReferenceInvalid(
+            "the chart's aggregate reconciliation definition is unavailable") from None
+    aggregate_points = {
+        (point["start"], point["end"]): point
+        for point in build_series_points(version_row, content, aggregate.id, start, end, {})
+    }
+    periods: dict[tuple[dt.datetime, dt.datetime], list[tuple[list[dict], int]]] = {}
+    for _combination, series in resolved_series:
+        for index, point in enumerate(series):
+            period = (point["start"], point["end"])
+            periods.setdefault(period, []).append((series, index))
+    for period, entries in periods.items():
+        aggregate_point = aggregate_points.get(period)
+        points = [series[index] for series, index in entries]
+        if (aggregate_point is None or not _is_exact_point(aggregate_point)
+                or len(points) != len(resolved_series)
+                or not all(_is_exact_point(point) for point in points)):
+            reason = RECONCILIATION_INCOMPLETE_REASON
+        elif sum(Decimal(point["value"]) for point in points) == Decimal(aggregate_point["value"]):
             continue
-        period = aggregate_point["start"]
-        total = Decimal(0)
-        complete = True
-        for _combination, points in resolved_series:
-            point = next((p for p in points if p["start"] == period), None)
-            if point is None or point["quality"]["status"] != "ok" \
-                    or point["value"] is None:
-                complete = False
-                break
-            total += Decimal(point["value"])
-        if not complete:
-            continue
-        if total != Decimal(aggregate_point["value"]):
-            for _combination, points in resolved_series:
-                for index, point in enumerate(points):
-                    if point["start"] == period and point["quality"]["status"] == "ok":
-                        points[index] = _unavailable_point(
-                            point["start"], point["end"], RECONCILIATION_MISMATCH_REASON)
+        else:
+            reason = RECONCILIATION_MISMATCH_REASON
+        for (series, index), point in zip(entries, points, strict=True):
+            if point["quality"]["status"] == "ok":
+                series[index] = _unavailable_point(point["start"], point["end"], reason)
 
 
 def build_chart_view(connection: Connection, *, chart_id: str, version: int | None,
                      start: dt.date, end: dt.date, dataset_version: UUID | None,
-                     filters: Mapping[str, "str | Sequence[str]"],
+                     filters: Mapping[str, str | Sequence[str]],
                      verify_content: bool = False) -> ChartViewResponse:
     """Resolve the complete renderer-agnostic ChartView for one selection.
 
@@ -1079,8 +1076,7 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
                 "definition; incompatible metric versions are never mixed silently")
 
     selection = ResolvedSelection(start=start, end=end, frequency="day",
-                                  filters={key: list(values)
-                                           for key, values in resolved_filters.items()})
+                                  filters=resolved_filters)
     dataset = dataset_response(version_row, content)
     combinations = _filter_combinations(resolved_filters)
     if len(bindings) * len(combinations) > MAX_FILTER_SERIES:
@@ -1111,8 +1107,7 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
             series.append(SeriesResponse(
                 metric=metric_response(metric_row), dataset=dataset,
                 selection=ResolvedSelection(start=start, end=end, frequency="day",
-                                            filters={key: [value]
-                                                     for key, value in combination.items()}),
+                                            filters=combination),
                 points=tuple(Observation.model_validate(point) for point in points),
                 sources=_series_sources(connection, metric_row["source_id"],
                                         content["input_source_ids"],

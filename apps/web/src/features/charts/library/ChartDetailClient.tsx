@@ -12,7 +12,6 @@ import type { ChartDefinitionResponse, ChartViewResponse } from "@/features/char
 import { ChartAuthActions } from "./ChartAuthActions";
 import { chartObservation } from "../renderer/observation-context";
 import { ChartFilterControls } from "../filters/FilterControls";
-import { asListDocument } from "../filters/filter-values";
 import {
   detailHrefFor,
   isIsoCalendarDate,
@@ -141,13 +140,12 @@ export function ChartDetailClient({
           />
         ) : <p className="text-metadata text-text-secondary">No filters are registered for this chart version.</p>}
         <ChartAuthActions
-          nextPath={detailHref({ ...selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
+          nextPath={detailHref({ ...selection, ...view?.selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
           chartTitle={definition.title}
           saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
-            // The saved pin carries the exact current selection in the
-            // server-canonical list form.
-            selection: { ...view.selection, filters: asListDocument(selection.filters) },
-            dataset_version_id: view.dataset.id, mode: "live" } : undefined}
+            selection: view.selection, dataset_version_id: view.dataset.id, mode: "live" } : undefined}
+          freezeInput={view ? { chart_definition_version_id: definition.id, dataset_version_id: view.dataset.id,
+            selection: view.selection } : undefined}
           insightContext={view ? chartObservation(view) : undefined}
           basePath={`${basePath}/`}
         />

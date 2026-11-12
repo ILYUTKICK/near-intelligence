@@ -47,6 +47,7 @@ from near_api.auth.principal import Principal
 from near_api.auth.verification import VerifiedToken
 from near_api.charts.registry import chart_by_chart_id
 from near_api.datasets import delivery
+from near_api.datasets.canonical import sha256_hex
 from near_api.datasets.delivery import _context_hash
 from near_api.db.session import create_runtime_engine, user_transaction
 from near_api.documents import service
@@ -56,7 +57,7 @@ from near_api.documents.context_resolver import (
     load_chart_definition,
     validate_selection_against_definition,
 )
-from near_api.documents.schema import canonical_context_json, parse_document
+from near_api.documents.schema import canonical_bytes, canonical_context_json, parse_document
 from near_api.insights.schemas import ResolvedContext
 from near_api.main import app
 from near_api.metrics.registry import definition_by_metric_id
@@ -155,12 +156,14 @@ class ChartBlockContractTests(unittest.TestCase):
                 insert_payload(selection={"start": "2026-01-01", "end": "2026-01-08",
                                           "frequency": "day",
                                           "filters": {"source": []}}))
-        # a single selected value may arrive in the NI-071 list canonical form
+        # The request may carry a singleton list, which serializes as a string.
         listed = ChartBlockInsertRequest.model_validate(
             insert_payload(selection={"start": "2026-01-01", "end": "2026-01-08",
                                       "frequency": "day",
                                       "filters": {"source": ["SRC-LLAMA"]}}))
-        self.assertEqual(listed.selection.filters, {"source": ["SRC-LLAMA"]})
+        self.assertEqual(listed.selection.filters, {"source": ("SRC-LLAMA",)})
+        self.assertEqual(listed.selection.model_dump(mode="json")["filters"],
+                         {"source": "SRC-LLAMA"})
         with self.assertRaises(ValidationError):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(block_id=str(uuid4()), owner_id=str(uuid4())))
@@ -458,11 +461,9 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
     def test_source_filter_is_persisted_and_unsupported_values_are_rejected(self):
         detail = self.create_document(self.alice)
         dataset_id = self.insert_dataset_version(self.dataset_key("filtered"))
-        # NI-071 canonical stored form: the server-validated selection stores
-        # the list-shaped value, so the resolved context and the document
-        # attrs carry the exact same canonical document.
-        selected = {**selection(), "filters": {"source": ["SRC-LLAMA"]}}
-        payload = insert_payload(dataset_version_id=str(dataset_id), selection=selected)
+        selected = {**selection(), "filters": {"source": "SRC-LLAMA"}}
+        listed = {**selected, "filters": {"source": ["SRC-LLAMA"]}}
+        payload = insert_payload(dataset_version_id=str(dataset_id), selection=listed)
         response = self.add_chart(detail.document.id, payload)
         self.assertEqual(response.status_code, 201, response.text)
         stored = self.stored_document(self.alice, detail.document.id)
@@ -768,10 +769,8 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
         # NI-042 explicit edits freeze the supplied inspected pin and selection;
         # this is not latest resolution (v2 exists, but v1 remains selected).
         changed = copy.deepcopy(revision_three["content"])
-        # NI-071 canonical stored form: every filter value is a list; a
-        # single selected value hashes exactly as the pre-NI-071 string form.
         selected = {**selection("2026-01-02", "2026-01-09"),
-                    "filters": {"source": ["SRC-LLAMA"]}}
+                    "filters": {"source": "SRC-LLAMA"}}
         changed["content"][0]["attrs"]["selection"] = selected
         changed_save = self.save_document(detail.document.id, changed, revision=3)
         self.assertEqual(changed_save.status_code, 201, changed_save.text)
@@ -928,6 +927,12 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
         saved = self.save_document(document_id, content, revision=1, observed_contexts=[claim])
         self.assertEqual(saved.status_code, 201, saved.text)
         version = saved.json()["version"]
+        legacy_content = copy.deepcopy(content)
+        legacy_attrs = legacy_content["content"][0]["attrs"]
+        legacy_attrs["snapshot_id"] = None
+        legacy_attrs["selection"]["filters"] = {"source": "SRC-LLAMA"}
+        self.assertEqual(version["content"], legacy_content)
+        self.assertEqual(version["content_sha256"], sha256_hex(canonical_bytes(legacy_content)))
         frozen = version["resolved_contexts"][block_id]
         self.assertEqual({**frozen, "resolved_at": claim["resolved_at"]}, claim)
         self.assertNotEqual(frozen["resolved_at"], claim["resolved_at"])

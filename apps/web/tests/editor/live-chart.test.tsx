@@ -3,7 +3,6 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InteractiveChart, type ChartBlockAttrs } from "@/features/editor/blocks/live-chart";
-import { asListDocument } from "@/features/charts/filters/filter-values";
 import { ResearchDocumentEditor } from "@/features/editor/workbench";
 import { loadDocumentChart } from "@/features/editor/blocks/chart-api";
 import { definition, metric, observation, series, view } from "../ui/renderer/fixtures";
@@ -31,7 +30,7 @@ afterEach(() => {
 });
 
 afterEach(() => { vi.resetAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); sessionStorage.clear(); });
-function resolveNormally(pointer: () => string | null = () => null) { loader.mockImplementation(async (_doc, _def, selection, dataset) => ({ ...resolved, selection: { ...selection, filters: asListDocument(selection.filters ?? {}), frequency: "day" }, dataset: { ...resolved.dataset, id: dataset === "latest" ? "33333333-3333-4333-8333-333333333333" : dataset }, latest_approved_dataset_version_id: pointer() })); }
+function resolveNormally(pointer: () => string | null = () => null) { loader.mockImplementation(async (_doc, _def, selection, dataset) => ({ ...resolved, selection: { ...selection, filters: selection.filters ?? {}, frequency: "day" }, dataset: { ...resolved.dataset, id: dataset === "latest" ? "33333333-3333-4333-8333-333333333333" : dataset }, latest_approved_dataset_version_id: pointer() })); }
 
 describe("Interactive editor chart", () => {
   it("renders the shared exact table, sources, definition and honest gated insight action", async () => {
@@ -52,7 +51,7 @@ describe("Interactive editor chart", () => {
     expect(apply).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Apply range and filters" }));
     await waitFor(() => expect(apply).toHaveBeenCalledOnce());
-    expect(apply).toHaveBeenCalledWith({ selection: { start: "2026-11-02", end: attrs.selection.end, frequency: "day", filters: { source: ["synthetic-b"] } }, observed_dataset_version_id: attrs.observed_dataset_version_id });
+    expect(apply).toHaveBeenCalledWith({ selection: { start: "2026-11-02", end: attrs.selection.end, frequency: "day", filters: { source: "synthetic-b" } }, observed_dataset_version_id: attrs.observed_dataset_version_id });
     await user.click(screen.getByRole("button", { name: "Refresh to latest and save observation" }));
     await waitFor(() => expect(apply).toHaveBeenCalledTimes(2));
     expect(loader.mock.calls.at(-1)?.[3]).toBe("latest");
@@ -66,7 +65,7 @@ describe("Interactive editor chart", () => {
     const multiResolved = view(multiDefinition, [series(metric("NEAR", "Synthetic payouts", "synthetic"), [observation("2026-11-01", "5")])]);
     loader.mockImplementation(async (_doc, _def, selection, datasetVersion) => ({
       ...multiResolved,
-      selection: { ...selection, filters: asListDocument(selection.filters ?? {}), frequency: "day" as const },
+      selection: { ...selection, filters: selection.filters ?? {}, frequency: "day" as const },
       dataset: { ...multiResolved.dataset, id: datasetVersion },
     }));
     const apply = vi.fn(); const user = userEvent.setup();
@@ -204,13 +203,12 @@ describe("Interactive editor chart", () => {
     expect(screen.getByText("Synthetic local prose")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^Save now/ }));
     await waitFor(() => expect(savedBodies.length).toBeGreaterThan(0));
-    // NI-071: the persisted selection carries the canonical list form.
-    expect(JSON.stringify(savedBodies[0])).toContain('"source":["synthetic-a"]');
+    expect(JSON.stringify(savedBodies[0])).toContain('"source":"synthetic-a"');
     expect(JSON.stringify(savedBodies[0])).toContain('"start":"2026-11-02"');
     expect(JSON.stringify(savedBodies[0])).toContain("Synthetic local prose");
     expect(savedBodies[0].observed_contexts).toEqual([{
       chart_definition_version_id: definitionFixture.id, dataset_version_id: attrs.observed_dataset_version_id,
-      selection: { start: "2026-11-02", end: attrs.selection.end, frequency: "day", filters: { source: ["synthetic-a"] } },
+      selection: { start: "2026-11-02", end: attrs.selection.end, frequency: "day", filters: { source: "synthetic-a" } },
       context_hash: resolved.context_hash, renderer_version: definitionFixture.renderer_version,
       metric_definition_versions: definitionFixture.metric_definition_ids, resolved_at: resolved.resolved_at,
     }]);

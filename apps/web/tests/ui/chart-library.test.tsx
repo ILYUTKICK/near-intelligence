@@ -1062,6 +1062,25 @@ describe("NI-071 multi-value comparison filters", () => {
     filter_schema: RECIPIENT_FILTER_SCHEMA,
   });
 
+  it("offers the pinned v1 aggregate when the v2 comparison dataset is unavailable", async () => {
+    installApiMock([
+      chartRoute("treasury-payouts", { ...multiDefinition, version: 2 }),
+      metricRoute(metricFixture(METRIC_FEES_ID, "provider_gross_fees_usd", "USD")),
+      (url) => url.pathname === "/api/charts/treasury-payouts/view"
+        ? apiError("DATA_NOT_READY", "The comparison dataset is unavailable (fixture)", true, 503)
+        : undefined,
+    ]);
+    render(await ChartDetailPage({
+      params: Promise.resolve({ chartId: "treasury-payouts" }),
+      searchParams: Promise.resolve({ version: "2", start: VIEW_WINDOW.start, end: VIEW_WINDOW.end,
+        dataset_version: PINNED_DATASET_ID }),
+    }));
+    const href = screen.getByRole("link", { name: "View payout totals (v1)" }).getAttribute("href");
+    const aggregate = new URL(href ?? "", "http://localhost");
+    expect(aggregate.searchParams.get("version")).toBe("1");
+    expect(aggregate.searchParams.get("dataset_version")).toBe(PINNED_DATASET_ID);
+  });
+
   it("parses a multi-value selection into the declared option order, collapsing duplicates", () => {
     const parsed = parseSelectionUrl(
       new URLSearchParams(`filters=${

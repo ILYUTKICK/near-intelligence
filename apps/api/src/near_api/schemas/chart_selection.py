@@ -1,63 +1,54 @@
-"""Canonical bounded chart selection shape; domains belong to definition versions.
+"""Structural validation for persisted selections and resolved chart filters.
 
-Structural validation preserves filters from historical definitions. The
-server must still validate the actual keys/values against the referenced
-immutable chart's filter_schema before storing or resolving a context.
-
-NI-071 multi-value canonical form: every filter value is a non-empty list of
-non-empty strings (one selected value per list entry). Selections persisted
-before NI-071 carry a bare string per key; the ``canonical_values``
-validator normalizes ``str`` -> ``[str]`` at the model boundary, so stored
-saved charts, document revisions and insight contexts keep loading unchanged
-while every newly stored selection is uniformly list-shaped. Single-value
-legacy context hashes stay stable because ``datasets.delivery._context_hash``
-hashes a single-element list back as the bare string.
-
-NI-071 canonical value order: a multi-value selection's per-key order is the
-dimension's declared option order (the same order every chart version's
-``filter_schema`` enum declares), never the request order. Reordering here —
-at the one model every persisted selection passes through — makes the
-document-context hash (``documents.context_resolver.build_resolved_context``)
-agree byte-exactly with the resolved view hash
-(``datasets.delivery.build_chart_view``, which canonicalizes against the
-chart schema) for any honest request order, so a saved multi-value block
-always reconstructs from its frozen evidence.
+Selections use tuples internally. A singleton serializes to the same string
+used in pre-NI-071 documents, snapshots and export plans, preserving their
+canonical bytes and hashes. Comparisons serialize as arrays in the approved
+option order. The server validates actual filter values against the pinned
+chart version before storing or resolving a context.
 """
 from typing import Annotated
-from pydantic import Field, StringConstraints, field_validator, model_validator
+
+from pydantic import BeforeValidator, Field, PlainSerializer, StringConstraints, field_validator
+
+from near_api.charts.filter_registry import FILTER_DIMENSIONS, MAX_FILTER_VALUES_PER_KEY
 from near_api.schemas.common import Selection
 
 FilterKey = Annotated[str, StringConstraints(strict=True, min_length=1, max_length=80)]
 FilterValue = Annotated[str, StringConstraints(strict=True, min_length=1, max_length=200)]
-FilterValues = Annotated[list[FilterValue], Field(min_length=1, max_length=32)]
+FilterValueList = Annotated[list[FilterValue], Field(min_length=1,
+                                                   max_length=MAX_FILTER_VALUES_PER_KEY)]
+
+
+def _normalize_filter_value(value: object) -> object:
+    return (value,) if isinstance(value, str) else value
+
+
+def _serialize_filter_value(values: tuple[str, ...]) -> str | list[str]:
+    return values[0] if len(values) == 1 else list(values)
+
+
+FilterValues = Annotated[
+    tuple[FilterValue, ...],
+    Field(min_length=1, max_length=MAX_FILTER_VALUES_PER_KEY),
+    BeforeValidator(_normalize_filter_value, json_schema_input_type=FilterValue | FilterValueList),
+    PlainSerializer(_serialize_filter_value, return_type=FilterValue | FilterValueList),
+]
+
 
 class ChartSelection(Selection):
     filters: dict[FilterKey, FilterValues] = Field(max_length=32)
 
-    @field_validator("filters", mode="before")
+    @field_validator("filters")
     @classmethod
-    def canonical_values(cls, value):
-        """Normalize to the canonical list form in the declared option order."""
-        if isinstance(value, dict):
-            from near_api.charts.filter_registry import FILTER_DIMENSIONS
-            canonical: dict = {}
-            for key, item in value.items():
-                items = [item] if isinstance(item, str) else item
-                options = FILTER_DIMENSIONS[key].options \
-                    if isinstance(key, str) and key in FILTER_DIMENSIONS else ()
-                if isinstance(items, list):
-                    chosen = set(items)
-                    ordered = [option for option in options if option in chosen]
-                    ordered.extend(item for item in items if item not in ordered)
-                    items = ordered
-                canonical[key] = items
-            value = canonical
-        return value
-
-    @model_validator(mode="after")
-    def registered_dimensions(self):
-        from near_api.charts.registry import CHARTS
-        keys = {key for chart in CHARTS for key in chart.filter_schema["properties"]}
-        if set(self.filters) - keys:
+    def canonical_values(cls, filters: dict[str, tuple[str, ...]]) -> dict[str, tuple[str, ...]]:
+        """Order structurally valid values before computing a frozen hash."""
+        if filters.keys() - FILTER_DIMENSIONS.keys():
             raise ValueError("Unknown chart filter dimension")
-        return self
+        canonical = {}
+        for key, values in filters.items():
+            options = FILTER_DIMENSIONS[key].options
+            selected = dict.fromkeys(values)
+            known = tuple(option for option in options if option in selected)
+            unknown = tuple(value for value in selected if value not in options)
+            canonical[key] = known + unknown
+        return canonical

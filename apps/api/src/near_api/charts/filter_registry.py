@@ -57,11 +57,14 @@ MAX_FILTER_OPTIONS = 32
 MAX_FILTER_VALUES_PER_KEY = MAX_FILTER_OPTIONS
 MAX_FILTER_SERIES = 32
 
-# datasets/delivery marks reconciliation-failing periods with this reason.
+# datasets/delivery marks periods that fail reconciliation with these reasons.
 RECONCILIATION_MISMATCH_REASON = (
     "the selected dimension values do not reconcile with the declared "
     "aggregate definition for this period; the values are withheld instead "
     "of shown inconsistently")
+RECONCILIATION_INCOMPLETE_REASON = (
+    "the full comparison cannot be reconciled for this period because an "
+    "exact recipient or aggregate value is unavailable")
 
 
 @dataclass(frozen=True)

@@ -39,7 +39,7 @@ export const MAX_METRIC_VERSIONS = 100;
 
 export const BLOCK_TYPES = [
   "paragraph", "heading", "bullet_list", "ordered_list", "liveChart",
-  "dataTable", "insight", "hypothesis", "evidence", "risk", "divider",
+  "dataTable", "insight", "hypothesis", "evidence", "risk", "modelResult", "divider",
 ] as const;
 export type BlockType = (typeof BLOCK_TYPES)[number];
 
@@ -109,13 +109,10 @@ export type RichFragment = Array<CanonicalParagraph | CanonicalRichList>;
 
 /**
  * NI-071: document content preserves the submitted filter values verbatim
- * (byte-exact revisions), so the canonical mirror accepts both the
- * pre-NI-071 bare-string values and the canonical list form instead of
- * silently rewriting persisted content.
+ * (byte-exact revisions). A single value uses the existing string shape and
+ * a comparison can carry several values.
  */
-export type CanonicalSelection = Omit<components["schemas"]["ChartSelection"], "filters"> & {
-  filters: Record<string, FilterValue>;
-};
+export type CanonicalSelection = components["schemas"]["ChartSelection"];
 
 /** Frozen chart inspection record (API_SPECIFICATION ResolvedContext). */
 export interface CanonicalResolvedContext {
@@ -233,6 +230,21 @@ export interface CanonicalRiskBlock extends BlockBase {
     related_hypothesis_id?: string;
   };
 }
+/**
+ * A pinned published model run with an editable interpretation (NI-055).
+ * Only identities and the authored narrative are stored — coefficients and
+ * diagnostics never live in the document JSON; the node view re-projects
+ * them from the immutable published run row.
+ */
+export interface CanonicalModelResultBlock extends BlockBase {
+  type: "modelResult";
+  attrs: {
+    block_id: string;
+    model_run_id: string;
+    dataset_version_id: string;
+    interpretation: RichFragment;
+  };
+}
 
 export type CanonicalBlock =
   | CanonicalParagraphBlock
@@ -244,7 +256,8 @@ export type CanonicalBlock =
   | CanonicalInsightBlock
   | CanonicalHypothesisBlock
   | CanonicalEvidenceBlock
-  | CanonicalRiskBlock;
+  | CanonicalRiskBlock
+  | CanonicalModelResultBlock;
 
 export interface CanonicalDocument {
   schema_version: typeof CANONICAL_SCHEMA_VERSION;
@@ -933,6 +946,25 @@ function parseRiskBlock(node: Record<string, unknown>, path: string, issues: Iss
   return { type: "risk", attrs: canonicalAttrs };
 }
 
+function parseModelResultBlock(node: Record<string, unknown>, path: string, issues: IssueCollector): CanonicalModelResultBlock {
+  // NI-055: ids + rich-text interpretation only — every other attr (any
+  // statistical value) is an unknown field and rejected, mirroring the
+  // server parser so summaries are always re-projected from the run row.
+  parseBlockKeys(node, path, { withContent: false }, issues);
+  const attrs = parseBlockAttrs(node, path, [
+    "block_id", "model_run_id", "dataset_version_id", "interpretation",
+  ], issues);
+  return {
+    type: "modelResult",
+    attrs: {
+      block_id: requireUuid(attrs.block_id, `${path}.attrs.block_id`, issues),
+      model_run_id: requireUuid(attrs.model_run_id, `${path}.attrs.model_run_id`, issues),
+      dataset_version_id: requireUuid(attrs.dataset_version_id, `${path}.attrs.dataset_version_id`, issues),
+      interpretation: requireRichBody(attrs.interpretation, `${path}.attrs.interpretation`, issues),
+    },
+  };
+}
+
 const BLOCK_PARSERS: Record<string, (node: Record<string, unknown>, path: string, issues: IssueCollector) => CanonicalBlock> = {
   paragraph: parseParagraphBlock,
   heading: parseHeadingBlock,
@@ -944,6 +976,7 @@ const BLOCK_PARSERS: Record<string, (node: Record<string, unknown>, path: string
   hypothesis: parseHypothesisBlock,
   evidence: parseEvidenceBlock,
   risk: parseRiskBlock,
+  modelResult: parseModelResultBlock,
   divider: parseDividerBlock,
 };
 

@@ -14,11 +14,10 @@
  * Pure module: no React, no DOM, no network.
  */
 
-/** One filter value as it travels through URLs, requests and saved pins. */
-export type FilterValue = string | string[];
+import type { components } from "@near-intelligence/shared-types";
 
-/** The filter document of a selection (server-validated canonical values). */
-export type FiltersSelection = Record<string, FilterValue>;
+export type FiltersSelection = components["schemas"]["ChartSelection"]["filters"];
+export type FilterValue = FiltersSelection[string];
 
 /**
  * True when this closed-schema property admits a multi-value selection.
@@ -37,13 +36,6 @@ export function asValueList(value: FilterValue | undefined): string[] {
     return [];
   }
   return Array.isArray(value) ? value : [value];
-}
-
-/** Every selected value across the document, normalized to the list form. */
-export function asListDocument(filters: FiltersSelection): Record<string, string[]> {
-  return Object.fromEntries(
-    Object.entries(filters).map(([key, value]) => [key, asValueList(value)]),
-  );
 }
 
 /**

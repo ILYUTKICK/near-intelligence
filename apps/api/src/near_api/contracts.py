@@ -46,7 +46,11 @@ def install_contracts(app: FastAPI) -> None:
         request.state.request_id = uuid4()
         response = await call_next(request)
         response.headers["X-Request-ID"] = str(request.state.request_id)
+        # Private workspace surfaces: owner-scoped content is never cached
+        # publicly (NI-035 saved charts, NI-044 research snapshots).
         if request.url.path == "/api/saved-charts" or request.url.path.startswith("/api/saved-charts/"):
+            response.headers["Cache-Control"] = "no-store"
+        if request.url.path == "/api/snapshots" or request.url.path.startswith("/api/snapshots/"):
             response.headers["Cache-Control"] = "no-store"
         return response
 

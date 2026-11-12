@@ -24,7 +24,7 @@ export function EditorHypothesisDialog({ intent, onClose, onSaved, onReload, res
   intent: HypothesisIntent;
   onClose: () => void;
   onSaved: (result: AnnotationSave) => void;
-  onReload: (content: CanonicalDocument, revision: number, savedAt: string) => void;
+  onReload: (content: CanonicalDocument, revision: number, savedAt: string, versionId: string | null) => void;
   restoreFocus: () => void;
 }) {
   const account = useChartEditorContext();
@@ -108,7 +108,7 @@ export function EditorHypothesisDialog({ intent, onClose, onSaved, onReload, res
         }
       }
       signal.throwIfAborted();
-      onReload(next, document.revision, document.updated_at);
+      onReload(next, document.revision, document.updated_at, document.current_version_id);
       attempt.current = null;
       setRemoveLinks(false);
       setStale(false);

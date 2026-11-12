@@ -12,7 +12,7 @@ import json
 import os
 import shutil
 import unittest
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from pathlib import Path
 from unittest.mock import patch
 from uuid import UUID, uuid4
@@ -21,6 +21,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
@@ -117,12 +118,12 @@ class ResolvedSelectionContractTests(unittest.TestCase):
     def test_resolved_selection_carries_validated_filters(self):
         selection = ResolvedSelection(start="2026-01-01", end="2026-01-31",
                                       frequency="day", filters={"source": ["SRC-LLAMA"]})
-        self.assertEqual(selection.filters.model_dump(), {"source": ["SRC-LLAMA"]})
-        # NI-071: resolved contexts persisted before the list canonical form
-        # carry a bare string per key; they keep loading unchanged.
+        self.assertEqual(selection.filters.model_dump(), {"source": "SRC-LLAMA"})
+        # A pre-NI-071 selection keeps its serialized form.
         legacy = ResolvedSelection(start="2026-01-01", end="2026-01-31",
                                    frequency="day", filters={"source": "SRC-LLAMA"})
-        self.assertEqual(legacy.filters.model_dump(), {"source": ["SRC-LLAMA"]})
+        self.assertEqual(legacy, selection)
+        self.assertEqual(legacy.filters.model_dump(), {"source": "SRC-LLAMA"})
         for changes in ({"end": "2024-01-01"}, {"end": "2026-01-01"},
                         {"filters": {"source": 123}},
                         {"filters": {"source": ["SRC-LLAMA", 4]}},
@@ -139,18 +140,18 @@ class ResolvedSelectionContractTests(unittest.TestCase):
 
     def test_chart_selection_normalizes_legacy_string_values(self):
         from near_api.schemas.chart_selection import ChartSelection
-        legacy = ChartSelection(start="2026-01-01", end="2026-01-31",
-                                frequency="day", filters={"source": "SRC-LLAMA"})
-        self.assertEqual(legacy.filters, {"source": ["SRC-LLAMA"]})
-        multi = ChartSelection(start="2026-01-01", end="2026-01-31", frequency="day",
-                               filters={"recipient": ["buybacks.multisignature.near"]})
-        self.assertEqual(multi.filters, {"recipient": ["buybacks.multisignature.near"]})
-        with self.assertRaises(Exception):
-            ChartSelection(start="2026-01-01", end="2026-01-31", frequency="day",
-                           filters={"wallet": ["x"]})
-        with self.assertRaises(Exception):
-            ChartSelection(start="2026-01-01", end="2026-01-31", frequency="day",
-                           filters={"recipient": []})
+        window = {"start": "2026-01-01", "end": "2026-01-31", "frequency": "day"}
+        legacy = ChartSelection(**window, filters={"source": "SRC-LLAMA"})
+        self.assertEqual(legacy.filters, {"source": ("SRC-LLAMA",)})
+        self.assertEqual(legacy.model_dump(mode="json")["filters"], {"source": "SRC-LLAMA"})
+        multi = ChartSelection(**window, filters={"recipient": [RECIPIENTS[1], RECIPIENTS[0]]})
+        self.assertEqual(multi.filters, {"recipient": RECIPIENTS[:2]})
+        self.assertEqual(multi.model_dump(mode="json")["filters"],
+                         {"recipient": list(RECIPIENTS[:2])})
+        for filters in ({"wallet": ["x"]}, {"recipient": []}, {"recipient": [{}]},
+                        {"recipient": [[RECIPIENTS[0]]]}, {"recipient": [RECIPIENTS[0]] * 33}):
+            with self.subTest(filters=filters), self.assertRaises(ValidationError):
+                ChartSelection(**window, filters=filters)
 
     def test_unavailable_chart_responses_carry_reason_and_available_do_not(self):
         from near_api.schemas.delivery import AvailableRanges
@@ -197,6 +198,8 @@ class FilterAndQualityUnitTests(unittest.TestCase):
         schema = chart_by_chart_id("intents-volume").filter_schema
         self.assertEqual(validate_filters_against_schema(
             {"source": "SRC-LLAMA"}, schema), {"source": ("SRC-LLAMA",)})
+        self.assertEqual(validate_filters_against_schema(
+            {"source": ["SRC-LLAMA", "SRC-LLAMA"]}, schema), {"source": ("SRC-LLAMA",)})
         # a single-value dimension rejects list selections beyond one value
         for filters in ({"wallet": "x"}, {"source": "SRC-NOPE"}, {"source": 1},
                         {"source": ["SRC-LLAMA", "SRC-DASHBOARD"]}):
@@ -894,7 +897,7 @@ class DeliveryDatabaseTests(unittest.TestCase):
                          ["100.5"] * DAILY_PERIODS)
         self.assertEqual(view.quality.status, "ok")
         self.assertEqual(view.selection.filters.model_dump(),
-                         {"source": ["SRC-LLAMA"]})
+                         {"source": "SRC-LLAMA"})
         for filters, code in (({"wallet": "x"}, "FILTER_UNSUPPORTED"),
                               ({"source": "SRC-NOPE"}, "FILTER_UNSUPPORTED")):
             with self.subTest(filters=filters):
@@ -1123,10 +1126,17 @@ class DeliveryDatabaseTests(unittest.TestCase):
         return self.get_json("/api/charts/treasury-payouts/view", **params)
 
     def test_13_multi_value_recipient_view_fans_out_and_reconciles(self):
-        recipients = {account: [f"{index + 1}.{offset}" for index in range(DAILY_PERIODS)]
-                      for offset, account in enumerate(RECIPIENTS, start=1)}
+        # Preserve the final yoctoNEAR digit even above 28 significant digits.
+        recipients = {
+            RECIPIENTS[0]: [f"{98765 + index}.000000000000000000000001"
+                            for index in range(DAILY_PERIODS)],
+            RECIPIENTS[1]: ["0.000000000000000000000001"] * DAILY_PERIODS,
+            RECIPIENTS[2]: ["0"] * DAILY_PERIODS,
+        }
+        expected = [f"{98765 + index}.000000000000000000000002"
+                    for index in range(DAILY_PERIODS)]
         staged = self.treasury_dataset(f"ni071.fanout-{uuid4().hex[:10]}",
-                                       recipients=recipients)
+                                       recipients=recipients, aggregate=expected)
         version_id = str(staged.dataset_version_id)
         scrambled = [RECIPIENTS[2], RECIPIENTS[0], RECIPIENTS[1]]
         response = self.recipient_view(version_id, filters={"recipient": scrambled})
@@ -1136,9 +1146,9 @@ class DeliveryDatabaseTests(unittest.TestCase):
         self.assertEqual(len(view.series), 3)
         self.assertEqual([series.selection.filters.model_dump()["recipient"]
                           for series in view.series],
-                         [[account] for account in RECIPIENTS])
+                         list(RECIPIENTS))
         for series in view.series:
-            account = series.selection.filters.model_dump()["recipient"][0]
+            account = series.selection.filters.model_dump()["recipient"]
             self.assertEqual([point.value for point in series.points],
                              recipients[account])
             self.assertEqual(series.metric.metric_id, "treasury_payouts_near")
@@ -1156,7 +1166,7 @@ class DeliveryDatabaseTests(unittest.TestCase):
         # without claiming the full-universe identity
         self.assertEqual([series.selection.filters.model_dump()["recipient"]
                           for series in pair_view.series],
-                         [[RECIPIENTS[0]], [RECIPIENTS[2]]])
+                         [RECIPIENTS[0], RECIPIENTS[2]])
         self.assertNotEqual(pair.json()["context_hash"], view.context_hash)
         # reconciliation identity: the compared series sum exactly to the v1
         # aggregate definition for every period of the same dataset version
@@ -1164,12 +1174,12 @@ class DeliveryDatabaseTests(unittest.TestCase):
                                   definition_version=1, start=WINDOW[0],
                                   end=WINDOW[1], dataset_version=version_id)
         self.assertEqual(aggregate.status_code, 200)
-        expected = [point["value"] for point in aggregate.json()["points"]]
-        for index in range(DAILY_PERIODS):
-            total = sum(Decimal(series.points[index].value) for series in view.series)
-            self.assertEqual(total, Decimal(expected[index]),
-                             f"period {index}: recipient sum diverges from the "
-                             "aggregate definition")
+        self.assertEqual([point["value"] for point in aggregate.json()["points"]], expected)
+        with localcontext() as context:
+            context.prec = 40
+            for index in range(DAILY_PERIODS):
+                total = sum(Decimal(series.points[index].value) for series in view.series)
+                self.assertEqual(total, Decimal(expected[index]))
 
     def test_14_reconciliation_mismatch_withholds_values_never_shows_them(self):
         recipients = {account: ["1" for _ in range(DAILY_PERIODS)]
@@ -1200,6 +1210,31 @@ class DeliveryDatabaseTests(unittest.TestCase):
         for series in partial_view.series:
             self.assertTrue(all(point.value == "1" and point.quality.status == "ok"
                                 for point in series.points))
+
+    def test_full_comparison_requires_aggregate_in_the_same_dataset(self):
+        day = dt.date.fromisoformat(WINDOW[0])
+        window = (WINDOW[0], "2026-01-02")
+        self.stage_fixture(
+            f"ni071.aggregate-{uuid4().hex[:10]}",
+            [observation(METRIC_PAYOUTS, day, value="3")], [METRIC_PAYOUTS],
+            window=window)
+        staged = self.stage_fixture(
+            f"ni071.recipients-{uuid4().hex[:10]}",
+            [observation(METRIC_PAYOUTS_V2, day, value="1", dimensions={"recipient": account})
+             for account in RECIPIENTS],
+            [METRIC_PAYOUTS_V2], window=window)
+        version_id = str(staged.dataset_version_id)
+        full = self.recipient_view(version_id, filters={"recipient": RECIPIENTS})
+        self.assertEqual(full.status_code, 200, full.text)
+        for series in full.json()["series"]:
+            point = series["points"][0]
+            self.assertIsNone(point["value"])
+            self.assertEqual(point["quality"]["status"], "unavailable")
+            self.assertIn(delivery.RECONCILIATION_INCOMPLETE_REASON, point["quality"]["reasons"])
+        partial = self.recipient_view(version_id, filters={"recipient": RECIPIENTS[:2]})
+        self.assertEqual(partial.status_code, 200, partial.text)
+        self.assertEqual([series["points"][0]["value"] for series in partial.json()["series"]],
+                         ["1", "1"])
 
     def test_15_v1_chart_renders_unchanged_and_v2_is_data_gated(self):
         recipients = {account: [f"{index + 1}.5" for index in range(DAILY_PERIODS)]

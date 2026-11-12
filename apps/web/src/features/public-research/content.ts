@@ -186,6 +186,16 @@ export const thesisToc: readonly { readonly id: string; readonly title: string }
 
 export const hypothesisIds = ["h1", "h2", "h3", "h4"] as const;
 
+/**
+ * The publication slug the duplication CTA on /research resolves (NI-045).
+ * The real thesis release is an owner content decision: it is seeded into
+ * `research_publications` only from an owner-approved canonical content
+ * source. Until such a release is published under this slug, the public read
+ * returns 404 and the CTA renders nothing — the page never fakes
+ * availability.
+ */
+export const thesisReleaseSlug = "near-thesis-2026-11";
+
 export const thesis = {
   title: "A conversion channel.",
   emphasis: "A conditional thesis.",

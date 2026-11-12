@@ -101,15 +101,11 @@ export const chartListResponseSchema = z.object({
   next_cursor: z.string().nullable(),
 });
 
-const resolvedSelectionSchema = z.object({
+export const resolvedSelectionSchema = z.object({
   start: isoDate,
   end: isoDate,
   frequency: z.literal("day"),
-  // NI-071: the canonical serialized form of every server-validated filter
-  // value is a non-empty list of approved strings (one series per selected
-  // value in the resolved view); legacy stored selections are normalized to
-  // this form before the API responds.
-  filters: z.record(z.string(), z.array(z.string())),
+  filters: z.record(z.string(), z.union([z.string().min(1), z.array(z.string().min(1)).min(1).max(32)])),
 });
 
 export const seriesResponseSchema = z.object({

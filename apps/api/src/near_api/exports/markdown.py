@@ -25,6 +25,7 @@ Honesty rules carried over from the IR:
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
 from typing import NamedTuple
 from uuid import UUID
@@ -48,6 +49,7 @@ from near_api.schemas.export import (
     ExportInsightBlock,
     ExportIr,
     ExportListBlock,
+    ExportModelResultBlock,
     ExportParagraphBlock,
     ExportRiskBlock,
 )
@@ -77,6 +79,11 @@ class ChartAssetFiles(NamedTuple):
 
     svg_name: str
     csv_name: str
+
+
+def model_manifest_path(run_id: UUID) -> str:
+    """Archive-relative filename of one immutable published run manifest."""
+    return f"assets/model-run-{run_id}-manifest.json"
 
 
 # --------------------------------------------------------------------------- #
@@ -184,6 +191,13 @@ def _render_body(body: RichTextBody, *, prefix: str = "") -> list[str]:
 # --------------------------------------------------------------------------- #
 
 
+def filter_description(filters: Mapping[str, str | list[str] | tuple[str, ...]]) -> str:
+    return "; ".join(
+        f"{key}: {values if isinstance(values, str) else ', '.join(values)}"
+        for key, values in sorted(filters.items())
+    )
+
+
 def _context_lines(context) -> list[str]:
     """The pinned-context provenance lines of an insight card."""
     if isinstance(context, ModelContext):
@@ -194,18 +208,8 @@ def _context_lines(context) -> list[str]:
         f"dataset version `{context.dataset_version_id}`",
         f"window {selection.start} to {selection.end} ({selection.frequency})",
     ]
-    # NI-071: the resolved filters are part of the pinned coverage context —
-    # an exported card must show exactly which dimension values were selected
-    # (the server-validated canonical values, multi-value lists included).
-    filters = selection.filters
-    if filters:
-        parts = []
-        for key in sorted(filters):
-            values = filters[key]
-            if isinstance(values, str):
-                values = [values]
-            parts.append(f"{escape_text(key)}: {escape_text(', '.join(values))}")
-        lines.append("filters " + "; ".join(parts))
+    if selection.filters:
+        lines.append("filters " + escape_text(filter_description(selection.filters)))
     lines.extend([
         f"resolved at {context.resolved_at}",
         f"context hash `{context.context_hash}`",
@@ -257,17 +261,83 @@ def _render_risk(block: ExportRiskBlock) -> list[str]:
 def _render_chart(block: ExportChartBlock, number: int,
                   assets: Mapping[UUID, ChartAssetFiles]) -> list[str]:
     asset = assets[block.block_id]
+    filters = filter_description(block.selection.filters)
+    filter_note = f"Pinned filters {escape_text(filters)}. " if filters else ""
     caption = (
         f"*Figure {number}. Frozen chart view of block `{block.block_id}` — "
         f"chart definition version `{block.chart_definition_version_id}`, dataset "
         f"version `{block.observed_dataset_version_id}`, resolved "
-        f"{block.view.resolved_at}. Exact values: "
+        f"{block.view.resolved_at}. {filter_note}Exact values: "
         f"[CSV]({_escape_link(asset.csv_name)}).*")
     return [
         f"![Chart {block.block_id}]({_escape_link(asset.svg_name)})",
         "",
         caption,
     ]
+
+
+def _recorded_number(value: float) -> str:
+    """The recorded statistical value verbatim (the shortest round-trip
+    spelling, never rounded or locale-formatted)."""
+    return str(value)
+
+
+def _render_model_result(block: ExportModelResultBlock) -> list[str]:
+    """Render one pinned model result from the plan's frozen projection.
+
+    Every number comes from ``block.summary`` — the NI-056 projection of the
+    immutable published run row — never from the document JSON (which stores
+    no statistical value at all). The interpretation renders as prose; the
+    recorded limitations of the run always precede the coefficients.
+    """
+    summary = block.summary
+    limitations = summary.limitations
+    lines = [
+        f"> **Model result** — pinned published run `{summary.run_id}` "
+        f"(specification `{escape_text(block.spec_id)}` version {block.spec_version}).",
+        ">",
+        f"> Gate verdict: {escape_text(summary.gate_verdict)} · sample "
+        f"{escape_text(summary.sample_start)} to {escape_text(summary.sample_end_exclusive)} "
+        f"(end exclusive) · {summary.nobs} observations.",
+        f"> Recorded reproduction tolerances: rtol {escape_text(summary.coefficient_rtol)} / "
+        f"atol {escape_text(summary.coefficient_atol)}.",
+        ">",
+        "> The publication gate recorded these limitations.",
+        ">",
+    ]
+    lines.extend(f"> - {escape_text(note)}" for note in limitations.spec_limitation_notes)
+    lines.append("> - Prohibited labels are "
+                 + ", ".join(escape_text(label) for label in limitations.prohibited_labels) + ".")
+    if limitations.gate_limit_codes:
+        lines.append("> - Recorded gate limit codes are "
+                     + ", ".join(escape_text(code) for code in limitations.gate_limit_codes) + ".")
+    lines.extend([
+        ">",
+        "> Recorded coefficients:",
+        ">",
+        "> | Term | Estimate | Std. error | t | p | 95% CI |",
+        "> | --- | --- | --- | --- | --- | --- |",
+    ])
+    for coefficient in summary.coefficients:
+        cells = (
+            escape_text(coefficient.name), _recorded_number(coefficient.estimate),
+            _recorded_number(coefficient.std_error), _recorded_number(coefficient.t_stat),
+            _recorded_number(coefficient.p_value),
+            f"[{_recorded_number(coefficient.ci95_low)}, "
+            f"{_recorded_number(coefficient.ci95_high)}]",
+        )
+        lines.append("> | " + " | ".join(cells) + " |")
+    lines.append(">")
+    lines.append("> Recorded diagnostics: "
+                 + escape_text(json.dumps(summary.diagnostics, sort_keys=True,
+                                          separators=(",", ":"), default=str)) + ".")
+    lines.append(">")
+    lines.append(f"> [Published run manifest]({model_manifest_path(block.model_run_id)}) "
+                 f"for offline verification. The interpretation pins dataset version "
+                 f"`{block.dataset_version_id}`.")
+    lines.append(">")
+    lines.extend(_render_body(block.interpretation, prefix="> "))
+    return lines
 
 
 def _render_data_table(block: ExportDataTableBlock) -> list[str]:
@@ -325,6 +395,8 @@ def _render_block(block: ExportBlock, *, chart_number: int,
         return _render_evidence(block), chart_number
     if isinstance(block, ExportRiskBlock):
         return _render_risk(block), chart_number
+    if isinstance(block, ExportModelResultBlock):
+        return _render_model_result(block), chart_number
     if isinstance(block, ExportDividerBlock):
         return ["---"], chart_number
     raise MarkdownRenderError(

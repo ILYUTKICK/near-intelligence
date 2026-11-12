@@ -42,7 +42,7 @@ import type {
   TooltipComponentOption,
 } from "echarts/components";
 
-import { asValueList } from "../filters/filter-values";
+import { canonicalFilters } from "../filters/filter-values";
 import { boundPrefix, compactAxisNumber, formatDecimal, utcDateLabel } from "./format";
 import { rendererSupports } from "./view-types";
 import type { ChartViewResponse, Observation, SeriesResponse } from "./view-types";
@@ -268,7 +268,7 @@ function buildSummary(
  * by their exact-match filter values (the server echoes one selected value
  * per series), while every other view keeps the bare metric title.
  */
-function seriesDisplayNames(view: ChartViewResponse): string[] {
+export function describeSeries(view: ChartViewResponse): Array<{ id: string; name: string }> {
   const repeated = new Set<string>();
   const seen = new Set<string>();
   for (const series of view.series) {
@@ -279,12 +279,15 @@ function seriesDisplayNames(view: ChartViewResponse): string[] {
   }
   return view.series.map((series) => {
     if (!repeated.has(series.metric.id)) {
-      return series.metric.title;
+      return { id: series.metric.id, name: series.metric.title };
     }
-    const suffix = Object.entries(series.selection.filters).sort()
-      .map(([key, values]) => `${key}: ${asValueList(values).join(", ")}`)
+    const filters = canonicalFilters(series.selection.filters);
+    const suffix = filters.map(([key, values]) => `${key}: ${values.join(", ")}`)
       .join("; ");
-    return suffix ? `${series.metric.title} — ${suffix}` : series.metric.title;
+    return {
+      id: JSON.stringify([series.metric.id, filters]),
+      name: suffix ? `${series.metric.title} — ${suffix}` : series.metric.title,
+    };
   });
 }
 
@@ -307,12 +310,12 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
   const layout = panelLayout(groups.length, legendSpace);
 
   // NI-071: compared fan-out series carry their distinguishing filter values.
-  const displayNames = seriesDisplayNames(view);
+  const labels = describeSeries(view);
   // Exact-value lookup per series/grid index for the tooltip formatter.
   const exactSeries: ExactCell[][] = view.series.map((seriesResponse, index) => {
     const byDate = pointsByDate(seriesResponse);
     return gridDates.map((date) =>
-      exactCell(byDate.get(date), displayNames[index], seriesResponse.metric.unit, date),
+      exactCell(byDate.get(date), labels[index].name, seriesResponse.metric.unit, date),
     );
   });
 
@@ -331,8 +334,8 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
       });
       if (isBar) {
         series.push({
-          id: seriesResponse.metric.id,
-          name: displayNames[seriesIndex],
+          id: labels[seriesIndex].id,
+          name: labels[seriesIndex].name,
           type: "bar",
           xAxisIndex: gridIndex,
           yAxisIndex: gridIndex,
@@ -342,8 +345,8 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
         });
       } else {
         series.push({
-          id: seriesResponse.metric.id,
-          name: displayNames[seriesIndex],
+          id: labels[seriesIndex].id,
+          name: labels[seriesIndex].name,
           type: "line",
           xAxisIndex: gridIndex,
           yAxisIndex: gridIndex,
@@ -397,7 +400,7 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
       view.series.length > 1
         ? {
             top: 0,
-            data: view.series.map((s) => s.metric.title),
+            data: labels.map(series => series.name),
             textStyle: { color: AXIS_TEXT, fontFamily: FONT_STACK },
           }
         : undefined,
@@ -546,7 +549,7 @@ export function buildChart(view: ChartViewResponse, options: BuildOptions = {}):
   const gridDates = unionGrid(view.series);
   const isScatter = view.definition.visualization_type === "scatter";
   // NI-071: compared fan-out series carry their distinguishing filter values.
-  const displayNames = seriesDisplayNames(view);
+  const displayNames = describeSeries(view).map(series => series.name);
 
   // The accessible exact-value table.
   let table: TableModel;

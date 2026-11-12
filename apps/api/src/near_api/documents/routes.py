@@ -32,13 +32,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import StringConstraints
 from sqlalchemy.engine import Connection, Engine
 
 from near_api.auth.principal import Principal, get_principal, get_runtime_engine
 from near_api.contracts import error_response
 from near_api.datasets.canonical import canonical_timestamp, dump_canonical
 from near_api.db.security import principal_transaction
-from near_api.documents import idempotency, service
+from near_api.documents import idempotency, organization, service
 from near_api.documents.context_resolver import ReconstructionError, reconstruct_revision_chart
 from near_api.documents.schema import (
     SCHEMA_VERSION,
@@ -46,12 +47,15 @@ from near_api.documents.schema import (
     DocumentTooLarge,
     ReferenceInvalid,
 )
+from near_api.documents.templates import template_document
 from near_api.repositories.documents import DocumentRow, get_version
 from near_api.schemas.common import ContractModel, ErrorDetail, ErrorResponse
 from near_api.schemas.delivery import ChartViewResponse
 from near_api.schemas.documents import (
     DocumentCreateRequest,
     DocumentListResponse,
+    DocumentOrganizationResponse,
+    DocumentOrganizationUpdateRequest,
     DocumentRenameRequest,
     DocumentResponse,
     DocumentSaveRequest,
@@ -96,6 +100,9 @@ def _document_summary(row: DocumentRow) -> DocumentSummary:
         id=row.id, title=row.title, revision=row.revision,
         schema_version=row.schema_version, current_version_id=row.current_version_id,
         created_at=row.created_at, updated_at=row.updated_at,
+        # NI-072 private organization metadata (empty defaults when the row
+        # carries none); editing it never changes revision or updated_at.
+        tags=row.tags, favorite=row.favorite,
         # Work-completion counters stay the documented zero until the home/list
         # wiring consumes the NI-036 projections (NI-024/NI-037 scope).
         progress=DocumentProgress(headings=0, charts=0, insights=0),
@@ -240,14 +247,35 @@ def mutate_document_annotation(
 
 @router.get("/documents", response_model=DocumentListResponse, operation_id="listDocuments",
             summary="Owner-scoped document list", responses=_PRIVATE_ERROR_RESPONSES)
-def list_documents(principal: PrincipalDependency, engine: RuntimeEngineDependency,
-                   response: Response, q: Annotated[str | None, Query(max_length=200)] = None,
+def list_documents(request: Request, principal: PrincipalDependency,
+                   engine: RuntimeEngineDependency, response: Response,
+                   q: Annotated[str | None, Query(max_length=200)] = None,
+                   tag: Annotated[list[Annotated[str, StringConstraints(max_length=40)]] | None,
+                                  Query()] = None,
+                   favorite: Annotated[bool | None, Query()] = None,
                    cursor: Annotated[str | None, Query(max_length=64)] = None,
                    limit: Annotated[int | None, Query(ge=1, le=100)] = None,
-                   ) -> DocumentListResponse:
-    """List the verified principal's documents, newest first, owner-scoped."""
+                   ) -> DocumentListResponse | JSONResponse:
+    """List the verified principal's documents, newest first, owner-scoped.
+
+    Optional private organization filters (NI-072): ``tag`` may repeat (AND
+    semantics — a document matches when it carries EVERY listed normalized
+    tag; at most :data:`MAX_FILTER_TAGS` values), ``favorite`` filters to
+    favorited (``true``) or non-favorited (``false``) documents. Filters
+    compose with ``q`` and pagination inside one owner-scoped query; a tag
+    no document carries is an honest empty page, never an error.
+    """
+    filter_tags: list[str] | None = None
+    if tag:
+        if len(tag) > organization.MAX_FILTER_TAGS:
+            return error_response(
+                request, 422, "VALIDATION_ERROR",
+                f"At most {organization.MAX_FILTER_TAGS} tags may be combined in one filter",
+                details=(ErrorDetail(path="tag", reason="too_many_filter_tags"),))
+        filter_tags = [value.strip().lower() for value in tag]
     offset = _decode_cursor(cursor)
     page = service.list_document_details(engine, principal, search=q,
+                                         tags=filter_tags, favorite=favorite,
                                          limit=limit, offset=offset)
     response.headers["Cache-Control"] = "no-store"
     next_cursor = _encode_cursor(page.offset + page.limit) \
@@ -264,7 +292,14 @@ def create_document(request: Request, principal: PrincipalDependency,
                     engine: RuntimeEngineDependency, response: Response,
                     payload: DocumentCreateRequest,
                     idempotency_key: Annotated[str | None, Header()] = None):
-    """Create an owned document whose first revision is the empty document.
+    """Create an owned document whose first revision is empty or templated.
+
+    With ``template_id: "investment-v1"`` the first revision carries the
+    template's eight section headings and nothing else (EDITOR_SPECIFICATION:
+    no fabricated paragraphs or numerical placeholder claims). Unknown
+    template ids are rejected by the request contract (typed 422) before any
+    write. ``template_id`` is part of the idempotent request fingerprint, so
+    a replayed creation with a template returns the SAME document.
 
     With an ``Idempotency-Key`` header the created result is stored in the
     write transaction and a repeated identical owner/route/body request
@@ -272,11 +307,11 @@ def create_document(request: Request, principal: PrincipalDependency,
     document; the same key with a different body is a 409 idempotency
     collision.
     """
-    if payload.template_id is not None:
-        # P1 templates are feature-gated: 422 FEATURE_UNAVAILABLE, never a
-        # simulated template (API_SPECIFICATION).
-        return error_response(request, 422, "FEATURE_UNAVAILABLE",
-                              "Document templates are not available yet")
+    try:
+        template_content = template_document(payload.template_id) \
+            if payload.template_id is not None else None
+    except DocumentSchemaError as error:
+        return _schema_error(request, error)
     try:
         key = idempotency.parse_idempotency_key(idempotency_key)
     except DocumentSchemaError as error:
@@ -291,7 +326,8 @@ def create_document(request: Request, principal: PrincipalDependency,
                     payload.model_dump(mode="json")),
                 operation=lambda connection: (
                     201, _document_response(service.create_document_in_transaction(
-                        connection, principal, title=payload.title)
+                        connection, principal, title=payload.title,
+                        content=template_content)
                     ).model_dump(mode="json")))
         except idempotency.IdempotencyConflict:
             return error_response(
@@ -307,7 +343,8 @@ def create_document(request: Request, principal: PrincipalDependency,
         response.headers["ETag"] = _etag(int(outcome.body["revision"]))
         return DocumentResponse.model_validate(outcome.body)
     try:
-        detail = service.create_document(engine, principal, title=payload.title)
+        detail = service.create_document(engine, principal, title=payload.title,
+                                         content=template_content)
     except DocumentSchemaError as error:
         return _schema_error(request, error)
     response.headers["Cache-Control"] = "no-store"
@@ -377,6 +414,39 @@ def delete_document(request: Request, principal: PrincipalDependency,
             details=(ErrorDetail(path="If-Match",
                                  reason=f"current_revision:{conflict.current_revision}"),))
     return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+
+@router.patch("/documents/{document_id}/organization",
+              response_model=DocumentOrganizationResponse,
+              operation_id="updateDocumentOrganization",
+              summary="Update an owned document's private tags and favorite flag",
+              responses=_PRIVATE_ERROR_RESPONSES)
+def update_document_organization(request: Request, principal: PrincipalDependency,
+                                 engine: RuntimeEngineDependency, response: Response,
+                                 document_id: UUID,
+                                 payload: DocumentOrganizationUpdateRequest,
+                                 ) -> DocumentOrganizationResponse | JSONResponse:
+    """Merge private organization metadata on the owned document (NI-072).
+
+    PATCH semantics: absent fields stay unchanged; ``tags`` normalizes
+    server-side (trim + lower + dedupe) and ``tags: []`` clears them. This is
+    metadata-only — no revision is created, no content hash changes and
+    ``documents.updated_at`` (the list order) is untouched, so no If-Match
+    precondition applies. The document must exist and be owned (one generic
+    404 otherwise).
+    """
+    with principal_transaction(engine, principal) as connection:
+        try:
+            state = organization.update_organization(
+                connection, principal, document_id,
+                tags=list(payload.tags) if payload.tags is not None else None,
+                favorite=payload.favorite)
+        except organization.OrganizationValidationError as error:
+            return _schema_error(request, error)
+    response.headers["Cache-Control"] = "no-store"
+    return DocumentOrganizationResponse(
+        document_id=state.document_id, tags=state.tags, favorite=state.favorite,
+        updated_at=state.updated_at)
 
 
 @router.get("/documents/{document_id}/versions", response_model=VersionListResponse,
@@ -464,13 +534,13 @@ def _chart_csv(view: ChartViewResponse) -> str:
         view.definition.id, view.dataset.id, view.dataset.content_sha256,
         view.definition.renderer_version, view.context_hash, view.selection.start,
         view.selection.end, view.selection.frequency,
-        dump_canonical(view.selection.filters.model_dump()).decode("utf-8"),
     )
     for series in view.series:
+        filters = dump_canonical(series.selection.filters.model_dump(mode="json")).decode("utf-8")
         metric = (series.metric.metric_id, series.metric.id, series.metric.unit)
         for point in series.points:
             writer.writerow((
-                *context, *metric, canonical_timestamp(point.start), canonical_timestamp(point.end),
+                *context, filters, *metric, canonical_timestamp(point.start), canonical_timestamp(point.end),
                 point.value, point.quality.status, point.quality.bound_kind,
                 dump_canonical(point.quality.reasons).decode("utf-8"),
                 point.quality.coverage.observed, point.quality.coverage.expected,
