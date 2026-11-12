@@ -50,6 +50,7 @@ import {
   detailOf,
 } from "./ui-bridge";
 import { ExportDialog } from "./exports/export-dialog";
+import { ShareDialog } from "./shares/share-dialog";
 import { ConflictRecoveryDialog } from "./persistence/conflict-dialog";
 import { SaveStatusBar, formatSavedAt } from "./persistence/save-status";
 import { useDocumentSave } from "./persistence/use-document-save";
@@ -209,6 +210,8 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const [tabletOutlineOpen, setTabletOutlineOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const exportReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareReturnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
@@ -730,8 +733,13 @@ export function EditorShell({ documentId, title, revision, updatedAt,
               onClick={() => setExportOpen(true)}>
               Export
             </Button>
+            <Button ref={shareReturnFocusRef} data-testid="share-open"
+              disabled={!currentVersionId}
+              onClick={() => setShareOpen(true)}>
+              Share
+            </Button>
           </div>
-        ) : <p className="mt-2 text-metadata text-text-secondary">Save your edits to open revision history and export.</p>}
+        ) : <p className="mt-2 text-metadata text-text-secondary">Save your edits to open revision history, export and sharing.</p>}
       </header>
 
       {controller.draft ? (
@@ -961,6 +969,14 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         versionId={currentVersionId ?? ""}
         onAnnounce={announce}
         returnFocusRef={exportReturnFocusRef}
+      />
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        documentId={documentId}
+        revision={controller.revision}
+        onAnnounce={announce}
+        returnFocusRef={shareReturnFocusRef}
       />
       <ConflictRecoveryDialog
         open={conflictDialogOpen}
