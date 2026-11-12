@@ -702,14 +702,17 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         {announcement}
       </p>
 
+      {/* NI-078 (NI-076 D5): one compact header row carries the title, the
+          truthful save state and every persistent action; the pane toggles
+          live in the same row. The paper below starts higher on desktop. */}
       <header className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3">
         <div className="min-w-0 flex-1 basis-64">
           <h1 className="font-serif text-title leading-title [overflow-wrap:anywhere]">{title}</h1>
-          <p className="mt-1 text-metadata text-text-secondary">
-            Updated <time dateTime={displayedUpdatedAt}>{displayedUpdatedAt}</time> · Revision{" "}
-            {controller.revision} · Schema version 1
-          </p>
-          <div className="mt-2">
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <p className="text-metadata text-text-secondary">
+              Updated <time dateTime={displayedUpdatedAt}>{displayedUpdatedAt}</time> · Revision{" "}
+              {controller.revision} · Schema version 1
+            </p>
             <SaveStatusBar
               status={controller.status}
               onSave={handleSaveNow}
@@ -719,69 +722,20 @@ export function EditorShell({ documentId, title, revision, updatedAt,
             />
           </div>
         </div>
-        {controller.status.kind === "clean" ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <Link href={`/workspace/research/${documentId}/versions`} prefetch={false}
-              className="inline-block text-ui underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
-              Revision history
-            </Link>
-            <Button ref={exportReturnFocusRef} data-testid="export-open"
-              disabled={!currentVersionId}
-              onClick={() => setExportOpen(true)}>
-              Export
-            </Button>
-          </div>
-        ) : <p className="mt-2 text-metadata text-text-secondary">Save your edits to open revision history and export.</p>}
-      </header>
-
-      {controller.draft ? (
-        <div
-          role="alert"
-          data-testid="draft-recovery"
-          className="rounded-surface border border-warning/50 bg-surface p-5"
-        >
-          <p className="text-ui leading-ui font-medium text-text">
-            A draft with unsaved changes from this session was found (saved at{" "}
-            {formatSavedAt(controller.draft.capturedAt)}, based on revision{" "}
-            {controller.draft.baseRevision}).
-          </p>
-          {controller.draft.invalidReason ? (
-            <p className="text-ui leading-ui text-warning mt-1">
-              The draft cannot be restored: {controller.draft.invalidReason}. Discard it or keep
-              editing without it.
-            </p>
-          ) : (
-            <p className="text-body leading-body text-text-secondary mt-1">
-              Restoring replaces the paper with the draft&apos;s content; it is saved to the
-              server by the next autosave. The server version stays in the document history.
-            </p>
-          )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {controller.draft.invalidReason === null ? (
-              <Button variant="secondary" onClick={handleDraftRestore} data-testid="draft-restore">
-                Restore draft
+        <div className="flex flex-wrap items-center gap-2">
+          {controller.status.kind === "clean" ? (
+            <>
+              <Link href={`/workspace/research/${documentId}/versions`} prefetch={false}
+                className="inline-block text-ui underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+                Revision history
+              </Link>
+              <Button ref={exportReturnFocusRef} data-testid="export-open"
+                disabled={!currentVersionId}
+                onClick={() => setExportOpen(true)}>
+                Export
               </Button>
-            ) : null}
-            <Button variant="quiet" onClick={handleDraftDiscard} data-testid="draft-discard">
-              Discard draft
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap items-start gap-2 border-b border-border pb-3">
-        <InsertMenuButton onInsert={handleInsert} disabled={!editor} />
-        <Button variant="secondary" disabled={!editor || controller.status.kind !== "clean" || Boolean(controller.draft)}
-          onClick={() => openHypothesis({ kind: "create" })}>Add hypothesis</Button>
-        <BlockToolbar
-          currentBlock={currentBlock}
-          blockCount={blockCount}
-          onMoveUp={() => handleMove(-1)}
-          onMoveDown={() => handleMove(1)}
-          onDuplicate={handleDuplicate}
-          onDelete={handleDeleteFromToolbar}
-        />
-        <div className="ml-auto flex items-center gap-2">
+            </>
+          ) : <p className="text-metadata text-text-secondary">Save your edits to open revision history and export.</p>}
           <button
             type="button"
             className="inline-flex min-h-11 items-center rounded-control border border-control-border bg-surface px-3 text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus md:hidden"
@@ -823,6 +777,57 @@ export function EditorShell({ documentId, title, revision, updatedAt,
             {toolsCollapsed ? "Show tools pane" : "Collapse tools"}
           </button>
         </div>
+      </header>
+
+      {controller.draft ? (
+        <div
+          role="alert"
+          data-testid="draft-recovery"
+          className="rounded-surface border border-warning/50 bg-surface p-5"
+        >
+          <p className="text-ui leading-ui font-medium text-text">
+            A draft with unsaved changes from this session was found (saved at{" "}
+            {formatSavedAt(controller.draft.capturedAt)}, based on revision{" "}
+            {controller.draft.baseRevision}).
+          </p>
+          {controller.draft.invalidReason ? (
+            <p className="text-ui leading-ui text-warning mt-1">
+              The draft cannot be restored: {controller.draft.invalidReason}. Discard it or keep
+              editing without it.
+            </p>
+          ) : (
+            <p className="text-body leading-body text-text-secondary mt-1">
+              Restoring replaces the paper with the draft&apos;s content; it is saved to the
+              server by the next autosave. The server version stays in the document history.
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {controller.draft.invalidReason === null ? (
+              <Button variant="secondary" onClick={handleDraftRestore} data-testid="draft-restore">
+                Restore draft
+              </Button>
+            ) : null}
+            <Button variant="quiet" onClick={handleDraftDiscard} data-testid="draft-discard">
+              Discard draft
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Document-level operations; block operations stay contextual through
+          the BlockToolbar acting on the selected block (NI-039 pattern). */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+        <InsertMenuButton onInsert={handleInsert} disabled={!editor} />
+        <Button variant="secondary" disabled={!editor || controller.status.kind !== "clean" || Boolean(controller.draft)}
+          onClick={() => openHypothesis({ kind: "create" })}>Add hypothesis</Button>
+        <BlockToolbar
+          currentBlock={currentBlock}
+          blockCount={blockCount}
+          onMoveUp={() => handleMove(-1)}
+          onMoveDown={() => handleMove(1)}
+          onDuplicate={handleDuplicate}
+          onDelete={handleDeleteFromToolbar}
+        />
       </div>
 
       {tabletOutlineOpen ? (
