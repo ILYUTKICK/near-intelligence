@@ -857,15 +857,19 @@ class PublicationDatabaseTests(unittest.TestCase):
 
     def test_seed_refuses_private_content_evidence_outside_manifest(self):
         artifact = self._insert_artifact(scope="private", owner_id=self.alice_id)
-        hypothesis = document_fixtures.hypothesis_attrs()
-        evidence = document_fixtures.evidence_attrs(
-            hypothesis["attrs"]["hypothesis_id"], "citation", str(artifact))
-        slug = f"synthetic-private-{uuid4().hex[:8]}"
-        with self.assertRaises(ReferenceInvalid) as rejected:
-            self.seed_release(slug, content={**empty_document(), "content": [hypothesis, evidence]},
-                              manifest=[])
-        self.assertIn(("content", "dangling_citation_target"), rejected.exception.details)
-        self.assertEqual(self.client.get(f"/api/publications/{slug}").status_code, 404)
+        try:
+            hypothesis = document_fixtures.hypothesis_attrs()
+            evidence = document_fixtures.evidence_attrs(
+                hypothesis["attrs"]["hypothesis_id"], "citation", str(artifact))
+            slug = f"synthetic-private-{uuid4().hex[:8]}"
+            with self.assertRaises(ReferenceInvalid) as rejected:
+                self.seed_release(slug, content={**empty_document(), "content": [hypothesis, evidence]},
+                                  manifest=[])
+            self.assertIn(("content", "dangling_citation_target"), rejected.exception.details)
+            self.assertEqual(self.client.get(f"/api/publications/{slug}").status_code, 404)
+        finally:
+            with self.admin.begin() as connection:
+                connection.execute(text("DELETE FROM app.artifacts WHERE id = :id"), {"id": artifact})
 
     def test_copy_keeps_model_run_dataset_and_release_version(self):
         from near_api.research.publication import (
