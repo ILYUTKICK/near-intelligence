@@ -540,6 +540,8 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/shares/{token}",
             "/api/shares/{token}/charts/{block_id}/view",
             "/api/shares/{token}/charts/{block_id}/csv",
+            "/api/documents/{document_id}/integrity",
+            "/api/documents/{document_id}/grounded-commentary",
             "/api/documents/{document_id}/insights",
             "/api/documents/{document_id}/insights/{insight_id}",
             "/api/documents/{document_id}/hypotheses",

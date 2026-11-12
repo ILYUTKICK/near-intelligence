@@ -83,8 +83,9 @@ class ContractTests(TestCase):
             # metrics/chart/dataset/source delivery routes, NI-054 added
             # the public model definition/readiness/run routes, NI-041
             # added the chart-block insertion route, NI-044 added the
-            # owner-scoped research snapshot routes and NI-060 added the
-            # share capability routes.
+            # owner-scoped research snapshot routes, NI-060 added the
+            # share capability routes and NI-065 added the integrity and
+            # grounded-commentary routes.
             self.assertEqual(set(schema["paths"]), {
                 "/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
@@ -106,6 +107,8 @@ class ContractTests(TestCase):
                 "/api/documents/{document_id}/evidence",
                 "/api/documents/{document_id}/evidence/{evidence_id}",
                 "/api/documents/{document_id}/evidence-targets",
+                "/api/documents/{document_id}/integrity",
+                "/api/documents/{document_id}/grounded-commentary",
                 "/api/metrics", "/api/metrics/{metric_id}",
                 "/api/metrics/{metric_id}/series",
                 "/api/charts", "/api/charts/{chart_id}", "/api/charts/{chart_id}/view",

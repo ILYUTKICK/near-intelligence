@@ -68,6 +68,7 @@ import { EditorHypothesisDialog, type HypothesisAction } from "./hypotheses/edit
 import { EditorEvidenceDialog, type EvidenceAction } from "./evidence/editor-dialog";
 import { EvidenceNavigationPanel } from "./evidence/evidence-panel";
 import { EditorModelBlockDialog } from "./models/model-block-dialog";
+import { IntegrityFindingsPanel } from "./integrity/integrity-panel";
 
 /**
  * The three-pane research editor workbench (NI-039):
@@ -944,6 +945,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
               <ContextPane editor={editor} currentBlock={currentBlock} onTableChange={handleTableChange} />
             ) : null}
             {editor ? <EvidenceNavigationPanel editor={editor} onAnnounce={announce} /> : null}
+            {editor ? <IntegrityFindingsPanel editor={editor} onAnnounce={announce} /> : null}
           </div>
         </aside>
       </div>
@@ -980,6 +982,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
               />
             ) : null}
             {editor ? <EvidenceNavigationPanel editor={editor} onAnnounce={announce} /> : null}
+            {editor ? <IntegrityFindingsPanel editor={editor} onAnnounce={announce} /> : null}
           </div>
         </DrawerContent>
       </Drawer>

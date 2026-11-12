@@ -402,6 +402,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{document_id}/grounded-commentary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request bounded advisory commentary over explicitly selected blocks of the acknowledged revision (requires enabled server configuration)
+         * @description Advisory commentary over the explicitly selected context — or the typed absence.
+         *
+         *     Ownership is checked before anything else (one generic 404). With the
+         *     adapter disabled the typed unavailable state is returned without reading
+         *     any provider secret; when enabled, exactly one bounded provider call is
+         *     made over the selected context and every returned item is marked advisory.
+         */
+        post: operations["createGroundedCommentary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{document_id}/hypotheses": {
         parameters: {
             query?: never;
@@ -474,6 +499,7 @@ export interface paths {
         patch: operations["updateDocumentInsight"];
         trace?: never;
     };
+<<<<<<< HEAD
     "/api/documents/{document_id}/model-blocks": {
         parameters: {
             query?: never;
@@ -527,6 +553,9 @@ export interface paths {
         trace?: never;
     };
     "/api/documents/{document_id}/shares": {
+=======
+    "/api/documents/{document_id}/integrity": {
+>>>>>>> feat/ni-065-integrity
         parameters: {
             query?: never;
             header?: never;
@@ -534,6 +563,7 @@ export interface paths {
             cookie?: never;
         };
         /**
+<<<<<<< HEAD
          * List an owned document's shares (never the token)
          * @description List the owned document's share records, newest first.
          *
@@ -575,6 +605,17 @@ export interface paths {
          *     it before any consent, and the create request must carry its SHA-256.
          */
         get: operations["previewDocumentShare"];
+=======
+         * Run the deterministic advisory integrity checks on an owned document's acknowledged (or requested historical) revision
+         * @description Report advisory integrity findings for one immutable revision.
+         *
+         *     Read-only and deterministic per revision content: findings carry exact
+         *     block/entity/context/dataset/definition references and advisory severities
+         *     (never a truth score), and no finding can change a pin, coefficient or
+         *     document — refresh and citation remain explicit author actions.
+         */
+        get: operations["getDocumentIntegrity"];
+>>>>>>> feat/ni-065-integrity
         put?: never;
         post?: never;
         delete?: never;
@@ -583,6 +624,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+<<<<<<< HEAD
     "/api/documents/{document_id}/shares/{share_id}": {
         parameters: {
             query?: never;
@@ -603,6 +645,8 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+=======
+>>>>>>> feat/ni-065-integrity
     "/api/documents/{document_id}/versions": {
         parameters: {
             query?: never;
@@ -2019,6 +2063,74 @@ export interface components {
              */
             status: "queued" | "running" | "succeeded" | "failed" | "expired";
         };
+        /**
+         * GroundedCommentaryItem
+         * @description One advisory commentary item bound to its selected source block.
+         */
+        GroundedCommentaryItem: {
+            /**
+             * Block Id
+             * Format: uuid
+             */
+            block_id: string;
+            /** Context Hash */
+            context_hash: string | null;
+            /** Text */
+            text: string;
+        };
+        /**
+         * GroundedCommentaryRequest
+         * @description The explicitly selected context for one grounded commentary request.
+         *
+         *     Only block ids of the acknowledged revision may be selected; everything
+         *     else the prompt contains is authored by the server. No provider, model or
+         *     endpoint field exists on the request — external transmission happens only
+         *     through server configuration.
+         */
+        GroundedCommentaryRequest: {
+            /** Block Ids */
+            block_ids: string[];
+            /** Question */
+            question: string;
+        };
+        /**
+         * GroundedCommentaryResponse
+         * @description Advisory commentary over the selected context — or the typed absence.
+         *
+         *     ``advisory`` is contractually ``true``: this endpoint never returns a
+         *     result the client could mistake for a data source. When the adapter is
+         *     disabled or fails, ``state`` names it and ``items`` is empty; a fake
+         *     successful commentary is impossible by construction.
+         */
+        GroundedCommentaryResponse: {
+            /**
+             * Advisory
+             * @constant
+             */
+            advisory: true;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Items */
+            items: components["schemas"]["GroundedCommentaryItem"][];
+            /** Message */
+            message?: string | null;
+            /** Notice */
+            notice: string;
+            /** Reason */
+            reason?: ("adapter_disabled" | "adapter_misconfigured" | "no_acknowledged_revision" | "unknown_block_reference" | "unresolved_block_context" | "context_too_large" | "provider_http_status" | "provider_unreachable" | "response_too_large" | "unsupported_provider_response" | "ungrounded_commentary") | null;
+            /** Revision */
+            revision: number | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "unavailable" | "failed";
+            /** Version Id */
+            version_id: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2418,6 +2530,82 @@ export interface components {
              * @enum {string}
              */
             type?: "observation" | "hypothesis" | "risk" | "conclusion";
+        };
+        /**
+         * IntegrityCheckCount
+         * @description Summary count of one check id present in the report.
+         */
+        IntegrityCheckCount: {
+            /**
+             * Check Id
+             * @enum {string}
+             */
+            check_id: "invalid_revision_content" | "missing_chart_context" | "invalid_chart_context" | "stale_chart_context" | "chart_definition_unavailable" | "dataset_pin_unavailable" | "evidence_target_unavailable" | "insight_context_unavailable" | "uncited_pinned_chart" | "uncited_pinned_dataset_table";
+            /** Count */
+            count: number;
+        };
+        /**
+         * IntegrityFinding
+         * @description One deterministic advisory finding with exact references.
+         */
+        IntegrityFinding: {
+            /** Block Id */
+            block_id?: string | null;
+            /** Chart Definition Version Id */
+            chart_definition_version_id?: string | null;
+            /**
+             * Check Id
+             * @enum {string}
+             */
+            check_id: "invalid_revision_content" | "missing_chart_context" | "invalid_chart_context" | "stale_chart_context" | "chart_definition_unavailable" | "dataset_pin_unavailable" | "evidence_target_unavailable" | "insight_context_unavailable" | "uncited_pinned_chart" | "uncited_pinned_dataset_table";
+            /** Context Hash */
+            context_hash?: string | null;
+            /** Dataset Version Id */
+            dataset_version_id?: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+            /**
+             * Jump
+             * @enum {string}
+             */
+            jump: "block" | "none";
+            /** Latest Dataset Version Id */
+            latest_dataset_version_id?: string | null;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "advisory" | "warning";
+            /** Target Kind */
+            target_kind?: ("insight" | "chart_block" | "model_run" | "citation") | null;
+        };
+        /**
+         * IntegrityReport
+         * @description The deterministic integrity report of one revision.
+         *
+         *     Deterministic content only: no wall-clock field, because a rerun is a new
+         *     GET over the same immutable row and must produce the same report. A
+         *     historical (non-acknowledged) check carries ``is_acknowledged:false`` and
+         *     stays read-only advisory — it is never refused.
+         */
+        IntegrityReport: {
+            /** Counts */
+            counts: components["schemas"]["IntegrityCheckCount"][];
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Findings */
+            findings: components["schemas"]["IntegrityFinding"][];
+            /** Is Acknowledged */
+            is_acknowledged: boolean;
+            /** Revision */
+            revision: number;
+            /** Version Id */
+            version_id: string | null;
         };
         /**
          * LimitationsResponse
@@ -5500,6 +5688,70 @@ export interface operations {
             };
         };
     };
+    createGroundedCommentary: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroundedCommentaryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroundedCommentaryResponse"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Verified account is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced target does not exist for this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request failed validation or references an unavailable target */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     listDocumentHypotheses: {
         parameters: {
             query?: {
@@ -6186,6 +6438,7 @@ export interface operations {
             };
         };
     };
+<<<<<<< HEAD
     addModelBlock: {
         parameters: {
             query?: never;
@@ -6373,6 +6626,13 @@ export interface operations {
     listDocumentShares: {
         parameters: {
             query?: never;
+=======
+    getDocumentIntegrity: {
+        parameters: {
+            query?: {
+                version_id?: string | null;
+            };
+>>>>>>> feat/ni-065-integrity
             header?: {
                 authorization?: string | null;
             };
@@ -6389,7 +6649,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+<<<<<<< HEAD
                     "application/json": components["schemas"]["DocumentShareListResponse"];
+=======
+                    "application/json": components["schemas"]["IntegrityReport"];
+>>>>>>> feat/ni-065-integrity
                 };
             };
             /** @description Missing or invalid session */
@@ -6419,6 +6683,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+<<<<<<< HEAD
             /** @description The consented revision or preview is not current, or the Idempotency-Key was reused with a different request */
             409: {
                 headers: {
@@ -6639,6 +6904,8 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+=======
+>>>>>>> feat/ni-065-integrity
             /** @description Request failed validation or references an unavailable target */
             422: {
                 headers: {
