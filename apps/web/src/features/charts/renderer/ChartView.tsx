@@ -75,6 +75,8 @@ export interface ChartViewProps {
   /** Injectable ECharts mount (tests inject a recording fake). */
   factory?: ChartFactory;
   className?: string;
+  /** Human instance context for repeated exact-table landmarks. */
+  instanceLabel?: string;
 }
 
 const FETCH_DEBOUNCE_MS = 200;
@@ -148,6 +150,7 @@ export function ChartView({
   presentation,
   factory = defaultChartFactory,
   className,
+  instanceLabel,
 }: ChartViewProps) {
   const [fetchedView, setFetchedView] = useState<ChartViewResponse | null>(null);
   const [loading, setLoading] = useState(Boolean(loader) && controlledView === undefined);
@@ -301,7 +304,7 @@ export function ChartView({
   const metadata = activeView ? metadataOf(activeView, definition) : undefined;
   const savedPreview = presentation === "saved-preview";
   const previewValues = savedPreview && plottable && built?.kind === "ok"
-    ? <SeriesTable model={built.table} title={definition.title} className="mt-3" />
+    ? <SeriesTable model={built.table} title={definition.title} instanceLabel={instanceLabel} className="mt-3" />
     : undefined;
 
   const plot = () => {
@@ -355,7 +358,7 @@ export function ChartView({
           className="w-full"
           style={{ height: height ?? 320, ...(width !== undefined ? { maxWidth: width } : {}) }}
         />
-        {savedPreview ? null : <SeriesTable model={built.table} title={definition.title} />}
+        {savedPreview ? null : <SeriesTable model={built.table} title={definition.title} instanceLabel={instanceLabel} />}
       </div>
     );
   };

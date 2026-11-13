@@ -4,8 +4,9 @@ import { ChartView } from "@/features/charts/renderer/ChartView";
 import { downloadBlob } from "../persistence/download";
 import { getRevisionChart, getRevisionCsv } from "../revision-api";
 
-export function HistoricalChart({ documentId, versionId, blockId, sessionSignal }: {
+export function HistoricalChart({ documentId, versionId, blockId, sessionSignal, instanceLabel }: {
   documentId: string; versionId: string; blockId: string; sessionSignal: AbortSignal;
+  instanceLabel?: string;
 }) {
   const [view, setView] = useState<Awaited<ReturnType<typeof getRevisionChart>> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,8 +48,8 @@ export function HistoricalChart({ documentId, versionId, blockId, sessionSignal 
     <Button variant="secondary" onClick={() => { setError(null); setAttempt(value => value + 1); }}>Retry saved chart</Button>
   </div>;
   if (!view) return <p role="status">Reconstructing saved chart…</p>;
-  return <section className="min-w-0 space-y-3" aria-label="Saved chart evidence">
-    <ChartView definition={view.definition} view={view} selection={view.selection} mode="historical" />
+  return <section className="min-w-0 space-y-3" aria-label={`Saved chart evidence${instanceLabel ? ` — ${instanceLabel}` : ""}`}>
+    <ChartView definition={view.definition} view={view} selection={view.selection} mode="historical" instanceLabel={instanceLabel} />
     <p className="break-all text-metadata text-text-secondary">Context hash {view.context_hash}</p>
     <Button variant="secondary" aria-disabled={downloading} onClick={downloadCsv}>
       {downloading ? "Downloading CSV…" : "Download saved CSV"}

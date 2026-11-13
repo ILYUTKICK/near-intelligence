@@ -16,11 +16,14 @@ import type { TableModel } from "./option-builder";
 export function SeriesTable({
   model,
   title,
+  instanceLabel,
   className,
 }: {
   model: TableModel;
   /** Chart title used in the accessible name/caption. */
   title: string;
+  /** Human context distinguishing repeated charts, e.g. "research block 10". */
+  instanceLabel?: string;
   className?: string;
 }) {
   const hasNotes = model.rows.some((row) =>
@@ -29,12 +32,12 @@ export function SeriesTable({
   return (
     <div
       role="region"
-      aria-label={`${title} — exact data table`}
+      aria-label={`${title} — exact data table${instanceLabel ? ` — ${instanceLabel}` : ""}`}
       tabIndex={0}
       className={cn("max-h-64 overflow-auto rounded-control border border-border", className)}
     >
       <table className="w-full border-collapse text-left tabular-nums">
-        <caption className="sr-only">{`${title} — equivalent data with exact values`}</caption>
+        <caption className="sr-only">{`${title} — equivalent data with exact values${instanceLabel ? ` — ${instanceLabel}` : ""}`}</caption>
         <thead>
           <tr className="bg-surface-muted">
             <th scope="col" className="font-ui text-ui leading-ui px-3 py-2 font-medium">
