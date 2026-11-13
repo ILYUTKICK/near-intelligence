@@ -135,10 +135,12 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
 
   await page.goto(`${state.web_url}/`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const thesisLink = page.getByRole("link", { name: "Read the full thesis" });
+  // NI-086 overview copy: the anonymous paths into the public thesis and
+  // methodology keep their relative hrefs under the new link names.
+  const thesisLink = page.getByRole("link", { name: "full research" });
   await expect(thesisLink).toBeVisible();
   expect(await thesisLink.getAttribute("href")).toMatch(/^\//);
-  const methodologyLink = page.getByRole("link", { name: "Check the methodology" });
+  const methodologyLink = page.getByRole("link", { name: "Our methodology" });
   await expect(methodologyLink).toBeVisible();
 
   await page.goto(`${state.web_url}/methodology`);

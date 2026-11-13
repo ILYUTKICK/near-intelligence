@@ -71,7 +71,7 @@ export default function HomePage() {
           <ProductIcon name={direction.icon} className="size-8 text-accent" />
           <h3 className="mt-5 font-serif text-heading leading-heading">{direction.title}</h3>
           <p className="mt-3 max-w-[36ch] text-ui leading-ui text-text-secondary">{direction.description}</p>
-          <Link href={direction.href} className={`${textLink} mt-3`} aria-label={`Explore ${direction.title}`}>Explore data <ProductIcon name="arrow" /></Link>
+          <Link href={direction.href} className={`${textLink} mt-3`} aria-label={`Explore data: ${direction.title}`}>Explore data <ProductIcon name="arrow" /></Link>
         </li>)}
       </ul>
       <p className="mt-4 text-metadata leading-metadata text-text-secondary">Historical datasets · coverage varies by source</p>
