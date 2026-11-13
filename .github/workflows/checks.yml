@@ -73,6 +73,8 @@ jobs:
           uv run python -m unittest discover -s tests -p test_security_session_boundary.py -v
           uv run python -m unittest discover -s tests -p test_security_static_sinks.py -v
           uv run python -m unittest discover -s tests -p test_security_untrusted_content.py -v
+          # NI-065: disabled/failed provider and grounding regressions stay offline.
+          uv run python -m unittest discover -s tests -p test_ai_adapter.py -v
       - name: Generated client matches the API contract
         run: node packages/shared-types/scripts/generate.mjs --check
 

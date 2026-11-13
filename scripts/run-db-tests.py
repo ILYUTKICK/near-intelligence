@@ -124,6 +124,7 @@ def main() -> int:
                     "test_delivery_apis.py", "test_saved_charts.py", "test_snapshots.py",
                     "test_profile.py", "test_documents.py", "test_chart_blocks.py",
                     "test_model_blocks.py", "test_document_insights.py", "test_publications.py",
+                    "test_integrity.py",
                     "test_models_readiness.py",
                     "test_models_fit.py", "test_models_diagnostics.py",
                     "test_models_publication.py", "test_models_public_apis.py",

@@ -34,6 +34,9 @@ ALLOWED_HTTP_MODULES = (
     "auth/jwks.py",  # fetches ONLY the configured https JWKS URL
     "ingestion/providers/finalized_header.py",  # operator-gated collector (stopped by default)
     "ingestion/capabilities/probe.py",  # operator capability probe, injected transport
+    "ai/adapter.py",  # NI-065 optional commentary adapter: ONLY the operator-configured
+                      # NEAR_AI_COMMENTARY_ENDPOINT (disabled by default, injected
+                      # transport in tests, finalized-header bounds, no retry)
 )
 
 FORBIDDEN_CALL_NAMES = {"os.system", "os.popen", "eval", "exec", "compile"}

@@ -232,6 +232,16 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await expect(page.getByText("Opening or typing never refreshes this pin")).toBeVisible();
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
   await waitForSavedRevision(page, 2);
+  // NI-065: a real saved uncited chart yields an actionable advisory. The
+  // keyboard jump changes selection only, then adding an insight fixes it.
+  const integrity = page.getByTestId("integrity-panel").filter({ visible: true });
+  await expect(integrity.getByTestId("integrity-revision")).toHaveText("Checked saved revision 2.");
+  await expect(integrity.getByText("Advisory · Uncited pinned chart")).toBeVisible();
+  const integrityJump = integrity.getByRole("button", { name: /Show block .* in the paper/ });
+  await integrityJump.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("editor-announcement")).toContainText("Uncited pinned chart");
+  await waitForSavedRevision(page, 2);
   // Capture the pinned context hash from the chart node's own inspection.
   await page.getByText("Chart definition and pinned context").click();
   await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
@@ -260,6 +270,9 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await insightDialog.getByRole("button", { name: "Save insight" }).click();
   await expect(page.getByText(INSIGHT_TEXT).first()).toBeVisible();
   await waitForSavedRevision(page, 5);
+  await expect(integrity.getByTestId("integrity-revision")).toHaveText("Checked saved revision 5.");
+  await expect(integrity.getByTestId("integrity-empty")).toHaveText("No integrity findings on this revision.");
+  await expect(integrity.getByTestId("integrity-findings")).toHaveCount(0);
 
   // -- 10. Contrary evidence against the hypothesis ----------------------- //
   await page.getByRole("button", { name: "Add evidence" }).click();

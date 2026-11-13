@@ -139,6 +139,9 @@ class HomeContractTests(unittest.TestCase):
                                                 "/api/documents/{document_id}/exports",
                                                 "/api/documents/{document_id}/exports/{job_id}",
                                                 "/api/documents/{document_id}/exports/{job_id}/download",
+                                                # NI-065 advisory integrity and commentary routes.
+                                                "/api/documents/{document_id}/integrity",
+                                                "/api/documents/{document_id}/grounded-commentary",
                                                 "/api/documents/{document_id}/model-blocks",
                                                 "/api/documents/{document_id}/shares",
                                                 "/api/documents/{document_id}/shares/preview",

@@ -14,6 +14,10 @@ async function handle(request: NextRequest, context: Context) {
   // (GET .../download) — the same document-nested implemented paths the API
   // serves; the download itself carries no query string.
   const exportJob = segments[1] === "exports" && segments.length >= 3 && uuid(segments[2]);
+  // NI-065: the read-only integrity report (GET, optional historical
+  // version_id) and the opt-in grounded-commentary POST (no query string).
+  const integrity = segments.length === 2 && segments[1] === "integrity";
+  const commentary = segments.length === 2 && segments[1] === "grounded-commentary";
   // NI-060 document shares: owner preview (GET .../shares/preview), consented
   // create (POST .../shares) and owner list (GET .../shares) plus the revoke
   // (DELETE .../shares/{shareId}) — no share route takes a query string, and
@@ -35,6 +39,8 @@ async function handle(request: NextRequest, context: Context) {
     if (segments.length === 2 && annotation) allowed = ["GET", "POST"];
     if (segments.length === 3 && annotation && uuid(segments[2])) allowed = ["PATCH", "DELETE"];
     if (segments.length === 2 && segments[1] === "evidence-targets") allowed = ["GET"];
+    if (integrity) allowed = ["GET"];
+    if (commentary) allowed = ["POST"];
     if (segments.length === 3 && segments[1] === "versions" && uuid(segments[2])) allowed = ["GET"];
     if (segments.length === 2 && segments[1] === "exports") allowed = ["POST"];
     if (exportJob && segments.length === 3) allowed = ["GET"];
@@ -81,6 +87,19 @@ async function handle(request: NextRequest, context: Context) {
       || [...query.keys()].some(key => !keys.includes(key) || query.getAll(key).length !== 1)) {
       return NextResponse.json({ error: "Unsupported evidence target query." }, { status: 422, headers: { "cache-control": "no-store" } });
     }
+  }
+  if (integrity) {
+    // Optional historical version_id only: a single well-formed UUID, or no
+    // query at all (the acknowledged revision).
+    const query = request.nextUrl.searchParams;
+    if (request.nextUrl.search.length > 100 || [...query.keys()].some(key =>
+      key !== "version_id" || !uuid(query.get(key) ?? undefined)
+      || query.getAll(key).length !== 1)) {
+      return NextResponse.json({ error: "Unsupported integrity query." }, { status: 422, headers: { "cache-control": "no-store" } });
+    }
+  }
+  if (commentary && request.nextUrl.search) {
+    return NextResponse.json({ error: "Commentary requests take no query." }, { status: 422, headers: { "cache-control": "no-store" } });
   }
   const response = await forwardPrivate(request, `/api/documents${segments.length ? `/${segments.join("/")}` : ""}`);
   if (shares) response.headers.set("referrer-policy", "no-referrer");

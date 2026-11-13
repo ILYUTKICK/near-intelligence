@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException
 from near_api.db.security import ResourceNotFound
 from near_api.insights.schemas import INSIGHT_CONTRACT_MODELS
 from near_api.schemas.common import ApiError, CONTRACT_MODELS, ErrorDetail, ErrorResponse
+from near_api.schemas.integrity import INTEGRITY_CONTRACT_MODELS
 
 _HTTP_ERRORS = {
     400: ("BAD_REQUEST", "Invalid request"),
@@ -142,7 +143,8 @@ def install_contracts(app: FastAPI) -> None:
             # Route responses such as Insight come directly from FastAPI.
             _, common = models_json_schema(
                 [(model, "validation")
-                 for model in (*CONTRACT_MODELS, *INSIGHT_CONTRACT_MODELS)],
+                 for model in (*CONTRACT_MODELS, *INSIGHT_CONTRACT_MODELS,
+                               *INTEGRITY_CONTRACT_MODELS)],
                 ref_template="#/components/schemas/{model}")
             common = jsonable_encoder(common, exclude_none=True)
             definitions = schema.setdefault("components", {}).setdefault("schemas", {})
