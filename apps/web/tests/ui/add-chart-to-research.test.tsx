@@ -89,7 +89,7 @@ describe("NI-041 destination confirmation", () => {
       return response({ ...summary, revision: 4, content: {}, resolved_contexts: {} });
     }));
     const user = userEvent.setup();
-    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    render(<ChartAuthActions nextPath="/charts/intents-volume" saveInput={input} />);
     await user.click(await screen.findByRole("button", { name: "Add to research" }));
     await screen.findByText(/No existing research matches/);
     await user.clear(screen.getByLabelText("New research title"));
@@ -124,7 +124,7 @@ describe("NI-041 destination confirmation", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => url === "/api/auth/session"
       ? response({ subject }) : response({ items: [], next_cursor: null })));
     const user = userEvent.setup();
-    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    render(<ChartAuthActions nextPath="/charts/intents-volume" saveInput={input} />);
     await user.click(await screen.findByRole("button", { name: "Add to research" }));
     await user.type(screen.getByLabelText("New research title"), " private Alice draft");
     subject = "synthetic-bob";

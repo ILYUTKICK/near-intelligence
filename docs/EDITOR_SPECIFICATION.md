@@ -59,6 +59,8 @@ P0 export uses the exact acknowledged document revision; renders all block types
 
 The NI-075 desktop layout uses a compact outline, writing paper and properties rail. Collapsing either side pane gives the paper its space. Revision History retains read-only links and the saved dates. Export remains available for the acknowledged current revision. The Settings page points readers to the per-document recovery controls when an unsaved draft remains in their tab.
 
+NI-078 groups the title, save status, revision actions and pane toggles in the editor header. Chart blocks show their pin, save state and newer-data status in the paper. Properties and the chart's pinned-context disclosure show the full observed dataset identifier. Refresh still requires an explicit action.
+
 The three-pane research editor lives at `apps/web/src/features/editor/` and serves
 `/workspace/research/[documentId]`. State of this step, without changing the contracts above:
 

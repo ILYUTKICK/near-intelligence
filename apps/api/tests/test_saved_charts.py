@@ -136,19 +136,39 @@ class SavedChartsDatabaseTests(unittest.TestCase):
 
     def test_live_changed_badge_and_resolution_does_not_reorder_list(self):
         saved = self.create()
+        path = "/api/saved-charts/" + saved["id"]
         replacement = fixtures.DeliveryDatabaseTests.stage_fixture(
             self, f"ni035.{uuid4().hex[:16]}",
             [observation(METRIC_VOLUME, dt.date(2026, 1, 1), value="999",
                          dimensions={"source": "SRC-LLAMA"})], [METRIC_VOLUME],
             window=("2026-01-01", "2026-01-02"))
         delivery.reset_delivery_caches()
-        response = self.client.get("/api/saved-charts/" + saved["id"])
+        replacement_id = str(replacement.dataset_version_id)
+        response = self.client.get(path, params={"preview": "true"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        preview = response.json()
+        self.assertTrue(preview["dataset_changed"])
+        self.assertEqual(preview["saved_chart"], saved)
+        self.assertEqual(preview["view"]["dataset"]["id"], replacement_id)
+        self.assertEqual(preview["view"]["series"][0]["points"][0]["value"], "999")
+        self.assertEqual(self.client.get("/api/saved-charts").json()["items"], [saved])
+
+        self.actor = self.bob
+        forbidden = self.client.get(path, params={"preview": "true"})
+        self.assertEqual(forbidden.status_code, 404, forbidden.text)
+        self.assertEqual(forbidden.headers["cache-control"], "no-store")
+        self.actor = self.alice
+
+        response = self.client.get(path)
         self.assertEqual(response.status_code, 200, response.text)
         detail = response.json()
         self.assertTrue(detail["dataset_changed"])
-        self.assertEqual(detail["view"]["dataset"]["id"], str(replacement.dataset_version_id))
+        self.assertEqual(detail["view"]["dataset"]["id"], replacement_id)
+        self.assertEqual(detail["saved_chart"]["last_resolved_dataset_version_id"], replacement_id)
         self.assertEqual(detail["saved_chart"]["updated_at"], saved["updated_at"])
         self.assertEqual(detail["saved_chart"]["selection"], saved["selection"])
+        self.assertFalse(self.client.get(path).json()["dataset_changed"])
 
     def test_ni071_multi_value_selection_round_trips_save_reopen_edit(self):
         """The compared selection persists byte-exactly and re-resolves."""
@@ -244,6 +264,14 @@ class SavedChartsDatabaseTests(unittest.TestCase):
                          dimensions={"source": "SRC-LLAMA"})], [METRIC_VOLUME],
             window=("2026-01-01", "2026-01-02"))
         delivery.reset_delivery_caches()
+        response = self.client.get(path, params={"preview": "true"})
+        self.assertEqual(response.status_code, 200, response.text)
+        preview = response.json()
+        self.assertEqual(preview["saved_chart"], pinned)
+        self.assertEqual(preview["view"]["dataset"]["id"], snapshot["dataset_version_id"])
+        self.assertEqual(preview["view"]["series"][0]["points"][0]["value"],
+                         "123456789.123456789012345678901234")
+        self.assertFalse(preview["dataset_changed"])
         frozen = self.client.get(path).json()
         self.assertEqual(frozen["view"]["dataset"]["id"], snapshot["dataset_version_id"])
         self.assertFalse(frozen["dataset_changed"])

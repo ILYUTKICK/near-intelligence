@@ -11272,6 +11272,18 @@
             }
           },
           {
+            "description": "Resolve the chart without recording an observation.",
+            "in": "query",
+            "name": "preview",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Resolve the chart without recording an observation.",
+              "title": "Preview",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,

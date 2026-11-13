@@ -59,9 +59,12 @@ def create_saved(body: SavedChartCreateRequest, owner: Owner, engine: Runtime, r
 
 
 @router.get("/{instance_id}", response_model=SavedChartDetailResponse, operation_id="getSavedChart")
-def get_saved(instance_id: UUID, owner: Owner, engine: Runtime):
+def get_saved(
+    instance_id: UUID, owner: Owner, engine: Runtime,
+    preview: Annotated[bool, Query(description="Resolve the chart without recording an observation.")] = False,
+):
     with principal_transaction(engine, owner) as connection:
-        return saved.detail(connection, owner.id, instance_id)
+        return saved.detail(connection, owner.id, instance_id, preview=preview)
 
 
 @router.patch("/{instance_id}", response_model=SavedChartResponse, operation_id="updateSavedChart")

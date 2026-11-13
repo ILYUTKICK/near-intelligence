@@ -34,6 +34,8 @@ export async function savedRequest<T>(path: string, schema: z.ZodType<T>, option
 export const saveChart = (input: SaveInput, key: string) => savedRequest("/api/saved-charts", savedSchema,
   { method: "POST", headers: { "idempotency-key": key }, body: JSON.stringify(input) });
 export const getSaved = (id: string, signal?: AbortSignal) => savedRequest(`/api/saved-charts/${id}`, detailSchema, { signal });
+export const getSavedPreview = (id: string, signal: AbortSignal) =>
+  savedRequest(`/api/saved-charts/${id}?preview=true`, detailSchema, { signal });
 export const listSaved = (search: string, cursor: string | null, signal?: AbortSignal) => {
   const params = new URLSearchParams({ q: search });
   if (cursor) params.set("cursor", cursor);

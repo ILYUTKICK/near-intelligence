@@ -6905,7 +6905,10 @@ export interface operations {
     };
     getSavedChart: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Resolve the chart without recording an observation. */
+                preview?: boolean;
+            };
             header?: {
                 authorization?: string | null;
             };

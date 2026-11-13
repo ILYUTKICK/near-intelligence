@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "jest-axe";
@@ -39,7 +39,7 @@ describe("Saved chart workflow", () => {
       return json(saved, 201);
     }));
     const user = userEvent.setup();
-    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    render(<ChartAuthActions nextPath="/charts/intents-volume" saveInput={input} />);
     await user.click(await screen.findByRole("button", { name: "Save chart" }));
     await screen.findByRole("alert");
     fireEvent(window, new Event("focus"));
@@ -63,7 +63,7 @@ describe("Saved chart workflow", () => {
       return json(saved, 201);
     }));
     const user = userEvent.setup();
-    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    render(<ChartAuthActions nextPath="/charts/intents-volume" saveInput={input} />);
     await user.click(await screen.findByRole("button", { name: "Save chart" }));
     await screen.findByRole("link", { name: "Open saved chart" });
     subject = "synthetic-bob";
@@ -202,5 +202,37 @@ describe("Saved chart workflow", () => {
     await screen.findByRole("heading", { name: "Compare to live" });
     expect(screen.getByText(/latest approved dataset differs/)).toBeInTheDocument();
     expect(screen.getAllByText(/Shared chart renderer/).length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("Saved Charts compact cards (NI-078, NI-076 D4)", () => {
+  it("renders every card with the shared renderer preview and one concise context line", async () => {
+    const second = { ...saved, id: "33333333-3333-4333-8333-333333333333", label: "Second synthetic saved chart", selection: { ...selection, filters: {} } };
+    const chartView = view(definition(), []);
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/auth/session") return json({ subject: "synthetic-alice" });
+      if (url === "/api/saved-charts" || url.startsWith("/api/saved-charts?")) {
+        return json({ items: [saved, second], next_cursor: null });
+      }
+      const item = [saved, second].find((chart) => url === `/api/saved-charts/${chart.id}?preview=true`);
+      if (item) {
+        return json({ saved_chart: item, view: chartView, dataset_changed: false });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    }));
+    render(<SavedCharts />);
+    await screen.findByRole("link", { name: saved.label });
+    // Consistent bounded previews: both cards resolve through the shared
+    // renderer (jsdom has no IntersectionObserver, so the lazy preview
+    // resolves immediately; in the browser only near-viewport cards fetch).
+    expect(await screen.findAllByText("Shared chart renderer")).toHaveLength(2);
+    // One concise context line: period and filters together, not two rows.
+    const card = screen.getByRole("link", { name: saved.label }).closest("li") as HTMLElement;
+    expect(within(card).getByText(`${selection.start} – ${selection.end} (UTC, end exclusive) · source: SRC-LLAMA`)).toBeInTheDocument();
+    const secondCard = screen.getByRole("link", { name: "Second synthetic saved chart" }).closest("li") as HTMLElement;
+    expect(within(secondCard).getByText(/No filters/)).toBeInTheDocument();
+    // The mode badge stays visible on every card.
+    expect(within(card).getByText("Live selection")).toBeInTheDocument();
+    expect(within(secondCard).getByText("Live selection")).toBeInTheDocument();
   });
 });

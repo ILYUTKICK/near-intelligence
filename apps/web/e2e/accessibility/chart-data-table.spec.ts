@@ -110,11 +110,11 @@ test("editor chart node: exact values visible without hover", async ({ page }) =
     .toBeVisible({ timeout: 30_000 });
   const firstChart = editor.locator("[data-live-chart-block]").first();
   await firstChart.scrollIntoViewIfNeeded();
-  // The editor chart pins the NI-064 performance dataset by UUID (its
-  // observed dataset is printed in the node), so the values come from the
-  // perf fixture's own day map, not the journey dataset.
+  // The pin disclosure identifies the performance fixture's dataset.
+  await firstChart.getByText("Chart definition and pinned context").click();
   await expect(firstChart.getByText(`Observed dataset: ${state.perf_dataset_version_id}`))
     .toBeVisible({ timeout: 30_000 });
+  await firstChart.getByText("Chart definition and pinned context").click();
 
   // The chart node embeds the same hover-free exact table; its pinned
   // selection is [2026-01-01, 2026-01-08) — seven covered days.

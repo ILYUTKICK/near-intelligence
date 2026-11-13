@@ -1,8 +1,9 @@
 """NI-035 owner-scoped saved analytical contexts, using canonical delivery.
 
 Definitions remain global/immutable; instance mutations never copy or delete
-registry rows. Only metadata/context edits affect recency. Successful live
-reads record the resolved dataset without reordering the private list.
+registry rows. Only metadata/context edits affect recency. Successful detail
+reads record the resolved dataset without reordering the private list. Card
+previews resolve the same chart without recording an observation.
 """
 
 from collections.abc import Mapping
@@ -144,8 +145,9 @@ def _snapshot_dataset_version(connection: Connection, owner_id: UUID,
     return one_or_not_found(row)[0]
 
 
-def detail(connection: Connection, owner_id: UUID, instance_id: UUID) -> SavedChartDetailResponse:
-    row = _owned(connection, owner_id, instance_id, lock=True)
+def detail(connection: Connection, owner_id: UUID, instance_id: UUID, *,
+           preview: bool = False) -> SavedChartDetailResponse:
+    row = _owned(connection, owner_id, instance_id, lock=not preview)
     saved = _response(row)
     if saved.mode == "snapshot" and saved.snapshot_id is not None:
         # Frozen read: the pinned dataset version, never latest.
@@ -156,11 +158,12 @@ def detail(connection: Connection, owner_id: UUID, instance_id: UUID) -> SavedCh
     else:
         view = _resolve(connection, saved.chart_definition_version_id, saved.selection, None)
         changed = saved.last_resolved_dataset_version_id != view.dataset.id
-    connection.execute(update(SavedChart).where(
-        SavedChart.id == instance_id, owner_scope(SavedChart.owner_id, owner_id))
-        .values(last_resolved_dataset_version_id=view.dataset.id))
-    return SavedChartDetailResponse(saved_chart=saved.model_copy(update={
-        "last_resolved_dataset_version_id": view.dataset.id}), view=view, dataset_changed=changed)
+    if not preview:
+        connection.execute(update(SavedChart).where(
+            SavedChart.id == instance_id, owner_scope(SavedChart.owner_id, owner_id))
+            .values(last_resolved_dataset_version_id=view.dataset.id))
+        saved = saved.model_copy(update={"last_resolved_dataset_version_id": view.dataset.id})
+    return SavedChartDetailResponse(saved_chart=saved, view=view, dataset_changed=changed)
 
 
 def edit(connection: Connection, owner_id: UUID, instance_id: UUID, body: SavedChartUpdateRequest) -> SavedChartResponse:

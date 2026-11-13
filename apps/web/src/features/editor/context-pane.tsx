@@ -366,7 +366,10 @@ export function ContextPane({
 
         {currentBlock.canonicalType === "liveChart" ? (
           <InfoList>
-            {fieldPair("Chart definition version", shortId(attrs.chart_definition_version_id as string | null), "lcv")}
+            {/* NI-078 (NI-076 D5): the full technical identifiers live here in
+                Properties instead of the paper; the block in the paper keeps
+                its compact status row. */}
+            {fieldPair("Chart definition version", (attrs.chart_definition_version_id as string | null) ?? "—", "lcv")}
             {fieldPair("Mode", (attrs.mode as string | null) === "snapshot" ? "snapshot" : "live", "lmode")}
             {fieldPair(
               "Selection window",
@@ -376,7 +379,7 @@ export function ContextPane({
               })(),
               "lsel",
             )}
-            {fieldPair("Observed dataset version", shortId(attrs.observed_dataset_version_id as string | null), "lod")}
+            {fieldPair("Observed dataset version", (attrs.observed_dataset_version_id as string | null) ?? "—", "lod")}
             {attrs.snapshot_id
               ? fieldPair("Snapshot", shortId(attrs.snapshot_id as string), "lsnap")
               : null}

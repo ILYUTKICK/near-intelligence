@@ -229,12 +229,12 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   // -- 6. The document holds the pinned chart ---------------------------- //
   const editor = page.getByLabel("Research paper editor");
   await expect(editor).toBeVisible();
-  await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
-  await expect(page.getByText("Opening or typing never refreshes this pin.")).toBeVisible();
+  await expect(page.getByText("Opening or typing never refreshes this pin")).toBeVisible();
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
   await waitForSavedRevision(page, 2);
   // Capture the pinned context hash from the chart node's own inspection.
   await page.getByText("Chart definition and pinned context").click();
+  await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
   const contextLine = page.getByText(/^Context hash: [0-9a-f]{64}$/);
   await expect(contextLine).toBeVisible();
   journey.contextHash = ((await contextLine.textContent()) ?? "").replace("Context hash: ", "");
@@ -283,9 +283,9 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await waitForSavedRevision(page, 6);
   await expect(page.getByText(HYPOTHESIS_STATEMENT).first()).toBeVisible();
   await expect(page.getByText(INSIGHT_TEXT).first()).toBeVisible();
-  await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
   // The pinned-context details is collapsed after a fresh load; open it again.
   await page.getByText("Chart definition and pinned context").click();
+  await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
   await expect(page.getByText(`Context hash: ${journey.contextHash}`).first()).toBeVisible();
   const counts = page.getByTestId("evidence-counts");
   await expect(counts).toContainText("Supporting 0 · Contradicting 1 · Uncertain 0");
@@ -320,6 +320,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   // UUID, no latest lookup) while the frame stays honestly historical.
   await page.goto(`${state.web_url}/workspace/research/${journey.documentId}`);
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
+  await page.getByText("Chart definition and pinned context").click();
   await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
 
   // Refresh-to-latest fails honestly; the last good values remain.
@@ -331,9 +332,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await addParagraph(page, OUTAGE_PARAGRAPH);
   await waitForSavedRevision(page, 7);
 
-  // Reopen before exporting (the workbench pins the export target at document
-  // load; the acknowledged current revision is picked up on reopen).
-  await page.reload();
+  // The export target is the revision acknowledged by autosave.
   await expect(page.getByLabel("Research paper editor")).toBeVisible();
   await waitForSavedRevision(page, 7);
   // Refresh the DB row: the exported revision is now revision 7.

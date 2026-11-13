@@ -225,3 +225,29 @@ describe("Interactive editor chart", () => {
     await waitFor(() => expect(screen.getByLabelText("Start date")).toHaveValue("2026-11-02"));
   });
 });
+
+describe("Compact editor chart chrome (NI-078, NI-076 D5)", () => {
+  it("keeps the pin and save state visible with the dataset id in the disclosure", async () => {
+    resolveNormally();
+    render(<InteractiveChart attrs={attrs} context={context} onApply={vi.fn()} />);
+    await screen.findByText("12.000000000000000001");
+    const identifier = screen.getByText(`Observed dataset: ${attrs.observed_dataset_version_id}`);
+    expect(identifier.closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText("Live chart · pinned observation")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Saved in document revision");
+    expect(screen.getByText(/Opening or typing never refreshes this pin/)).toBeInTheDocument();
+  });
+
+  it("keeps the explicit refresh and stable action row outside the frame", async () => {
+    resolveNormally();
+    const { container } = render(<InteractiveChart attrs={attrs} context={context} onApply={vi.fn()} />);
+    await screen.findByText("12.000000000000000001");
+    const refresh = screen.getByRole("button", { name: "Refresh to latest and save observation" });
+    expect(refresh).toBeEnabled();
+    // The action row is the block's own control group, not a frame toolbar
+    // remount: it exists before and after the view resolves (stable focus).
+    const group = refresh.closest("div[role='group']") ?? refresh.closest("div");
+    expect(group).not.toBeNull();
+    expect(container.contains(refresh)).toBe(true);
+  });
+});

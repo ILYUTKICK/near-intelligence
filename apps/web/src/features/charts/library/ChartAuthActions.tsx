@@ -38,14 +38,12 @@ import { AddInsightToResearch } from "@/features/editor/insights/public-insight"
  */
 export function ChartAuthActions({
   nextPath,
-  chartTitle,
   basePath = "/charts/",
   saveInput,
   freezeInput,
   insightContext,
 }: {
   nextPath: string;
-  chartTitle: string;
   /** Internal-path base the continuation may target (with trailing slash). */
   basePath?: string;
   saveInput?: SaveInput;
@@ -91,28 +89,21 @@ export function ChartAuthActions({
 
   if (session.status === "anonymous") {
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
-            Sign in to save this chart
-          </Button>
-          <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
-            Sign in to add it to research
-          </Button>
-          {freezeInput ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to freeze a snapshot</Button> : null}
-          {insightContext ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to add an insight</Button> : null}
-        </div>
+      <>
+        <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
+          Sign in to save this chart
+        </Button>
+        <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
+          Sign in to add it to research
+        </Button>
+        {freezeInput ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to freeze a snapshot</Button> : null}
+        {insightContext ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to add an insight</Button> : null}
         {pending ? (
           <p role="status" className="text-ui leading-ui text-text-secondary">
             Signing in to continue — this chart and its selection are preserved in the sign-in link.
           </p>
-        ) : (
-          <p className="text-metadata text-text-secondary">
-            Saving and adding to research need your account. Signing in returns you to
-            &ldquo;{chartTitle}&rdquo; with the current selection preserved.
-          </p>
-        )}
-      </div>
+        ) : null}
+      </>
     );
   }
 
