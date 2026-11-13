@@ -1,6 +1,6 @@
 /** NI-065 integrity findings panel tests (synthetic fixtures, visibly labeled). */
 import { axe } from "jest-axe";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { loadDocumentChart } from "@/features/editor/blocks/chart-api";
@@ -94,10 +94,13 @@ interface Options {
   integrity?: () => unknown[];
   revision?: number;
   failFirstIntegrity?: boolean;
+  respondToIntegrity?: (requestNumber: number, revision: number) => Response | Promise<Response>;
+  sessionSubject?: () => string;
 }
 
 function renderEditor(options: Options = {}) {
-  const { integrity = () => [staleFinding], revision = REVISION, failFirstIntegrity = false } = options;
+  const { integrity = () => [staleFinding], revision = REVISION, failFirstIntegrity = false,
+    respondToIntegrity, sessionSubject = () => "synthetic-alice" } = options;
   const requests: string[] = [];
   let integrityRequests = 0;
   let currentRevision = revision;
@@ -105,7 +108,7 @@ function renderEditor(options: Options = {}) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(input instanceof Request ? input.url : String(input), location.origin);
     requests.push(url.pathname);
-    if (url.pathname === "/api/auth/session") return Response.json({ subject: "synthetic-alice" });
+    if (url.pathname === "/api/auth/session") return Response.json({ subject: sessionSubject() });
     if (url.pathname === "/api/auth/csrf") return Response.json({ token: "synthetic-csrf" });
     if (url.pathname === `/api/documents/${DOC_ID}`) {
       return Response.json({ ...summary, revision: currentRevision, content: paper,
@@ -118,6 +121,7 @@ function renderEditor(options: Options = {}) {
           request_id: "fixture", retryable: true } }, { status: 500 });
       }
       const checkedRevision = savedOnce ? currentRevision : revision;
+      if (respondToIntegrity) return respondToIntegrity(integrityRequests, checkedRevision);
       return Response.json(integrityResponse(integrity(), checkedRevision));
     }
     if (url.pathname === `/api/documents/${DOC_ID}/versions`
@@ -211,7 +215,7 @@ it("shows the explicit empty state for a clean revision", async () => {
   expect(within(panel).queryAllByTestId("integrity-findings")).toHaveLength(0);
 });
 
-it("keeps findings readable after a failed check and an explicit retry", async () => {
+it("recovers from a failed check through an explicit retry", async () => {
   const user = userEvent.setup();
   const { integrityRequests } = renderEditor({ failFirstIntegrity: true });
   await screen.findByRole("textbox", { name: "Research paper editor" });
@@ -259,6 +263,94 @@ it("shows the honest unsaved-edits notice while the paper has local changes", as
   // The status line states that unsaved edits are not checked yet.
   expect(within(panel).getByTestId("integrity-revision"))
     .toHaveTextContent(/the paper has unsaved edits, so findings appear after the next save\./);
+});
+
+function deferredResponse() {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+async function saveAnotherRevision() {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Insert block" }));
+  const menu = await screen.findByRole("menu", { name: "Insert block" });
+  await user.click(within(menu).getByRole("menuitem", { name: /Divider/ }));
+  await waitFor(() => expect(screen.getByTestId("save-status")).toHaveTextContent(/Unsaved changes/));
+  await user.click(screen.getByTestId("save-now"));
+  await waitFor(() => expect(screen.getByTestId("save-status")).toHaveTextContent(/Revision 5/));
+}
+
+it("shows loading until the first report arrives, without a premature clean result", async () => {
+  const response = deferredResponse();
+  const { integrityRequests } = renderEditor({ respondToIntegrity: () => response.promise });
+  const panel = await screen.findByTestId("integrity-panel");
+  await waitFor(() => expect(integrityRequests()).toBe(1));
+  expect(within(panel).getByRole("status")).toHaveTextContent("Checking this revision…");
+  expect(within(panel).queryByTestId("integrity-revision")).not.toBeInTheDocument();
+  expect(within(panel).queryByTestId("integrity-empty")).not.toBeInTheDocument();
+  await act(async () => response.resolve(Response.json(integrityResponse([]))));
+  expect(await within(panel).findByTestId("integrity-empty")).toBeInTheDocument();
+});
+
+it("hides prior findings during a new revision check and after its failure", async () => {
+  const response = deferredResponse();
+  const { panel, integrityRequests } = await renderReady({
+    respondToIntegrity: (requestNumber) => requestNumber === 1
+      ? Response.json(integrityResponse([staleFinding])) : response.promise,
+  });
+  expect(within(panel).getByTestId("integrity-findings")).toBeInTheDocument();
+  await saveAnotherRevision();
+  await waitFor(() => expect(integrityRequests()).toBe(2));
+  expect(within(panel).getByRole("status")).toHaveTextContent("Checking this revision…");
+  expect(within(panel).queryByTestId("integrity-findings")).not.toBeInTheDocument();
+  expect(within(panel).queryByTestId("integrity-revision")).not.toBeInTheDocument();
+  await act(async () => response.resolve(Response.json({}, { status: 500 })));
+  expect(await within(panel).findByRole("alert")).toBeInTheDocument();
+  expect(within(panel).queryByTestId("integrity-findings")).not.toBeInTheDocument();
+  expect(within(panel).queryByTestId("integrity-empty")).not.toBeInTheDocument();
+});
+
+it("ignores a superseded response that finishes after the new revision report", async () => {
+  const first = deferredResponse();
+  const { integrityRequests } = renderEditor({
+    respondToIntegrity: (requestNumber, revision) => requestNumber === 1
+      ? first.promise : Response.json(integrityResponse([], revision)),
+  });
+  const panel = await screen.findByTestId("integrity-panel");
+  await waitFor(() => expect(integrityRequests()).toBe(1));
+  await saveAnotherRevision();
+  expect(await within(panel).findByTestId("integrity-empty")).toBeInTheDocument();
+  await act(async () => first.resolve(Response.json(integrityResponse([staleFinding]))));
+  expect(within(panel).getByTestId("integrity-revision")).toHaveTextContent("Checked saved revision 5.");
+  expect(within(panel).queryByTestId("integrity-findings")).not.toBeInTheDocument();
+});
+
+it.each(["document", "revision", "acknowledgement"])(
+  "rejects a report with a mismatched %s instead of presenting it as checked", async (mismatch) => {
+    const response = { ...integrityResponse([staleFinding]),
+      ...(mismatch === "document" ? { document_id: PARA_BLOCK_ID } : {}),
+      ...(mismatch === "revision" ? { revision: REVISION + 1 } : {}),
+      ...(mismatch === "acknowledgement" ? { is_acknowledged: false } : {}),
+    };
+    renderEditor({ respondToIntegrity: () => Response.json(response) });
+    const panel = await screen.findByTestId("integrity-panel");
+    expect(await within(panel).findByRole("alert")).toBeInTheDocument();
+    expect(within(panel).queryByTestId("integrity-revision")).not.toBeInTheDocument();
+    expect(within(panel).queryByTestId("integrity-findings")).not.toBeInTheDocument();
+  },
+);
+
+it("hides a previous owner's findings when session revalidation suspends the editor", async () => {
+  let subject = "synthetic-alice";
+  const { panel } = await renderReady({ sessionSubject: () => subject });
+  expect(within(panel).getByTestId("integrity-findings")).toBeInTheDocument();
+  subject = "synthetic-bob";
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  await waitFor(() => expect(within(panel).getByRole("status"))
+    .toHaveTextContent("Findings are listed once the document session is verified."));
+  expect(within(panel).queryByTestId("integrity-findings")).not.toBeInTheDocument();
+  expect(within(panel).queryByTestId("integrity-revision")).not.toBeInTheDocument();
 });
 
 afterEach(cleanup);

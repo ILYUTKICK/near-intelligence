@@ -28,7 +28,7 @@ from near_api.metrics.events import (
     match_payouts,
 )
 from near_api.metrics.loaders import load_longitudinal_flows
-from near_api.metrics.registry import definition_by_metric_id
+from near_api.metrics.registry import definition_by_metric_id_version
 
 YOCTO = Decimal(YOCTO_PER_NEAR)
 D1, D2, D3 = fixtures.DAYS
@@ -43,8 +43,8 @@ def emitted(inputs, manifest_inputs):
         manifest_inputs=manifest_inputs)
 
 
-def values(document: dict, metric_id: str) -> list[dict]:
-    definition = definition_by_metric_id(metric_id)
+def values(document: dict, metric_id: str, version: int = 1) -> list[dict]:
+    definition = definition_by_metric_id_version(metric_id, version)
     return [record for record in document["observations"]
             if UUID(record["metric_definition_id"]) == definition.id]
 

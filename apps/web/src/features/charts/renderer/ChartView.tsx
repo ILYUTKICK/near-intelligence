@@ -11,13 +11,14 @@ import {
 } from "@/components/data-state/DataState";
 import type { DataMetadata } from "@/components/data-state/quality";
 import { ChartFrame } from "@/features/charts/ChartFrame";
-import type { ChartMode } from "@/features/charts/chart-frame-types";
+import type { ChartMode, ChartPresentation } from "@/features/charts/chart-frame-types";
 
 import { RangeSelect } from "./RangeSelect";
 import { SeriesTable } from "./SeriesTable";
 import { buildChart, displayUnits } from "./option-builder";
 import type { ChartFactory, EChartsLike } from "./chart-factory";
 import { defaultChartFactory } from "./chart-factory";
+import type { FiltersSelection } from "../filters/filter-values";
 import type { ChartDefinitionResponse, ChartViewResponse } from "./view-types";
 import { RENDERER_VERSION } from "./view-types";
 
@@ -25,8 +26,12 @@ import { RENDERER_VERSION } from "./view-types";
 export interface ChartSelection {
   start: string;
   end: string;
-  /** Values already validated against the definition's closed filter schema. */
-  filters?: Record<string, string>;
+  /**
+   * Values already validated against the definition's closed filter schema:
+   * one approved string, or a list for a `multi_value` dimension (NI-071
+   * comparison form; the resolved view carries one series per value).
+   */
+  filters?: FiltersSelection;
 }
 
 /**
@@ -39,7 +44,7 @@ export type ChartViewLoader = (args: {
   definitionId: string;
   start: string;
   end: string;
-  filters: Record<string, string>;
+  filters: FiltersSelection;
   signal: AbortSignal;
 }) => Promise<ChartViewResponse>;
 
@@ -65,6 +70,8 @@ export interface ChartViewProps {
   /** Explicit plot size; omit to let the container size the chart. */
   width?: number;
   height?: number;
+  /** Saved previews show one context line and put exact values under the summary. */
+  presentation?: ChartPresentation;
   /** Injectable ECharts mount (tests inject a recording fake). */
   factory?: ChartFactory;
   className?: string;
@@ -138,6 +145,7 @@ export function ChartView({
   onSelectionChange,
   width,
   height,
+  presentation,
   factory = defaultChartFactory,
   className,
 }: ChartViewProps) {
@@ -291,6 +299,10 @@ export function ChartView({
 
   const refreshing = loading && activeView !== null;
   const metadata = activeView ? metadataOf(activeView, definition) : undefined;
+  const savedPreview = presentation === "saved-preview";
+  const previewValues = savedPreview && plottable && built?.kind === "ok"
+    ? <SeriesTable model={built.table} title={definition.title} className="mt-3" />
+    : undefined;
 
   const plot = () => {
     if (definition.data_status === "unavailable") {
@@ -343,7 +355,7 @@ export function ChartView({
           className="w-full"
           style={{ height: height ?? 320, ...(width !== undefined ? { maxWidth: width } : {}) }}
         />
-        <SeriesTable model={built.table} title={definition.title} />
+        {savedPreview ? null : <SeriesTable model={built.table} title={definition.title} />}
       </div>
     );
   };
@@ -354,7 +366,7 @@ export function ChartView({
       units={activeView ? displayUnits(activeView) : undefined}
       mode={mode}
       quality={activeView?.quality}
-      metadata={metadata}
+      metadata={savedPreview && metadata ? { ...metadata, period: undefined } : metadata}
       summary={
         built && built.kind === "ok"
           ? built.summary
@@ -370,6 +382,8 @@ export function ChartView({
       }
       actions={actions}
       stale={activeView?.quality.status === "stale"}
+      presentation={presentation}
+      previewValues={previewValues}
       className={className}
     >
       {plot()}

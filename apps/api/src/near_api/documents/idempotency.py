@@ -58,6 +58,7 @@ from near_api.documents.schema import DocumentSchemaError
 ROUTE_CREATE_DOCUMENT = "POST /api/documents"
 ROUTE_SAVE_DOCUMENT_VERSION = "POST /api/documents/{document_id}/versions"
 ROUTE_ADD_CHART_BLOCK = "POST /api/documents/{document_id}/chart-blocks"
+ROUTE_ADD_MODEL_BLOCK = "POST /api/documents/{document_id}/model-blocks"
 
 # API_SPECIFICATION: repeated identical owner/route/body requests return the
 # original result for 24h. Evaluated server-side against now() at read time.

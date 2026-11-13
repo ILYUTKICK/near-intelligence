@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type MouseEventHandler } from "react";
+import { useRef, useState, type KeyboardEvent, type MouseEventHandler } from "react";
 
 import { Skeleton } from "@/components/data-state/Skeleton";
 import { PageIntro } from "@/components/layout/PageIntro";
@@ -13,26 +13,26 @@ import { Label } from "@/components/ui/label";
 import {
   CreateDocumentDialog,
   DeleteDocumentDialog,
+  EditTagsDialog,
   RenameDocumentDialog,
 } from "./DocumentDialogs";
+import { DocumentApiError, updateOrganization } from "./documents-api";
 import type { DocumentSummary } from "./documents-schema";
 import { formatUpdated } from "./format";
 import { useDocumentList } from "./useDocumentList";
 
 /**
- * My Research list (NI-023): the usable entry point to persisted documents.
+ * My Research list (NI-023) with private organization controls (NI-072).
  *
  * Every row comes from GET /api/documents through the verified session — the
- * component never sends a user identifier, never fabricates or filters rows
- * client-side, and shows honest empty, loading, error and pending states.
- * The first page (updated_at DESC) is the recent-documents view; the workspace
- * Home (NI-024) will reuse the NI-022 home aggregation instead of this list.
- *
- * Mutation results: create navigates to the persisted document route
- * /workspace/research/[documentId]; rename/delete refresh the list because a
- * revision bumps updated_at and the server owns the order. A stale revision
- * (409) keeps the item visible with an error and refreshes the current
- * revision — nothing is silently retried or overwritten.
+ * component never sends a user identifier, never fabricates rows locally and
+ * never filters client-side: search (`q`), the tag/favorite filters, the
+ * updated_at-DESC order and pagination cursors are the API's. Tags and the
+ * favorite flag are private metadata edits (PATCH .../organization) that
+ * never create a revision and never reorder the list; a favorite toggle
+ * updates the row optimistically and reverts it with an honest error when
+ * the API refuses. Row arrows (Up/Down) move between documents and Enter
+ * opens the focused document.
  */
 
 const REVISION_CONFLICT_MESSAGE =
@@ -41,6 +41,7 @@ const REVISION_CONFLICT_MESSAGE =
 export function DocumentList() {
   const returnFocus = useRef<HTMLElement | null>(null);
   const newButton = useRef<HTMLButtonElement | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
   function restoreDialogFocus(event: Event) {
     event.preventDefault();
     const target = returnFocus.current;
@@ -57,8 +58,12 @@ export function DocumentList() {
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<DocumentSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null);
+  const [tagsTarget, setTagsTarget] = useState<DocumentSummary | null>(null);
   const [itemError, setItemError] = useState<{ id: string; message: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Document ids with a favorite toggle in flight; the optimistic row update
+  // is reverted with the API's refusal, never silently retried or kept fake.
+  const [favoritePendingIds, setFavoritePendingIds] = useState<string[]>([]);
 
   function handleCreated() {
     // The dialog navigates to the persisted document route after the API
@@ -77,6 +82,49 @@ export function DocumentList() {
     setNotice("Document deleted.");
     setItemError(null);
     list.refresh();
+  }
+
+  function handleTagsSaved(updatedDocumentId: string, tags: string[]) {
+    setNotice(
+      tags.length
+        ? "Tags saved. They are private to your account."
+        : "Tags cleared. They are private to your account.",
+    );
+    setItemError(null);
+    list.applyOrganization({ documentId: updatedDocumentId, tags });
+    setTagsTarget(null);
+  }
+
+  async function handleToggleFavorite(item: DocumentSummary) {
+    if (favoritePendingIds.includes(item.id)) {
+      return;
+    }
+    const nextFavorite = !item.favorite;
+    setFavoritePendingIds((ids) => [...ids, item.id]);
+    setItemError(null);
+    list.applyOrganization({ documentId: item.id, favorite: nextFavorite });
+    try {
+      const updated = await updateOrganization({
+        documentId: item.id,
+        favorite: nextFavorite,
+      });
+      list.applyOrganization({
+        documentId: item.id,
+        tags: updated.tags,
+        favorite: updated.favorite,
+      });
+    } catch (error) {
+      // Revert to the server's last known state and say so honestly.
+      list.applyOrganization({ documentId: item.id, favorite: item.favorite });
+      setItemError({
+        id: item.id,
+        message: error instanceof DocumentApiError && error.status === 401
+          ? "Your session has expired. Sign in again to change favorites."
+          : "The favorite state could not be changed. The list shows the server's state.",
+      });
+    } finally {
+      setFavoritePendingIds((ids) => ids.filter((id) => id !== item.id));
+    }
   }
 
   function handleRevisionConflict(documentId: string) {
@@ -99,7 +147,45 @@ export function DocumentList() {
     list.clearSearch();
   }
 
+  function handleClearFilters() {
+    setSearchInput("");
+    setNotice(null);
+    setItemError(null);
+    list.applyTagFilter(null);
+    if (list.favoriteOnly) list.toggleFavoriteOnly();
+  }
+
+  function handleTagChipClick(tag: string) {
+    setNotice(null);
+    setItemError(null);
+    list.applyTagFilter(list.activeTag === tag ? null : tag);
+  }
+
+  /**
+   * Row navigation (NI-072): Up/Down move between the list's document links
+   * in API order; Enter opens the focused link natively. Home/End and plain
+   * Tab order are untouched.
+   */
+  function handleListKeyDown(event: KeyboardEvent<HTMLUListElement>) {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+      return;
+    }
+    const links = Array.from(
+      listRef.current?.querySelectorAll<HTMLAnchorElement>("a[data-document-link]") ?? [],
+    );
+    if (links.length === 0) {
+      return;
+    }
+    event.preventDefault();
+    const currentIndex = links.findIndex((link) => link === document.activeElement);
+    const nextIndex = event.key === "ArrowDown"
+      ? (currentIndex < 0 ? 0 : Math.min(currentIndex + 1, links.length - 1))
+      : (currentIndex < 0 ? links.length - 1 : Math.max(currentIndex - 1, 0));
+    links[nextIndex]?.focus();
+  }
+
   const hasQuery = list.activeQuery.length > 0;
+  const hasFilters = hasQuery || list.activeTag !== null || list.favoriteOnly;
 
   return (
     <div>
@@ -140,6 +226,43 @@ export function DocumentList() {
         <p className="text-metadata text-text-secondary" aria-label="Sort order">Sorted by last update, newest first</p>
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant={list.favoriteOnly ? "primary" : "secondary"}
+          aria-pressed={list.favoriteOnly}
+          onClick={() => {
+            setNotice(null);
+            setItemError(null);
+            list.toggleFavoriteOnly();
+          }}
+        >
+          Favorites
+        </Button>
+        {list.activeTag ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-control-border bg-surface px-3 py-1.5 text-ui text-text">
+            Tag: {list.activeTag}
+            <button
+              type="button"
+              aria-label={`Remove tag filter ${list.activeTag}`}
+              className="rounded-full px-1 text-ui font-semibold text-text-secondary hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              onClick={() => {
+                setNotice(null);
+                setItemError(null);
+                list.applyTagFilter(null);
+              }}
+            >
+              ×
+            </button>
+          </span>
+        ) : null}
+        {hasFilters ? (
+          <Button type="button" variant="quiet" onClick={handleClearFilters}>
+            Clear filters
+          </Button>
+        ) : null}
+      </div>
+
       {list.status === "loading" ? (
         <div className="mt-6 flex flex-col gap-3" role="status" aria-label="Loading documents">
           <Skeleton className="h-20 w-full" />
@@ -178,7 +301,7 @@ export function DocumentList() {
             </p>
           ) : null}
 
-          {list.items.length === 0 && !hasQuery ? (
+          {list.items.length === 0 && !hasFilters ? (
             <FirstUseExplanation onCreate={openCreate} />
           ) : null}
 
@@ -198,13 +321,42 @@ export function DocumentList() {
             </div>
           ) : null}
 
+          {list.items.length === 0 && !hasQuery && hasFilters ? (
+            <div className="paper-panel mt-6 p-8 text-center">
+              <ProductIcon name="search" className="mx-auto mb-4 size-7 text-accent" />
+              <p role="status" className="font-serif text-heading font-medium text-text">
+                No documents match your filters.
+              </p>
+              <p className="text-body leading-body text-text-secondary mt-2">
+                No document in your workspace currently matches the active tag and favorites
+                filters. Filters are private to your account and never change your documents.
+              </p>
+              <Button type="button" variant="secondary" className="mt-3" onClick={handleClearFilters}>
+                Clear filters
+              </Button>
+            </div>
+          ) : null}
+
           {list.items.length > 0 ? (
-            <ul className="paper-panel mt-6 divide-y divide-border" aria-busy={list.refreshing || undefined}>
+            <ul
+              ref={listRef}
+              className="paper-panel mt-6 divide-y divide-border"
+              aria-busy={list.refreshing || undefined}
+              onKeyDown={handleListKeyDown}
+            >
               {list.items.map((item) => (
                 <DocumentListItem
                   key={item.id}
                   item={item}
                   error={itemError?.id === item.id ? itemError.message : null}
+                  favoritePending={favoritePendingIds.includes(item.id)}
+                  activeTag={list.activeTag}
+                  onToggleFavorite={() => void handleToggleFavorite(item)}
+                  onTagClick={handleTagChipClick}
+                  onEditTags={(event) => {
+                    returnFocus.current = event.currentTarget;
+                    setTagsTarget(item);
+                  }}
                   onRename={(event) => {
                     returnFocus.current = event.currentTarget;
                     setRenameTarget(item);
@@ -264,6 +416,19 @@ export function DocumentList() {
           onCloseAutoFocus={restoreDialogFocus}
         />
       ) : null}
+      {tagsTarget ? (
+        <EditTagsDialog
+          key={tagsTarget.id}
+          target={tagsTarget}
+          onOpenChange={(open) => {
+            if (!open) {
+              setTagsTarget(null);
+            }
+          }}
+          onSaved={(updated) => handleTagsSaved(updated.document_id, updated.tags)}
+          onCloseAutoFocus={restoreDialogFocus}
+        />
+      ) : null}
     </div>
   );
 }
@@ -271,11 +436,21 @@ export function DocumentList() {
 function DocumentListItem({
   item,
   error,
+  favoritePending,
+  activeTag,
+  onToggleFavorite,
+  onTagClick,
+  onEditTags,
   onRename,
   onDelete,
 }: {
   item: DocumentSummary;
   error: string | null;
+  favoritePending: boolean;
+  activeTag: string | null;
+  onToggleFavorite: () => void;
+  onTagClick: (tag: string) => void;
+  onEditTags: MouseEventHandler<HTMLButtonElement>;
   onRename: MouseEventHandler<HTMLButtonElement>;
   onDelete: MouseEventHandler<HTMLButtonElement>;
 }) {
@@ -288,6 +463,7 @@ function DocumentListItem({
         <div className="min-w-0 flex-1 basis-48">
           <Link
             href={`/workspace/research/${item.id}`}
+            data-document-link
             className="text-ui font-semibold text-text underline-offset-2 hover:underline [overflow-wrap:anywhere]"
           >
             {item.title}
@@ -300,8 +476,36 @@ function DocumentListItem({
             {item.progress.headings} headings, {item.progress.charts} charts,{" "}
             {item.progress.insights} insights
           </p>
+          {item.tags.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {item.tags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  aria-pressed={activeTag === tag}
+                  title={`Filter by tag “${tag}”`}
+                  onClick={() => onTagClick(tag)}
+                  className="rounded-full border border-control-border bg-surface px-2.5 py-1 text-metadata leading-metadata text-text-secondary hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
+          <Button
+            type="button"
+            variant={item.favorite ? "primary" : "secondary"}
+            aria-pressed={item.favorite}
+            pending={favoritePending}
+            onClick={onToggleFavorite}
+          >
+            {item.favorite ? "Favorited" : "Favorite"}
+          </Button>
+          <Button type="button" variant="secondary" onClick={onEditTags}>
+            Tags
+          </Button>
           <Button type="button" variant="secondary" onClick={onRename}>
             Rename
           </Button>

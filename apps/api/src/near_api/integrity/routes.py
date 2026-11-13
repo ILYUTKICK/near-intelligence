@@ -58,6 +58,7 @@ def get_document_integrity(request: Request, principal: PrincipalDependency,
     (never a truth score), and no finding can change a pin, coefficient or
     document — refresh and citation remain explicit author actions.
     """
+    response.headers["Cache-Control"] = "no-store"
     with principal_transaction(engine, principal) as connection:
         document = get_document(connection, principal, document_id)
         if version_id is None:

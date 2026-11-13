@@ -2,7 +2,7 @@
 
 The checks re-read a SAVED revision row and report the conditions that can
 genuinely arise after save-time validation blocked everything it covers
-(ADR-021). Save-time rules already refuse broken same-document links,
+(ADR-022). Save-time rules already refuse broken same-document links,
 unapproved dataset pins, unverifiable insight contexts and unknown public
 targets, so those conditions are NOT re-reported — a check that cannot fire
 would be dead weight. What remains advisory reality after a save:
@@ -40,7 +40,11 @@ from sqlalchemy import Connection, select
 
 from near_api.datasets import delivery
 from near_api.db.models import DatasetVersion
-from near_api.documents.context_resolver import ChartDefinitionRow, load_chart_definition
+from near_api.documents.context_resolver import (
+    ChartDefinitionRow, build_model_context, build_resolved_context,
+    load_chart_definition, load_published_run, model_context_hash,
+    same_chart_pins, same_model_pins,
+)
 from near_api.documents.schema import (
     CanonicalDocument,
     DocumentSchemaError,
@@ -48,6 +52,7 @@ from near_api.documents.schema import (
 )
 from near_api.insights.schemas import ModelContext, ResolvedContext
 from near_api.repositories.documents import DocumentRow, DocumentVersionRow
+from near_api.schemas.chart_selection import ChartSelection
 from near_api.schemas.integrity import (
     IntegrityCheckCount,
     IntegrityFinding,
@@ -67,7 +72,7 @@ def _insight_pins(canonical: CanonicalDocument) -> tuple[set[tuple[UUID, UUID]],
 
     An insight IS a source-bearing annotation: its frozen context cites the
     exact chart definition/dataset or model run it interprets, so the uncited
-    checks treat it as a citation (ADR-021 precise definition).
+    checks treat it as a citation (ADR-022 precise definition).
     """
     pairs: set[tuple[UUID, UUID]] = set()
     datasets: set[UUID] = set()
@@ -113,6 +118,15 @@ def build_integrity_report(connection: Connection, document: DocumentRow,
             jump="none"))
         return _report(document, version, is_acknowledged, findings)
 
+    if (canonical.content_sha256 != version.content_sha256
+            or canonical.canonical["schema_version"] != version.schema_version):
+        findings.append(_finding(
+            "invalid_revision_content", "warning",
+            "The stored revision content does not match its saved hash or schema "
+            "version. This is a corruption signal; nothing was changed by this check.",
+            jump="none"))
+        return _report(document, version, is_acknowledged, findings)
+
     contexts = version.resolved_contexts
     if contexts is not None and not isinstance(contexts, dict):
         contexts = None
@@ -130,6 +144,7 @@ def build_integrity_report(connection: Connection, document: DocumentRow,
                            if table.dataset_version_id is not None)
     for insight in canonical.insights:
         pinned_datasets.add(UUID(insight.context["dataset_version_id"]))
+    pinned_datasets.update(model.dataset_version_id for model in canonical.model_results)
 
     # Public target drift: re-run the save-time registry membership check
     # READ-ONLY and report divergence instead of raising (save-time raises).
@@ -223,7 +238,31 @@ def build_integrity_report(connection: Connection, document: DocumentRow,
                 dataset_version_id=chart.observed_dataset_version_id))
             definition = None
 
-        if context is not None and definition is not None:
+        if context is not None:
+            matches = (context.chart_definition_version_id == chart.chart_definition_version_id
+                       and context.dataset_version_id == chart.observed_dataset_version_id
+                       and context.selection == ChartSelection.model_validate(chart.selection))
+            if definition is not None:
+                expected = build_resolved_context(
+                    definition, chart.observed_dataset_version_id,
+                    ChartSelection.model_validate(chart.selection), resolved_at=context.resolved_at)
+                matches = matches and same_chart_pins(context, expected)
+            if not matches:
+                findings.append(_finding(
+                    "invalid_chart_context", "warning",
+                    "The frozen chart context does not match the saved block's pins "
+                    "or canonical context hash. This is a corruption signal; nothing "
+                    "was reconstructed from the inconsistent context.",
+                    block_id=chart.block_id,
+                    chart_definition_version_id=chart.chart_definition_version_id,
+                    dataset_version_id=chart.observed_dataset_version_id,
+                    context_hash=str(context.context_hash)))
+                context = None
+
+        # An unavailable pin already has its own finding. A fallback selected
+        # after revocation may be OLDER, so never call it a newer publication.
+        if (context is not None and definition is not None
+                and chart.observed_dataset_version_id not in unapproved):
             requirements = frozenset(definition.required_metric_versions)  # type: ignore[union-attr]
             if requirements not in latest_by_requirements:
                 latest_by_requirements[requirements] = _latest_version(connection, requirements)
@@ -270,6 +309,48 @@ def build_integrity_report(connection: Connection, document: DocumentRow,
                 "Add an insight over the dataset if it supports a claim.",
                 block_id=table.block_id, dataset_version_id=table.dataset_version_id))
 
+    for model in canonical.model_results:
+        references = dict(block_id=model.block_id, entity_id=model.model_run_id,
+                          dataset_version_id=model.dataset_version_id, target_kind="model_run")
+        if model.dataset_version_id in unapproved:
+            findings.append(_finding(
+                "dataset_pin_unavailable", "advisory",
+                "The model block's pinned dataset is no longer an approved public "
+                "dataset. Its saved pin stays verbatim and is never substituted.", **references))
+        if model.model_run_id not in public_runs:
+            findings.append(_finding(
+                "model_run_unavailable", "advisory",
+                "The model block's pinned run is no longer published. The result "
+                "cannot be verified against the public registry; no replacement "
+                "run was selected.", **references))
+        stored = contexts.get(str(model.block_id)) if contexts is not None else None
+        if stored is None:
+            findings.append(_finding(
+                "missing_model_context", "warning",
+                "The saved model block has no frozen model context in this revision. "
+                "This is a corruption signal: inspect the model block before editing.",
+                **references))
+            continue
+        try:
+            context = ModelContext.model_validate(stored)
+            matches = (context.model_run_id == model.model_run_id
+                       and context.dataset_version_id == model.dataset_version_id
+                       and context.context_hash == model_context_hash(
+                           model.model_run_id, model.dataset_version_id,
+                           context.specification_version))
+            if model.model_run_id in public_runs:
+                run = load_published_run(connection, model.model_run_id, error_path="content")
+                matches = matches and same_model_pins(
+                    context, build_model_context(run, model.dataset_version_id))
+        except (ValidationError, DocumentSchemaError):
+            matches = False
+        if not matches:
+            findings.append(_finding(
+                "invalid_model_context", "warning",
+                "The frozen model context does not match the saved model block's "
+                "pins, specification or canonical hash. This is a corruption signal; "
+                "no result or coefficient was changed.", **references))
+
     return _report(document, version, is_acknowledged, findings)
 
 
@@ -294,6 +375,7 @@ def _public_targets(connection: Connection,
                if item.target_kind == "model_run"}
     run_ids.update(UUID(insight.context["model_run_id"]) for insight in canonical.insights
                    if "model_run_id" in insight.context)
+    run_ids.update(model.model_run_id for model in canonical.model_results)
     citation_ids = {item.target_id for item in canonical.evidence
                     if item.target_kind == "citation"}
     runs = set(connection.scalars(
@@ -308,9 +390,11 @@ def _public_targets(connection: Connection,
 def _unapproved_datasets(connection: Connection, pinned: set[UUID]) -> set[UUID]:
     if not pinned:
         return set()
-    rows = connection.execute(
-        select(DatasetVersion.id, DatasetVersion.status).where(DatasetVersion.id.in_(pinned)))
-    return {row.id for row in rows if row.status != "approved"}
+    approved = set(connection.scalars(
+        select(DatasetVersion.id).where(DatasetVersion.id.in_(pinned),
+                                        DatasetVersion.status == "approved")))
+    # A missing row is unavailable too; corruption must not look approved.
+    return pinned - approved
 
 
 def _latest_version(connection: Connection, requirements: frozenset) -> UUID | None:

@@ -42,6 +42,7 @@ import type {
   TooltipComponentOption,
 } from "echarts/components";
 
+import { canonicalFilters } from "../filters/filter-values";
 import { boundPrefix, compactAxisNumber, formatDecimal, utcDateLabel } from "./format";
 import { rendererSupports } from "./view-types";
 import type { ChartViewResponse, Observation, SeriesResponse } from "./view-types";
@@ -260,6 +261,36 @@ function buildSummary(
   return parts.join(" ");
 }
 
+
+/**
+ * NI-071: one display name per series. A multi-value comparison fan-out
+ * resolves several series of the same bound metric; they are distinguished
+ * by their exact-match filter values (the server echoes one selected value
+ * per series), while every other view keeps the bare metric title.
+ */
+export function describeSeries(view: ChartViewResponse): Array<{ id: string; name: string }> {
+  const repeated = new Set<string>();
+  const seen = new Set<string>();
+  for (const series of view.series) {
+    if (seen.has(series.metric.id)) {
+      repeated.add(series.metric.id);
+    }
+    seen.add(series.metric.id);
+  }
+  return view.series.map((series) => {
+    if (!repeated.has(series.metric.id)) {
+      return { id: series.metric.id, name: series.metric.title };
+    }
+    const filters = canonicalFilters(series.selection.filters);
+    const suffix = filters.map(([key, values]) => `${key}: ${values.join(", ")}`)
+      .join("; ");
+    return {
+      id: JSON.stringify([series.metric.id, filters]),
+      name: suffix ? `${series.metric.title} — ${suffix}` : series.metric.title,
+    };
+  });
+}
+
 function seriesColor(index: number): string {
   return CHART_SERIES_COLORS[index % CHART_SERIES_COLORS.length];
 }
@@ -278,11 +309,13 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
   const legendSpace = view.series.length > 1 ? 10 : 0;
   const layout = panelLayout(groups.length, legendSpace);
 
+  // NI-071: compared fan-out series carry their distinguishing filter values.
+  const labels = describeSeries(view);
   // Exact-value lookup per series/grid index for the tooltip formatter.
-  const exactSeries: ExactCell[][] = view.series.map((seriesResponse) => {
+  const exactSeries: ExactCell[][] = view.series.map((seriesResponse, index) => {
     const byDate = pointsByDate(seriesResponse);
     return gridDates.map((date) =>
-      exactCell(byDate.get(date), seriesResponse.metric.title, seriesResponse.metric.unit, date),
+      exactCell(byDate.get(date), labels[index].name, seriesResponse.metric.unit, date),
     );
   });
 
@@ -301,8 +334,8 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
       });
       if (isBar) {
         series.push({
-          id: seriesResponse.metric.id,
-          name: seriesResponse.metric.title,
+          id: labels[seriesIndex].id,
+          name: labels[seriesIndex].name,
           type: "bar",
           xAxisIndex: gridIndex,
           yAxisIndex: gridIndex,
@@ -312,8 +345,8 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
         });
       } else {
         series.push({
-          id: seriesResponse.metric.id,
-          name: seriesResponse.metric.title,
+          id: labels[seriesIndex].id,
+          name: labels[seriesIndex].name,
           type: "line",
           xAxisIndex: gridIndex,
           yAxisIndex: gridIndex,
@@ -367,7 +400,7 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
       view.series.length > 1
         ? {
             top: 0,
-            data: view.series.map((s) => s.metric.title),
+            data: labels.map(series => series.name),
             textStyle: { color: AXIS_TEXT, fontFamily: FONT_STACK },
           }
         : undefined,
@@ -515,6 +548,8 @@ export function buildChart(view: ChartViewResponse, options: BuildOptions = {}):
 
   const gridDates = unionGrid(view.series);
   const isScatter = view.definition.visualization_type === "scatter";
+  // NI-071: compared fan-out series carry their distinguishing filter values.
+  const displayNames = describeSeries(view).map(series => series.name);
 
   // The accessible exact-value table.
   let table: TableModel;
@@ -545,7 +580,7 @@ export function buildChart(view: ChartViewResponse, options: BuildOptions = {}):
     };
   } else {
     table = {
-      columns: view.series.map((s) => ({ label: s.metric.title, unit: s.metric.unit })),
+      columns: view.series.map((s, index) => ({ label: displayNames[index], unit: s.metric.unit })),
       rows: gridDates.map((date) => ({
         date,
         cells: view.series.map((seriesResponse) => {

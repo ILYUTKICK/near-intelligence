@@ -20,12 +20,16 @@ from uuid import UUID
 
 from pydantic import Field, StringConstraints, model_validator
 
+from near_api.documents.schema import MAX_TOP_LEVEL_BLOCKS
 from near_api.schemas.common import ContractModel
 
 FindingCheckId = Literal[
     "invalid_revision_content",
     "missing_chart_context",
     "invalid_chart_context",
+    "missing_model_context",
+    "invalid_model_context",
+    "model_run_unavailable",
     "stale_chart_context",
     "chart_definition_unavailable",
     "dataset_pin_unavailable",
@@ -34,7 +38,7 @@ FindingCheckId = Literal[
     "uncited_pinned_chart",
     "uncited_pinned_dataset_table",
 ]
-"""The bounded vocabulary of deterministic checks (ADR-021).
+"""The bounded vocabulary of deterministic checks (ADR-022).
 
 ``warning`` severities signal stored evidence that looks inconsistent
 (corruption signal: inspect before editing); ``advisory`` severities describe
@@ -48,11 +52,11 @@ revision, or nowhere (document-level corruption signal)."""
 
 BoundedMessage = Annotated[str, StringConstraints(min_length=1, max_length=500)]
 
-MAX_FINDINGS = 400
-"""Report size bound. By construction every check emits at most one finding
-per top-level block per check id, and a document has at most
-``MAX_TOP_LEVEL_BLOCKS`` (200) blocks with at most two findings each
-(one pin-integrity + one citation finding), so 400 can never be exceeded."""
+MAX_FINDINGS = MAX_TOP_LEVEL_BLOCKS * 4 + 1
+"""A chart can report context corruption, unavailable dataset, unavailable
+chart definition and missing citation (four findings). Models have at most
+three; tables at most two; other blocks at most one. Add one document-level
+warning for a malformed context map. Never truncate corruption findings."""
 
 Sha256Hex = Annotated[str, StringConstraints(min_length=64, max_length=64,
                                               pattern=r"^[0-9a-f]{64}$")]

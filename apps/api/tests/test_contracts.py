@@ -1,6 +1,7 @@
 """NI-004 contracts: synthetic fixtures, in-process HTTP, no external I/O."""
 
 import json
+import logging
 from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
@@ -10,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import TypeAdapter, ValidationError
 
-from near_api.contracts import install_contracts
+from near_api.contracts import _ShareAccessLogFilter, install_contracts
 from near_api.main import app
 from near_api.schemas.common import DataQuality, ErrorResponse, HealthResponse, Observation, RawAmountString, Selection
 from near_api.settings import Settings, SettingsError
@@ -23,6 +24,27 @@ class ContractTests(TestCase):
     def observation(self, index=0, **changes):
         value = {key: value for key, value in self.fixture["observations"][index].items() if key != "name"}
         return {**value, **changes}
+
+    def test_share_http_boundaries_protect_capability_paths(self):
+        sample = "s" * 43
+        prefix = "/api/shares/" + sample
+        with TestClient(app) as client:
+            for path in (prefix + "/", prefix + "?ignored=1"):
+                response = client.get(path, follow_redirects=False)
+                self.assertEqual(response.status_code, 404)
+                self.assertEqual(response.json()["error"]["code"], "NOT_FOUND")
+                self.assertEqual(response.headers["Cache-Control"], "no-store")
+                self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
+                self.assertNotIn("Location", response.headers)
+                self.assertNotIn(sample, response.text)
+
+        def record(path):
+            return logging.LogRecord("uvicorn.access", logging.INFO, "", 0,
+                                     "%s %s %s %s %d", ("127.0.0.1", "GET", path, "1.1", 200), None)
+
+        access_filter = _ShareAccessLogFilter()
+        self.assertFalse(access_filter.filter(record(prefix)))
+        self.assertTrue(access_filter.filter(record("/health")))
 
     def test_exact_null_and_bound_round_trip(self):
         for index, fixture in enumerate(self.fixture["observations"]):
@@ -82,17 +104,22 @@ class ContractTests(TestCase):
             # version detail route, NI-032 added the public
             # metrics/chart/dataset/source delivery routes, NI-054 added
             # the public model definition/readiness/run routes, NI-041
-            # added the chart-block insertion route and NI-065 added the
-            # integrity and grounded-commentary routes.
+            # added chart-block insertion, NI-044 added owner snapshots and
+            # NI-060 added the share capability routes.
+            # NI-065 adds integrity and grounded-commentary routes.
             self.assertEqual(set(schema["paths"]), {
                 "/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
+                "/api/snapshots", "/api/snapshots/{snapshot_id}",
+                "/api/snapshots/{snapshot_id}/compare-live",
                 "/api/documents", "/api/documents/{document_id}",
+                "/api/documents/{document_id}/organization",
                 "/api/documents/{document_id}/versions",
                 "/api/documents/{document_id}/versions/{version_id}",
                 "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/view",
                 "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/csv",
                 "/api/documents/{document_id}/chart-blocks",
+                "/api/documents/{document_id}/model-blocks",
                 "/api/documents/{document_id}/chart-view",
                 "/api/documents/{document_id}/insights",
                 "/api/documents/{document_id}/insights/{insight_id}",
@@ -115,6 +142,13 @@ class ContractTests(TestCase):
                 "/api/documents/{document_id}/exports",
                 "/api/documents/{document_id}/exports/{job_id}",
                 "/api/documents/{document_id}/exports/{job_id}/download",
+                "/api/documents/{document_id}/shares",
+                "/api/documents/{document_id}/shares/preview",
+                "/api/documents/{document_id}/shares/{share_id}",
+                "/api/shares/{token}",
+                "/api/shares/{token}/charts/{block_id}/view",
+                "/api/shares/{token}/charts/{block_id}/csv",
+                "/api/publications/{slug}", "/api/publications/{slug}/duplicate",
             })
             self.assertIn("DecimalString", schema["components"]["schemas"])
             self.assertFalse(schema["components"]["schemas"]["Selection"]["additionalProperties"])

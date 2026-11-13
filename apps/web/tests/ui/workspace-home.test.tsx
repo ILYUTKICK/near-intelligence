@@ -15,7 +15,8 @@ const DOC = "11111111-1111-4111-8111-111111111111";
 const CHART = "22222222-2222-4222-8222-222222222222";
 const summary = { id: DOC, title: "Synthetic current research (fixture)", revision: 3,
   schema_version: 1, current_version_id: CHART, created_at: "2026-11-01T00:00:00Z",
-  updated_at: "2026-11-08T00:00:00Z", progress: { headings: 1, charts: 2, insights: 0 } };
+  updated_at: "2026-11-08T00:00:00Z", progress: { headings: 1, charts: 2, insights: 0 },
+  tags: [], favorite: false };
 function homeFixture(): Home {
   return { recent_documents: [], recent_charts: [], recent_insights: [], indicators: [], counts: { documents: 0 } };
 }

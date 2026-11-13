@@ -43,11 +43,19 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
 from near_api.auth.principal import Principal
+from near_api.charts.registry import chart_by_chart_id
 from near_api.datasets import delivery as delivery_module
 from near_api.db.security import ResourceNotFound
 from near_api.db.session import create_runtime_engine, user_transaction
 from near_api.documents import service
 from near_api.documents.schema import canonical_bytes, parse_document
+from near_api.exports.bundle import (
+    BundleError,
+    build_bundle,
+    extract_bundle,
+    verify_bundle,
+    verify_research_links,
+)
 from near_api.exports.ir import (
     ExportIrError,
     _map_block,
@@ -55,7 +63,12 @@ from near_api.exports.ir import (
     export_cell,
     export_ir_canonical_bytes,
 )
-from near_api.schemas.export import ExportDataTableBlock, ExportInsightBlock
+from near_api.exports.markdown import escape_text
+from near_api.exports.worker import render_bundle
+from near_api.models import service as model_service
+from near_api.models.routes import get_model_run_manifest
+from near_api.schemas.export import ExportDataTableBlock, ExportInsightBlock, ExportIr
+from near_api.shares.projection import build_share_projection
 import test_chart_blocks as chart_fixtures
 import test_delivery_apis as data_fixture
 import test_documents as document_fixtures
@@ -107,6 +120,36 @@ class ExportCellTests(unittest.TestCase):
 
 class ExportContractTests(unittest.TestCase):
     """Offline contract shapes of the frozen representation."""
+
+    def test_ni071_context_lines_print_resolved_filters(self):
+        """An exported insight card shows exactly which values were selected."""
+        import datetime as dt
+
+        from near_api.exports.markdown import _context_lines
+        from near_api.insights.schemas import ResolvedContext
+        from near_api.schemas.chart_selection import ChartSelection
+        from test_delivery_apis import RECIPIENTS
+
+        context = ResolvedContext(
+            chart_definition_version_id=uuid4(), dataset_version_id=uuid4(),
+            selection=ChartSelection.model_validate({
+                "start": "2026-01-01", "end": "2026-01-31", "frequency": "day",
+                "filters": {"recipient": [RECIPIENTS[0], RECIPIENTS[1]]}}),
+            context_hash="a" * 64, renderer_version="echarts-modular-svg@1",
+            metric_definition_versions=(uuid4(),),
+            resolved_at=dt.datetime.now(dt.UTC))
+        lines = _context_lines(context)
+        filters_lines = [line for line in lines if line.startswith("filters")]
+        self.assertEqual(len(filters_lines), 1)
+        self.assertEqual(filters_lines[0],
+                         f"filters recipient: {RECIPIENTS[0]}, {RECIPIENTS[1]}")
+        unfiltered = ResolvedContext.model_validate(context.model_dump(mode="json")
+                                                    | {"selection": {
+                                                        **context.selection.model_dump(
+                                                            mode="json"),
+                                                        "filters": {}}})
+        self.assertFalse(any(line.startswith("filters")
+                             for line in _context_lines(unfiltered)))
 
     def test_data_table_rows_and_dataset_reference_are_exclusive(self):
         columns = ({"key": "metric", "label": "Metric", "type": "string"},)
@@ -178,12 +221,14 @@ class ExportIrDatabaseTests(unittest.TestCase):
         cls.bundle_path = bundle_dir(directory, valid_bundle())
         bundle = load_bundle(cls.bundle_path)
         report = verify_bundle(bundle)
-        cls.assertTrue(report.passed, "the synthetic bundle must pass the gate")
+        if not report.passed:
+            raise AssertionError(report.failures)
         hashes = {key: canonical_artifact_hash(json.loads(
             (cls.bundle_path / f"{key}.json").read_text("utf-8")))
             for key in MANIFEST_KEYS}
         cls.run_id = derive_run_id(hashes)
         publish_run(os.environ["NI_TEST_OPERATOR_URL"], bundle, cls.run_id)
+        cls.fit_manifest = bundle["fit_manifest"]
 
     @classmethod
     def insert_public_citation(cls):
@@ -226,14 +271,18 @@ class ExportIrDatabaseTests(unittest.TestCase):
     def dataset_key(self, name: str) -> str:
         return f"synthetic.{uuid4().hex[:8]}.{name}"
 
-    def stage_volume(self, key: str, value: str) -> UUID:
-        """One published synthetic dataset version for the intents chart."""
+    def ensure_stage_directory(self) -> None:
+        """The lazily created staging root every stage_fixture call needs."""
         if not hasattr(self, "directory"):
             tmp = tempfile.TemporaryDirectory(prefix="ni056-",
                                               dir=os.environ["NI_TEST_TMP_DIR"])
             self.addCleanup(tmp.cleanup)
             self.directory = Path(tmp.name)
             self.storage_root = self.directory / "storage"
+
+    def stage_volume(self, key: str, value: str) -> UUID:
+        """One published synthetic dataset version for the intents chart."""
+        self.ensure_stage_directory()
         dimensions = {"source": "SRC-LLAMA"}
         result = data_fixture.DeliveryDatabaseTests.stage_fixture(
             self, key,
@@ -330,7 +379,8 @@ class ExportIrDatabaseTests(unittest.TestCase):
         return created, saved
 
     def inject_revision(self, document_id: UUID, owner_id: UUID, content: dict,
-                        *, canonicalize: bool = True) -> UUID:
+                        *, canonicalize: bool = True, resolved_contexts: dict | None = None,
+                        ) -> UUID:
         """Append a revision row directly (content the save rules would refuse).
 
         Used for states reachable in principle but not through the current
@@ -353,10 +403,11 @@ class ExportIrDatabaseTests(unittest.TestCase):
                        revision, schema_version, content, resolved_contexts,
                        content_sha256)
                 VALUES (:id, :doc, :owner, :revision, 1,
-                        CAST(:content AS jsonb), CAST('{}' AS jsonb), :sha)
+                        CAST(:content AS jsonb), CAST(:contexts AS jsonb), :sha)
             """), {"id": version_id, "doc": document_id, "owner": owner_id,
                    "revision": current.revision + 1,
-                   "content": canonical_bytes(stored).decode("utf-8"), "sha": sha})
+                   "content": canonical_bytes(stored).decode("utf-8"),
+                   "contexts": json.dumps(resolved_contexts or {}), "sha": sha})
             connection.execute(text("""
                 UPDATE app.documents SET revision = :revision,
                        current_version_id = :version WHERE id = :id
@@ -372,6 +423,92 @@ class ExportIrDatabaseTests(unittest.TestCase):
 
     def stored_chart_context(self, saved, block_id: UUID) -> dict:
         return saved.resolved_contexts[str(block_id)]
+
+
+    def test_ni071_multi_filter_chart_insight_export_round_trip(self):
+        """Save a compared chart + insight, export twice, byte-identical IR."""
+        import datetime as dt
+        from decimal import Decimal
+
+        from near_api.documents.context_resolver import build_resolved_context, \
+            load_chart_definition
+        from near_api.schemas.chart_selection import ChartSelection
+        from test_delivery_apis import (METRIC_PAYOUTS, METRIC_PAYOUTS_V2,
+                                        RECIPIENTS)
+
+        self.ensure_stage_directory()
+        filters = {"recipient": [RECIPIENTS[1], RECIPIENTS[0]]}
+        selection_input = {"start": "2026-01-01", "end": "2026-01-03",
+                           "frequency": "day", "filters": filters}
+        canonical_selection = ChartSelection.model_validate(
+            selection_input).model_dump(mode="json")
+        observations = []
+        for day, values_by_recipient in (
+                ("2026-01-01", {RECIPIENTS[0]: "3", RECIPIENTS[1]: "2.5",
+                                RECIPIENTS[2]: "0"}),
+                ("2026-01-02", {RECIPIENTS[0]: "4", RECIPIENTS[1]: "2",
+                                RECIPIENTS[2]: "0"})):
+            instant = dt.date.fromisoformat(day)
+            observations.append(data_fixture.observation(
+                METRIC_PAYOUTS, instant,
+                value=str(sum(Decimal(value)
+                              for value in values_by_recipient.values()))))
+            for account, value in values_by_recipient.items():
+                observations.append(data_fixture.observation(
+                    METRIC_PAYOUTS_V2, instant, value=value,
+                    dimensions={"recipient": account}))
+        dataset_id = data_fixture.DeliveryDatabaseTests.stage_fixture(
+            self, self.dataset_key("ni071export"), observations,
+            [METRIC_PAYOUTS, METRIC_PAYOUTS_V2],
+            window=("2026-01-01", "2026-01-03")).dataset_version_id
+        treasury_v2 = chart_by_chart_id("treasury-payouts")
+        with self.operator.connect() as connection:
+            definition = load_chart_definition(connection, treasury_v2.id,
+                                               error_path="fixture")
+        insight_context = build_resolved_context(
+            definition, dataset_id,
+            ChartSelection.model_validate(selection_input),
+            resolved_at=dt.datetime.now(dt.UTC)).model_dump(mode="json")
+        hypothesis = document_fixtures.hypothesis_attrs()
+        hypothesis_id = hypothesis["attrs"]["hypothesis_id"]
+        insight = document_fixtures.insight_attrs(hypothesis_id=hypothesis_id,
+                                                  context=insight_context)
+        chart_block_id = str(uuid4())
+        content = {"schema_version": 1, "type": "doc", "content": [
+            hypothesis,
+            insight,
+            document_fixtures.evidence_attrs(hypothesis_id, "insight",
+                                             insight["attrs"]["insight_id"]),
+            document_fixtures.block(
+                "liveChart", chart_block_id, mode="live",
+                selection=canonical_selection,
+                chart_definition_version_id=str(treasury_v2.id),
+                observed_dataset_version_id=str(dataset_id)),
+        ]}
+        created = service.create_document(self.engine, self.alice,
+                                          title="Compared payouts export")
+        saved = service.save_revision(self.engine, self.alice, created.document.id,
+                                      expected_revision=1, document_payload=content)
+        first = build_export_ir(self.engine, self.alice, created.document.id,
+                                saved.version.id)
+        second = build_export_ir(self.engine, self.alice, created.document.id,
+                                 saved.version.id)
+        self.assertEqual(export_ir_canonical_bytes(first),
+                         export_ir_canonical_bytes(second))
+        chart_block = next(block for block in first.blocks
+                           if block.block_type == "liveChart")
+        self.assertEqual(chart_block.selection.model_dump(mode="json")["filters"],
+                         {"recipient": [RECIPIENTS[0], RECIPIENTS[1]]})
+        self.assertEqual(chart_block.observed_dataset_version_id, dataset_id)
+        self.assertEqual([series.selection.filters.model_dump()["recipient"]
+                          for series in chart_block.view.series],
+                         [RECIPIENTS[0], RECIPIENTS[1]])
+        self.assertEqual([point.value for point in chart_block.view.series[0].points],
+                         ["3", "4"])
+        insight_block = next(block for block in first.blocks
+                             if block.block_type == "insight")
+        self.assertEqual(insight_block.context.selection.model_dump(mode="json")
+                         ["filters"], {"recipient": [RECIPIENTS[0], RECIPIENTS[1]]})
 
     # -- every block mapper -------------------------------------------------- #
 
@@ -662,6 +799,239 @@ class ExportIrDatabaseTests(unittest.TestCase):
         self.assertIn("not a valid canonical document", str(caught.exception))
         self.assertEqual(caught.exception.details,
                          (("document.content[0].type", "unsupported_block_type"),))
+
+    # -- NI-055 model-result blocks ------------------------------------------- #
+
+    def create_model_document(self, dataset_id: UUID, *, run_id=None,
+                              title="Synthetic model research"):
+        """A document with one modelResult block saved through the real flow.
+
+        The published synthetic run and the approved dataset pin are both
+        verified by the save transaction, so the plan is built from a state
+        the revision rules actually admit.
+        """
+        content = {"schema_version": 1, "type": "doc", "content": [
+            document_fixtures.model_result_attrs(
+                model_run_id=str(run_id or self.run_id),
+                dataset_version_id=str(dataset_id),
+                interpretation=[{"type": "paragraph", "content": [
+                    {"type": "text", "text": "Authored interpretation of the recorded run."}]}]),
+        ]}
+        created = service.create_document(self.engine, self.alice, title=title)
+        saved = service.save_revision(self.engine, self.alice, created.document.id,
+                                      expected_revision=1, document_payload=content)
+        return created, saved
+
+    def test_13_model_result_maps_the_published_run(self):
+        dataset_id = self.insert_dataset_row(self.dataset_key("model-export"))
+        created, saved = self.create_model_document(dataset_id)
+        plan = build_export_ir(self.engine, self.alice, created.document.id,
+                               saved.version.id)
+        model = plan.blocks[0]
+        self.assertEqual(model.block_type, "modelResult")
+        self.assertEqual(str(model.model_run_id), str(self.run_id))
+        self.assertEqual(str(model.dataset_version_id), str(dataset_id))
+        self.assertEqual(model.spec_id, "gross_fee_activity_v1")
+        self.assertEqual(model.spec_version, 1)
+        self.assertEqual(model.interpretation[0].content[0].text,
+                         "Authored interpretation of the recorded run.")
+        # The summary is the projection of the immutable row (the same source
+        # as the public run detail), never a value from the document JSON.
+        summary = model.summary
+        self.assertEqual(str(summary.run_id), str(self.run_id))
+        self.assertEqual(summary.model_id, self.fit_manifest["model"]["model_id"])
+        self.assertEqual(summary.model_version, int(self.fit_manifest["model"]["model_version"]))
+        self.assertEqual(summary.gate_verdict, self.fit_manifest["admission"]["verdict"])
+        self.assertEqual(summary.sample_start, self.fit_manifest["sample"]["window"]["start"])
+        self.assertEqual(summary.sample_end_exclusive,
+                         self.fit_manifest["sample"]["window"]["end_exclusive"])
+        self.assertEqual(summary.nobs, int(self.fit_manifest["sample"]["nobs"]))
+        self.assertEqual(summary.coefficient_rtol,
+                         self.fit_manifest["reproduction"]["coefficient_rtol"])
+        self.assertEqual(summary.coefficient_atol,
+                         self.fit_manifest["reproduction"]["coefficient_atol"])
+        self.assertEqual([entry.name for entry in summary.coefficients],
+                         [entry["name"] for entry in self.fit_manifest["coefficients"]])
+        self.assertEqual([entry.estimate for entry in summary.coefficients],
+                         [entry["estimate"] for entry in self.fit_manifest["coefficients"]])
+        self.assertIn("stationarity", summary.diagnostics)
+        self.assertEqual(summary.manifest_url, f"/api/model-runs/{self.run_id}/manifest")
+        self.assertEqual(list(summary.limitations.spec_limitation_notes),
+                         self.fit_manifest["limitations"]["spec_limitation_notes"])
+        shared = build_share_projection(plan).model_dump(mode="json")
+        shared_block = next(block for block in shared["blocks"]
+                            if block["block_type"] == "modelResult")
+        public_summary = summary.model_dump(mode="json")
+        self.assertEqual(shared_block["model_run_id"], str(self.run_id))
+        self.assertEqual(shared_block["dataset_version_id"], str(dataset_id))
+        self.assertEqual(shared_block["coefficients"], public_summary["coefficients"])
+        self.assertEqual(shared_block["limitations"], public_summary["limitations"])
+        self.assertNotIn("diagnostics", shared_block)
+        self.assertNotIn("author", shared["document"])
+        # The run reference joins the aggregated plan registry.
+        self.assertEqual([run.run_id for run in plan.model_runs], [self.run_id])
+        self.assertEqual([run.spec_id for run in plan.model_runs],
+                         ["gross_fee_activity_v1"])
+        # Building twice for the same revision yields byte-identical output.
+        rebuilt = build_export_ir(self.engine, self.alice, created.document.id,
+                                  saved.version.id)
+        self.assertEqual(export_ir_canonical_bytes(plan),
+                         export_ir_canonical_bytes(rebuilt))
+
+    def test_14_model_result_plan_is_frozen_against_newer_publications(self):
+        dataset_id = self.insert_dataset_row(self.dataset_key("model-frozen"))
+        created, saved = self.create_model_document(dataset_id)
+        plan = build_export_ir(self.engine, self.alice, created.document.id,
+                               saved.version.id)
+        frozen_bytes = export_ir_canonical_bytes(plan)
+        self.assertEqual(plan.blocks[0].interpretation[0].content[0].text,
+                         "Authored interpretation of the recorded run.")
+        # A newer dataset publication and a moved document (new revision,
+        # edited interpretation) never change the already-built plan and the
+        # superseded revision is refused a fresh rebuild — no silent refresh.
+        self.insert_dataset_row(self.dataset_key("model-frozen-newer"))
+        moved = service.save_revision(
+            self.engine, self.alice, created.document.id,
+            expected_revision=2,
+            document_payload={"schema_version": 1, "type": "doc", "content": [
+                document_fixtures.model_result_attrs(
+                    model_run_id=str(self.run_id),
+                    dataset_version_id=str(dataset_id),
+                    interpretation=[{"type": "paragraph", "content": [
+                        {"type": "text", "text": "Edited interpretation."}]}])],
+            })
+        self.assertEqual(moved.document.revision, 3)
+        with self.assertRaises(ExportIrError) as caught:
+            build_export_ir(self.engine, self.alice, created.document.id,
+                            saved.version.id)
+        self.assertEqual(caught.exception.details,
+                         (("version_id", "revision_not_acknowledged"),))
+        self.assertEqual(frozen_bytes, export_ir_canonical_bytes(plan))
+        # The new acknowledged revision exports its own fresh plan.
+        fresh = build_export_ir(self.engine, self.alice, created.document.id,
+                                moved.version.id)
+        self.assertEqual(fresh.blocks[0].interpretation[0].content[0].text,
+                         "Edited interpretation.")
+        self.assertNotEqual(frozen_bytes, export_ir_canonical_bytes(fresh))
+
+    def test_15_unpublished_run_and_unapproved_dataset_fail_closed(self):
+        dataset_id = self.insert_dataset_row(self.dataset_key("model-fail"))
+        created, _saved = self.create_model_document(dataset_id)
+        unpublished = self.inject_revision(
+            created.document.id, self.alice_id,
+            {"schema_version": 1, "type": "doc", "content": [
+                document_fixtures.model_result_attrs(
+                    model_run_id=str(uuid4()), dataset_version_id=str(dataset_id))]})
+        with self.assertRaises(ExportIrError) as caught:
+            build_export_ir(self.engine, self.alice, created.document.id, unpublished)
+        self.assertEqual([reason for _path, reason in caught.exception.details],
+                         ["dangling_model_run_reference"])
+        self.assertIn("not a published immutable artifact", str(caught.exception))
+        staged = self.insert_dataset_row(self.dataset_key("model-staged"),
+                                         status="staged")
+        unapproved = self.inject_revision(
+            created.document.id, self.alice_id,
+            {"schema_version": 1, "type": "doc", "content": [
+                document_fixtures.model_result_attrs(
+                    model_run_id=str(self.run_id), dataset_version_id=str(staged))]})
+        with self.assertRaises(ExportIrError) as caught:
+            build_export_ir(self.engine, self.alice, created.document.id, unapproved)
+        self.assertIn("not an approved public dataset", str(caught.exception))
+        self.assertEqual(caught.exception.details,
+                         (("modelResult.dataset_version_id",
+                           "dangling_dataset_reference"),))
+
+    def test_16_model_result_zip_links_to_the_verified_published_manifest(self):
+        from near_api.research.publication import load_bundle
+        from near_api.research.publication import verify_bundle as verify_model_bundle
+
+        dataset_id = self.insert_dataset_row(self.dataset_key("model-md"))
+        created, saved = self.create_model_document(dataset_id)
+        content = copy.deepcopy(saved.content)
+        duplicate = copy.deepcopy(content["content"][0])
+        duplicate["attrs"]["block_id"] = str(uuid4())
+        content["content"].append(duplicate)
+        saved = service.save_revision(self.engine, self.alice, created.document.id,
+                                      expected_revision=2, document_payload=content)
+        plan = build_export_ir(self.engine, self.alice, created.document.id,
+                               saved.version.id)
+        frozen = ExportIr.model_validate_json(export_ir_canonical_bytes(plan))
+        archive = render_bundle(frozen)
+        extracted = extract_bundle(archive)
+        verify_bundle(json.loads(extracted["manifest.json"]), extracted)
+        rendered = extracted["research.md"].decode("utf-8")
+        verify_research_links(rendered, extracted)
+
+        spec = escape_text("gross_fee_activity_v1")
+        verdict = escape_text(plan.blocks[0].summary.gate_verdict)
+        coefficient = plan.blocks[0].summary.coefficients[0]
+        self.assertIn("Model result", rendered)
+        self.assertIn(f"`{self.run_id}`", rendered)
+        self.assertIn(f"specification `{spec}` version 1", rendered)
+        self.assertIn(f"Gate verdict: {verdict}", rendered)
+        self.assertIn("| Term | Estimate | Std. error | t | p | 95% CI |", rendered)
+        self.assertIn(f"| {escape_text(coefficient.name)} | {coefficient.estimate} | "
+                      f"{coefficient.std_error} |", rendered)
+        manifest_path = f"assets/model-run-{self.run_id}-manifest.json"
+        self.assertEqual(rendered.count(f"]({manifest_path})"), 2)
+        self.assertEqual(set(extracted), {"manifest.json", "research.md", manifest_path})
+        published = get_model_run_manifest(self.engine, self.run_id)
+        self.assertEqual(json.loads(extracted[manifest_path]), json.loads(published.body))
+        with tempfile.TemporaryDirectory(dir=os.environ["NI_TEST_TMP_DIR"]) as directory:
+            manifest_file = Path(directory) / "model-run.json"
+            manifest_file.write_bytes(extracted[manifest_path])
+            report = verify_model_bundle(load_bundle(manifest_file))
+        self.assertTrue(report.passed, report.failures)
+        for note in self.fit_manifest["limitations"]["spec_limitation_notes"]:
+            self.assertLess(rendered.index(escape_text(note)), rendered.index("| Term |"))
+        self.assertIn("Authored interpretation of the recorded run.", rendered)
+        self.assertIn("## Model runs", rendered)
+        self.assertIn(f"`{self.run_id}` — specification `{spec}` version 1", rendered)
+        # Rendering twice is byte-identical (no clock, no registry lookup).
+        self.assertEqual(archive, render_bundle(frozen))
+
+    def test_17_model_export_refuses_missing_and_mismatched_saved_contexts(self):
+        dataset_id = self.insert_dataset_row(self.dataset_key("model-context"))
+        created, saved = self.create_model_document(dataset_id)
+        contexts = copy.deepcopy(saved.resolved_contexts)
+        block_id = saved.content["content"][0]["attrs"]["block_id"]
+        contexts[block_id]["context_hash"] = SHA256
+        for stored, reason in (({}, "missing_model_context"),
+                               (contexts, "model_context_mismatch")):
+            with self.subTest(reason=reason):
+                injected = self.inject_revision(
+                    created.document.id, self.alice_id, saved.content, resolved_contexts=stored)
+                with self.assertRaises(ExportIrError) as caught:
+                    build_export_ir(self.engine, self.alice, created.document.id, injected)
+                self.assertEqual(caught.exception.details, ((f"blocks.{block_id}", reason),))
+
+    def test_18_model_export_refuses_missing_and_changed_publication_artifacts(self):
+        dataset_id = self.insert_dataset_row(self.dataset_key("model-manifest"))
+        created, saved = self.create_model_document(dataset_id)
+        with user_transaction(self.engine, None) as connection:
+            row = model_service.get_published_run_row(connection, self.run_id)
+        missing, changed = copy.deepcopy(row), copy.deepcopy(row)
+        del missing["manifests"]["readiness_report"]
+        changed["manifests"]["fit_manifest"]["coefficients"][0]["estimate"] += 1
+        for manifest_row in (missing, changed):
+            with patch.object(model_service, "get_published_run_row", return_value=manifest_row):
+                with self.assertRaises(ExportIrError) as caught:
+                    build_export_ir(self.engine, self.alice, created.document.id, saved.version.id)
+                self.assertEqual(_reasons(caught.exception), ["model_result_projection_failed"])
+
+    def test_19_bundle_refuses_missing_or_mismatched_frozen_model_manifest(self):
+        dataset_id = self.insert_dataset_row(self.dataset_key("model-zip-invalid"))
+        created, saved = self.create_model_document(dataset_id)
+        plan = build_export_ir(self.engine, self.alice, created.document.id, saved.version.id)
+        run = plan.model_runs[0]
+        invalid = {**run.manifest_bundle, "run_id": str(uuid4())}
+        for manifest, reason in ((None, "missing_model_manifest"),
+                                 (invalid, "model_manifest_mismatch")):
+            with self.subTest(reason=reason):
+                broken = run.model_copy(update={"manifest_bundle": manifest})
+                with self.assertRaises(BundleError) as caught:
+                    build_bundle(plan.model_copy(update={"model_runs": (broken,)}), None)
+                self.assertEqual(caught.exception.details[-1][1], reason)
 
     # -- ownership and acknowledgment ----------------------------------------- #
 

@@ -240,6 +240,7 @@ describe("one in-flight request; coalescing; truthful dirty state", () => {
     h.coordinator.saveNow(); // manual intent while in flight → coalesce
     await h.respond(ACK(8));
     expect(h.requests).toHaveLength(2);
+    expect(h.requests[1].revision).toBe(8);
     expect(JSON.stringify(h.requests[1].body)).toBe(JSON.stringify(BODY_C));
     expect(h.coordinator.getStatus().kind).toBe("saving");
   });

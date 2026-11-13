@@ -10,7 +10,7 @@ import { topLevelNodePosition } from "../commands";
 import { fetchIntegrityReport, type IntegrityFinding, type IntegrityReport } from "./api";
 
 /**
- * Advisory integrity findings panel (NI-065, ADR-021). The deterministic,
+ * Advisory integrity findings panel (NI-065, ADR-022). The deterministic,
  * owner-checked report over the SAVED revision, shown next to the evidence
  * panel in the editor's tools pane: stale chart contexts (newer approved
  * data exists — refreshing stays the author's explicit action on the chart
@@ -28,6 +28,9 @@ const CHECK_LABELS: Record<IntegrityFinding["check_id"], string> = {
   invalid_revision_content: "Revision content corrupted",
   missing_chart_context: "Missing frozen chart context",
   invalid_chart_context: "Invalid frozen chart context",
+  missing_model_context: "Missing frozen model context",
+  invalid_model_context: "Invalid frozen model context",
+  model_run_unavailable: "Pinned model run unavailable",
   stale_chart_context: "Newer approved data exists",
   chart_definition_unavailable: "Chart definition unavailable",
   dataset_pin_unavailable: "Dataset pin unavailable",
@@ -82,13 +85,27 @@ export function IntegrityFindingsPanel({ editor, onAnnounce }: {
   onAnnounce?: (message: string) => void;
 }) {
   const account = useChartEditorContext();
-  const [report, setReport] = useState<IntegrityReport | null>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    documentId: string;
+    revision: number;
+    signal: AbortSignal;
+    attempt: number;
+    report?: IntegrityReport;
+    error?: string;
+  } | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   const ready = Boolean(account?.ready && account.signal && !account.signal.aborted);
   const revision = account?.revision;
+  // A completed response belongs to one session, document and acknowledged
+  // revision. Switching any of them immediately hides previous findings,
+  // before the next effect runs, instead of relabeling old data as checked.
+  const current = ready && result?.documentId === account?.documentId
+    && result?.revision === revision && result?.signal === account?.signal
+    && result?.attempt === attempt ? result : null;
+  const report = current?.report;
+  const error = current?.error;
+  const pending = ready && revision !== undefined && current === null;
 
   // The report describes the acknowledged revision and reruns when that
   // revision changes (after a save) or on the explicit Retry. State changes
@@ -101,22 +118,19 @@ export function IntegrityFindingsPanel({ editor, onAnnounce }: {
     }
     const controller = new AbortController();
     const requestSignal = AbortSignal.any([signal, controller.signal]);
-    fetchIntegrityReport(account.documentId, requestSignal).then((data) => {
+    const request = { documentId: account.documentId, revision, signal, attempt };
+    fetchIntegrityReport(account.documentId, revision, requestSignal).then((data) => {
       if (requestSignal.aborted) return;
-      setReport(data);
-      setError(null);
-      setPending(false);
+      setResult({ ...request, report: data });
     }).catch(() => {
       if (requestSignal.aborted) return;
-      setError("Integrity findings could not be loaded. Nothing was changed — try again.");
-      setPending(false);
+      setResult({ ...request,
+        error: "Integrity findings could not be loaded. Nothing was changed — try again." });
     });
     return () => controller.abort();
   }, [account?.ready, account?.documentId, account?.signal, revision, attempt]);
 
   function rerun() {
-    setError(null);
-    setPending(true);
     setAttempt((value) => value + 1);
   }
 
@@ -169,14 +183,14 @@ export function IntegrityFindingsPanel({ editor, onAnnounce }: {
           <Button variant="quiet" onClick={rerun}>Retry integrity check</Button>
         </div>
       ) : null}
-      {ready && !pending && !error && revision !== undefined ? (
+      {report ? (
         <p className="mt-1 text-metadata leading-metadata text-text-secondary" data-testid="integrity-revision">
-          Checked saved revision {revision}
+          Checked saved revision {report.revision}
           {account?.saved ? "." : " — the paper has unsaved edits, so findings appear after the next save."}
         </p>
       ) : null}
 
-      {ready && !pending && !error && findings.length === 0 ? (
+      {report && findings.length === 0 ? (
         <p className="mt-2 text-metadata leading-metadata text-text-secondary" data-testid="integrity-empty">
           No integrity findings on this revision.
         </p>

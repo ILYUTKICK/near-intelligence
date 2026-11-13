@@ -10,6 +10,9 @@ integrity DB suite.
 
 import json
 import unittest
+from contextlib import contextmanager
+from types import SimpleNamespace
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import httpx
@@ -131,6 +134,17 @@ class SettingsBoundaryTests(unittest.TestCase):
             module.AICommentarySettings = original
 
 
+    def test_malformed_endpoint_is_typed_misconfiguration_without_echoing_value(self):
+        import near_api.ai.settings as module
+        raw = _CleanStaticSettings()
+        raw.NEAR_AI_COMMENTARY_ENDPOINT = "https://[synthetic-secret-endpoint"
+        with patch.object(module, "AICommentarySettings", return_value=raw):
+            with self.assertRaises(SettingsError) as caught:
+                module.get_ai_commentary.__wrapped__()
+        self.assertIn("NEAR_AI_COMMENTARY_ENDPOINT", str(caught.exception))
+        self.assertNotIn("synthetic-secret-endpoint", str(caught.exception))
+
+
 class SelectionAndPromptTests(unittest.TestCase):
     """The prompt contains ONLY the selected context, bounded and quoted."""
 
@@ -153,6 +167,32 @@ class SelectionAndPromptTests(unittest.TestCase):
         self.assertNotIn("Private strategy note", prompt)
         self.assertNotIn("999.5", prompt)
 
+    def test_selected_model_result_includes_only_frozen_pins_and_authored_interpretation(self):
+        from near_api.documents.context_resolver import PublishedRunRow, build_model_context
+        context = build_model_context(PublishedRunRow(uuid4(), "synthetic_model_v1", 1), uuid4())
+        block_id = uuid4()
+        model = {"type": "modelResult", "attrs": {
+            "block_id": str(block_id), "model_run_id": str(context.model_run_id),
+            "dataset_version_id": str(context.dataset_version_id),
+            "interpretation": [{"type": "paragraph", "content": [text_node("Synthetic selected model interpretation")]}]}}
+        private = paragraph("Unselected private interpretation 999.5")
+        canonical = canonical_document([model, private])
+        selected = select_context(canonical, {str(block_id): context.model_dump(mode="json")}, (block_id,))
+        self.assertEqual(selected[0].context_hash, context.context_hash)
+        prompt = build_prompt(selected, "Summarize the pin", revision=1)
+        for expected in (str(context.model_run_id), str(context.dataset_version_id),
+                         context.specification_version, context.context_hash,
+                         "Synthetic selected model interpretation"):
+            self.assertIn(expected, prompt)
+        self.assertNotIn("Unselected private", prompt)
+        self.assertNotIn("999.5", prompt)
+        for stored in (None, [], {str(block_id): {}},
+                       {str(block_id): {**context.model_dump(mode="json"), "context_hash": SHA256}},
+                       {str(block_id): {**context.model_dump(mode="json"), "model_run_id": str(uuid4())}}):
+            with self.subTest(stored=stored), self.assertRaises(CommentaryError) as caught:
+                select_context(canonical, stored, (block_id,))
+            self.assertEqual(caught.exception.reason, "unresolved_block_context")
+
     def test_unknown_selected_id_is_typed(self):
         canonical = canonical_document([self.chart])
         with self.assertRaises(CommentaryError) as caught:
@@ -171,6 +211,13 @@ class SelectionAndPromptTests(unittest.TestCase):
             select_context(canonical, {self.chart["attrs"]["block_id"]: {"broken": True}},
                            (UUID(self.chart["attrs"]["block_id"]),))
         self.assertEqual(caught.exception.reason, "unresolved_block_context")
+
+    def test_malformed_stored_context_map_is_typed_refusal(self):
+        canonical = canonical_document([self.chart])
+        for malformed in (["synthetic corruption"], "synthetic corruption", 7):
+            with self.subTest(contexts=malformed), self.assertRaises(CommentaryError) as caught:
+                select_context(canonical, malformed, (UUID(self.chart["attrs"]["block_id"]),))
+            self.assertEqual(caught.exception.reason, "unresolved_block_context")
 
     def test_prose_bound_refuses_instead_of_truncating(self):
         canonical = canonical_document(
@@ -293,6 +340,71 @@ class GroundingTests(unittest.TestCase):
         with self.assertRaises(CommentaryError) as caught:
             verify_grounded("The value is 12 (quoted).", "row: 12.5")
         self.assertEqual(caught.exception.reason, "ungrounded_commentary")
+
+
+    def test_complete_numeric_spelling_cannot_invent_sign_scale_or_grouping(self):
+        for response, source in (
+            ("-12.5", "12.5"), ("+12.5", "12.5"), ("−12.5", "12.5"),
+            ("12.5e99", "12.5"), ("12.5E+99", "12.5"),
+            ("1,200", "1 and 200"), (".5", "5"),
+            ("12.5e99USD", "12.5"), ("12.5%", "12.5"),
+        ):
+            with self.subTest(response=response), self.assertRaises(CommentaryError) as caught:
+                verify_grounded(response, source)
+            self.assertEqual(caught.exception.reason, "ungrounded_commentary")
+        for literal in ("-12.5", "+12.5", "−12.5", "12.5e99", "1,200", ".5", "12.5%"):
+            with self.subTest(literal=literal):
+                verify_grounded(f"Value {literal} (quoted).", f"row: {literal}")
+
+
+class CommentaryRouteBoundaryTests(unittest.TestCase):
+    """Offline route failures; the transport seam cannot contact a provider."""
+
+    @contextmanager
+    def transaction(self, *_args):
+        yield object()
+
+    def request(self, document_id):
+        from near_api.ai.routes import create_grounded_commentary
+        from near_api.schemas.integrity import GroundedCommentaryRequest
+        from fastapi import Response
+        return create_grounded_commentary(
+            None, object(), object(), Response(), document_id,
+            GroundedCommentaryRequest(block_ids=[self.block_id], question="Synthetic question"))
+
+    def setUp(self):
+        self.block_id = uuid4()
+        self.document_id = uuid4()
+
+    def test_owner_lookup_precedes_misconfigured_adapter(self):
+        from fastapi import HTTPException
+        with patch("near_api.ai.routes.principal_transaction", self.transaction), \
+                patch("near_api.ai.routes.get_document", side_effect=HTTPException(404)), \
+                patch("near_api.ai.routes.get_ai_commentary",
+                      side_effect=SettingsError("Synthetic invalid configuration")) as settings:
+            with self.assertRaises(HTTPException) as caught:
+                self.request(self.document_id)
+            self.assertEqual(caught.exception.status_code, 404)
+            settings.assert_not_called()
+
+    def test_oversized_provider_commentary_is_typed_failure_without_mutation(self):
+        node = {"type": "paragraph", "attrs": {"block_id": str(self.block_id)},
+                "content": [text_node("Synthetic bounded context")]}
+        version = SimpleNamespace(id=uuid4(), revision=1,
+                                  content={"schema_version": 1, "type": "doc", "content": [node]},
+                                  resolved_contexts={})
+        def handler(_request):
+            return httpx.Response(200, json={"choices": [{"message": {"content": "x" * 4001}}]})
+        with patch("near_api.ai.routes.principal_transaction", self.transaction), \
+                patch("near_api.ai.routes.get_document", return_value=SimpleNamespace(current_version_id=version.id)), \
+                patch("near_api.ai.routes.get_version", return_value=version), \
+                patch("near_api.ai.routes.get_ai_commentary", return_value=enabled_config()), \
+                patch("near_api.ai.routes._provider_transport", return_value=httpx.MockTransport(handler)):
+            response = self.request(self.document_id)
+        self.assertEqual(response.state, "failed")
+        self.assertEqual(response.reason, "response_too_large")
+        self.assertEqual(response.items, ())
+        self.assertEqual(version.content["content"], [node])
 
 
 class InjectionBoundaryTests(unittest.TestCase):

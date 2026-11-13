@@ -3,14 +3,7 @@ import Link from "next/link";
 import { ProductIcon } from "@/components/layout/ProductIcon";
 import { cn } from "@/lib/utils";
 import { getLandingClaim } from "./landing-findings";
-
-const dayMonth = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
-
-function periodLabel(scope: string) {
-  const dates = scope.match(/\d{4}-\d{2}-\d{2}/g);
-  if (!dates || dates.length !== 2) return scope;
-  return dates.map((date) => dayMonth.format(new Date(date))).join("–");
-}
+import { scopePeriodLabel as periodLabel } from "./ResearchFigures";
 
 /** Fixed-window editorial illustration of the recorded NI-014 claim. */
 export function RecordedPurchases({ compact = false }: { compact?: boolean }) {

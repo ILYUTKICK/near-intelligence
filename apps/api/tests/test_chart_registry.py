@@ -21,6 +21,8 @@ from near_api.charts.registry import (
     ChartDefinition,
     ChartRegistryError,
     ChartSeries,
+    FILTER_PROVIDER_SOURCES,
+    FILTER_TREASURY_RECIPIENTS,
     MAX_RANGE_DAYS,
     RENDERER_VERSION,
     SERIES_ROLES,
@@ -31,7 +33,7 @@ from near_api.charts.registry import (
 )
 from near_api.db.session import user_transaction
 from near_api.metrics.registry import DEFINITIONS as METRIC_DEFINITIONS
-from near_api.metrics.registry import definition_by_metric_id
+from near_api.metrics.registry import definition_by_metric_id, definition_by_metric_id_version
 
 import uuid as uuid_module
 
@@ -63,34 +65,49 @@ class RegistryIntegrityTests(unittest.TestCase):
 
     def test_definitions_are_complete_and_deterministic(self):
         seen_ids: set[UUID] = set()
+        latest_by_id: dict[str, ChartDefinition] = {}
         for chart in CHARTS:
             with self.subTest(chart=chart.chart_id):
                 expected = uuid_module.uuid5(CHART_REGISTRY_NAMESPACE,
                                              f"{chart.chart_id}:v{chart.version}")
                 self.assertEqual(chart.id, expected)
-                self.assertIs(chart_by_chart_id(chart.chart_id), chart)
+                # the chart_id map resolves the latest registered version;
+                # superseded versions coexist in the registry tuple
+                previous = latest_by_id.get(chart.chart_id)
+                if previous is None or previous.version < chart.version:
+                    latest_by_id[chart.chart_id] = chart
                 self.assertNotIn(chart.id, seen_ids)
                 seen_ids.add(chart.id)
                 self.assertTrue(chart.title and chart.description)
                 self.assertIn(chart.category, CATEGORIES)
                 self.assertEqual(chart.renderer_version, RENDERER_VERSION)
+        for chart_id, latest in latest_by_id.items():
+            self.assertIs(chart_by_chart_id(chart_id), latest)
 
     def test_all_chart_metrics_resolve_with_matching_units_and_ids(self):
         for chart in CHARTS:
             with self.subTest(chart=chart.chart_id):
                 row = chart.row(METRICS)
-                resolved = sorted(str(METRICS[binding.metric_id].id)
+                resolved = sorted(str(chart_registry.resolve_binding(METRICS, binding).id)
                                   for binding in chart.series)
                 self.assertEqual(row["metric_definition_ids"], resolved)
                 for binding in chart.series:
-                    metric = METRICS[binding.metric_id]
+                    metric = chart_registry.resolve_binding(METRICS, binding)
                     self.assertIn(binding.series_role, SERIES_ROLES)
                     self.assertEqual(chart.unit_schema[binding.series_role], metric.unit)
                 junction = chart.junction_rows(METRICS)
                 self.assertEqual(len(junction), len(chart.series))
                 for binding_row, binding in zip(junction, chart.series):
                     self.assertEqual(binding_row["metric_definition_id"],
-                                     METRICS[binding.metric_id].id)
+                                     chart_registry.resolve_binding(METRICS, binding).id)
+                # a binding pins an exact metric definition version: the v1
+                # aggregate chart keeps binding v1 after v2 supersedes it
+                if chart.chart_id == "treasury-payouts":
+                    expected = ("treasury_payouts_near", chart.version)
+                    self.assertEqual((binding.metric_id, 0) and
+                                     (chart.series[0].metric_id,
+                                      chart.series[0].metric_version),
+                                     (expected[0], expected[1]))
 
     def test_initial_catalog_covers_available_and_gated_charts(self):
         available = {chart.chart_id for chart in CHARTS if chart.data_status == "available"}
@@ -110,7 +127,8 @@ class RegistryIntegrityTests(unittest.TestCase):
         for chart in CHARTS:
             with self.subTest(chart=chart.chart_id):
                 gated = [binding.metric_id for binding in chart.series
-                         if METRICS[binding.metric_id].definition["availability"] == "G"]
+                         if chart_registry.resolve_binding(METRICS, binding)
+                         .definition["availability"] == "G"]
                 contract = view_contract(chart, METRICS)
                 if gated or not chart.series:
                     # gated bindings or a non-metric driver (model artifact)
@@ -125,7 +143,8 @@ class RegistryIntegrityTests(unittest.TestCase):
         # the gated bindings are exactly the three OQ-gated metric definitions;
         # the model-artifact chart binds nothing and stays unavailable
         self.assertEqual({binding.metric_id for chart in CHARTS for binding in chart.series
-                          if METRICS[binding.metric_id].definition["availability"] == "G"},
+                          if chart_registry.resolve_binding(METRICS, binding)
+                          .definition["availability"] == "G"},
                          GATED_METRIC_IDS)
         self.assertIn("model run", chart_by_chart_id("model-diagnostics").unavailable_reason)
 
@@ -167,10 +186,10 @@ class RegistryIntegrityTests(unittest.TestCase):
                 self.assertEqual(contract["visualization_type"], chart.visualization_type)
                 self.assertEqual(len(contract["series"]), len(chart.series))
                 for entry, binding in zip(contract["series"], chart.series):
+                    metric = chart_registry.resolve_binding(METRICS, binding)
                     self.assertEqual(entry["series_role"], binding.series_role)
-                    self.assertEqual(entry["metric_definition_id"],
-                                     str(METRICS[binding.metric_id].id))
-                    self.assertEqual(entry["unit"], METRICS[binding.metric_id].unit)
+                    self.assertEqual(entry["metric_definition_id"], str(metric.id))
+                    self.assertEqual(entry["unit"], metric.unit)
                     self.assertIn(entry["availability"], ("A", "P", "B", "G"))
                 # renderer + lineage travel with the contract; no page-specific keys
                 self.assertEqual(contract["renderer_version"], chart.renderer_version)
@@ -279,6 +298,101 @@ class RegistryRejectionTests(unittest.TestCase):
                         ChartSeries("provider_intents_volume_usd", "optional_overlay")),
                 unit_schema={"required_primary": "USD", "optional_overlay": "USD"}))
 
+    def test_ni071_comparison_markers_are_validated(self):
+        from near_api.charts.filter_registry import FILTER_DIMENSIONS
+
+        # the registered v2 recipient schema validates and carries the markers
+        v2 = next(chart for chart in CHARTS
+                  if chart.chart_id == "treasury-payouts" and chart.version == 2)
+        validate_single(v2)
+        self.assertIs(v2.filter_schema["properties"]["recipient"]["multi_value"], True)
+        self.assertEqual(FILTER_DIMENSIONS["recipient"].reconciliation,
+                         v2.filter_schema["properties"]["recipient"]["reconciliation"])
+        # only registered multi-value dimensions may carry the marker
+        with self.assertRaisesRegex(ChartRegistryError, "not a registered multi-value"):
+            validate_single(doctored("intents-volume", filter_schema={
+                "type": "object",
+                "properties": {"source": {"type": "string",
+                                          "enum": list(FILTER_PROVIDER_SOURCES),
+                                          "multi_value": True}},
+                "additionalProperties": False}))
+        with self.assertRaisesRegex(ChartRegistryError, "must be true when present"):
+            validate_single(doctored("treasury-payouts", version=9, filter_schema={
+                "type": "object",
+                "properties": {"recipient": {"type": "string",
+                                             "enum": list(FILTER_TREASURY_RECIPIENTS),
+                                             "multi_value": False}},
+                "additionalProperties": False}))
+
+    def test_ni071_reconciliation_declarations_are_validated(self):
+        recipient_property = {
+            "type": "string", "enum": list(FILTER_TREASURY_RECIPIENTS),
+            "multi_value": True,
+            "reconciliation": {"aggregate_metric_id": "treasury_payouts_near",
+                               "aggregate_metric_version": 1,
+                               "universe_note": "the three named treasuries"}}
+        # a full valid declaration validates on a single-binding chart
+        validate_single(doctored("treasury-payouts", version=8, title="x",
+                                 description="x", filter_schema={
+                                     "type": "object",
+                                     "properties": {"recipient": recipient_property},
+                                     "additionalProperties": False}))
+        # a reconciliation marker without multi_value is not even a valid
+        # property shape (fail closed on the declared key set)
+        with self.assertRaisesRegex(ChartRegistryError, "must be a string enum"):
+            validate_single(doctored("treasury-payouts", version=9, title="x",
+                                     description="x", filter_schema={
+                                         "type": "object",
+                                         "properties": {"recipient": {
+                                             "type": "string",
+                                             "enum": list(FILTER_TREASURY_RECIPIENTS),
+                                             "reconciliation": recipient_property[
+                                                 "reconciliation"]}},
+                                         "additionalProperties": False}))
+        # the aggregate must be an exact registered (metric_id, version)
+        for changes in ({"aggregate_metric_id": "not_a_metric"},
+                        {"aggregate_metric_version": 7}):
+            bad = {**recipient_property,
+                   "reconciliation": {**recipient_property["reconciliation"], **changes}}
+            with self.subTest(changes=changes), self.assertRaisesRegex(
+                    ChartRegistryError, "not a registered metric definition version"):
+                validate_single(doctored("treasury-payouts", version=10, title="x",
+                                         description="x", filter_schema={
+                                             "type": "object",
+                                             "properties": {"recipient": bad},
+                                             "additionalProperties": False}))
+        # a gated aggregate can never back a reconciliation identity
+        gated = {**recipient_property,
+                 "reconciliation": {"aggregate_metric_id": "protocol_revenue_usd",
+                                    "aggregate_metric_version": 1,
+                                    "universe_note": "gated"}}
+        with self.assertRaisesRegex(ChartRegistryError, "must not be a gated metric"):
+            validate_single(doctored("treasury-payouts", version=11, title="x",
+                                     description="x",
+                                     unit_schema={"required_primary": "USD"},
+                                     filter_schema={
+                                         "type": "object",
+                                         "properties": {"recipient": gated},
+                                         "additionalProperties": False}))
+        # a reconcilable dimension requires exactly one bound metric
+        two_bindings = doctored("observed-conversions", filter_schema={
+            "type": "object",
+            "properties": {"recipient": recipient_property},
+            "additionalProperties": False})
+        with self.assertRaisesRegex(ChartRegistryError, "exactly one bound metric"):
+            validate_single(two_bindings)
+
+    def test_filter_enum_must_match_the_filter_registry(self):
+        with self.assertRaisesRegex(ChartRegistryError, "disagree with the filter"):
+            chart_registry._filter_enum("source", ("SRC-OTHER",))
+
+    def test_recipient_is_the_only_multi_value_dimension(self):
+        from near_api.charts.filter_registry import FILTER_DIMENSIONS
+        self.assertTrue(FILTER_DIMENSIONS["recipient"].multi_value)
+        self.assertIsNone(FILTER_DIMENSIONS["source"].reconciliation)
+        self.assertFalse(FILTER_DIMENSIONS["source"].multi_value)
+        self.assertFalse(FILTER_DIMENSIONS["price_basis"].multi_value)
+
     def test_version_increment_adds_a_new_definition_without_touching_v1(self):
         first = chart_by_chart_id("intents-volume")
         second = doctored("intents-volume", version=2, title="Intents volume (revised)")
@@ -374,21 +488,38 @@ class ChartRegistryDatabaseTests(unittest.TestCase):
         with self.operator.begin() as connection:
             row = connection.execute(text("""
                 SELECT id, chart_id, version, title, data_status, unavailable_reason,
-                       metric_definition_ids, unit_schema, renderer_version
+                       metric_definition_ids, unit_schema, filter_schema, renderer_version
                 FROM app.chart_definitions WHERE chart_id = 'treasury-payouts'
-            """)).one()
-            junction = connection.execute(text("""
+                ORDER BY version
+            """)).all()
+            self.assertEqual([item.version for item in row], [1, 2])
+            stored_v1, stored_v2 = row
+            junctions = {item.id: connection.execute(text("""
                 SELECT metric_definition_id, series_role FROM app.chart_metrics
                 WHERE chart_definition_version_id = :id
-            """), {"id": row.id}).all()
+            """), {"id": item.id}).all() for item in row}
         definition = chart_by_chart_id("treasury-payouts")
-        self.assertEqual(row.id, definition.id)
-        self.assertEqual(row.metric_definition_ids,
+        self.assertIs(definition.version, 2)
+        # v1 stays registered unchanged against the v1 aggregate definition
+        self.assertEqual(stored_v1.metric_definition_ids,
+                         [str(definition_by_metric_id_version(
+                             "treasury_payouts_near", 1).id)])
+        self.assertEqual(stored_v1.filter_schema["properties"]["recipient"],
+                         {"type": "string",
+                          "enum": list(chart_registry.FILTER_TREASURY_RECIPIENTS)})
+        self.assertEqual(sorted(junctions[stored_v1.id]),
+                         [(definition_by_metric_id_version(
+                             "treasury_payouts_near", 1).id, "required_primary")])
+        # v2 binds the per-recipient definition and carries the NI-071
+        # multi-value/reconciliation filter schema
+        self.assertEqual(stored_v2.id, definition.id)
+        self.assertEqual(stored_v2.metric_definition_ids,
                          [str(definition_by_metric_id("treasury_payouts_near").id)])
-        self.assertEqual(row.unit_schema, {"required_primary": "NEAR"})
-        self.assertEqual(row.data_status, "available")
-        self.assertIsNone(row.unavailable_reason)
-        self.assertEqual(sorted(junction),
+        self.assertEqual(stored_v2.unit_schema, {"required_primary": "NEAR"})
+        self.assertEqual(stored_v2.data_status, "available")
+        self.assertIsNone(stored_v2.unavailable_reason)
+        self.assertTrue(stored_v2.filter_schema["properties"]["recipient"]["multi_value"])
+        self.assertEqual(sorted(junctions[stored_v2.id]),
                          [(definition_by_metric_id("treasury_payouts_near").id,
                            "required_primary")])
 

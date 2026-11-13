@@ -229,12 +229,22 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   // -- 6. The document holds the pinned chart ---------------------------- //
   const editor = page.getByLabel("Research paper editor");
   await expect(editor).toBeVisible();
-  await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
-  await expect(page.getByText("Opening or typing never refreshes this pin.")).toBeVisible();
+  await expect(page.getByText("Opening or typing never refreshes this pin")).toBeVisible();
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
+  await waitForSavedRevision(page, 2);
+  // NI-065: a real saved uncited chart yields an actionable advisory. The
+  // keyboard jump changes selection only, then adding an insight fixes it.
+  const integrity = page.getByTestId("integrity-panel").filter({ visible: true });
+  await expect(integrity.getByTestId("integrity-revision")).toHaveText("Checked saved revision 2.");
+  await expect(integrity.getByText("Advisory · Uncited pinned chart")).toBeVisible();
+  const integrityJump = integrity.getByRole("button", { name: /Show block .* in the paper/ });
+  await integrityJump.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("editor-announcement")).toContainText("Uncited pinned chart");
   await waitForSavedRevision(page, 2);
   // Capture the pinned context hash from the chart node's own inspection.
   await page.getByText("Chart definition and pinned context").click();
+  await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
   const contextLine = page.getByText(/^Context hash: [0-9a-f]{64}$/);
   await expect(contextLine).toBeVisible();
   journey.contextHash = ((await contextLine.textContent()) ?? "").replace("Context hash: ", "");
@@ -260,6 +270,9 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await insightDialog.getByRole("button", { name: "Save insight" }).click();
   await expect(page.getByText(INSIGHT_TEXT).first()).toBeVisible();
   await waitForSavedRevision(page, 5);
+  await expect(integrity.getByTestId("integrity-revision")).toHaveText("Checked saved revision 5.");
+  await expect(integrity.getByTestId("integrity-empty")).toHaveText("No integrity findings on this revision.");
+  await expect(integrity.getByTestId("integrity-findings")).toHaveCount(0);
 
   // -- 10. Contrary evidence against the hypothesis ----------------------- //
   await page.getByRole("button", { name: "Add evidence" }).click();
@@ -283,9 +296,9 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await waitForSavedRevision(page, 6);
   await expect(page.getByText(HYPOTHESIS_STATEMENT).first()).toBeVisible();
   await expect(page.getByText(INSIGHT_TEXT).first()).toBeVisible();
-  await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
   // The pinned-context details is collapsed after a fresh load; open it again.
   await page.getByText("Chart definition and pinned context").click();
+  await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
   await expect(page.getByText(`Context hash: ${journey.contextHash}`).first()).toBeVisible();
   const counts = page.getByTestId("evidence-counts");
   await expect(counts).toContainText("Supporting 0 · Contradicting 1 · Uncertain 0");
@@ -320,6 +333,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   // UUID, no latest lookup) while the frame stays honestly historical.
   await page.goto(`${state.web_url}/workspace/research/${journey.documentId}`);
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
+  await page.getByText("Chart definition and pinned context").click();
   await expect(page.getByText(`Observed dataset: ${state.dataset_version_id}`)).toBeVisible();
 
   // Refresh-to-latest fails honestly; the last good values remain.
@@ -331,9 +345,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await addParagraph(page, OUTAGE_PARAGRAPH);
   await waitForSavedRevision(page, 7);
 
-  // Reopen before exporting (the workbench pins the export target at document
-  // load; the acknowledged current revision is picked up on reopen).
-  await page.reload();
+  // The export target is the revision acknowledged by autosave.
   await expect(page.getByLabel("Research paper editor")).toBeVisible();
   await waitForSavedRevision(page, 7);
   // Refresh the DB row: the exported revision is now revision 7.
@@ -350,6 +362,11 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await page.getByTestId("export-open").click();
   const exportDialog = page.getByTestId("export-dialog");
   await expect(exportDialog).toBeVisible();
+  // NI-059: the dialog first asks for the bundle format and starts the job
+  // only on the explicit Start action (Markdown ZIP is the preselected
+  // default; the PDF path is the same job lifecycle).
+  await expect(exportDialog.getByTestId("export-choosing")).toBeVisible();
+  await exportDialog.getByTestId("export-start").click();
   const download = await downloadPromise;
   const exportDir = path.join(os.tmpdir(), `ni063-e2e-export-${Date.now()}`);
   mkdirSync(exportDir, { recursive: true });
@@ -474,4 +491,44 @@ test("the public explorer shows approved data again once the outage ends", async
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
   await expect(page.getByText(state.dataset_version_id).first()).toBeVisible();
   await context.close();
+});
+
+test("a signed-in reader can copy a pinned publication and edit only the private copy", async ({ page, browser }) => {
+  const publicationUrl = `${state.web_url}/api/publications/near-thesis-2026-11?version=1`;
+  const published = await page.request.get(publicationUrl);
+  expect(published.status()).toBe(200);
+  const publicContent = await published.json();
+  await page.goto(`${state.web_url}/research`);
+  await page.getByRole("button", { name: "Sign in to save a private copy" }).click();
+  await expect(page).toHaveURL(/\/login\?next=%2Fresearch$/);
+  await page.goto(`${state.session_alice}?next=${encodeURIComponent("/research")}`);
+  await page.getByRole("button", { name: "Save a private copy" }).click();
+  const dialog = page.getByRole("dialog", { name: "Save a private copy of this research" });
+  await expect(dialog).toContainText("version 1");
+  await dialog.getByLabel("Title of your private copy").fill("Synthetic NI-045 private copy");
+  await dialog.getByRole("button", { name: "Save private copy" }).click();
+  await expect(page).toHaveURL(/\/workspace\/research\/[0-9a-f-]{36}$/);
+  const copyPath = new URL(page.url()).pathname;
+  const copyId = copyPath.split("/").pop();
+  const editor = page.getByLabel("Research paper editor");
+  await expect(editor).toContainText("Synthetic publication heading");
+  await expect(editor).toContainText("near-thesis-2026-11");
+  const edit = "Synthetic private edit";
+  await addParagraph(page, edit);
+  await waitForSavedRevision(page, 3);
+  await page.reload();
+  await expect(editor).toContainText(edit);
+
+  const afterEdit = await page.request.get(publicationUrl);
+  expect(afterEdit.headers().etag).toBe(published.headers().etag);
+  expect(await afterEdit.json()).toEqual(publicContent);
+  const bob = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  try {
+    const bobPage = await bob.newPage();
+    await bobPage.goto(`${state.session_bob}?next=${encodeURIComponent("/workspace")}`);
+    const denied = await bob.request.get(`${state.web_url}/api/documents/${copyId}`);
+    expect(denied.status()).toBe(404);
+  } finally {
+    await bob.close();
+  }
 });

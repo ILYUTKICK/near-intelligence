@@ -23,3 +23,6 @@ export interface FrameTableRow {
 
 /** Chart display mode; historical frames pin the inspected dataset. */
 export type ChartMode = "live" | "historical";
+
+/** Frame presentation when the page or card already shows chart context. */
+export type ChartPresentation = "compact" | "saved-preview";

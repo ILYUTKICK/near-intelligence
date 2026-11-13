@@ -77,7 +77,12 @@ def get_ai_commentary() -> AICommentaryConfig:
         return AICommentaryConfig(enabled=False)
     problems: list[str] = []
     endpoint = raw.NEAR_AI_COMMENTARY_ENDPOINT
-    parts = urlsplit(endpoint or "")
+    try:
+        parts = urlsplit(endpoint or "")
+    except ValueError:
+        raise SettingsError(
+            "Invalid commentary adapter configuration. "
+            "NEAR_AI_COMMENTARY_ENDPOINT: must be a clean public HTTPS URL") from None
     if not endpoint or parts.scheme != "https" or not parts.hostname \
             or parts.username or parts.password or parts.query or parts.fragment:
         problems.append("NEAR_AI_COMMENTARY_ENDPOINT: must be a clean public HTTPS URL")

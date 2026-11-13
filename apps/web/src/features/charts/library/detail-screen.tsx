@@ -15,6 +15,7 @@ import {
 import type { ApiFailure } from "@/features/charts/library/catalog-api";
 import {
   defaultRangeFor,
+  detailHrefFor,
   parseSelectionUrl,
   todayUtc,
 } from "@/features/charts/library/selection-url";
@@ -176,6 +177,11 @@ export async function ChartDetailScreen({
 
   /** The retry/reset URL: only the definition version re-pinned. */
   const resetHref = `${links.basePath}/${encodeURIComponent(chartId)}?version=${definition.version}`;
+  const aggregateHref = chartId === "treasury-payouts" && definition.version === 2
+    ? selection
+      ? detailHrefFor(links.basePath, chartId, { ...selection, version: 1, filters: {} })
+      : `${links.basePath}/${encodeURIComponent(chartId)}?version=1`
+    : null;
   const category = {
     label: links.categoryLabel ?? categoryWordings[definition.category] ?? definition.category,
     href: links.categoryHref ?? `/charts?category=${definition.category}`,
@@ -188,12 +194,20 @@ export async function ChartDetailScreen({
         ...(links.categoryHref ? [] : [category]),
         { label: definition.title },
       ]} />
-      <PageIntro className="mt-5" eyebrow={category.label} title={definition.title} description={definition.description} />
+      {/* NI-076 D3: one title and short visible metadata — the description
+          and full provenance stay available through "Sources & definitions"
+          and the definitions panel below. */}
+      <PageIntro className="mt-5" compact eyebrow={category.label} title={definition.title} />
       <p className="mt-2 max-w-prose text-metadata text-text-secondary">
         Definition version v{definition.version} (pinned in the URL); renderer{" "}
         <span className="font-mono">{definition.renderer_version}</span>.
         {rangeNote !== null ? ` ${rangeNote}` : ""}
       </p>
+      {aggregateHref ? (
+        <Link href={aggregateHref} className="mt-2 inline-block text-ui underline underline-offset-4">
+          View payout totals (v1)
+        </Link>
+      ) : null}
 
       {datasetFailure !== null ? (
         <div role="alert" className="paper-panel mt-6 p-8">
@@ -228,6 +242,7 @@ export async function ChartDetailScreen({
               ? { start: selection.start, end: selection.end, filters: selection.filters }
               : { start: "", end: "" }}
             mode="live"
+            presentation="compact"
           />
           {dropped.length > 0 ? <DroppedNotice dropped={dropped} /> : null}
         </div>

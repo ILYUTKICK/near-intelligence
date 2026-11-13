@@ -5,17 +5,20 @@ direct discovery skips the class — a skip is never successful integration
 evidence. Every document, dataset, artifact and identity is a synthetic
 fixture; no provider, archive or network is contacted.
 
-The oracle family (ADR-021): each test builds a document with KNOWN
+The oracle family (ADR-022): each test builds a document with KNOWN
 conditions and asserts the exact findings — a clean document reports zero,
 each planted condition reports exactly its typed finding with the correct
 block/entity/dataset/definition references, and nothing is ever mutated by a
 check (the stored revision is byte-identical before and after).
 """
 
+import copy
 import json
 import os
 import unittest
+from types import SimpleNamespace
 from uuid import UUID, uuid4
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -161,6 +164,23 @@ class IntegrityOracleTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Te
         self.assertEqual(missing.block_id, UUID(block_id))
         self.assertEqual(missing.jump, "block")
 
+    def test_valid_shape_context_corruption_is_reported_without_mutation(self):
+        dataset = self.publish_volume(self.dataset_key("integrity-hash-corruption"), "12.5")
+        fixtures = self.cited_chart_document(dataset_version_id=dataset.dataset_version_id)
+        stored = self.stored_document(self.alice, fixtures["document_id"])
+        contexts = copy.deepcopy(stored["resolved_contexts"])
+        contexts[fixtures["chart_block_id"]]["context_hash"] = "f" * 64
+        with self.admin.begin() as connection:
+            connection.execute(text(
+                "UPDATE app.document_versions SET resolved_contexts = CAST(:contexts AS jsonb) "
+                "WHERE id = :id"), {"id": stored["id"], "contexts": json.dumps(contexts)})
+        report = integrity_response_ok(self.fetch(fixtures["document_id"]))
+        self.assertEqual([finding.check_id for finding in report.findings], ["invalid_chart_context"])
+        self.assertEqual(report.findings[0].severity, "warning")
+        self.assertEqual(report.findings[0].block_id, UUID(fixtures["chart_block_id"]))
+        self.assertEqual(self.stored_document(self.alice, fixtures["document_id"])["resolved_contexts"],
+                         contexts)
+
     def test_05_public_citation_drift_is_reported_not_raised(self):
         artifact_id = uuid4()
         with self.operator.begin() as connection:
@@ -207,11 +227,10 @@ class IntegrityOracleTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Te
                 {"id": dataset.dataset_version_id})
             self.assertEqual(updated.rowcount, 1)
         report = integrity_response_ok(self.fetch(fixtures["document_id"]))
-        # The revoked pin AND the now-different newest approved dataset (the
-        # shared cluster holds other approved datasets for this metric) are
-        # both honest findings of the same out-of-band change.
+        # The fallback may be older than this revoked pin. Report the
+        # unavailable pin without claiming that an older dataset is newer.
         self.assertEqual({finding.check_id for finding in report.findings},
-                         {"dataset_pin_unavailable", "stale_chart_context"})
+                         {"dataset_pin_unavailable"})
         revoked = next(finding for finding in report.findings
                        if finding.check_id == "dataset_pin_unavailable")
         self.assertEqual(revoked.severity, "advisory")
@@ -253,6 +272,142 @@ class IntegrityOracleTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Te
         after = self.stored_document(self.alice, fixtures["document_id"])
         self.assertEqual(json.dumps(before, sort_keys=True, default=str),
                          json.dumps(after, sort_keys=True, default=str))
+
+    def test_09_misconfigured_commentary_preserves_owner_boundary(self):
+        from near_api.settings import SettingsError
+        document_id = self.create_document(self.alice).document.id
+        payload = {"block_ids": [str(uuid4())], "question": "Synthetic selected context"}
+        with patch("near_api.ai.routes.get_ai_commentary",
+                   side_effect=SettingsError("Synthetic invalid adapter configuration")) as settings, \
+                patch("near_api.ai.routes._provider_transport",
+                      side_effect=AssertionError("No provider call is permitted")):
+            with self.as_session(self.alice_id):
+                owned = self.client.post(f"/api/documents/{document_id}/grounded-commentary",
+                                         json=payload,
+                                         headers={"Authorization": f"Bearer t.{self.alice_id}"})
+            self.assertEqual(owned.status_code, 200, owned.text)
+            self.assertEqual(owned.json()["state"], "failed")
+            self.assertEqual(owned.json()["reason"], "adapter_misconfigured")
+            settings.assert_called_once()
+            settings.reset_mock()
+            denied = []
+            with self.as_session(self.bob_id):
+                for target in (document_id, uuid4()):
+                    response = self.client.post(f"/api/documents/{target}/grounded-commentary",
+                                                json=payload,
+                                                headers={"Authorization": f"Bearer t.{self.bob_id}"})
+                    self.assertEqual(response.status_code, 404, response.text)
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                    error = response.json()["error"]
+                    denied.append({key: error.get(key) for key in ("code", "message", "details")})
+            self.assertEqual(denied[0], denied[1])
+            settings.assert_not_called()
+
+
+class IntegrityCorruptionBoundaryTests(unittest.TestCase):
+    """Offline corruption oracles; every input and registry response is synthetic."""
+
+    def report(self, content, contexts, *, unapproved=(), public_runs=(), definition=None):
+        from near_api.documents.schema import parse_document
+        from near_api.integrity.checks import build_integrity_report
+        canonical = parse_document({"schema_version": 1, "type": "doc", "content": content})
+        document = SimpleNamespace(id=uuid4())
+        version = SimpleNamespace(id=uuid4(), revision=1, schema_version=1,
+                                  content=canonical.canonical, content_sha256=canonical.content_sha256,
+                                  resolved_contexts=contexts)
+        with patch("near_api.integrity.checks._public_targets", return_value=(set(public_runs), set())), \
+                patch("near_api.integrity.checks._unapproved_datasets", return_value=set(unapproved)), \
+                patch("near_api.integrity.checks._latest_version", return_value=None), \
+                patch("near_api.integrity.checks.load_chart_definition", return_value=definition):
+            return build_integrity_report(MagicMock(), document, version, is_acknowledged=True)
+
+    def chart(self, *, definition_id=None, dataset_id=None):
+        return {"type": "liveChart", "attrs": {
+            "block_id": str(uuid4()), "mode": "live", "snapshot_id": None,
+            "chart_definition_version_id": str(definition_id or chart_fixtures.CHART_ID),
+            "observed_dataset_version_id": str(dataset_id or uuid4()),
+            "selection": chart_fixtures.selection()}}
+
+    def test_all_200_blocks_can_report_four_findings_without_overflow(self):
+        from near_api.documents.schema import MAX_TOP_LEVEL_BLOCKS, ReferenceInvalid
+        from near_api.integrity.checks import build_integrity_report
+        from near_api.documents.schema import parse_document
+        charts = [self.chart() for _ in range(MAX_TOP_LEVEL_BLOCKS)]
+        canonical = parse_document({"schema_version": 1, "type": "doc", "content": charts})
+        version = SimpleNamespace(id=uuid4(), revision=1, schema_version=1,
+                                  content=canonical.canonical, content_sha256=canonical.content_sha256,
+                                  resolved_contexts=[])
+        datasets = {chart.observed_dataset_version_id for chart in canonical.live_charts}
+        with patch("near_api.integrity.checks._public_targets", return_value=(set(), set())), \
+                patch("near_api.integrity.checks._unapproved_datasets", return_value=datasets), \
+                patch("near_api.integrity.checks.load_chart_definition",
+                      side_effect=ReferenceInvalid("Synthetic missing definition", [])):
+            report = build_integrity_report(MagicMock(), SimpleNamespace(id=uuid4()), version,
+                                            is_acknowledged=True)
+        self.assertEqual(len(report.findings), MAX_TOP_LEVEL_BLOCKS * 4 + 1)
+        self.assertEqual(sum(count.count for count in report.counts), len(report.findings))
+
+    def test_valid_shape_chart_pin_and_hash_corruption_are_reported(self):
+        from datetime import datetime, timezone
+        from near_api.documents.context_resolver import ChartDefinitionRow, build_resolved_context
+        from near_api.schemas.chart_selection import ChartSelection
+        chart = self.chart()
+        attrs = chart["attrs"]
+        definition = ChartDefinitionRow(
+            id=UUID(attrs["chart_definition_version_id"]), chart_id="synthetic", version=1,
+            data_status="available", unavailable_reason=None, renderer_version="synthetic@1",
+            max_days=366, filter_schema={}, metric_definition_versions=(), required_metric_versions=())
+        context = build_resolved_context(
+            definition, UUID(attrs["observed_dataset_version_id"]),
+            ChartSelection.model_validate(attrs["selection"]),
+            resolved_at=datetime(2026, 11, 13, tzinfo=timezone.utc)).model_dump(mode="json")
+        for change in ({"context_hash": "f" * 64}, {"dataset_version_id": str(uuid4())},
+                       {"chart_definition_version_id": str(uuid4())},
+                       {"selection": {**attrs["selection"], "end": "2026-01-09"}},
+                       {"renderer_version": "different@1"}):
+            with self.subTest(change=change):
+                report = self.report([chart], {attrs["block_id"]: {**context, **change}},
+                                     definition=definition)
+                self.assertEqual({finding.check_id for finding in report.findings},
+                                 {"invalid_chart_context", "uncited_pinned_chart"})
+
+    def test_absent_dataset_rows_are_unavailable(self):
+        from near_api.integrity.checks import _unapproved_datasets
+        approved, absent = uuid4(), uuid4()
+        connection = MagicMock()
+        connection.scalars.return_value = [approved]
+        self.assertEqual(_unapproved_datasets(connection, {approved, absent}), {absent})
+
+    def test_model_block_reports_missing_context_and_unavailable_run_and_dataset(self):
+        block_id, run_id, dataset_id = uuid4(), uuid4(), uuid4()
+        model = {"type": "modelResult", "attrs": {
+            "block_id": str(block_id), "model_run_id": str(run_id),
+            "dataset_version_id": str(dataset_id), "interpretation": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Synthetic model."}]}]}}
+        report = self.report([model], {}, unapproved={dataset_id})
+        self.assertEqual({finding.check_id for finding in report.findings},
+                         {"missing_model_context", "model_run_unavailable", "dataset_pin_unavailable"})
+        for finding in report.findings:
+            self.assertEqual(finding.block_id, block_id)
+            self.assertEqual(finding.entity_id, run_id)
+            self.assertEqual(finding.dataset_version_id, dataset_id)
+
+    def test_model_context_hash_corruption_is_reported_and_clean_pin_stays_clean(self):
+        from near_api.documents.context_resolver import PublishedRunRow, build_model_context
+        block_id, run_id, dataset_id = uuid4(), uuid4(), uuid4()
+        model = {"type": "modelResult", "attrs": {
+            "block_id": str(block_id), "model_run_id": str(run_id),
+            "dataset_version_id": str(dataset_id), "interpretation": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Synthetic model."}]}]}}
+        run = PublishedRunRow(run_id=run_id, spec_id="synthetic", spec_version=1)
+        context = build_model_context(run, dataset_id).model_dump(mode="json")
+        with patch("near_api.integrity.checks.load_published_run", return_value=run):
+            clean = self.report([model], {str(block_id): context}, public_runs={run_id})
+            self.assertEqual(clean.findings, ())
+            corrupt = self.report([model], {str(block_id): {**context, "context_hash": "f" * 64}},
+                                  public_runs={run_id})
+        self.assertEqual([finding.check_id for finding in corrupt.findings], ["invalid_model_context"])
+        self.assertEqual(corrupt.findings[0].block_id, block_id)
 
 
 class IntegrityRouteContractTests(unittest.TestCase):

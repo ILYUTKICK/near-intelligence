@@ -64,6 +64,8 @@ jobs:
           uv run python -m unittest discover -s tests -p test_exports_charts.py -v
           # NI-058: the Markdown bundle/manifest/ZIP packaging (offline part).
           uv run python -m unittest discover -s tests -p test_exports_bundle.py -v
+          # NI-059: frozen PDF rendering, layout, parity and failure behavior.
+          uv run python -m unittest discover -s tests -p test_exports_pdf.py -v
           # NI-062: the offline security-audit suites (session/JWT boundary at
           # the HTTP layer, static subprocess/network/secret sinks, untrusted
           # content inertness); the two cluster security suites run in the
@@ -71,6 +73,8 @@ jobs:
           uv run python -m unittest discover -s tests -p test_security_session_boundary.py -v
           uv run python -m unittest discover -s tests -p test_security_static_sinks.py -v
           uv run python -m unittest discover -s tests -p test_security_untrusted_content.py -v
+          # NI-065: disabled/failed provider and grounding regressions stay offline.
+          uv run python -m unittest discover -s tests -p test_ai_adapter.py -v
       - name: Generated client matches the API contract
         run: node packages/shared-types/scripts/generate.mjs --check
 

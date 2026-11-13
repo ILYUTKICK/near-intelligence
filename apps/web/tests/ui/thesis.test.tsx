@@ -10,7 +10,15 @@ import { join } from "node:path";
 
 import { axe } from "jest-axe";
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The NI-045 duplication CTA on the research page is a client component that
+// reads the router for the sign-in continuation; these structural tests stub
+// the router (they render the page outside the app-router context). The CTA
+// behavior itself is covered by tests/ui/duplicate-release.test.tsx.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 import ResearchPage from "@/app/(public)/research/page";
 import {
@@ -344,7 +352,11 @@ describe("Public projection allowlists", () => {
       ...verifiedExternalLinks,
       ...thesisToc.map((entry) => `#${entry.id}`),
       ...hypothesisIds.map((id) => `#${id}`),
+      // Provenance anchors for the opening, USD windows and supply figures.
+      "#CL-001-heading",
       "#CL-002-heading",
+      "#CL-004-heading",
+      "#CL-007-heading",
     ]);
     const hrefs = Array.from(container.querySelectorAll("a")).map((anchor) => anchor.getAttribute("href"));
     expect(hrefs.length).toBeGreaterThan(0);
@@ -412,5 +424,42 @@ describe("Claim cards render with sources and evidence", () => {
     renderedPage();
     expect(screen.getByText(/index-scoped absence is not universal proof/)).toBeInTheDocument();
     expect(screen.getByText(/governance-controlled retention does not establish permanent supply removal/i)).toBeInTheDocument();
+  });
+});
+
+describe("Compact hypothesis assessment (NI-076 D1)", () => {
+  it("renders the H1–H4 overview with each recorded status and a real anchor link", () => {
+    renderedPage();
+    const overview = document.getElementById("hypothesis-assessment");
+    expect(overview).not.toBeNull();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Hypothesis assessment at a glance" }),
+    ).toBeInTheDocument();
+    for (const hypothesis of thesis.question.hypotheses) {
+      // The status wording restates the thesis verbatim — no new claims.
+      const card = within(overview as HTMLElement).getByText(hypothesis.code, { exact: true })
+        .closest("li");
+      expect(card).not.toBeNull();
+      expect(card!.textContent).toContain(hypothesis.status);
+      expect(card!.textContent).toContain(hypothesis.title);
+      const link = within(card as HTMLElement).getByRole("link", {
+        name: `Read the full ${hypothesis.code} assessment`,
+      });
+      expect(link).toHaveAttribute("href", `#${hypothesis.id}`);
+      // The anchor target is the unchanged full section below.
+      expect(document.getElementById(hypothesis.id)).not.toBeNull();
+    }
+  });
+
+  it("keeps the full thesis reachable: the overview links on to the executive summary", () => {
+    renderedPage();
+    const overview = document.getElementById("hypothesis-assessment");
+    expect(overview!.textContent).toMatch(/all fifteen sections, definitions and limitations/);
+    expect(screen.getByRole("link", { name: "continue to the executive summary" }))
+      .toHaveAttribute("href", "#executive-summary");
+    // All fifteen original sections remain rendered below the overview.
+    for (const entry of thesisToc) {
+      expect(document.getElementById(entry.id)).not.toBeNull();
+    }
   });
 });

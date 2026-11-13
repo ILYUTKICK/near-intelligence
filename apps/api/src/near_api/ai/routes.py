@@ -7,7 +7,7 @@ Implements the commentary row of API_SPECIFICATION under the ``/api`` prefix:
   acknowledged revision). The endpoint is read-only: it never changes a pin,
   coefficient, context or document.
 
-Availability is explicit (ADR-021): without enabled server configuration the
+Availability is explicit (ADR-022): without enabled server configuration the
 response carries the typed ``unavailable``/``adapter_disabled`` state — never
 a fabricated successful commentary. Even when enabled, no unapproved context
 leaves the machine: the prompt is built only from the selected blocks
@@ -88,13 +88,15 @@ def create_grounded_commentary(request: Request, principal: PrincipalDependency,
     """
     # Private content (document/revision references) on EVERY response path.
     response.headers["Cache-Control"] = "no-store"
-    try:
-        config = get_ai_commentary()
-    except SettingsError as error:
-        return _response(document_id, None, None, "failed",
-                         reason="adapter_misconfigured", message=str(error))
     with principal_transaction(engine, principal) as connection:
         document = get_document(connection, principal, document_id)
+        # Owner isolation precedes optional configuration on every path,
+        # including an enabled but incomplete adapter configuration.
+        try:
+            config = get_ai_commentary()
+        except SettingsError as error:
+            return _response(document_id, None, None, "failed",
+                             reason="adapter_misconfigured", message=str(error))
         if document.current_version_id is None:
             return _response(document_id, None, None, "failed",
                              reason="no_acknowledged_revision",
@@ -127,8 +129,9 @@ def create_grounded_commentary(request: Request, principal: PrincipalDependency,
         grounding_source = "\n".join(block.section for block in selected) \
             + f"\nQuestion: {payload.question}"
         adapter.verify_grounded(text, grounding_source)
+        items = adapter.commentary_items(selected, text)
     except adapter.CommentaryError as error:
         return _response(document_id, version.id, version.revision, "failed",
                          reason=error.reason, message=error.message)
     return _response(document_id, version.id, version.revision, "ok",
-                     items=adapter.commentary_items(selected, text))
+                     items=items)

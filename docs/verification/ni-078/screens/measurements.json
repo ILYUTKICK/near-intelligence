@@ -1,0 +1,50 @@
+{
+  "verifiedOn": "2026-11-13",
+  "fixture": "NI-063 and NI-064 synthetic loopback data",
+  "integrationBase": "c56ec29",
+  "research": {
+    "assessment": {
+      "top": 882,
+      "height": 430,
+      "visibleHeight": 18
+    },
+    "figures": 3,
+    "documentHeight": 21482
+  },
+  "chart": {
+    "1440x900": {
+      "top": 596,
+      "height": 320,
+      "visibleHeight": 304
+    },
+    "1280x800": {
+      "top": 596,
+      "height": 320,
+      "visibleHeight": 204
+    }
+  },
+  "savedCharts": {
+    "plot": {
+      "top": 581,
+      "height": 208,
+      "visibleHeight": 208
+    },
+    "card": {
+      "top": 336,
+      "height": 639,
+      "visibleHeight": 564
+    }
+  },
+  "editor": {
+    "paper": {
+      "top": 351,
+      "height": 23964,
+      "visibleHeight": 549
+    },
+    "firstBlock": {
+      "top": 408,
+      "height": 32,
+      "visibleHeight": 32
+    }
+  }
+}

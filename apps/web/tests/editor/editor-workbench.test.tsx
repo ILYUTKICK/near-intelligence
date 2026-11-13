@@ -469,3 +469,22 @@ describe("context tools", () => {
     expect(pane).toHaveTextContent(/2026-11-08T00:00:00Z/);
   });
 });
+
+describe("Compact editor chrome (NI-078, NI-076 D5)", () => {
+  it("carries the title, truthful save state and pane toggles in one header", async () => {
+    await renderReady();
+    const header = document.querySelector("[data-testid='editor-workbench'] header");
+    expect(header).not.toBeNull();
+    expect(within(header as HTMLElement).getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(within(header as HTMLElement).getByTestId("save-now")).toBeInTheDocument();
+    expect(within(header as HTMLElement).getByText(/Revision 7 · Schema version 1/)).toBeInTheDocument();
+    // The pane toggles live in the header row, not in a third operations row.
+    expect(within(header as HTMLElement).getByRole("button", { name: "Collapse outline" })).toBeInTheDocument();
+    expect(within(header as HTMLElement).getByRole("button", { name: "Collapse tools" })).toBeInTheDocument();
+    // The contextual block-operations group renders exactly once, outside
+    // the header, and the shell renders no second breadcrumb trail.
+    expect(screen.getAllByRole("group", { name: "Block operations" })).toHaveLength(1);
+    expect(within(header as HTMLElement).queryByRole("group", { name: "Block operations" })).toBeNull();
+    expect(document.querySelectorAll("nav[aria-label='Breadcrumb']")).toHaveLength(0);
+  });
+});

@@ -1,6 +1,6 @@
 """Bounded prompt builder and provider adapter for grounded commentary (NI-065).
 
-Boundary (ADR-021): the prompt is built ONLY from the explicitly selected
+Boundary (ADR-022): the prompt is built ONLY from the explicitly selected
 blocks of the acknowledged revision (frozen contexts plus bounded authored
 prose) and the server-authored instructions; nothing else — least of all any
 other document or user's content — is ever transmitted. Document text travels
@@ -25,9 +25,12 @@ import httpx
 from pydantic import ValidationError
 
 from near_api.ai.settings import AICommentaryConfig
+from near_api.documents.context_resolver import model_context_hash, same_model_pins
 from near_api.documents.schema import CanonicalDocument
-from near_api.insights.schemas import ResolvedContext
-from near_api.schemas.integrity import GroundedCommentaryItem, Sha256Hex
+from near_api.insights.schemas import ModelContext, ResolvedContext
+from near_api.schemas.integrity import (
+    MAX_COMMENTARY_TEXT_CHARS, GroundedCommentaryItem, Sha256Hex,
+)
 
 REQUEST_TIMEOUT_SECONDS = 60.0
 MAX_RESPONSE_BYTES = 512 * 1024
@@ -40,8 +43,13 @@ never a silent truncation that could unground the commentary."""
 MAX_PROSE_PER_BLOCK_CHARS = 2_000
 """Bounded authored prose per selected block (plain-text equivalent)."""
 
-_NUMBER = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)")
-# Provider response shapes accepted (documented in ADR-021): OpenAI-style
+# Preserve the complete spelling, including signs, decimal/group separators
+# and scientific notation. Searching without word boundaries is deliberately
+# conservative: attaching a unit/letter must not hide an invented number.
+_NUMBER = re.compile(
+    r"[+\-−]?(?:\d+(?:[.,]\d+)*|\.\d+)"
+    r"(?:[eE][+\-−]?\d+)?%?")
+# Provider response shapes accepted (documented in ADR-022): OpenAI-style
 # chat choices and Anthropic-style content blocks. Anything else is typed
 # unsupported; the adapter does not grow a provider SDK.
 
@@ -95,6 +103,7 @@ def select_context(canonical: CanonicalDocument, contexts: dict | None,
     by_block = {block.block_id: block for block in canonical.blocks}
     insights = {insight.block_id: insight for insight in canonical.insights}
     tables = {table.block_id: table for table in canonical.data_tables}
+    models = {model.block_id: model for model in canonical.model_results}
     selected: list[SelectedBlock] = []
     for block_id in block_ids:
         block = by_block.get(block_id)
@@ -105,6 +114,11 @@ def select_context(canonical: CanonicalDocument, contexts: dict | None,
         lines: list[str] = [f"[Selected block {block.block_id} — type {block.block_type}]"]
         context_hash: Sha256Hex | None = None
         if block.block_type == "liveChart":
+            if contexts is not None and not isinstance(contexts, dict):
+                raise CommentaryError(
+                    "unresolved_block_context",
+                    "The selected chart's frozen context map is invalid and "
+                    "cannot be used for grounding")
             stored = (contexts or {}).get(str(block_id))
             if stored is None:
                 raise CommentaryError(
@@ -124,6 +138,38 @@ def select_context(canonical: CanonicalDocument, contexts: dict | None,
             lines.append(f"dataset_version_id: {context.dataset_version_id}")
             lines.append(f"selection: {context.selection.model_dump_json()}")
             lines.append(f"context_hash: {context.context_hash}")
+        elif block_id in models:
+            model = models[block_id]
+            if not isinstance(contexts, dict) or str(block_id) not in contexts:
+                raise CommentaryError(
+                    "unresolved_block_context",
+                    "A selected model result has no valid frozen context map")
+            try:
+                context = ModelContext.model_validate(contexts[str(block_id)])
+            except ValidationError:
+                raise CommentaryError(
+                    "unresolved_block_context",
+                    "A selected model result's frozen context is invalid") from None
+            # Reuse the canonical hash/pin comparator. No latest run or
+            # coefficients are fetched: this tool transmits only the saved
+            # model identity and the explicitly selected interpretation.
+            expected = ModelContext(
+                model_run_id=model.model_run_id,
+                dataset_version_id=model.dataset_version_id,
+                specification_version=context.specification_version,
+                context_hash=model_context_hash(
+                    model.model_run_id, model.dataset_version_id,
+                    context.specification_version))
+            if not same_model_pins(context, expected):
+                raise CommentaryError(
+                    "unresolved_block_context",
+                    "A selected model result's frozen context disagrees with its pins")
+            context_hash = str(context.context_hash)
+            lines.append("Frozen model context (ids only — no fitted results):")
+            for key, value in context.model_dump(mode="json").items():
+                lines.append(f"{key}: {value}")
+            lines.append("Model interpretation (authored prose, quoted data):")
+            lines.append(_bound(_rich_plain_text(model.interpretation), "model interpretation"))
         elif block_id in insights:
             insight = insights[block_id]
             context = insight.context
@@ -342,6 +388,11 @@ def commentary_items(selected: list[SelectedBlock], text: str) -> tuple[Grounded
     frozen context hash) without pretending the provider addressed blocks
     individually.
     """
+    if not text.strip() or len(text) > MAX_COMMENTARY_TEXT_CHARS:
+        raise CommentaryError(
+            "response_too_large" if len(text) > MAX_COMMENTARY_TEXT_CHARS
+            else "unsupported_provider_response",
+            "The commentary text does not fit the bounded response contract")
     return tuple(GroundedCommentaryItem(
         block_id=block.block_id, context_hash=block.context_hash, text=text)
         for block in selected)

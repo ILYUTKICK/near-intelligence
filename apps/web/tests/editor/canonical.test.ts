@@ -156,6 +156,17 @@ describe("canonical validator — valid P0 documents", () => {
           related_hypothesis_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         },
       },
+      {
+        type: "modelResult",
+        attrs: {
+          block_id: "f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1",
+          model_run_id: "f2f2f2f2-f2f2-4f2f-8f2f-f2f2f2f2f2f2",
+          dataset_version_id: "f3f3f3f3-f3f3-4f3f-8f3f-f3f3f3f3f3f3",
+          interpretation: [
+            { type: "paragraph", content: [TEXT("Recorded gate verdict (fixture)")] },
+          ],
+        },
+      },
     ];
     const validated = validateCanonicalDocument(doc(blocks));
     expect(validated.content).toHaveLength(blocks.length);
@@ -166,14 +177,48 @@ describe("canonical validator — valid P0 documents", () => {
     expect(graph.chartBlockIds).toContain("66666666-6666-4666-8666-666666666666");
   });
 
-  it("preserves inspected source filters in chart blocks and rejects non-string values", () => {
+  it("accepts a modelResult block carrying ids and interpretation only (NI-055)", () => {
+    const block = {
+      type: "modelResult",
+      attrs: {
+        block_id: UUID_A,
+        model_run_id: UUID_B,
+        dataset_version_id: UUID_C,
+        interpretation: [
+          {
+            type: "paragraph",
+            content: [
+              TEXT("Association recorded by the gate", [{ type: "italic" }]),
+              TEXT(" — never causality."),
+            ],
+          },
+        ],
+      },
+    };
+    const parsed = validateCanonicalDocument(doc([block]));
+    expect(parsed.content[0].type).toBe("modelResult");
+    expect(parsed.content[0].attrs).toEqual(block.attrs);
+    // Round-trip through the serializer: the Tiptap form validates back to the
+    // same canonical block (ids preserved, no statistical value anywhere).
+    expect(() => validateCanonicalDocument(doc([block]))).not.toThrow();
+  });
+
+  it("preserves inspected single and compared filters and rejects malformed shapes", () => {
     const block = { type: "liveChart", attrs: { block_id: UUID_A,
       chart_definition_version_id: UUID_C, observed_dataset_version_id: UUID_D,
       mode: "live", snapshot_id: null, selection: { ...SELECTION, filters: { source: "SRC-LLAMA" } } } };
     const parsed = validateCanonicalDocument(doc([block]));
     expect(parsed.content[0].attrs).toMatchObject({ selection: { filters: { source: "SRC-LLAMA" } } });
-    expect(() => validateCanonicalDocument(doc([{ ...block, attrs: { ...block.attrs,
-      selection: { ...SELECTION, filters: { source: ["SRC-LLAMA"] } } } }]))).toThrow(CanonicalDocumentError);
+    // NI-071: the multi-value comparison form is the canonical list shape
+    // and is preserved verbatim too; genuinely malformed values are refused.
+    const multi = validateCanonicalDocument(doc([{ ...block, attrs: { ...block.attrs,
+      selection: { ...SELECTION, filters: { source: ["SRC-LLAMA", "SRC-DASHBOARD"] } } } }]));
+    expect(multi.content[0].attrs).toMatchObject({
+      selection: { filters: { source: ["SRC-LLAMA", "SRC-DASHBOARD"] } } });
+    for (const invalid of [{ source: [] }, { source: [42] }, { source: [""] }]) {
+      expect(() => validateCanonicalDocument(doc([{ ...block, attrs: { ...block.attrs,
+        selection: { ...SELECTION, filters: invalid } } }]))).toThrow(CanonicalDocumentError);
+    }
   });
 
   it("accepts an empty paragraph with an empty inline content array", () => {
@@ -444,6 +489,69 @@ describe("canonical validator — rejections", () => {
       }]),
       "document.content[0].attrs.selection.end",
       "window_must_be_half_open_nonempty",
+    );
+  });
+
+  it("rejects modelResult violations — no statistical values, ids required (NI-055)", () => {
+    const base = {
+      type: "modelResult",
+      attrs: {
+        block_id: UUID_A,
+        model_run_id: UUID_B,
+        dataset_version_id: UUID_C,
+        interpretation: [{ type: "paragraph", content: [TEXT("Interpretation (fixture)")] }],
+      },
+    };
+    // Any statistical value is an unknown attr: coefficients never live in
+    // the document JSON (summaries are re-projected from the run row).
+    expectInvalid(
+      doc([{ ...base, attrs: { ...base.attrs, coefficients: [{ name: "const", estimate: 1 }] } }]),
+      "document.content[0].attrs.coefficients",
+      "unknown_field",
+    );
+    expectInvalid(
+      doc([{ ...base, attrs: { ...base.attrs, estimate: 0.5 } }]),
+      "document.content[0].attrs.estimate",
+      "unknown_field",
+    );
+    expectInvalid(
+      doc([{ ...base, attrs: { ...base.attrs, context: RESOLVED_CONTEXT } }]),
+      "document.content[0].attrs.context",
+      "unknown_field",
+    );
+    expectInvalid(
+      doc([{ type: "modelResult", attrs: { block_id: UUID_A, model_run_id: UUID_B,
+        interpretation: base.attrs.interpretation } }]),
+      "document.content[0].attrs.dataset_version_id",
+      "must_be_uuid_string",
+    );
+    expectInvalid(
+      doc([{ type: "modelResult", attrs: { block_id: UUID_A, dataset_version_id: UUID_C,
+        interpretation: base.attrs.interpretation } }]),
+      "document.content[0].attrs.model_run_id",
+      "must_be_uuid_string",
+    );
+    expectInvalid(
+      doc([{ ...base, attrs: { ...base.attrs, model_run_id: "not-a-uuid" } }]),
+      "document.content[0].attrs.model_run_id",
+      "must_be_uuid",
+    );
+    expectInvalid(
+      doc([{ ...base, attrs: { ...base.attrs, interpretation: [] } }]),
+      "document.content[0].attrs.interpretation",
+      "must_not_be_empty",
+    );
+    expectInvalid(
+      doc([{ ...base, attrs: { ...base.attrs, interpretation: [{ type: "heading", content: [TEXT("x")] }] } }]),
+      "document.content[0].attrs.interpretation[0].type",
+      "unsupported_rich_node",
+    );
+    // The block takes no node content (interpretation is an attr); the key
+    // is rejected as unknown exactly like the server parser does.
+    expectInvalid(
+      doc([{ ...base, content: [] }]),
+      "document.content[0].content",
+      "unknown_field",
     );
   });
 

@@ -2,8 +2,8 @@
 
 The bundle is the single reliable MVP export (docs/MVP_SCOPE.md):
 ``research.md`` rendered from the frozen NI-056 plan, the NI-057 static
-chart assets, and a ``manifest.json`` that pins every identity needed to
-verify the artifact later:
+chart assets, published model manifests, and a ``manifest.json`` that pins
+every identity needed to verify the artifact later:
 
 - the plan identity (IR version, revision pins, canonical plan SHA-256);
 - per-file SHA-256 and byte size for ``research.md`` and every asset;
@@ -43,8 +43,13 @@ from near_api.exports.charts import (
     safe_chart_asset_name,
 )
 from near_api.exports.ir import export_ir_canonical_bytes
-from near_api.exports.markdown import ChartAssetFiles, limitations_of, render_markdown
-from near_api.schemas.export import ExportChartBlock, ExportIr
+from near_api.exports.markdown import (
+    ChartAssetFiles,
+    limitations_of,
+    model_manifest_path,
+    render_markdown,
+)
+from near_api.schemas.export import ExportChartBlock, ExportIr, ExportModelResultBlock
 
 BUNDLE_FORMAT_VERSION = 1
 """The only bundle format this builder emits; a format change appends a
@@ -104,6 +109,32 @@ def chart_asset_files(chart_blocks: tuple[ExportChartBlock, ...],
         for block in chart_blocks}
 
 
+def model_manifest_files(plan: ExportIr) -> tuple[BundleFile, ...]:
+    """Validate and serialize the frozen model manifests for both export formats."""
+    references = {run.run_id: run for run in plan.model_runs}
+    files: dict[UUID, BundleFile] = {}
+    for block in plan.blocks:
+        if not isinstance(block, ExportModelResultBlock):
+            continue
+        run_id = block.model_run_id
+        reference = references.get(run_id)
+        if reference is None or reference.manifest_bundle is None:
+            raise BundleError(f"The plan is missing the published manifest for {run_id}",
+                              [(f"blocks.{block.block_id}", "missing_model_manifest")])
+        manifest = reference.manifest_bundle
+        if (reference.spec_id != block.spec_id or reference.spec_version != block.spec_version
+                or manifest.get("run_id") != str(run_id) or manifest.get("spec_id") != block.spec_id
+                or block.summary.run_id != run_id or block.summary.model_id != block.spec_id
+                or block.summary.model_version != block.spec_version):
+            raise BundleError(f"The published manifest disagrees with the pinned run {run_id}",
+                              [(f"blocks.{block.block_id}", "model_manifest_mismatch")])
+        if run_id not in files:
+            files[run_id] = BundleFile(model_manifest_path(run_id), json.dumps(
+                manifest, ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"), allow_nan=False).encode("utf-8"))
+    return tuple(files.values())
+
+
 def build_bundle(plan: ExportIr, render_result: ChartRenderResult | None) -> ExportBundle:
     """Build research.md + assets + manifest and package them as the ZIP.
 
@@ -127,10 +158,12 @@ def build_bundle(plan: ExportIr, render_result: ChartRenderResult | None) -> Exp
                 "exactly",
                 [("charts", "chart_set_mismatch")])
 
+    model_manifests = model_manifest_files(plan)
     assets = chart_asset_files(chart_blocks)
     research_md = render_markdown(plan, assets).encode("utf-8")
 
     files: list[BundleFile] = [BundleFile(RESEARCH_DOC_NAME, research_md)]
+    files.extend(model_manifests)
     if render_result is not None:
         asset_by_id = {chart.chart_id: chart for chart in render_result.charts}
         for block in chart_blocks:
@@ -288,9 +321,8 @@ def verify_bundle(manifest: dict, extracted: Mapping[str, bytes]) -> None:
 def verify_research_links(research_md: str, extracted: Mapping[str, bytes]) -> None:
     """Every relative asset link in research.md must resolve in the bundle.
 
-    The Markdown embeds charts through ``assets/chart-<uuid>.svg`` /
-    ``.csv`` links; a link that does not resolve inside the extracted bundle
-    means the document references an asset that was never shipped.
+    Chart SVGs, chart CSVs and published model manifests link to assets inside
+    the extracted bundle.
     """
     pattern = re.compile(r"\]\(([^)\s]+)\)")
     for match in pattern.finditer(research_md):

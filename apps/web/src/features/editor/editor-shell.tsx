@@ -50,6 +50,7 @@ import {
   detailOf,
 } from "./ui-bridge";
 import { ExportDialog } from "./exports/export-dialog";
+import { ShareDialog } from "./shares/share-dialog";
 import { ConflictRecoveryDialog } from "./persistence/conflict-dialog";
 import { SaveStatusBar, formatSavedAt } from "./persistence/save-status";
 import { useDocumentSave } from "./persistence/use-document-save";
@@ -67,6 +68,7 @@ import { EditorHypothesisDialog, type HypothesisAction } from "./hypotheses/edit
 import { EditorEvidenceDialog, type EvidenceAction } from "./evidence/editor-dialog";
 import { EvidenceNavigationPanel } from "./evidence/evidence-panel";
 import { IntegrityFindingsPanel } from "./integrity/integrity-panel";
+import { EditorModelBlockDialog } from "./models/model-block-dialog";
 
 /**
  * The three-pane research editor workbench (NI-039):
@@ -120,7 +122,8 @@ interface DeleteRequest {
 
 type AnnotationAction = { kind: "insight"; action: InsightAction } | { kind: "hypothesis"; action: HypothesisAction }
   | { kind: "evidence"; action: EvidenceAction };
-type AnnotationIntent = AnnotationAction & { content: CanonicalDocument; revision: number };
+type PaperSnapshot = { content: CanonicalDocument; revision: number };
+type AnnotationIntent = AnnotationAction & PaperSnapshot;
 
 export function EditorShell({ documentId, title, revision, updatedAt,
   currentVersionId, content, sessionOwner, verifySessionOwner }: EditorShellProps) {
@@ -132,6 +135,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const [conflictBusy, setConflictBusy] = useState(false);
   const [conflictActionError, setConflictActionError] = useState<string | null>(null);
   const [annotationIntent, setAnnotationIntent] = useState<AnnotationIntent | null>(null);
+  const [modelIntent, setModelIntent] = useState<PaperSnapshot | null>(null);
   const annotationTrigger = useRef<HTMLElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const paperRef = useRef<HTMLDivElement>(null);
@@ -169,7 +173,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
     };
   }, []);
 
-  const controller = useDocumentSave({ documentId, initialRevision: revision, capture });
+  const controller = useDocumentSave({ documentId, initialRevision: revision, initialVersionId: currentVersionId, capture });
   // The controller's members are stable callbacks (they close over the
   // coordinator); depending on THEM — not the per-status object — keeps the
   // effects below from re-running on every save-status transition. This is
@@ -208,8 +212,10 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
   const [tabletOutlineOpen, setTabletOutlineOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
+  const [exportVersionId, setExportVersionId] = useState<string | null>(null);
   const exportReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareReturnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
@@ -239,13 +245,13 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   // Manual save (button and Mod+S): during a conflict the button reopens the
   // explicit resolution dialog instead of racing another 409.
   const handleSaveNow = useCallback(() => {
-    if (annotationIntent) return;
+    if (annotationIntent || modelIntent) return;
     if (controller.status.kind === "conflict") {
       setConflictDismissedAt(null);
       return;
     }
     controller.saveNow();
-  }, [controller, annotationIntent]);
+  }, [controller, annotationIntent, modelIntent]);
 
   // Mod+S inside the research editor claims the browser save shortcut for
   // the document save (standard editor behavior; the listener lives on the
@@ -314,7 +320,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         throw new Error("the editor is not ready");
       }
       editorRef.current.commands.setContent(canonicalToTiptapDoc(validated));
-      controller.adoptServerState(document.revision);
+      controller.adoptServerState(document.revision, undefined, document.current_version_id);
       announce("Loaded the server version. Your local edits were discarded as you confirmed.");
     } catch (error) {
       setConflictActionError(describeRecoveryActionError(error, "The server version could not be loaded."));
@@ -434,7 +440,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
 
   const openAnnotation = useCallback((request: AnnotationAction) => {
     const current = editorRef.current;
-    if (!current || annotationIntent) return;
+    if (!current || annotationIntent || modelIntent) return;
     if (!controller.isClean(controller.revision) || controller.draft) {
       if (request.kind === "hypothesis") announce("Resolve the recovered draft or save the current edits to change a hypothesis.");
       if (request.kind === "evidence") announce("Resolve the recovered draft or save the current edits to change an evidence link.");
@@ -454,29 +460,30 @@ export function EditorShell({ documentId, title, revision, updatedAt,
     }
     annotationTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setAnnotationIntent({ ...request, content: snapshot, revision: controller.revision });
-  }, [controller, annotationIntent, announce]);
+  }, [controller, annotationIntent, modelIntent, announce]);
 
   const openInsight = useCallback((action: InsightAction) => openAnnotation({ kind: "insight", action }), [openAnnotation]);
   const openHypothesis = useCallback((action: HypothesisAction) => openAnnotation({ kind: "hypothesis", action }), [openAnnotation]);
   const openEvidence = useCallback((action: EvidenceAction) => openAnnotation({ kind: "evidence", action }), [openAnnotation]);
 
-  const adoptAnnotationPaper = useCallback((savedContent: CanonicalDocument, revision: number, savedAt: string) => {
+  const adoptSavedPaper = useCallback((starting: PaperSnapshot | null, savedContent: CanonicalDocument, revision: number,
+    savedAt: string, versionId: string | null) => {
     const current = editorRef.current;
-    if (!current || !annotationIntent || !controller.isClean(annotationIntent.revision) || controller.draft
-      || JSON.stringify(canonicalSnapshot(current)) !== JSON.stringify(annotationIntent.content)) return false;
+    if (!current || current.isDestroyed || !starting || !controller.isClean(starting.revision) || controller.draft
+      || JSON.stringify(canonicalSnapshot(current)) !== JSON.stringify(starting.content)) return false;
     if (!current.chain().setMeta("addToHistory", false).setContent(canonicalToTiptapDoc(savedContent), { emitUpdate: false }).run()) {
       throw new Error("The saved revision could not be loaded into the editor.");
     }
     refreshDoc(current, false);
-    controller.adoptServerState(revision, savedAt);
+    controller.adoptServerState(revision, savedAt, versionId);
     return true;
-  }, [controller, annotationIntent, refreshDoc]);
+  }, [controller, refreshDoc]);
 
   const acceptAnnotationSave = useCallback((result: AnnotationSave) => {
     if (!annotationIntent) return;
     const label = { insight: "Insight", hypothesis: "Hypothesis", evidence: "Evidence link" }[annotationIntent.kind];
     const savedContent = validateCanonicalDocument(result.version.content);
-    if (!adoptAnnotationPaper(savedContent, result.version.revision, result.document.updated_at)) {
+    if (!adoptSavedPaper(annotationIntent, savedContent, result.version.revision, result.document.updated_at, result.version.id)) {
       announce(`${label} change saved on the server. Your local edits are still in the editor. Resolve the revision conflict to load the saved change.`);
     } else if (annotationIntent.action.kind === "delete") {
       announce(`${label} deleted from this revision.`);
@@ -484,15 +491,37 @@ export function EditorShell({ documentId, title, revision, updatedAt,
       announce(annotationIntent.kind === "insight" ? "Insight saved with its pinned context." : `${label} saved.`);
     }
     setAnnotationIntent(null);
-  }, [adoptAnnotationPaper, announce, annotationIntent]);
+  }, [adoptSavedPaper, announce, annotationIntent]);
 
-  const reloadAnnotationPaper = useCallback((content: CanonicalDocument, revision: number, savedAt: string) => {
-    if (!annotationIntent || !adoptAnnotationPaper(content, revision, savedAt)) {
+  const reloadAnnotationPaper = useCallback((content: CanonicalDocument, revision: number, savedAt: string, versionId: string | null) => {
+    if (!annotationIntent || !adoptSavedPaper(annotationIntent, content, revision, savedAt, versionId)) {
       throw new Error("Local edits are still in the editor. Save them before reopening this form.");
     }
     setAnnotationIntent({ ...annotationIntent, content, revision });
     announce(`Loaded the current revision. Review the retained ${annotationIntent.kind} draft before saving.`);
-  }, [adoptAnnotationPaper, announce, annotationIntent]);
+  }, [adoptSavedPaper, announce, annotationIntent]);
+
+  const acceptModelInsert = useCallback((savedContent: CanonicalDocument, revision: number, savedAt: string, versionId: string, blockId: string) => {
+    const current = editorRef.current;
+    const adopted = adoptSavedPaper(modelIntent, savedContent, revision, savedAt, versionId);
+    setModelIntent(null);
+    if (!current || !adopted) {
+      announce("Model result saved on the server. Your local edits are still in the editor.");
+      return;
+    }
+    announce("Model result added with its pinned run and dataset.");
+    const index = savedContent.content.findIndex(block => block.attrs.block_id === blockId);
+    if (index >= 0) current.commands.setNodeSelection(topLevelNodePosition(current, index));
+    annotationTrigger.current = null;
+  }, [adoptSavedPaper, announce, modelIntent]);
+
+  const reloadModelPaper = useCallback((content: CanonicalDocument, revision: number, savedAt: string, versionId: string | null) => {
+    const current = editorRef.current;
+    if (!current || !adoptSavedPaper(modelIntent, content, revision, savedAt, versionId)) {
+      throw new Error("Save the local edits before loading the current revision.");
+    }
+    setModelIntent({ content: canonicalSnapshot(current), revision });
+  }, [adoptSavedPaper, modelIntent]);
 
   const restoreAnnotationFocus = useCallback(() => {
     const trigger = annotationTrigger.current;
@@ -561,10 +590,24 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         return;
       }
       setSlashMenu(null);
+      // NI-055: a model result is pinned server-side (published run + dataset
+      // verified in the save transaction) — never a local draft. The same
+      // clean-state rule as the annotation dialogs applies.
+      if (choice.type === "modelResult") {
+        if (annotationIntent || modelIntent) return;
+        if (!controller.isClean(controller.revision) || controller.draft) {
+          announce("Save your current edits before adding a model result.");
+          return;
+        }
+        annotationTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        setModelIntent({ revision: controller.revision, content: canonicalSnapshot(editor) });
+        announce("The Add Model dialog is open.");
+        return;
+      }
       const ok = insertBlock(editor, choice.type, { headingLevel: choice.headingLevel });
       announce(ok ? "Block inserted. Focus is in the new block." : "The block could not be inserted at this position.");
     },
-    [editor, announce],
+    [editor, announce, controller, annotationIntent, modelIntent],
   );
 
   const handleMove = useCallback(
@@ -694,7 +737,9 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const displayedUpdatedAt = savedAt ?? updatedAt;
 
   return (
-    <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasEvidenceActions || annotationIntent?.kind === "hypothesis"}
+    // The identity guard powers every owner mutation surface; the NI-055
+    // Add Model dialog needs it too, even on an evidence-free document.
+    <ChartEditorProvider key={documentId} documentId={documentId} enabled={hasEvidenceActions || modelIntent !== null || annotationIntent?.kind === "hypothesis"}
       saved={controller.status.kind === "clean"} revision={controller.revision} onObserve={recordObservation}
       onInsightAction={controller.draft ? undefined : openInsight} onHypothesisAction={controller.draft ? undefined : openHypothesis}
       onEvidenceAction={controller.draft ? undefined : openEvidence}>
@@ -703,14 +748,22 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         {announcement}
       </p>
 
+      {/* NI-078 (NI-076 D5): one compact header row carries the title, the
+          truthful save state and every persistent action; the pane toggles
+          live in the same row. The paper below starts higher on desktop. */}
       <header className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3">
         <div className="min-w-0 flex-1 basis-64">
+          <Button ref={shareReturnFocusRef} data-testid="share-open" variant="secondary" className="float-right ml-3"
+              disabled={controller.status.kind !== "clean" || !controller.versionId || Boolean(controller.draft)}
+              onClick={() => setShareOpen(true)}>
+              Share
+          </Button>
           <h1 className="font-serif text-title leading-title [overflow-wrap:anywhere]">{title}</h1>
-          <p className="mt-1 text-metadata text-text-secondary">
-            Updated <time dateTime={displayedUpdatedAt}>{displayedUpdatedAt}</time> · Revision{" "}
-            {controller.revision} · Schema version 1
-          </p>
-          <div className="mt-2">
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <p className="text-metadata text-text-secondary">
+              Updated <time dateTime={displayedUpdatedAt}>{displayedUpdatedAt}</time> · Revision{" "}
+              {controller.revision} · Schema version 1
+            </p>
             <SaveStatusBar
               status={controller.status}
               onSave={handleSaveNow}
@@ -720,69 +773,20 @@ export function EditorShell({ documentId, title, revision, updatedAt,
             />
           </div>
         </div>
-        {controller.status.kind === "clean" ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <Link href={`/workspace/research/${documentId}/versions`} prefetch={false}
-              className="inline-block text-ui underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
-              Revision history
-            </Link>
-            <Button ref={exportReturnFocusRef} data-testid="export-open"
-              disabled={!currentVersionId}
-              onClick={() => setExportOpen(true)}>
-              Export
-            </Button>
-          </div>
-        ) : <p className="mt-2 text-metadata text-text-secondary">Save your edits to open revision history and export.</p>}
-      </header>
-
-      {controller.draft ? (
-        <div
-          role="alert"
-          data-testid="draft-recovery"
-          className="rounded-surface border border-warning/50 bg-surface p-5"
-        >
-          <p className="text-ui leading-ui font-medium text-text">
-            A draft with unsaved changes from this session was found (saved at{" "}
-            {formatSavedAt(controller.draft.capturedAt)}, based on revision{" "}
-            {controller.draft.baseRevision}).
-          </p>
-          {controller.draft.invalidReason ? (
-            <p className="text-ui leading-ui text-warning mt-1">
-              The draft cannot be restored: {controller.draft.invalidReason}. Discard it or keep
-              editing without it.
-            </p>
-          ) : (
-            <p className="text-body leading-body text-text-secondary mt-1">
-              Restoring replaces the paper with the draft&apos;s content; it is saved to the
-              server by the next autosave. The server version stays in the document history.
-            </p>
-          )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {controller.draft.invalidReason === null ? (
-              <Button variant="secondary" onClick={handleDraftRestore} data-testid="draft-restore">
-                Restore draft
+        <div className="flex flex-wrap items-center gap-2">
+          {controller.status.kind === "clean" ? (
+            <>
+              <Link href={`/workspace/research/${documentId}/versions`} prefetch={false}
+                className="inline-block text-ui underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+                Revision history
+              </Link>
+              <Button ref={exportReturnFocusRef} data-testid="export-open"
+                disabled={!controller.versionId}
+                onClick={() => setExportVersionId(controller.versionId)}>
+                Export
               </Button>
-            ) : null}
-            <Button variant="quiet" onClick={handleDraftDiscard} data-testid="draft-discard">
-              Discard draft
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap items-start gap-2 border-b border-border pb-3">
-        <InsertMenuButton onInsert={handleInsert} disabled={!editor} />
-        <Button variant="secondary" disabled={!editor || controller.status.kind !== "clean" || Boolean(controller.draft)}
-          onClick={() => openHypothesis({ kind: "create" })}>Add hypothesis</Button>
-        <BlockToolbar
-          currentBlock={currentBlock}
-          blockCount={blockCount}
-          onMoveUp={() => handleMove(-1)}
-          onMoveDown={() => handleMove(1)}
-          onDuplicate={handleDuplicate}
-          onDelete={handleDeleteFromToolbar}
-        />
-        <div className="ml-auto flex items-center gap-2">
+            </>
+          ) : <p className="text-metadata text-text-secondary">Save your edits to open revision history and export.</p>}
           <button
             type="button"
             className="inline-flex min-h-11 items-center rounded-control border border-control-border bg-surface px-3 text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus md:hidden"
@@ -824,6 +828,57 @@ export function EditorShell({ documentId, title, revision, updatedAt,
             {toolsCollapsed ? "Show tools pane" : "Collapse tools"}
           </button>
         </div>
+      </header>
+
+      {controller.draft ? (
+        <div
+          role="alert"
+          data-testid="draft-recovery"
+          className="rounded-surface border border-warning/50 bg-surface p-5"
+        >
+          <p className="text-ui leading-ui font-medium text-text">
+            A draft with unsaved changes from this session was found (saved at{" "}
+            {formatSavedAt(controller.draft.capturedAt)}, based on revision{" "}
+            {controller.draft.baseRevision}).
+          </p>
+          {controller.draft.invalidReason ? (
+            <p className="text-ui leading-ui text-warning mt-1">
+              The draft cannot be restored: {controller.draft.invalidReason}. Discard it or keep
+              editing without it.
+            </p>
+          ) : (
+            <p className="text-body leading-body text-text-secondary mt-1">
+              Restoring replaces the paper with the draft&apos;s content; it is saved to the
+              server by the next autosave. The server version stays in the document history.
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {controller.draft.invalidReason === null ? (
+              <Button variant="secondary" onClick={handleDraftRestore} data-testid="draft-restore">
+                Restore draft
+              </Button>
+            ) : null}
+            <Button variant="quiet" onClick={handleDraftDiscard} data-testid="draft-discard">
+              Discard draft
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Document-level operations; block operations stay contextual through
+          the BlockToolbar acting on the selected block (NI-039 pattern). */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+        <InsertMenuButton onInsert={handleInsert} disabled={!editor} />
+        <Button variant="secondary" disabled={!editor || controller.status.kind !== "clean" || Boolean(controller.draft)}
+          onClick={() => openHypothesis({ kind: "create" })}>Add hypothesis</Button>
+        <BlockToolbar
+          currentBlock={currentBlock}
+          blockCount={blockCount}
+          onMoveUp={() => handleMove(-1)}
+          onMoveDown={() => handleMove(1)}
+          onDuplicate={handleDuplicate}
+          onDelete={handleDeleteFromToolbar}
+        />
       </div>
 
       {tabletOutlineOpen ? (
@@ -958,12 +1013,21 @@ export function EditorShell({ documentId, title, revision, updatedAt,
       />
 
       <ExportDialog
-        open={exportOpen}
-        onOpenChange={setExportOpen}
+        open={exportVersionId !== null}
+        onOpenChange={open => { if (!open) setExportVersionId(null); }}
         documentId={documentId}
-        versionId={currentVersionId ?? ""}
+        versionId={exportVersionId ?? ""}
         onAnnounce={announce}
         returnFocusRef={exportReturnFocusRef}
+      />
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        documentId={documentId}
+        revision={controller.revision}
+        canPublish={controller.status.kind === "clean" && Boolean(controller.versionId) && !controller.draft}
+        onAnnounce={announce}
+        returnFocusRef={shareReturnFocusRef}
       />
       <ConflictRecoveryDialog
         open={conflictDialogOpen}
@@ -987,6 +1051,9 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         onSaved={acceptAnnotationSave} onReload={reloadAnnotationPaper} restoreFocus={restoreAnnotationFocus} /> : null}
       {annotationIntent?.kind === "evidence" ? <EditorEvidenceDialog intent={annotationIntent} onClose={() => setAnnotationIntent(null)}
         onSaved={acceptAnnotationSave} onReload={reloadAnnotationPaper} restoreFocus={restoreAnnotationFocus} /> : null}
+      {modelIntent && annotationIntent === null ? <EditorModelBlockDialog documentId={documentId}
+        revision={modelIntent.revision} onClose={() => setModelIntent(null)}
+        onInserted={acceptModelInsert} onReload={reloadModelPaper} restoreFocus={restoreAnnotationFocus} /> : null}
     </div>
     </ChartEditorProvider>
   );

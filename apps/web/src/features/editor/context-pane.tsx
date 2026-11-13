@@ -268,6 +268,8 @@ const LATER_TASKS_NOTE: Record<string, string> = {
     "Use Edit evidence link on the saved block to revise its target, classification or explanation.",
   risk: "Risk body rich-text editing arrives with the annotation tasks; the title is edited on the card itself.",
   dataTable: "Cells are edited below; the block serializes through the canonical schema.",
+  modelResult:
+    "The recorded result is re-projected from the pinned published run and never stored here; edit the interpretation on the card itself. Changing the run or dataset pin is an explicit document edit that freezes a new context.",
 };
 
 function plainPreview(node: JSONContent, limit = 160): string {
@@ -364,7 +366,10 @@ export function ContextPane({
 
         {currentBlock.canonicalType === "liveChart" ? (
           <InfoList>
-            {fieldPair("Chart definition version", shortId(attrs.chart_definition_version_id as string | null), "lcv")}
+            {/* NI-078 (NI-076 D5): the full technical identifiers live here in
+                Properties instead of the paper; the block in the paper keeps
+                its compact status row. */}
+            {fieldPair("Chart definition version", (attrs.chart_definition_version_id as string | null) ?? "—", "lcv")}
             {fieldPair("Mode", (attrs.mode as string | null) === "snapshot" ? "snapshot" : "live", "lmode")}
             {fieldPair(
               "Selection window",
@@ -374,7 +379,7 @@ export function ContextPane({
               })(),
               "lsel",
             )}
-            {fieldPair("Observed dataset version", shortId(attrs.observed_dataset_version_id as string | null), "lod")}
+            {fieldPair("Observed dataset version", (attrs.observed_dataset_version_id as string | null) ?? "—", "lod")}
             {attrs.snapshot_id
               ? fieldPair("Snapshot", shortId(attrs.snapshot_id as string), "lsnap")
               : null}
@@ -445,6 +450,25 @@ export function ContextPane({
             {fieldPair("Target", `${(attrs.target_kind as string | null) ?? "—"} ${shortId(attrs.target_id as string | null)}`, "et")}
             {fieldPair("Explanation", (attrs.explanation as string | null) ?? "—", "eexpl")}
           </InfoList>
+        ) : null}
+
+        {currentBlock.canonicalType === "modelResult" ? (
+          <div>
+            <InfoList>
+              {fieldPair("Pinned run", shortId(attrs.model_run_id as string | null), "mmr")}
+              {fieldPair("Pinned dataset version", shortId(attrs.dataset_version_id as string | null), "mds")}
+            </InfoList>
+            {attrs.interpretation ? (
+              <div className="mt-2 text-body leading-body text-text">
+                <RichFragmentView fragment={attrs.interpretation as never} />
+              </div>
+            ) : null}
+            <FieldNote>
+              The block stores the run and dataset identities plus your interpretation only —
+              coefficients/diagnostics live on the immutable published run row and are re-projected
+              for display. A newer published run never re-points this block.
+            </FieldNote>
+          </div>
         ) : null}
 
         {currentBlock.canonicalType === "divider" ? (

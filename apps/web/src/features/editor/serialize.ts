@@ -9,7 +9,7 @@
  *    (camelCase), the canonical schema uses `bullet_list`/`ordered_list`/
  *    `list_item`. Every other P0 type is named identically in both grammars
  *    (paragraph, heading, liveChart, dataTable, insight, hypothesis,
- *    evidence, risk, divider).
+ *    evidence, risk, modelResult, divider).
  * 2. Tiptap omits empty inline `content` arrays; the canonical schema
  *    requires the `content` key (it may be an empty array). The transform
  *    normalizes this one way (Tiptap -> canonical) without inventing text.
@@ -122,6 +122,7 @@ export function canonicalBlockToTiptap(block: CanonicalBlock): JSONContent {
     case "hypothesis":
     case "evidence":
     case "risk":
+    case "modelResult":
       return { type: block.type, attrs };
   }
 }
@@ -261,6 +262,15 @@ function canonicalAttrs(nodeType: string, source: Record<string, unknown>): Reco
       }
       return attrs;
     }
+    case "modelResult":
+      // Ids + interpretation only: any coefficient a client injected into the
+      // node attrs is dropped here and then rejected by the validator.
+      return {
+        block_id: pick("block_id"),
+        model_run_id: pick("model_run_id"),
+        dataset_version_id: pick("dataset_version_id"),
+        interpretation: pick("interpretation"),
+      };
     default:
       return { ...source };
   }
@@ -291,6 +301,7 @@ function nodeToCanonicalBlock(node: JSONContent): unknown {
     case "hypothesis":
     case "evidence":
     case "risk":
+    case "modelResult":
       return { type: node.type, attrs: canonicalAttrs(node.type, (node.attrs ?? {}) as Record<string, unknown>) };
     default:
       // Unknown top-level node: validated verbatim so it is rejected with an

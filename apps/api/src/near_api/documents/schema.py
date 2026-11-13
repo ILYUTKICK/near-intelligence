@@ -24,6 +24,12 @@ P0 node taxonomy (EDITOR_SPECIFICATION block table):
   annotations (insight types observation|hypothesis|risk|conclusion;
   classifications supporting|contradicting|uncertain; hypothesis assessments
   untested|supported|mixed|weakened|insufficient_data).
+- ``modelResult`` (NI-055): pinned published model run + interpretation
+  rich text. The block stores ONLY ids and the authored narrative —
+  coefficients/diagnostics never live in the document JSON; summaries are
+  re-projected from the immutable published ``app.model_runs`` row, so
+  editing the prose can never change the recorded result and a source
+  revision never refits it.
 - ``divider``: semantic separator.
 
 Same-document private links are validated here without the database: every
@@ -84,7 +90,7 @@ SCHEMA_VERSION = 1
 
 BLOCK_TYPES = (
     "paragraph", "heading", "liveChart", "dataTable",
-    "insight", "hypothesis", "evidence", "risk", "divider",
+    "insight", "hypothesis", "evidence", "risk", "modelResult", "divider",
 )
 INSIGHT_TYPES = ("observation", "hypothesis", "risk", "conclusion")
 CLASSIFICATIONS = ("supporting", "contradicting", "uncertain")
@@ -629,6 +635,25 @@ class DataTableNode:
     rows_json: list[list[object]] | None
 
 
+@dataclass(frozen=True)
+class ModelResultNode:
+    """A pinned published model run with an editable interpretation.
+
+    Only identities and the authored narrative are stored: ``model_run_id``
+    must reference a published immutable ``app.model_runs`` row (verified in
+    the save transaction), ``dataset_version_id`` the approved public dataset
+    the interpretation reads against, and ``interpretation`` is rich text in
+    the canonical annotation grammar. No coefficient or diagnostic value is
+    ever stored here.
+    """
+
+    block_id: UUID
+    model_run_id: UUID
+    dataset_version_id: UUID
+    interpretation: tuple[RichNode, ...]
+    interpretation_json: list[dict]
+
+
 def _parse_block_node_keys(node: dict, path: str, *, with_content: bool) -> None:
     """Top-level node keys are exactly {type, attrs} (+ content for text blocks)."""
     allowed = {"type", "attrs"} | ({"content"} if with_content else set())
@@ -855,6 +880,39 @@ def _parse_insight_block(node: dict, path: str) -> tuple[Block, InsightNode]:
     return Block(block_id, "insight", canonical_attrs), node_data
 
 
+def _parse_model_result_block(node: dict, path: str) -> tuple[Block, ModelResultNode]:
+    """NI-055: published-run pin + editable interpretation, never coefficients.
+
+    The authoritative attr set (EDITOR_SPECIFICATION ``modelResult`` row) is
+    exactly ``block_id``, ``model_run_id``, ``dataset_version_id`` and the
+    rich-text ``interpretation``. Any statistical value inside the node JSON
+    is an unknown field and rejected — summaries are re-projected from the
+    immutable published run row, never stored in the document.
+    """
+    _parse_block_node_keys(node, path, with_content=False)
+    attrs = _parse_block_attrs(node, path, (
+        "block_id", "model_run_id", "dataset_version_id", "interpretation",
+    ))
+    block_id = _require_uuid(attrs.get("block_id"), f"{path}.attrs.block_id")
+    model_run_id = _require_uuid(attrs.get("model_run_id"),
+                                 f"{path}.attrs.model_run_id")
+    dataset_version_id = _require_uuid(attrs.get("dataset_version_id"),
+                                       f"{path}.attrs.dataset_version_id")
+    interpretation = _require_rich_body(attrs.get("interpretation"),
+                                        f"{path}.attrs.interpretation")
+    canonical_attrs = {
+        "block_id": _canonical_uuid(block_id),
+        "model_run_id": _canonical_uuid(model_run_id),
+        "dataset_version_id": _canonical_uuid(dataset_version_id),
+        "interpretation": _rich_to_json(interpretation),
+    }
+    node_data = ModelResultNode(
+        block_id=block_id, model_run_id=model_run_id,
+        dataset_version_id=dataset_version_id, interpretation=interpretation,
+        interpretation_json=canonical_attrs["interpretation"])
+    return Block(block_id, "modelResult", canonical_attrs), node_data
+
+
 def _parse_hypothesis_block(node: dict, path: str) -> tuple[Block, HypothesisNode]:
     _parse_block_node_keys(node, path, with_content=False)
     attrs = _parse_block_attrs(node, path, (
@@ -951,6 +1009,7 @@ _BLOCK_PARSERS = {
     "hypothesis": _parse_hypothesis_block,
     "evidence": _parse_evidence_block,
     "risk": _parse_risk_block,
+    "modelResult": _parse_model_result_block,
     "divider": _parse_divider_block,
 }
 
@@ -973,6 +1032,7 @@ class CanonicalDocument:
     risks: tuple[RiskNode, ...]
     live_charts: tuple[LiveChartNode, ...]
     data_tables: tuple[DataTableNode, ...]
+    model_results: tuple[ModelResultNode, ...] = ()
 
     @property
     def block_ids(self) -> set[UUID]:
@@ -1054,6 +1114,7 @@ def parse_document(document: dict, *, max_bytes: int = MAX_CONTENT_BYTES) -> Can
     risks: list[RiskNode] = []
     live_charts: list[LiveChartNode] = []
     data_tables: list[DataTableNode] = []
+    model_results: list[ModelResultNode] = []
     seen_block_ids: set[UUID] = set()
     canonical_blocks: list[dict] = []
     for index, node in enumerate(content):
@@ -1082,6 +1143,8 @@ def parse_document(document: dict, *, max_bytes: int = MAX_CONTENT_BYTES) -> Can
             live_charts.append(payload[0])
         elif node_type == "dataTable":
             data_tables.append(payload[0])
+        elif node_type == "modelResult":
+            model_results.append(payload[0])
         elif node_type == "insight":
             insights.append(payload[0])
         elif node_type == "hypothesis":
@@ -1102,7 +1165,7 @@ def parse_document(document: dict, *, max_bytes: int = MAX_CONTENT_BYTES) -> Can
         canonical=canonical, content_sha256=_sha256_of_canonical(canonical),
         blocks=tuple(blocks), insights=tuple(insights), hypotheses=tuple(hypotheses),
         evidence=tuple(evidence), risks=tuple(risks), live_charts=tuple(live_charts),
-        data_tables=tuple(data_tables))
+        data_tables=tuple(data_tables), model_results=tuple(model_results))
     _check_same_document_links(result)
     return result
 
