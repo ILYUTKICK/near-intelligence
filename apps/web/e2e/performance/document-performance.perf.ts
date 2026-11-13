@@ -87,6 +87,12 @@ test("public landing LCP on a warm service (PRD budget 2.5s)", async ({ page }) 
 
   await page.goto(`${state.web_url}/`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  // Read the last settled LCP candidate, not the first candidate buffered
+  // when the heading appears. Font and hydration requests may produce a
+  // later candidate; settling is outside the measured entry.startTime.
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(
+    () => requestAnimationFrame(resolve))));
   const lcp = await page.evaluate(() => new Promise<number>((resolve) => {
     new PerformanceObserver((list) => {
       const entries = list.getEntries();

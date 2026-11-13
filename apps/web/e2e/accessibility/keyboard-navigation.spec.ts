@@ -178,11 +178,14 @@ test("slash menu: opens from / in an empty block, inserts with Enter, closes wit
   await expect(editor).toBeVisible({ timeout: 30_000 });
   await editor.click();
 
-  // keyboard.insertText goes through Chromium's real editing pipeline
-  // (beforeinput), which is the path the fixed slash trigger listens on;
-  // Playwright's synthetic key events bypass that pipeline on this Chromium
-  // build and produce no DOM input events at all.
-  await page.keyboard.insertText("/");
+  // A fresh canonical content:[] has no paragraph. The first native key
+  // used to insert a slash without opening the menu; keydown must work
+  // without requiring Chromium's insertText/beforeinput test shortcut.
+  const saved = await page.request.get(`${state.web_url}/api/documents/${page.url().split("/").pop()}`);
+  expect(saved.status()).toBe(200);
+  expect((await saved.json()).content.content).toEqual([]);
+  await page.keyboard.press("/");
+  await expect(editor).toHaveText("/");
   const slashMenu = page.getByTestId("slash-menu");
   await expect(slashMenu).toBeVisible();
   await expect(slashMenu).toHaveAttribute("aria-label", "Insert block (slash menu)");

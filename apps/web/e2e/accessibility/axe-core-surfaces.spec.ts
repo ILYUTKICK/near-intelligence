@@ -87,7 +87,10 @@ test("research editor with the 200-block synthetic performance fixture document"
   await expect(editor.getByText("NI-064 performance fixture paragraph 160").first())
     .toBeVisible({ timeout: 30_000 });
   await expect(editor.locator("[data-live-chart-block]")).toHaveCount(20);
-  await expectNoSeriousViolations(page, "editor workbench (200-block synthetic document)");
+  const findings = await expectNoSeriousViolations(page, "editor workbench (200-block synthetic document)");
+  // Repeated definitions remain distinct landmarks by their current paper
+  // position; do not remove region semantics just to suppress this finding.
+  expect(findings.filter((finding) => finding.id === "landmark-unique")).toEqual([]);
 });
 
 test("NI-024 regression: every workspace sidebar link resolves (no alias prefetch 404s)", async ({ page }) => {

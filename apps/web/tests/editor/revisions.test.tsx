@@ -60,6 +60,9 @@ it("renders the saved paper read-only and downloads exact CSV through the same r
   const save = vi.spyOn(download, "downloadBlob").mockImplementation(() => {});
   render(<ResearchRevisions documentId={documentId} versionId={versionId} />);
   expect(await screen.findByText(exactValue)).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: `${chart.definition.title} — exact data table — research block 2` }))
+    .toHaveAttribute("tabindex", "0");
+  expect(screen.getByRole("region", { name: "Saved chart evidence — research block 2" })).toBeInTheDocument();
   expect(screen.getByText("Synthetic saved prose").closest(".editor-paper")).toHaveAttribute("contenteditable", "false");
   expect(screen.queryByRole("button", { name: /refresh|edit properties|save now/i })).toBeNull();
   await userEvent.setup().click(screen.getByRole("button", { name: "Download saved CSV" }));

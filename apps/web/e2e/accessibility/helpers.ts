@@ -91,6 +91,15 @@ export async function expectNoSeriousViolations(
   ).toEqual([]);
   console.log(`[ni064-axe] ${surface}: 0 serious/critical; lower-impact: ${
     recorded.length ? JSON.stringify(recorded) : "none"}`);
+  for (const violation of results.violations.filter(
+    (item) => item.impact !== "serious" && item.impact !== "critical")) {
+    // Keep actionable evidence for the report's lower-impact disposition;
+    // an id/count alone cannot identify the affected landmark or control.
+    console.log(`[ni064-axe-detail] ${surface}: ${JSON.stringify({
+      id: violation.id, impact: violation.impact, help: violation.help,
+      targets: violation.nodes.map((node) => node.target),
+    })}`);
+  }
   return recorded;
 }
 

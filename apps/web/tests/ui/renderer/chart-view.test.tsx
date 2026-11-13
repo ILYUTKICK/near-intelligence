@@ -132,6 +132,23 @@ afterEach(() => {
 });
 
 describe("ChartView — plot and accessible table integration", () => {
+  it("distinguishes repeated exact table landmarks with human instance context", () => {
+    const { factory } = recordingFactory();
+    render(<>
+      <ChartView definition={baseDefinition} selection={resolvedView.selection} view={resolvedView}
+        mode="historical" factory={factory} instanceLabel="research block 2" />
+      <ChartView definition={baseDefinition} selection={resolvedView.selection} view={resolvedView}
+        mode="historical" factory={factory} instanceLabel="research block 7" />
+    </>);
+    for (const block of [2, 7]) {
+      const table = screen.getByRole("region", {
+        name: `${baseDefinition.title} — exact data table — research block ${block}`,
+      });
+      expect(table).toHaveAttribute("tabindex", "0");
+      expect(within(table).getByText(`${baseDefinition.title} — equivalent data with exact values — research block ${block}`))
+        .toBeInTheDocument();
+    }
+  });
   it("mounts the chart via the factory and renders the exact-value table without hover", async () => {
     const { instances } = renderChart();
     await waitFor(() => expect(instances.length).toBe(1));

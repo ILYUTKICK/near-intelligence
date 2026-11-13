@@ -10,6 +10,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import {
   NodeViewWrapper,
   ReactNodeViewRenderer,
+  useEditorState,
   type NodeViewProps,
 } from "@tiptap/react";
 
@@ -59,8 +60,17 @@ function LiveChartBlockView({ node, editor, getPos, updateAttributes }: NodeView
   const attrs = node.attrs as ChartBlockAttrs;
   const context = useChartEditorContext();
   const historical = useContext(HistoricalRevisionContext);
+  // Node views can survive inserts and moves. Subscribe to the primitive
+  // ordinal so their landmark names follow the current paper, not the
+  // position at the time the chart happened to mount.
+  const blockNumber = useEditorState({ editor, selector: ({ editor: current }) => {
+    const position = getPos();
+    if (typeof position !== "number" || position < 0 || position > current.state.doc.content.size) return null;
+    return current.state.doc.resolve(position).index(0) + 1;
+  } });
+  const instanceLabel = blockNumber === null ? undefined : `research block ${blockNumber}`;
   if (historical) return <NodeViewWrapper className="not-prose my-4 min-w-0" aria-label="Saved chart block">
-    {attrs.block_id ? <HistoricalChart {...historical} blockId={attrs.block_id} />
+    {attrs.block_id ? <HistoricalChart {...historical} blockId={attrs.block_id} instanceLabel={instanceLabel} />
       : <p role="alert">Chart reconstruction failed. This saved block has no identity.</p>}
   </NodeViewWrapper>;
   return <NodeViewWrapper data-live-chart-block className="my-4 min-w-0 max-w-full" aria-label="Live chart block">
@@ -71,7 +81,7 @@ function LiveChartBlockView({ node, editor, getPos, updateAttributes }: NodeView
         if (typeof pos === "number") { editor.commands.setNodeSelection(pos); editor.view.focus(); }
       }
     }}>
-      {context ? <InteractiveChart attrs={attrs} context={context} onApply={updateAttributes} /> : <p>Chart controls require an owned research document.</p>}
+      {context ? <InteractiveChart attrs={attrs} context={context} onApply={updateAttributes} instanceLabel={instanceLabel} /> : <p>Chart controls require an owned research document.</p>}
       <button type="button" className={CONTROL_CLASS} onClick={() => {
         const pos = getPos();
         if (typeof pos === "number") editor.commands.setNodeSelection(pos);
@@ -101,8 +111,9 @@ class ChartBoundary extends Component<{ children: ReactNode; resetKey: string },
   render() { return this.state.failed ? <p role="alert">This chart could not render. Prose editing remains available. Retry loading the chart.</p> : this.props.children; }
 }
 
-export function InteractiveChart({ attrs, context, onApply }: {
+export function InteractiveChart({ attrs, context, onApply, instanceLabel }: {
   attrs: ChartBlockAttrs; context: Context; onApply: (attrs: Record<string, unknown>) => void;
+  instanceLabel?: string;
 }) {
   const [loaded, setLoaded] = useState<{ key: string; view: DocumentChartView; order: number } | null>(null);
   const [candidate, setCandidate] = useState<{ key: string; view: DocumentChartView; attempt: number; order: number; signal: AbortSignal; subject: string | null; documentId: string } | null>(null);
@@ -227,6 +238,7 @@ export function InteractiveChart({ attrs, context, onApply }: {
     {view && context.ready ? <>
       <ChartBoundary resetKey={`${attrsKey}:${retry}`}>
         <ChartView definition={view.definition} view={view} mode="historical" selection={attrs.selection}
+          instanceLabel={instanceLabel}
           className="min-w-0 p-3 sm:p-6" onSelectionChange={enabled ? (next) => void resolve({ ...next, filters: attrs.selection.filters }, attrs.observed_dataset_version_id, true) : undefined} />
       </ChartBoundary>
       <details className="rounded-control border border-border p-3"><summary className="min-h-11 cursor-pointer text-ui">Chart definition and pinned context</summary>

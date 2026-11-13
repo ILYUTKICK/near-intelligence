@@ -33,6 +33,47 @@ afterEach(() => { vi.resetAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(
 function resolveNormally(pointer: () => string | null = () => null) { loader.mockImplementation(async (_doc, _def, selection, dataset) => ({ ...resolved, selection: { ...selection, filters: selection.filters ?? {}, frequency: "day" }, dataset: { ...resolved.dataset, id: dataset === "latest" ? "33333333-3333-4333-8333-333333333333" : dataset }, latest_approved_dataset_version_id: pointer() })); }
 
 describe("Interactive editor chart", () => {
+  it("names repeated table landmarks by current research block after inserts and moves", async () => {
+    resolveNormally();
+    const user = userEvent.setup();
+    const content = { schema_version: 1, type: "doc", content: [
+      { type: "paragraph", attrs: { block_id: "44444444-4444-4444-8444-444444444444" }, content: [{ type: "text", text: "Synthetic landmark anchor" }] },
+      { type: "liveChart", attrs: { ...attrs, snapshot_id: null } },
+      { type: "liveChart", attrs: { ...attrs, block_id: "55555555-5555-4555-8555-555555555555", snapshot_id: null } },
+    ] };
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith("/api/auth/session")) return Response.json({ subject: "synthetic-alice" });
+      if (url.endsWith("/api/auth/csrf")) return Response.json({ token: "synthetic-csrf" });
+      return Response.json({ id: context.documentId, title: "Synthetic repeated charts", revision: 2,
+        schema_version: 1, current_version_id: null, created_at: "2026-11-01T00:00:00Z",
+        updated_at: "2026-11-08T00:00:00Z", progress: { headings: 0, charts: 2, insights: 0 },
+        content, resolved_contexts: {} });
+    }));
+    render(<ResearchDocumentEditor documentId={context.documentId} />);
+    const table = (block: number) => screen.getByRole("region", {
+      name: `${definitionFixture.title} — exact data table — research block ${block}`,
+    });
+    await waitFor(() => expect(table(2)).toBeInTheDocument());
+    expect(table(3)).toHaveAttribute("tabindex", "0");
+    expect(within(table(2)).getByText("12.000000000000000001")).toBeInTheDocument();
+
+    screen.getByRole("textbox", { name: "Research paper editor" }).focus();
+    await user.click(screen.getByRole("button", { name: "Insert block" }));
+    await user.click(screen.getByRole("menuitem", { name: /Divider/ }));
+    await waitFor(() => expect(table(4)).toBeInTheDocument());
+    expect(table(3)).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /exact data table — research block 2$/ })).toBeNull();
+
+    await user.click(screen.getAllByRole("button", { name: "Edit properties" })[0]);
+    // The jsdom viewport takes the compact tools-drawer path; closing it
+    // leaves the chart selected before the keyboard-equivalent operation.
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Move up" }));
+    await waitFor(() => expect(table(2)).toBeInTheDocument());
+    expect(table(4)).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /exact data table — research block 3$/ })).toBeNull();
+  });
   it("renders the shared exact table, sources, definition and honest gated insight action", async () => {
     resolveNormally(); const apply = vi.fn(); render(<InteractiveChart attrs={attrs} context={context} onApply={apply} />);
     expect(await screen.findByText("12.000000000000000001")).toBeInTheDocument();

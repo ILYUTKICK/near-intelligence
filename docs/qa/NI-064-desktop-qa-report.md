@@ -217,3 +217,116 @@ silent keyboard operations, export focus return) are fixed with regression
 tests. Chart data is accessible without hover on public and editor surfaces.
 All measured PRD budgets pass at the documented limits with no revision
 needed. No mobile viewport/device/touch pass was performed or is claimed.
+
+
+## 9. Completion verification — 13 November 2026
+
+The owner reassigned completion to Codex `/root`. The current registry stays
+**IN_PROGRESS** until the remaining actual human input/screen-reader checks
+are recorded; neither a green axe run nor launching VoiceOver substitutes
+for those results. Earlier sections are historical 10–11 November evidence.
+
+### Source and environment
+
+- Source baseline: main `1e276937e7b8f6572a0d141ea247c04ad7dfe4b7` (PR #97 merged).
+- Production build: `QAEASxflg2LGXP7w_kyFU`, with the bounded corrections below.
+- Runtime/test diff SHA-256 (excludes this documentation): `a794739541666deea8996f628355e1a6f8a57ea14b5610f88c139e131e3d5412`.
+- Apple M2, 8 cores, 8 GiB RAM, macOS 26.6.2 (25G83), Node 24.22.2,
+  pnpm 12.16.1, Python 3.13.5, PostgreSQL 18.6, Playwright 1.65.0.
+- Explicit PATH prefix `/opt/homebrew/opt/node@24/bin` is required on this host:
+  new login shells selected Node 22.22.3. That preliminary automatic run was
+  interrupted and excluded from acceptance. The final runs pin Node 24.
+- Desktop 1440×900, warm local production service, real FastAPI/PostgreSQL/
+  worker with labeled synthetic auth transport/data. No provider calls,
+  stopped collectors, deployment or mobile tests.
+
+### Confirmed defects and corrections
+
+1. Native Chrome first `/` in the canonical childless `content:[]` document
+   inserted text without opening the menu. Backspace then `/` in the resulting
+   empty paragraph worked. The old browser test's `keyboard.insertText` did
+   not cover that native key route. A narrow initial-key handler now inserts
+   one paragraph/slash through a normal undoable ProseMirror transaction and
+   opens the menu. It accepts Shift-produced `/` on other layouts, preserves
+   existing paragraph input, and excludes Ctrl/Alt/Meta, composing/keyCode229,
+   and read-only editors. The real-stack regression asserts saved `content:[]`
+   before `keyboard.press('/')`; native Chrome was also rechecked afterwards.
+2. Twenty repeated editor charts produced one moderate `landmark-unique`
+   finding: their exact-data regions shared the same name. Tables retain
+   their region role, keyboard focus, exact-value caption and chart-title
+   prefix; editor instances add a human `research block N` context, updated
+   on insert/move. Historical chart regions use the same context. Regression
+   tests verify repeated instances and movement; the 200-block browser axe
+   scan now explicitly rejects `landmark-unique` as well.
+3. The local LCP test now waits for settled network/paint before reading the
+   latest buffered LCP candidate; the measured value remains its original
+   `startTime`. Budgets are unchanged. Lower-impact axe logs include exact
+   targets/help instead of only a count.
+
+### Current results
+
+| Check | Result |
+| --- | --- |
+| Accessibility + complete research journey | 18/18 pass on the final build; all public/private/editor scans have zero serious/critical and zero lower-impact findings |
+| Initial slash unit regressions | 17/17 pass, including history/IDs/composition/modifier/read-only guards |
+| Repeated table / historical / actual insert-and-move regressions | 40/40 pass |
+| Performance | 6/6 pass; final measurements below |
+| Final serial web unit/interaction run | 63 files / 666 tests pass; 20/20 save/conflict tests also passed in the isolated diagnostic run |
+| Final lint/strict TS/build/contracts/contrast/doc links | Pass; 22 contrast pairs and 863 relative links |
+| Native Chrome initial key | PASS: a newly created empty document opens slash menu on the first native OS slash event; choosing Paragraph removes the slash, prose saves as revision 3 |
+| VoiceOver | Started through the actual macOS first-run dialog; output observation repeatedly timed out and no audio channel is available to this agent. Actual spoken-output review remains pending; no audible announcement-quality pass is claimed |
+| System IME | Only ABC/Russian installed. Owner chose to perform the real IME test manually; no input method was added. Awaiting composition/commit/cancel/save/reopen result |
+
+VoiceOver was returned to its original OFF state. Input-source configuration
+remains ABC/Russian; the add-source dialog was canceled without adding one.
+The final disposable native stack remains available for the owner's pending
+manual check. Its temporary port/document identifiers stay local, not research
+artifacts or production data.
+
+| Final production-mode performance check | Measured | Budget/verdict |
+| --- | --- | --- |
+| Settled warm landing LCP | 144 ms | ≤2500 ms — PASS |
+| Editor load, 200 blocks / 20 chart refs | 693 ms | ≤2000 ms — PASS |
+| Lazy mounting | 0/20 near top; chart 16 mounts on scroll | PASS |
+| Autosave, including typing + 1s idle + POST + acknowledgement | 1916 ms | Observational; save/restore verified |
+| 366 points / ten concurrent requests, five rounds | 107, 99, 65, 85, 209 ms; batch p95 209 ms | ≤800 ms — PASS; local-batch caveat from §6 applies |
+| Load long tasks / CLS | 1 task, 56 ms / 0.016 | Recorded observations |
+| Full scroll long tasks / CLS / horizontal overflow | 1 task, 76 ms / 0.017 / 0 px | Overflow gate PASS |
+
+Commands use the Node 24 PATH prefix above:
+
+```sh
+corepack pnpm lint
+corepack pnpm typecheck
+corepack pnpm build
+corepack pnpm --filter web test --maxWorkers=1
+corepack pnpm --filter web exec playwright test --config e2e/playwright.config.ts e2e/accessibility e2e/research-workflow.spec.ts
+corepack pnpm --filter web exec playwright test --config e2e/performance/playwright.perf.config.ts
+corepack pnpm check:contracts
+corepack pnpm check:contrast
+```
+
+The first full unit process overlapped a source edit and loaded the old Shift
+handler with the new test; that failure was discarded and the final focused
+17-case run passes. A later full run overlapped real-stack axe tests and had
+three 5s save/conflict timeouts (663/666 passed); the unchanged save/conflict
+file passed 20/20 alone. The final serial all-file run passed 63 files / 666 tests. Published-head CI
+is recorded on the pull request. No timeout was increased and no
+assertion was weakened to hide a failure.
+
+### Remaining manual checklist
+
+The owner has a prepared synthetic document in native Chrome. Record the
+actual input method/browser and observed result:
+
+- Compose text with an actual system IME and select/commit a candidate; start
+  and cancel another composition. No duplicates, lost prior text or unwanted
+  slash menu. Wait for the acknowledged save, reload, and compare the text.
+- With VoiceOver, review Insert block/Export names, dialog announcement,
+  keyboard trap and Escape returning focus to Export. The agent's native AX
+  observations and automated tests are supporting evidence, not an audible
+  screen-reader review.
+
+No NI-064 DONE or deployment readiness is claimed while these results are
+missing. NI-079 still owns final integrated release/data/model/container
+acceptance, and NI-067 rechecks actual staging-machine performance later.
