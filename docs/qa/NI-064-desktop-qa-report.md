@@ -221,10 +221,12 @@ needed. No mobile viewport/device/touch pass was performed or is claimed.
 
 ## 9. Completion verification — 13 November 2026
 
-The owner reassigned completion to Codex `/root`. The current registry stays
-**IN_PROGRESS** until the remaining actual human input/screen-reader checks
-are recorded; neither a green axe run nor launching VoiceOver substitutes
-for those results. Earlier sections are historical 10–11 November evidence.
+The owner reassigned completion to Codex `/root`. Engineering checks below
+passed, and the owner subsequently confirmed the remaining real IME and
+audible VoiceOver checklist with “Все четок” on 13 November. NI-064 is
+**DONE** on this combined evidence. Owner-reported manual results are
+distinguished from agent observations. Earlier sections are historical
+10–11 November evidence.
 
 ### Source and environment
 
@@ -274,14 +276,14 @@ for those results. Earlier sections are historical 10–11 November evidence.
 | Final serial web unit/interaction run | 63 files / 666 tests pass; 20/20 save/conflict tests also passed in the isolated diagnostic run |
 | Final lint/strict TS/build/contracts/contrast/doc links | Pass; 22 contrast pairs and 863 relative links |
 | Native Chrome initial key | PASS: a newly created empty document opens slash menu on the first native OS slash event; choosing Paragraph removes the slash, prose saves as revision 3 |
-| VoiceOver | Started through the actual macOS first-run dialog; output observation repeatedly timed out and no audio channel is available to this agent. Actual spoken-output review remains pending; no audible announcement-quality pass is claimed |
-| System IME | Only ABC/Russian installed. Owner chose to perform the real IME test manually; no input method was added. Awaiting composition/commit/cancel/save/reopen result |
+| VoiceOver | PASS reported by owner for the manual checklist below. The agent could launch VoiceOver but had no audio channel and does not claim independent audible verification |
+| System IME | PASS reported by owner for composition/commit/cancel/save/reopen checklist below. Exact input method was not supplied; the agent did not add one |
 
-VoiceOver was returned to its original OFF state. Input-source configuration
-remains ABC/Russian; the add-source dialog was canceled without adding one.
-The final disposable native stack remains available for the owner's pending
-manual check. Its temporary port/document identifiers stay local, not research
-artifacts or production data.
+Before the owner's manual check, the agent returned VoiceOver to its original
+OFF state and left the ABC/Russian configuration unchanged; the add-source
+dialog was canceled. The final disposable native stack was supplied for the
+owner's check and remains available locally. Its temporary port/document
+identifiers stay local, not research artifacts or production data.
 
 | Final production-mode performance check | Measured | Budget/verdict |
 | --- | --- | --- |
@@ -314,10 +316,10 @@ file passed 20/20 alone. The final serial all-file run passed 63 files / 666 tes
 is recorded on the pull request. No timeout was increased and no
 assertion was weakened to hide a failure.
 
-### Remaining manual checklist
+### Manual checklist and owner result
 
-The owner has a prepared synthetic document in native Chrome. Record the
-actual input method/browser and observed result:
+The owner received a prepared synthetic document in native Chrome and the
+following remaining acceptance checklist:
 
 - Compose text with an actual system IME and select/commit a candidate; start
   and cancel another composition. No duplicates, lost prior text or unwanted
@@ -327,6 +329,15 @@ actual input method/browser and observed result:
   observations and automated tests are supporting evidence, not an audible
   screen-reader review.
 
-No NI-064 DONE or deployment readiness is claimed while these results are
-missing. NI-079 still owns final integrated release/data/model/container
+On 13 November 2026, ILYUTKICK replied **“Все четок”** to this checklist
+in the completion chat. This is accepted as the owner's report that both
+IME and VoiceOver checks passed with no issues reported. The exact input
+method and an audio transcript were not supplied; this report does not
+invent them or describe the agent as having heard the announcements.
+
+All four published-source CI jobs passed on `1eb79c347e5fdc03f56fd93f408200d0f98fc1c9`
+([checks run 217](https://github.com/ILYUTKICK/near-intelligence/actions/runs/43448020652)).
+The acceptance closure changes documentation only, preserving the tested
+runtime. NI-064 local desktop acceptance is complete in PR #99; merge remains
+with the owner. NI-079 still owns final integrated release/data/model/container
 acceptance, and NI-067 rechecks actual staging-machine performance later.
