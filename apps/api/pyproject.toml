@@ -23,6 +23,15 @@ dependencies = [
     "scipy",
     "statsmodels",
     "matplotlib",
+    "reportlab",
+    "svglib",
+]
+
+[dependency-groups]
+dev = [
+    # Test-time structural PDF reader (NI-059): page count and text
+    # extraction assertions only; never imported by application code.
+    "pypdf",
 ]
 
 [build-system]

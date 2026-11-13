@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Button } from "@/components/ui/button";
 import { ChartView } from "@/features/charts/renderer/ChartView";
+import type { FiltersSelection } from "@/features/charts/filters/filter-values";
 import type { ChartFactory, ChartViewLoader } from "@/features/charts/renderer/ChartView";
 import type { ChartOption } from "@/features/charts/renderer/option-builder";
 import type { ChartViewResponse } from "@/features/charts/renderer/view-types";
@@ -76,7 +77,7 @@ interface LoaderCall {
   definitionId: string;
   start: string;
   end: string;
-  filters: Record<string, string>;
+  filters: FiltersSelection;
   signal: AbortSignal;
 }
 
@@ -592,7 +593,7 @@ describe("ChartView — localized rendering failures", () => {
 
 describe("ChartView — compact presentation (NI-078, NI-076 D3/D4)", () => {
   it("hides the repeated frame title in compact contexts while the exact table stays visible", () => {
-    render(<ChartView definition={definition()} view={resolvedView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" compact />);
+    render(<ChartView definition={definition()} view={resolvedView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" presentation="compact" />);
     // The frame does not repeat the title in compact contexts.
     const figure = screen.getByRole("img").closest("figure");
     expect(figure).not.toBeNull();
@@ -606,13 +607,18 @@ describe("ChartView — compact presentation (NI-078, NI-076 D3/D4)", () => {
     expect(screen.queryByText("Exact values and summary")).toBeNull();
   });
 
-  it("moves the exact-value table and summary into one disclosure when disclosing exact values", () => {
-    render(<ChartView definition={definition()} view={resolvedView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" compact discloseExactValues />);
+  it("keeps one exact-value disclosure and preserves provenance in saved previews", () => {
+    render(<ChartView definition={definition()} view={resolvedView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" presentation="saved-preview" />);
     const disclosure = screen.getByText("Exact values and summary").closest("details");
     expect(disclosure).not.toBeNull();
     const region = within(disclosure as HTMLElement).getByRole("region", { name: /exact data table/ });
     expect(region).toBeInTheDocument();
     expect(region.closest("details")).toBe(disclosure);
+    expect(screen.queryByText("Accessible summary")).toBeNull();
+    expect(screen.queryByText("Historical — pinned version")).toBeNull();
+    expect(screen.queryByText(/Period:/)).toBeNull();
+    expect(screen.getByText(/Last observed:/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sources & definitions" })).toBeInTheDocument();
   });
 
   it("keeps the table always open outside compact contexts", () => {

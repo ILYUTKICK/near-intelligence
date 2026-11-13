@@ -56,6 +56,47 @@ describe("Interactive editor chart", () => {
     await waitFor(() => expect(apply).toHaveBeenCalledTimes(2));
     expect(loader.mock.calls.at(-1)?.[3]).toBe("latest");
   });
+  it("round-trips an NI-071 multi-value filter draft into one persisted explicit edit", async () => {
+    const recipients = ["buybacks.multisignature.near", "fefundsadmin.sputnik-dao.near"];
+    const multiDefinition = definition({ filter_schema: { type: "object", properties: {
+      recipient: { type: "string", enum: recipients, multi_value: true,
+        reconciliation: { aggregate_metric_id: "m", aggregate_metric_version: 1, universe_note: "fixture" } },
+    }, additionalProperties: false } });
+    const multiResolved = view(multiDefinition, [series(metric("NEAR", "Synthetic payouts", "synthetic"), [observation("2026-11-01", "5")])]);
+    loader.mockImplementation(async (_doc, _def, selection, datasetVersion) => ({
+      ...multiResolved,
+      selection: { ...selection, filters: selection.filters ?? {}, frequency: "day" as const },
+      dataset: { ...multiResolved.dataset, id: datasetVersion },
+    }));
+    const apply = vi.fn(); const user = userEvent.setup();
+    const multiAttrs: ChartBlockAttrs = { ...attrs, chart_definition_version_id: multiDefinition.id, selection: { ...multiResolved.selection, filters: {} } };
+    const element = render(<InteractiveChart attrs={multiAttrs} context={context} onApply={apply} />);
+    await screen.findByRole("button", { name: "Apply range and filters" });
+
+    // Draft-local: checking two recipients never writes the document.
+    await user.click(screen.getByRole("checkbox", { name: recipients[1] }));
+    await user.click(screen.getByRole("checkbox", { name: recipients[0] }));
+    expect(apply).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Apply range and filters" }));
+    await waitFor(() => expect(apply).toHaveBeenCalledOnce());
+    // The resolved context (server-validated canonical echo) drives the edit;
+    // the stored per-key order is the declared option order.
+    const appliedSelection = apply.mock.calls[0][0].selection as { filters: Record<string, string[]> };
+    expect(appliedSelection.filters).toEqual({ recipient: [recipients[0], recipients[1]] });
+    // the shared controls canonicalize on change, so the request — like the
+    // persisted edit — carries the declared option order
+    expect(loader.mock.calls.at(-1)?.[2].filters).toEqual({ recipient: [recipients[0], recipients[1]] });
+    // The applied selection is acknowledged by the parent (attrs update),
+    // then clearing every box removes the dimension ("all — no filter").
+    element.rerender(<InteractiveChart attrs={{ ...multiAttrs, selection: apply.mock.calls[0][0].selection as ChartBlockAttrs["selection"] }} context={context} onApply={apply} />);
+    await user.click(screen.getByRole("checkbox", { name: recipients[0] }));
+    await user.click(screen.getByRole("checkbox", { name: recipients[1] }));
+    await user.click(screen.getByRole("button", { name: "Apply range and filters" }));
+    await waitFor(() => expect(apply).toHaveBeenCalledTimes(2));
+    expect((apply.mock.calls[1][0].selection as { filters: Record<string, string[]> }).filters).toEqual({});
+  });
+
   it("leaves the persisted node untouched on source/range errors and rejects late results after account suspension", async () => {
     resolveNormally(); const apply = vi.fn(); const user = userEvent.setup();
     const element = render(<InteractiveChart attrs={attrs} context={context} onApply={apply} />);
@@ -186,14 +227,13 @@ describe("Interactive editor chart", () => {
 });
 
 describe("Compact editor chart chrome (NI-078, NI-076 D5)", () => {
-  it("shares one compact status row for mode, save state and the observed dataset id", async () => {
+  it("keeps the pin and save state visible with the dataset id in the disclosure", async () => {
     resolveNormally();
     render(<InteractiveChart attrs={attrs} context={context} onApply={vi.fn()} />);
     await screen.findByText("12.000000000000000001");
-    // The identifier is rendered once, inside the compact status row.
-    const idNodes = screen.getAllByText(`Observed dataset: ${attrs.observed_dataset_version_id}`);
-    expect(idNodes).toHaveLength(1);
-    // Pin and save state stay visible alongside it.
+    const identifier = screen.getByText(`Observed dataset: ${attrs.observed_dataset_version_id}`);
+    expect(identifier.closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText("Live chart · pinned observation")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Saved in document revision");
     expect(screen.getByText(/Opening or typing never refreshes this pin/)).toBeInTheDocument();
   });

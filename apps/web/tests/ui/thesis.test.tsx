@@ -10,7 +10,15 @@ import { join } from "node:path";
 
 import { axe } from "jest-axe";
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The NI-045 duplication CTA on the research page is a client component that
+// reads the router for the sign-in continuation; these structural tests stub
+// the router (they render the page outside the app-router context). The CTA
+// behavior itself is covered by tests/ui/duplicate-release.test.tsx.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 import ResearchPage from "@/app/(public)/research/page";
 import {
@@ -344,8 +352,8 @@ describe("Public projection allowlists", () => {
       ...verifiedExternalLinks,
       ...thesisToc.map((entry) => `#${entry.id}`),
       ...hypothesisIds.map((id) => `#${id}`),
-      // Claim anchors the recorded-evidence figures link to (NI-078 D2:
-      // CL-004 USD windows, CL-007 supply scale; CL-002 opening figure).
+      // Provenance anchors for the opening, USD windows and supply figures.
+      "#CL-001-heading",
       "#CL-002-heading",
       "#CL-004-heading",
       "#CL-007-heading",

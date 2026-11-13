@@ -216,10 +216,7 @@ it("navigates to a pinned chart, keeps its observation intact, and Escape return
   const properties = screen.getByLabelText("Block properties");
   expect(within(properties).getAllByText("Live chart").length).toBeGreaterThan(0);
   // The chart's saved observation is unchanged by the navigation.
-  // NI-078 (NI-076 D5): the identifier shares the compact status row; the
-  // pin language stays visible.
-  expect(screen.getByText(`Observed dataset: ${insightContext.dataset_version_id}`))
-    .toBeInTheDocument();
+  expect(within(properties).getByText(insightContext.dataset_version_id)).toBeVisible();
   expect(screen.getByText(/Opening or typing never refreshes this pin/)).toBeInTheDocument();
   expectCleanDocument();
   const back = screen.getByTestId("evidence-return");

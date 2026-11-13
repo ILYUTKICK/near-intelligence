@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChartView } from "@/features/charts/renderer/ChartView";
-import { deleteSaved, getSaved, listSaved, renameSaved, type SavedChart, type SavedDetail } from "./api";
+import { canonicalFilters } from "@/features/charts/filters/filter-values";
+import { deleteSaved, getSavedPreview, listSaved, renameSaved, type SavedChart, type SavedDetail } from "./api";
 import { useOwnedData } from "./use-owned-data";
 
 /**
@@ -18,8 +19,8 @@ import { useOwnedData } from "./use-owned-data";
  * lazy — it fires only when the card approaches the viewport (an
  * IntersectionObserver; without the API it resolves immediately), so a long
  * list never fetches off-screen cards, and every fetch honours the session
- * signal (account changes abort stale previews). The saved frozen view is
- * rendered through the controlled `view` prop — no re-resolve.
+ * signal (account changes abort stale previews). The owned preview resolves
+ * a view without advancing the last-opened dataset.
  */
 function SavedChartPreview({ chartId, sessionSignal }: { chartId: string; sessionSignal: AbortSignal }) {
   const [detail, setDetail] = useState<SavedDetail | null>(null);
@@ -46,7 +47,7 @@ function SavedChartPreview({ chartId, sessionSignal }: { chartId: string; sessio
     if (!visible) return;
     const controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, sessionSignal]);
-    void getSaved(chartId, signal).then((value) => {
+    void getSavedPreview(chartId, signal).then((value) => {
       if (!signal.aborted) setDetail(value);
     }, () => {
       if (!signal.aborted) setFailed(true);
@@ -65,8 +66,7 @@ function SavedChartPreview({ chartId, sessionSignal }: { chartId: string; sessio
           selection={detail.saved_chart.selection}
           mode={detail.saved_chart.mode === "snapshot" ? "historical" : "live"}
           height={208}
-          compact
-          discloseExactValues
+          presentation="saved-preview"
           className="border-0 bg-transparent p-0 shadow-none lg:p-0"
         />
       ) : null}
@@ -88,7 +88,8 @@ function SavedItem({ chart, reload, previewSignal }: { chart: SavedChart; reload
     } catch (error) { setError(error instanceof Error ? error.message : "The change failed."); }
     finally { setPending(false); }
   }
-  const filtersSummary = Object.entries(chart.selection.filters).map(([key, value]) => `${key}: ${value}`).join(" · ") || "No filters";
+  const filtersSummary = canonicalFilters(chart.selection.filters)
+    .map(([key, values]) => `${key}: ${values.join(", ")}`).join(" · ") || "No filters";
   return <li className="paper-panel min-w-0 space-y-3 p-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <h2 className="text-heading">

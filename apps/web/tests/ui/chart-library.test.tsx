@@ -27,6 +27,7 @@ import {
   defaultRangeFor,
   isIsoCalendarDate,
   parseSelectionUrl,
+  serializeFilters,
   serializeSelectionQuery,
   shiftIsoDate,
   todayUtc,
@@ -155,7 +156,7 @@ function datasetFixture(window: { start: string; end: string }) {
 function seriesFixture(
   metric: MetricResponse,
   window: { start: string; end: string },
-  filters: Record<string, string> = {},
+  filters: Record<string, string[]> = {},
 ): SeriesResponse {
   return {
     metric,
@@ -182,7 +183,7 @@ function seriesFixture(
 
 function viewFixture(
   definition: ChartDefinitionResponse,
-  selection: { start: string; end: string; filters?: Record<string, string> },
+  selection: { start: string; end: string; filters?: Record<string, string[]> },
 ): ChartViewResponse {
   const series = seriesFixture(
     metricFixture(METRIC_FEES_ID, "provider_gross_fees_usd", "USD"),
@@ -1030,6 +1031,171 @@ describe("ChartDetailClient — selection survives navigation through the URL", 
   });
 });
 
+// -- NI-071 multi-value comparison filters ------------------------------------- //
+
+describe("NI-071 multi-value comparison filters", () => {
+  const RECIPIENTS = [
+    "buybacks.multisignature.near",
+    "fefundsadmin.sputnik-dao.near",
+    "1csfundsadmin.sputnik-dao.near",
+  ];
+  const RECIPIENT_FILTER_SCHEMA = {
+    type: "object",
+    properties: {
+      recipient: {
+        type: "string",
+        enum: RECIPIENTS,
+        multi_value: true,
+        reconciliation: {
+          aggregate_metric_id: "treasury_payouts_near",
+          aggregate_metric_version: 1,
+          universe_note: "fixture universe note",
+        },
+      },
+    },
+    additionalProperties: false,
+  };
+  const multiDefinition = definitionFixture({
+    chart_id: "treasury-payouts",
+    title: "Synthetic treasury payouts (fixture)",
+    units: { required_primary: "NEAR" },
+    filter_schema: RECIPIENT_FILTER_SCHEMA,
+  });
+
+  it("offers the pinned v1 aggregate when the v2 comparison dataset is unavailable", async () => {
+    installApiMock([
+      chartRoute("treasury-payouts", { ...multiDefinition, version: 2 }),
+      metricRoute(metricFixture(METRIC_FEES_ID, "provider_gross_fees_usd", "USD")),
+      (url) => url.pathname === "/api/charts/treasury-payouts/view"
+        ? apiError("DATA_NOT_READY", "The comparison dataset is unavailable (fixture)", true, 503)
+        : undefined,
+    ]);
+    render(await ChartDetailPage({
+      params: Promise.resolve({ chartId: "treasury-payouts" }),
+      searchParams: Promise.resolve({ version: "2", start: VIEW_WINDOW.start, end: VIEW_WINDOW.end,
+        dataset_version: PINNED_DATASET_ID }),
+    }));
+    const href = screen.getByRole("link", { name: "View payout totals (v1)" }).getAttribute("href");
+    const aggregate = new URL(href ?? "", "http://localhost");
+    expect(aggregate.searchParams.get("version")).toBe("1");
+    expect(aggregate.searchParams.get("dataset_version")).toBe(PINNED_DATASET_ID);
+  });
+
+  it("parses a multi-value selection into the declared option order, collapsing duplicates", () => {
+    const parsed = parseSelectionUrl(
+      new URLSearchParams(`filters=${
+        encodeURIComponent(JSON.stringify({ recipient: [RECIPIENTS[2], RECIPIENTS[0], RECIPIENTS[0]] }))
+      }`),
+      multiDefinition,
+    );
+    // The stored order is the schema's declared order, never the request
+    // order; a duplicate is one selection, not extra weight.
+    expect(parsed.filters).toEqual({ recipient: [RECIPIENTS[0], RECIPIENTS[2]] });
+    expect(parsed.dropped).toEqual([]);
+  });
+
+  it("drops a list on a single-value dimension and an unknown list value with honest reasons", () => {
+    const singleSchema = definitionFixture();
+    const parsed = parseSelectionUrl(
+      new URLSearchParams(`filters=${encodeURIComponent('{"source":["SRC-LLAMA","SRC-DASHBOARD"]}')}`),
+      singleSchema,
+    );
+    expect(parsed.filters).toEqual({});
+    expect(parsed.dropped[0].reason).toContain("accepts one selected value only");
+
+    const unknown = parseSelectionUrl(
+      new URLSearchParams(`filters=${encodeURIComponent(
+        JSON.stringify({ recipient: [RECIPIENTS[0], "not-a-treasury"] }),
+      )}`),
+      multiDefinition,
+    );
+    expect(unknown.filters).toEqual({});
+    expect(unknown.dropped[0].param).toBe("filters.recipient");
+    expect(unknown.dropped[0].reason).toContain("not-a-treasury");
+  });
+
+  it("round-trips a multi-value selection through serialization byte-exactly", () => {
+    // Serialization writes the page selection verbatim; every page path
+    // that produces a selection (URL parse, checkbox change) has already
+    // canonicalized the order to the declared option order.
+    const selection = pinnedSelection({
+      filters: { recipient: [RECIPIENTS[0], RECIPIENTS[1]] },
+    });
+    const query = serializeSelectionQuery(selection);
+    expect(query).toBe(
+      `version=1&start=${VIEW_WINDOW.start}&end=${VIEW_WINDOW.end}`
+      + `&filters=${encodeURIComponent(JSON.stringify({ recipient: [RECIPIENTS[0], RECIPIENTS[1]] }))}`,
+    );
+    const reparsed = parseSelectionUrl(new URLSearchParams(query), multiDefinition);
+    expect(reparsed.filters).toEqual({ recipient: [RECIPIENTS[0], RECIPIENTS[1]] });
+    expect(serializeFilters(reparsed.filters)).toBe(
+      JSON.stringify({ recipient: [RECIPIENTS[0], RECIPIENTS[1]] }));
+    // one selected value serializes as the bare string (the server hash
+    // convention), so the URL is stable across interactions
+    expect(serializeFilters({ recipient: [RECIPIENTS[0]] })).toBe(
+      JSON.stringify({ recipient: RECIPIENTS[0] }));
+  });
+
+  it("renders one compared series per selected recipient and re-requests on change", async () => {
+    const user = userEvent.setup();
+    const compared = viewFixture(multiDefinition, VIEW_WINDOW);
+    const firstSeries = compared.series[0];
+    const secondSeries = {
+      ...firstSeries,
+      selection: { ...firstSeries.selection,
+        filters: { recipient: [RECIPIENTS[1]] } },
+    };
+    const twoSeriesView = {
+      ...compared,
+      selection: { ...compared.selection, filters: { recipient: [RECIPIENTS[0], RECIPIENTS[1]] } },
+      series: [firstSeries, secondSeries],
+    };
+    const requests = installApiMock([
+      chartRoute("treasury-payouts", multiDefinition),
+      metricRoute(metricFixture(METRIC_FEES_ID, "provider_gross_fees_usd", "USD")),
+      (url) => (url.pathname === "/api/charts/treasury-payouts/view"
+        ? jsonResponse(twoSeriesView) : undefined),
+      ANONYMOUS_SESSION,
+    ]);
+    const ui = await ChartDetailPage({
+      params: Promise.resolve({ chartId: "treasury-payouts" }),
+      searchParams: Promise.resolve({
+        version: "1",
+        start: VIEW_WINDOW.start,
+        end: VIEW_WINDOW.end,
+        filters: JSON.stringify({ recipient: [RECIPIENTS[1], RECIPIENTS[0]] }),
+      }),
+    });
+    render(ui);
+    await screen.findByRole("region", { name: /exact data table/ });
+
+    // The request carried the exact canonical multi-selection.
+    const viewRequests = requestsTo(requests, "/api/charts/treasury-payouts/view");
+    expect(decodeURIComponent(viewRequests[0].searchParams.get("filters") ?? "")).toBe(
+      JSON.stringify({ recipient: [RECIPIENTS[0], RECIPIENTS[1]] }));
+
+    // The comparison controls show the two selected recipients …
+    const firstBox = screen.getByRole("checkbox", { name: RECIPIENTS[0] });
+    const secondBox = screen.getByRole("checkbox", { name: RECIPIENTS[1] });
+    expect(firstBox).toBeChecked();
+    expect(secondBox).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: RECIPIENTS[2] })).not.toBeChecked();
+
+    // … and the exact table carries one column per compared series,
+    // distinguished by the selected value.
+    expect(screen.getAllByText(RECIPIENTS[0]).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(RECIPIENTS[1]).length).toBeGreaterThan(0);
+
+    // Clearing one box re-requests with the remaining single selection.
+    await user.click(secondBox);
+    expect(routerReplace).toHaveBeenLastCalledWith(
+      `/charts/treasury-payouts?version=1&start=${VIEW_WINDOW.start}&end=${VIEW_WINDOW.end}`
+      + `&filters=${encodeURIComponent(JSON.stringify({ recipient: RECIPIENTS[0] }))}`,
+      { scroll: false },
+    );
+  });
+});
+
 describe("ChartAuthActions — anonymous private-action continuation", () => {
   const definition = definitionFixture();
 
@@ -1052,7 +1218,6 @@ describe("ChartAuthActions — anonymous private-action continuation", () => {
 
     const saveButton = await screen.findByRole("button", { name: "Sign in to save this chart" });
     expect(screen.getByRole("button", { name: "Sign in to add it to research" })).toBeInTheDocument();
-    expect(screen.getByText(/Saving and adding to research need your account/)).toBeInTheDocument();
 
     await user.click(saveButton);
     expect(routerPush).toHaveBeenCalledTimes(1);

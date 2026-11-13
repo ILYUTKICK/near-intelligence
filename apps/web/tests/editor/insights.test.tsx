@@ -71,13 +71,13 @@ it("captures the public inspection when opened and keeps its key and payload aft
   const input = { chart_definition_version_id: context.chart_definition_version_id, dataset_version_id: context.dataset_version_id,
     selection: context.selection, mode: "live" as const };
   const nextPath = "/charts/synthetic";
-  const screenView = render(<ChartAuthActions nextPath={nextPath} chartTitle="Synthetic" saveInput={input} insightContext={context} />);
+  const screenView = render(<ChartAuthActions nextPath={nextPath} saveInput={input} insightContext={context} />);
   await user.click(await screen.findByRole("button", { name: "Add Insight" }));
   await user.selectOptions(screen.getByLabelText("Destination"), await screen.findByRole("option", { name: doc.title }));
   await user.selectOptions(await screen.findByLabelText("Linked hypothesis"), hypothesisId);
   await user.type(screen.getByLabelText("Insight text"), "Synthetic note from the original inspection");
   const newer = { ...context, dataset_version_id: "11111111-1111-4111-8111-111111111111" };
-  screenView.rerender(<ChartAuthActions nextPath={nextPath} chartTitle="Synthetic"
+  screenView.rerender(<ChartAuthActions nextPath={nextPath}
     saveInput={{ ...input, dataset_version_id: newer.dataset_version_id }} insightContext={newer} />);
   expect(screen.getByRole("dialog")).toHaveTextContent(context.dataset_version_id);
   await user.click(screen.getByRole("button", { name: "Confirm Add Insight" }));

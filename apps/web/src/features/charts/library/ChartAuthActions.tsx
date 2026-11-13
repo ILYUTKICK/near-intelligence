@@ -1,14 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
 import type { components } from "@near-intelligence/shared-types";
 
 import { Button } from "@/components/ui/button";
 import { SaveChartButton } from "../saved/SaveChartButton";
 import { AddChartToResearch } from "../add-to-research/AddChartToResearch";
+import { FreezeSnapshotButton } from "../snapshots/FreezeSnapshotButton";
 import type { SaveInput } from "../saved/api";
-import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
+import type { FreezeInput } from "../snapshots/api";
+import { usePublicSession } from "@/lib/auth/use-public-session";
 import { AddInsightToResearch } from "@/features/editor/insights/public-insight";
 
 /**
@@ -36,57 +38,22 @@ import { AddInsightToResearch } from "@/features/editor/insights/public-insight"
  */
 export function ChartAuthActions({
   nextPath,
-  chartTitle,
   basePath = "/charts/",
   saveInput,
+  freezeInput,
   insightContext,
 }: {
   nextPath: string;
-  chartTitle: string;
   /** Internal-path base the continuation may target (with trailing slash). */
   basePath?: string;
   saveInput?: SaveInput;
+  /** NI-044 freeze continuation: the inspected evidence triple, when resolved. */
+  freezeInput?: FreezeInput;
   insightContext?: components["schemas"]["ResolvedContext"];
 }) {
   const router = useRouter();
-  const [session, setSession] = useState<{
-    status: "checking" | "anonymous" | "authenticated" | "unknown";
-    subject: string | null;
-  }>({ status: "checking", subject: null });
+  const { session } = usePublicSession();
   const [pending, setPending] = useState(false);
-
-  useEffect(() => {
-    let controller = new AbortController();
-    function check(resetIdentity = false) {
-      controller.abort(); controller = new AbortController();
-      const signal = controller.signal;
-      setSession((previous) => ({ status: "checking", subject: resetIdentity ? null : previous.subject }));
-      fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store", signal })
-        .then(async (response) => {
-          if (response.status === 401) {
-            if (!signal.aborted) setSession({ status: "anonymous", subject: null });
-            return;
-          }
-          if (!response.ok) throw new Error("Session unavailable");
-          const value: unknown = await response.json();
-          if (!value || typeof value !== "object" || !("subject" in value)
-            || typeof value.subject !== "string" || !value.subject || value.subject === "unknown") {
-            throw new Error("Session identity unavailable");
-          }
-          if (!signal.aborted) setSession({ status: "authenticated", subject: value.subject });
-        })
-        .catch(() => { if (!signal.aborted) setSession((previous) => ({ ...previous, status: "unknown" })); });
-    }
-    const authChange = () => check(true);
-    const focus = () => check();
-    const storage = (event: StorageEvent) => { if (event.key === AUTH_CHANGE_STORAGE) check(true); };
-    check();
-    window.addEventListener(AUTH_CHANGE, authChange);
-    window.addEventListener("focus", focus);
-    window.addEventListener("storage", storage);
-    return () => { controller.abort(); window.removeEventListener(AUTH_CHANGE, authChange);
-      window.removeEventListener("focus", focus); window.removeEventListener("storage", storage); };
-  }, []);
 
   function continueToSignIn(): void {
     // Defense in depth: the payload is constructed internally, but never
@@ -107,6 +74,9 @@ export function ChartAuthActions({
       <Fragment key={JSON.stringify(saveInput)}>
         <SaveChartButton input={saveInput} suspended={session.status !== "authenticated"} />
         <AddChartToResearch input={saveInput} suspended={session.status !== "authenticated"} />
+        {freezeInput ? <Fragment key={JSON.stringify(freezeInput)}>
+          <FreezeSnapshotButton input={freezeInput} suspended={session.status !== "authenticated"} />
+        </Fragment> : null}
       </Fragment>
       {insightContext ? <AddInsightToResearch context={insightContext} suspended={session.status !== "authenticated"} /> : null}
       {session.status === "unknown" ? <p role="status">The sign-in state could not be checked. Try returning to this window again.</p> : null}
@@ -119,27 +89,21 @@ export function ChartAuthActions({
 
   if (session.status === "anonymous") {
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
-            Sign in to save this chart
-          </Button>
-          <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
-            Sign in to add it to research
-          </Button>
-          {insightContext ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to add an insight</Button> : null}
-        </div>
+      <>
+        <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
+          Sign in to save this chart
+        </Button>
+        <Button variant="secondary" onClick={continueToSignIn} pending={pending}>
+          Sign in to add it to research
+        </Button>
+        {freezeInput ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to freeze a snapshot</Button> : null}
+        {insightContext ? <Button variant="secondary" onClick={continueToSignIn} pending={pending}>Sign in to add an insight</Button> : null}
         {pending ? (
           <p role="status" className="text-ui leading-ui text-text-secondary">
             Signing in to continue — this chart and its selection are preserved in the sign-in link.
           </p>
-        ) : (
-          <p className="text-metadata text-text-secondary">
-            Saving and adding to research need your account. Signing in returns you to
-            &ldquo;{chartTitle}&rdquo; with the current selection preserved.
-          </p>
-        )}
-      </div>
+        ) : null}
+      </>
     );
   }
 

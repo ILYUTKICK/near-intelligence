@@ -33,6 +33,7 @@ export interface DraftOffer {
 export interface DocumentSaveController {
   status: SaveStatus;
   revision: number;
+  versionId: string | null;
   /** Adopts the editor content as the acknowledged baseline (initial load). */
   adoptBaseline(revision: number): void;
   /** Editor update signal — schedules autosave when unacknowledged edits exist. */
@@ -42,7 +43,7 @@ export interface DocumentSaveController {
   /** Explicit conflict resolution (dialog action) against the server revision. */
   overwriteConflict(revision: number): void;
   /** Adopts the editor content as the acknowledged server state. */
-  adoptServerState(revision: number, savedAt?: string): void;
+  adoptServerState(revision: number, savedAt?: string, versionId?: string | null): void;
   isClean(expectedRevision: number): boolean;
   /** Captures the current editor content for download / new-copy actions. */
   captureLocal(): SaveRequestBody;
@@ -54,6 +55,7 @@ export interface DocumentSaveController {
 export interface UseDocumentSaveOptions {
   documentId: string;
   initialRevision: number;
+  initialVersionId: string | null;
   /** Captures the editor state; kept current through the coordinator. */
   capture: () => SaveRequestBody;
 }
@@ -87,6 +89,7 @@ export function useDocumentSave(options: UseDocumentSaveOptions): DocumentSaveCo
   const [coordinator] = useState(
     () =>
       new SaveCoordinator(documentId, initialRevision, {
+        initialVersionId: options.initialVersionId,
         transport: (attempt) => saveRevision(attempt),
         capture: options.capture,
         onCapture: (body, revision) => {
@@ -216,8 +219,8 @@ export function useDocumentSave(options: UseDocumentSaveOptions): DocumentSaveCo
   );
 
   const adoptServerState = useCallback(
-    (revision: number, savedAt?: string) => {
-      coordinator.adoptServerState(revision, savedAt);
+    (revision: number, savedAt?: string, versionId?: string | null) => {
+      coordinator.adoptServerState(revision, savedAt, versionId);
       setDraft(null);
     },
     [coordinator],
@@ -247,6 +250,7 @@ export function useDocumentSave(options: UseDocumentSaveOptions): DocumentSaveCo
     () => ({
       status,
       revision: status.revision,
+      versionId: coordinator.getVersionId(),
       adoptBaseline,
       markChanged,
       saveNow,
@@ -260,6 +264,7 @@ export function useDocumentSave(options: UseDocumentSaveOptions): DocumentSaveCo
       discardDraft,
     }),
     [
+      coordinator,
       status,
       adoptBaseline,
       markChanged,

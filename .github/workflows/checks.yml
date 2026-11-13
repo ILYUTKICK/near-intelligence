@@ -64,6 +64,8 @@ jobs:
           uv run python -m unittest discover -s tests -p test_exports_charts.py -v
           # NI-058: the Markdown bundle/manifest/ZIP packaging (offline part).
           uv run python -m unittest discover -s tests -p test_exports_bundle.py -v
+          # NI-059: frozen PDF rendering, layout, parity and failure behavior.
+          uv run python -m unittest discover -s tests -p test_exports_pdf.py -v
           # NI-062: the offline security-audit suites (session/JWT boundary at
           # the HTTP layer, static subprocess/network/secret sinks, untrusted
           # content inertness); the two cluster security suites run in the

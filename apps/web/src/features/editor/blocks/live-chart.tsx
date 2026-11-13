@@ -1,7 +1,7 @@
 import { Component, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ChartView, type ChartSelection } from "@/features/charts/renderer/ChartView";
 import { chartObservation, inspectionKey } from "@/features/charts/renderer/observation-context";
-import { filterEnumOptions, filterLabel } from "@/features/charts/library/filter-controls";
+import { ChartFilterControls } from "@/features/charts/filters/FilterControls";
 import { isIsoCalendarDate, windowDays } from "@/features/charts/library/selection-url";
 import { HistoricalRevisionContext, useChartEditorContext } from "./chart-context";
 import { loadDocumentChart, type DocumentChartView } from "./chart-api";
@@ -194,28 +194,19 @@ export function InteractiveChart({ attrs, context, onApply }: {
     attrsKey, attrs.chart_definition_version_id, attrs.selection, attrs.observed_dataset_version_id]);
   const selection = draft ?? attrs.selection;
   const definition = view?.definition;
-  const properties = definition?.filter_schema["properties"];
-  const filterKeys = properties && typeof properties === "object" && !Array.isArray(properties) ? Object.keys(properties).sort() : [];
   const enabled = context.ready && attrs.mode === "live";
   const canAddInsight = enabled && context.saved && !loading && Boolean(view && attrs.block_id && context.onInsightAction);
   const draftRangeError = definition && (!isIsoCalendarDate(selection.start) || !isIsoCalendarDate(selection.end)
     || windowDays(selection.start, selection.end) < 1 || windowDays(selection.start, selection.end) > definition.available_ranges.max_days);
 
-  /* NI-078 (NI-076 D5): the observed-dataset identifier shares the compact
-     status row instead of its own paragraph before the frame — full
-     technical identifiers stay in the Properties pane and the pinned-context
-     disclosure. Pin and save state stay visible in the same row, and the
-     explicit "Refresh to latest and save observation" stays a real button.
-     The buttons keep their own stable row so keyboard focus is never lost
-     when the chart view resolves. */
+  // The stable action row preserves keyboard focus while the chart resolves.
   return <div role="group" className="min-w-0 space-y-3" aria-label="Embedded chart controls">
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-metadata leading-metadata">
-      <span>{attrs.mode === "live" ? "Live chart · saved observation" : "Snapshot chart · reconstruction unavailable"}</span>
+      <span>{attrs.mode === "live" ? "Live chart · pinned observation" : "Snapshot chart · reconstruction unavailable"}</span>
       <span role="status">{context.saved ? "Saved in document revision" : "Changed — document has unsaved edits"}</span>
       {openedDataset !== attrs.observed_dataset_version_id ? <span>Changed dataset — explicit observation edit</span> : null}
       {context.ready && view?.latest_approved_dataset_version_id && view.latest_approved_dataset_version_id !== view.dataset.id
         ? <span role="status">Newer approved data available</span> : null}
-      <span className="min-w-0 break-all font-mono text-text-secondary">Observed dataset: {attrs.observed_dataset_version_id}</span>
     </div>
     <p className="text-metadata leading-metadata text-text-secondary">Opening or typing never refreshes this pin; identifiers and the pinned context are in Properties and the chart disclosure.</p>
     {!context.ready ? <p role="status">Chart controls are suspended while your document account is checked. Reopen the document after an account change.</p> : null}
@@ -241,19 +232,23 @@ export function InteractiveChart({ attrs, context, onApply }: {
       <details className="rounded-control border border-border p-3"><summary className="min-h-11 cursor-pointer text-ui">Chart definition and pinned context</summary>
         <p>{definition?.title} · version {definition?.version}</p><p>{definition?.description}</p>
         <p className="break-all">Definition: {definition?.id}</p><p className="break-all">Renderer: {definition?.renderer_version}</p>
-        <p className="break-all">Displayed dataset: {view.dataset.id}</p><p className="break-all">Context hash: {view.context_hash}</p>
+        <p className="break-all">Observed dataset: {attrs.observed_dataset_version_id}</p>
+        {view.dataset.id !== attrs.observed_dataset_version_id ? <p className="break-all">Displayed dataset: {view.dataset.id}</p> : null}
+        <p className="break-all">Context hash: {view.context_hash}</p>
       </details>
       <fieldset disabled={!enabled} className="min-w-0 space-y-3"><legend className="text-ui">Edit chart range and filters</legend>
         <p className="text-metadata text-text-secondary">UTC [start, end); maximum {definition?.available_ranges.max_days} days. Apply explicitly changes the document. Filters and range use the current observed dataset.</p>
         <div className="flex flex-wrap gap-3">
           <label className="flex min-w-0 flex-col gap-1 text-ui">Start date<input className={CONTROL_CLASS} type="date" value={selection.start} onChange={event => setDraft({ ...selection, start: event.target.value })} /></label>
           <label className="flex min-w-0 flex-col gap-1 text-ui">End date (exclusive)<input className={CONTROL_CLASS} type="date" value={selection.end} onChange={event => setDraft({ ...selection, end: event.target.value })} /></label>
-          {filterKeys.map(key => <label key={key} className="flex min-w-0 flex-col gap-1 text-ui">{filterLabel(key)}<select className={CONTROL_CLASS} value={selection.filters?.[key] ?? ""} onChange={event => {
-            const filters = { ...selection.filters }; if (event.target.value) filters[key] = event.target.value; else delete filters[key];
-            setDraft({ ...selection, filters });
-          }}><option value="">All — no filter</option>{filterEnumOptions(properties, key).map(option => <option key={option} value={option}>{option}</option>)}</select></label>)}
         </div>
-        {!filterKeys.length ? <p className="text-metadata text-text-secondary">No filters are registered for this chart version.</p> : null}
+        {/* NI-071: the same shared filter controls as the chart detail —
+          single-select for single-value dimensions, an accessible checkbox
+          group for `multi_value` comparison dimensions. Edits stay
+          draft-local until Apply (NI-042 discipline). */}
+        <ChartFilterControls definition={view.definition} filters={selection.filters ?? {}}
+          idPrefix={`chart-filters-${attrs.block_id ?? "block"}`}
+          onChange={filters => setDraft({ ...selection, filters })} />
         {draftRangeError ? <p role="alert">Enter a non-empty calendar range within the chart limit. Nothing has been applied.</p> : null}
         <button type="button" className={CONTROL_CLASS} aria-disabled={!draft || Boolean(draftRangeError)} onClick={() => { if (draft && !draftRangeError) void resolve(selection, attrs.observed_dataset_version_id, true); }}>Apply range and filters</button>
       </fieldset>

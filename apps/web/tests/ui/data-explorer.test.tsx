@@ -159,7 +159,7 @@ function datasetFixture(window: { start: string; end: string }) {
 function seriesFixture(
   metric: MetricResponse,
   window: { start: string; end: string },
-  filters: Record<string, string> = {},
+  filters: Record<string, string[]> = {},
 ): SeriesResponse {
   return {
     metric,
@@ -186,7 +186,7 @@ function seriesFixture(
 
 function viewFixture(
   definition: ChartDefinitionResponse,
-  selection: { start: string; end: string; filters?: Record<string, string> },
+  selection: { start: string; end: string; filters?: Record<string, string[]> },
 ): ChartViewResponse {
   const series = seriesFixture(
     metricFixture(METRIC_FEES_ID, "provider_gross_fees_usd", "USD"),
@@ -287,7 +287,11 @@ function viewRoute(chartId: string, definition: ChartDefinitionResponse) {
     return jsonResponse(viewFixture(definition, {
       start: url.searchParams.get("start") ?? VIEW_WINDOW.start,
       end: url.searchParams.get("end") ?? VIEW_WINDOW.end,
-      filters: JSON.parse(url.searchParams.get("filters") ?? "{}") as Record<string, string>,
+      // the mock API echoes the server-canonical list form
+      filters: Object.fromEntries(
+        Object.entries(
+          JSON.parse(url.searchParams.get("filters") ?? "{}") as Record<string, string | string[]>,
+        ).map(([key, value]) => [key, Array.isArray(value) ? value : [value]])),
     }));
   };
 }

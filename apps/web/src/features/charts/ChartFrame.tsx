@@ -7,7 +7,7 @@ import { StaleNotice } from "@/components/data-state/DataState";
 import type { DataMetadata, DataQuality } from "@/components/data-state/quality";
 import { DataTable } from "./DataTable";
 import { SourceDrawer } from "./SourceDrawer";
-import type { ChartMode, DataSource, FrameTableRow } from "./chart-frame-types";
+import type { ChartMode, ChartPresentation, DataSource, FrameTableRow } from "./chart-frame-types";
 
 import { cn } from "@/lib/utils";
 
@@ -38,7 +38,8 @@ export function ChartFrame({
   rangeSlot,
   actions,
   stale,
-  compact = false,
+  presentation,
+  previewValues,
   children,
   className,
 }: {
@@ -62,14 +63,9 @@ export function ChartFrame({
   actions?: ReactNode;
   /** When true, shows the stale notice while retaining the last good values. */
   stale?: boolean;
-  /**
-   * Compact header (NI-078, NI-076 D3/D4): the surrounding page or card
-   * already carries the title, so the frame does not repeat it. Units, mode
-   * badge, quality, freshness metadata, the source drawer, the accessible
-   * summary and the equivalent data table all stay visible — compacting the
-   * header never removes provenance or hover-free exact values.
-   */
-  compact?: boolean;
+  presentation?: ChartPresentation;
+  /** In a saved-card preview the exact table shares the summary disclosure. */
+  previewValues?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
@@ -78,7 +74,7 @@ export function ChartFrame({
       <figcaption className="flex flex-col gap-2">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            {compact ? null : (
+            {presentation ? null : (
               <p className="font-serif text-heading leading-heading font-medium text-text">{title}</p>
             )}
             {units ? (
@@ -88,9 +84,11 @@ export function ChartFrame({
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-sage px-2.5 py-1 text-metadata font-medium text-accent">
-              {mode === "live" ? "Live — latest approved data" : "Historical — pinned version"}
-            </span>
+            {presentation !== "saved-preview" ? (
+              <span className="rounded-full bg-sage px-2.5 py-1 text-metadata font-medium text-accent">
+                {mode === "live" ? "Live — latest approved data" : "Historical — pinned version"}
+              </span>
+            ) : null}
             {quality ? <QualityBadge quality={quality} /> : null}
           </div>
         </div>
@@ -105,7 +103,7 @@ export function ChartFrame({
       </figcaption>
 
       {/* Toolbar: wraps on narrow screens; all controls are real buttons. */}
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-y border-border py-2.5">
+      <div className={cn("flex flex-wrap items-center gap-2 border-y border-border", presentation ? "mt-3 py-2" : "mt-4 py-2.5")}>
         {rangeSlot}
         {actions}
         <SourceDrawer
@@ -118,14 +116,15 @@ export function ChartFrame({
         />
       </div>
 
-      <div className="mt-4">{children}</div>
+      <div className={presentation ? "mt-3" : "mt-4"}>{children}</div>
 
       <div className="mt-4 flex flex-col gap-3">
         <details className="rounded-control border border-border bg-surface-muted p-4">
           <summary className="text-ui leading-ui font-medium cursor-pointer">
-            Accessible summary
+            {previewValues ? "Exact values and summary" : "Accessible summary"}
           </summary>
           <p className="text-body leading-body text-text-secondary mt-2">{summary}</p>
+          {previewValues}
         </details>
         {tableRows ? (
           <DataTable

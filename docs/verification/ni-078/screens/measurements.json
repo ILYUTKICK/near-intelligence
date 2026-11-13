@@ -1,15 +1,50 @@
 {
-  "research_assessment_y_1440": 882,
-  "research_document_height": 21414,
-  "research_word_count": 5476,
-  "research_figure_count": 3,
-  "chart_plot_y_1440x900": 662,
-  "chart_viewport_height": 900,
-  "chart_plot_y_1280x800": 662,
-  "saved_card_plot_y_1440": 593,
-  "saved_card_height": 717,
-  "editor_paper_y_1440": 351,
-  "editor_first_paragraph_y": 408,
-  "editor_breadcrumb_count": 1,
-  "editor_page_breadcrumb_count": 0
+  "verifiedOn": "2026-11-13",
+  "fixture": "NI-063 and NI-064 synthetic loopback data",
+  "integrationBase": "c56ec29",
+  "research": {
+    "assessment": {
+      "top": 882,
+      "height": 430,
+      "visibleHeight": 18
+    },
+    "figures": 3,
+    "documentHeight": 21482
+  },
+  "chart": {
+    "1440x900": {
+      "top": 596,
+      "height": 320,
+      "visibleHeight": 304
+    },
+    "1280x800": {
+      "top": 596,
+      "height": 320,
+      "visibleHeight": 204
+    }
+  },
+  "savedCharts": {
+    "plot": {
+      "top": 581,
+      "height": 208,
+      "visibleHeight": 208
+    },
+    "card": {
+      "top": 336,
+      "height": 639,
+      "visibleHeight": 564
+    }
+  },
+  "editor": {
+    "paper": {
+      "top": 351,
+      "height": 23964,
+      "visibleHeight": 549
+    },
+    "firstBlock": {
+      "top": 408,
+      "height": 32,
+      "visibleHeight": 32
+    }
+  }
 }

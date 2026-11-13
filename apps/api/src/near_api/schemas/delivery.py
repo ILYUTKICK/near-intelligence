@@ -24,18 +24,17 @@ ChartView) with the implemented additions recorded in API_SPECIFICATION.md:
 """
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import Field, StringConstraints, model_validator
-from typing import Annotated
 
+from near_api.schemas.chart_selection import FilterValues
 from near_api.schemas.common import ContractModel, DataQuality, Observation, Selection
 
 SHA256_HEX = Annotated[str, StringConstraints(strict=True, pattern=r"^[0-9a-f]{64}$")]
 
 AvailabilityCode = Literal["A", "P", "B", "G"]
-
 
 class ResolvedSelectionFilters(ContractModel):
     """Chart-version-validated filters carried inside a resolved selection.
@@ -43,13 +42,16 @@ class ResolvedSelectionFilters(ContractModel):
     Request filters arrive as the urlencoded ``filters`` query parameter and
     are validated server-side against the resolved chart definition version's
     closed ``filter_schema`` (the NI-031 versioned allowlist: string enums
-    from approved source/recipient/price-basis mappings only). Unknown keys
-    and unlisted values are rejected before any resolution happens, so this
-    permissive container never serializes an unapproved filter value.
+    from approved source/recipient/price-basis mappings only; NI-071 adds
+    list-valued multi-selections whose values fan out into one compared
+    series per selected value). Unknown keys and unlisted values are rejected
+    before any resolution happens, so this permissive container never
+    serializes an unapproved filter value. Singletons serialize as strings
+    and comparisons as arrays, preserving historical selection hashes.
     """
 
     model_config = ContractModel.model_config | {"extra": "allow"}
-    __pydantic_extra__: dict[str, str] = Field(init=False)
+    __pydantic_extra__: dict[str, FilterValues] = Field(init=False)
 
 
 class ResolvedSelection(Selection):

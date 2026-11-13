@@ -114,7 +114,6 @@ function FigureShell({
   unit,
   takeaway,
   note,
-  anchor,
 }: {
   readonly idPrefix: string;
   readonly kind: string;
@@ -126,7 +125,6 @@ function FigureShell({
   readonly unit: string;
   readonly takeaway: string;
   readonly note: string;
-  readonly anchor: string;
 }) {
   const id = `${idPrefix}-${kind}`;
   return (
@@ -151,10 +149,11 @@ function FigureShell({
         sources in the claim cards below
       </p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-metadata text-text-secondary">
-        <span>{claimIds.join(" · ")} · Full provenance in the linked claims</span>
-        <Link href={anchor} className={claimLinkClasses}>
-          Recorded claim <ProductIcon name="arrow" className="size-3.5" />
-        </Link>
+        {claimIds.map((id) => (
+          <Link key={id} href={`#${id}-heading`} className={claimLinkClasses}>
+            Recorded claim {id} <ProductIcon name="arrow" className="size-3.5" />
+          </Link>
+        ))}
       </div>
     </figure>
   );
@@ -194,7 +193,6 @@ export function UsdWindowsFigure({ idPrefix = "thesis" }: { readonly idPrefix?: 
         + `${startMarks.value} ${startMarks.unit} on start-of-day marks and ${endMarks.value} ${endMarks.unit} `
         + `on ${endMarks.basis}.`
       }
-      anchor="#CL-004-heading"
     />
   );
 }
@@ -244,7 +242,6 @@ export function SupplyScaleFigure({ idPrefix = "thesis" }: { readonly idPrefix?:
         `Purchases are never subtracted from total supply. Emission does not equal market selling `
         + `pressure; recipients may hold or stake their rewards.`
       }
-      anchor="#CL-007-heading"
     />
   );
 }

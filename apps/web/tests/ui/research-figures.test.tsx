@@ -112,11 +112,10 @@ describe("Figures on the thesis page", () => {
     const tokenEconomics = document.getElementById("token-economics");
     expect(tokenEconomics).not.toBeNull();
     expect(tokenEconomics!.querySelector("#thesis-supply-scale")).not.toBeNull();
-    // All three figures (CL-002 opening, CL-004, CL-007) link down to their
-    // recorded claim cards.
+    // All plotted quantities link to their recorded claim cards.
     const claimLinks = screen.getAllByRole("link", { name: /Recorded claim/ });
     expect(claimLinks.map((link) => link.getAttribute("href")).sort())
-      .toEqual(["#CL-002-heading", "#CL-004-heading", "#CL-007-heading"]);
+      .toEqual(["#CL-001-heading", "#CL-002-heading", "#CL-004-heading", "#CL-007-heading"]);
   });
 
   it("passes axe on the rendered page", async () => {

@@ -11,13 +11,14 @@ import {
 } from "@/components/data-state/DataState";
 import type { DataMetadata } from "@/components/data-state/quality";
 import { ChartFrame } from "@/features/charts/ChartFrame";
-import type { ChartMode } from "@/features/charts/chart-frame-types";
+import type { ChartMode, ChartPresentation } from "@/features/charts/chart-frame-types";
 
 import { RangeSelect } from "./RangeSelect";
 import { SeriesTable } from "./SeriesTable";
 import { buildChart, displayUnits } from "./option-builder";
 import type { ChartFactory, EChartsLike } from "./chart-factory";
 import { defaultChartFactory } from "./chart-factory";
+import type { FiltersSelection } from "../filters/filter-values";
 import type { ChartDefinitionResponse, ChartViewResponse } from "./view-types";
 import { RENDERER_VERSION } from "./view-types";
 
@@ -25,8 +26,12 @@ import { RENDERER_VERSION } from "./view-types";
 export interface ChartSelection {
   start: string;
   end: string;
-  /** Values already validated against the definition's closed filter schema. */
-  filters?: Record<string, string>;
+  /**
+   * Values already validated against the definition's closed filter schema:
+   * one approved string, or a list for a `multi_value` dimension (NI-071
+   * comparison form; the resolved view carries one series per value).
+   */
+  filters?: FiltersSelection;
 }
 
 /**
@@ -39,7 +44,7 @@ export type ChartViewLoader = (args: {
   definitionId: string;
   start: string;
   end: string;
-  filters: Record<string, string>;
+  filters: FiltersSelection;
   signal: AbortSignal;
 }) => Promise<ChartViewResponse>;
 
@@ -65,20 +70,8 @@ export interface ChartViewProps {
   /** Explicit plot size; omit to let the container size the chart. */
   width?: number;
   height?: number;
-  /**
-   * Compact header (NI-078, NI-076 D3/D4): for detail pages and saved cards
-   * that already render the title/context above the frame. Hides only the
-   * frame's repeated title — the exact-value table stays visible unless
-   * `discloseExactValues` is also set.
-   */
-  compact?: boolean;
-  /**
-   * Saved-card exact values (NI-078, NI-076 D4): the always-open table under
-   * the plot moves into one keyboard-accessible "Exact values and summary"
-   * disclosure. Only used where a card keeps the view short; the public
-   * detail page keeps the table visible (charts cannot require hover).
-   */
-  discloseExactValues?: boolean;
+  /** Saved previews show one context line and put exact values under the summary. */
+  presentation?: ChartPresentation;
   /** Injectable ECharts mount (tests inject a recording fake). */
   factory?: ChartFactory;
   className?: string;
@@ -152,8 +145,7 @@ export function ChartView({
   onSelectionChange,
   width,
   height,
-  compact = false,
-  discloseExactValues = false,
+  presentation,
   factory = defaultChartFactory,
   className,
 }: ChartViewProps) {
@@ -307,6 +299,10 @@ export function ChartView({
 
   const refreshing = loading && activeView !== null;
   const metadata = activeView ? metadataOf(activeView, definition) : undefined;
+  const savedPreview = presentation === "saved-preview";
+  const previewValues = savedPreview && plottable && built?.kind === "ok"
+    ? <SeriesTable model={built.table} title={definition.title} className="mt-3" />
+    : undefined;
 
   const plot = () => {
     if (definition.data_status === "unavailable") {
@@ -343,20 +339,6 @@ export function ChartView({
       }
       return <EmptyState metadata={metadata} />;
     }
-    const exactValues = discloseExactValues ? (
-      /* NI-076 D4: saved-card contexts keep exact data access one disclosure
-         away instead of an always-open table under the plot. The values,
-         bounds and missing-point reasons stay exactly as delivered. */
-      <details className="rounded-control border border-border bg-surface-muted p-4">
-        <summary className="text-ui leading-ui font-medium cursor-pointer">
-          Exact values and summary
-        </summary>
-        <p className="text-body leading-body text-text-secondary mt-2">{built.summary}</p>
-        <SeriesTable model={built.table} title={definition.title} className="mt-3" />
-      </details>
-    ) : (
-      <SeriesTable model={built.table} title={definition.title} />
-    );
     return (
       <div className="flex flex-col gap-3">
         {refreshing ? (
@@ -373,7 +355,7 @@ export function ChartView({
           className="w-full"
           style={{ height: height ?? 320, ...(width !== undefined ? { maxWidth: width } : {}) }}
         />
-        {exactValues}
+        {savedPreview ? null : <SeriesTable model={built.table} title={definition.title} />}
       </div>
     );
   };
@@ -384,7 +366,7 @@ export function ChartView({
       units={activeView ? displayUnits(activeView) : undefined}
       mode={mode}
       quality={activeView?.quality}
-      metadata={metadata}
+      metadata={savedPreview && metadata ? { ...metadata, period: undefined } : metadata}
       summary={
         built && built.kind === "ok"
           ? built.summary
@@ -400,7 +382,8 @@ export function ChartView({
       }
       actions={actions}
       stale={activeView?.quality.status === "stale"}
-      compact={compact}
+      presentation={presentation}
+      previewValues={previewValues}
       className={className}
     >
       {plot()}

@@ -13,7 +13,7 @@ const dataset = "55555555-5555-4555-8555-555555555555";
 const summary = { id, title: "Synthetic research", revision: 3, schema_version: 1, current_version_id: id,
   created_at: "2026-11-08T10:00:00Z", updated_at: "2026-11-08T10:00:00Z", progress: { headings: 0, charts: 0, insights: 0 } };
 const input = { chart_definition_version_id: id, dataset_version_id: dataset,
-  selection: { start: "2026-01-01", end: "2026-01-08", frequency: "day" as const, filters: { source: "SRC-LLAMA" } }, mode: "live" as const };
+  selection: { start: "2026-01-01", end: "2026-01-08", frequency: "day" as const, filters: { source: ["SRC-LLAMA"] } }, mode: "live" as const };
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -89,7 +89,7 @@ describe("NI-041 destination confirmation", () => {
       return response({ ...summary, revision: 4, content: {}, resolved_contexts: {} });
     }));
     const user = userEvent.setup();
-    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    render(<ChartAuthActions nextPath="/charts/intents-volume" saveInput={input} />);
     await user.click(await screen.findByRole("button", { name: "Add to research" }));
     await screen.findByText(/No existing research matches/);
     await user.clear(screen.getByLabelText("New research title"));
@@ -124,7 +124,7 @@ describe("NI-041 destination confirmation", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => url === "/api/auth/session"
       ? response({ subject }) : response({ items: [], next_cursor: null })));
     const user = userEvent.setup();
-    render(<ChartAuthActions chartTitle="Synthetic" nextPath="/charts/intents-volume" saveInput={input} />);
+    render(<ChartAuthActions nextPath="/charts/intents-volume" saveInput={input} />);
     await user.click(await screen.findByRole("button", { name: "Add to research" }));
     await user.type(screen.getByLabelText("New research title"), " private Alice draft");
     subject = "synthetic-bob";

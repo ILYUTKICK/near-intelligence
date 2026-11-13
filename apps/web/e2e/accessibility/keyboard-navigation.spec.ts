@@ -259,8 +259,6 @@ test("chart source drawer and pinned-context details operate from the keyboard",
   // The editor chart pins the NI-064 performance dataset by UUID; the
   // rendered value is the perf fixture's first day ("100.00", trailing zero
   // trimmed by the significant-digit formatter).
-  await expect(firstChart.getByText(`Observed dataset: ${state.perf_dataset_version_id}`))
-    .toBeVisible({ timeout: 30_000 });
   await expect(firstChart.getByText("100").first()).toBeVisible({ timeout: 30_000 });
 
   // Native details summary: focus + Enter toggles the pinned-context drawer.
@@ -268,6 +266,7 @@ test("chart source drawer and pinned-context details operate from the keyboard",
   await summary.focus();
   await expect(summary).toBeFocused();
   await page.keyboard.press("Enter");
+  await expect(firstChart.getByText(`Observed dataset: ${state.perf_dataset_version_id}`)).toBeVisible();
   await expect(firstChart.getByText(/Context hash: [0-9a-f]{64}/)).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(firstChart.getByText(/Context hash: [0-9a-f]{64}/)).toBeHidden();

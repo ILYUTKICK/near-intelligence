@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 
 import { PageIntro } from "@/components/layout/PageIntro";
 import { ClaimCard } from "@/features/public-research/ClaimCard";
+import { DuplicateReleaseAction } from "@/features/public-research/DuplicateReleaseAction";
 import { MechanismFlow } from "@/features/public-research/MechanismFlow";
 import { RecordedPurchases } from "@/features/public-research/RecordedPurchases";
 import { SupplyScaleFigure, UsdWindowsFigure } from "@/features/public-research/ResearchFigures";
 import {
   claimRegistry,
   thesis,
+  thesisReleaseSlug,
   thesisToc,
   type ClaimEvidenceLink,
   type ThesisClaim,
@@ -141,6 +143,10 @@ function ThesisBody() {
 
       {/* NI-076 D1: compact overview of the four canonical hypotheses. */}
       <HypothesisAssessment />
+
+      {/* NI-045 duplication CTA: rendered only when a published release
+          exists for the thesis slug; otherwise it renders nothing. */}
+      <DuplicateReleaseAction slug={thesisReleaseSlug} nextPath="/research" />
 
       <MechanismFlow />
 
