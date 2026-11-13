@@ -52,6 +52,10 @@ Private responses and server components no-store; include identity in any privat
 
 Content Security Policy with nonce-based script policy, frame-ancestors 'none', object-src 'none', restricted connect-src; HSTS in production, Referrer-Policy and nosniff. Validate chart tooltip HTML handling to avoid XSS; plain text formatted values preferred. Do not put private content or tokens in URLs/analytics/errors. Logs contain request IDs, resource IDs and operation outcomes, not notes or source credentials.
 
+NI-060 share links grant access to one frozen projection. The token is a path-only 256-bit secret. The create response returns it once. Storage retains only its SHA-256 digest. Each public transaction sets the digest locally, and the RLS policy requires an exact match, no user identity and an active, unexpired row. The pool clears the setting on return. Owner management uses a verified session and owner-scoped RLS.
+
+Owner and capability responses use `no-store` and `no-referrer`. The viewer sets robots noindex. Uvicorn and Next.js development request logging exclude capability paths. The deployment proxy must exclude them from access logs as well. Invalid, revoked and expired capabilities receive the same API 404. The next request after revocation or expiry rechecks state for the projection and all chart assets.
+
 ## Secrets and operations
 
 Use environment/secret manager, separate production/dev credentials, least-privilege DB roles, restricted artifact volumes and TLS database connections. Exclude .env, raw auth headers and private exports from Git. Legacy research raw files require a secret/privacy/license scan before a public repository release. No credentials were needed or generated for this documentation phase.

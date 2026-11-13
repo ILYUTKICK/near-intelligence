@@ -764,7 +764,7 @@ class ExportJobDatabaseTests(unittest.TestCase):
                 with self.admin.connect() as connection:
                     self.assertEqual(connection.scalar(text(
                         "SELECT version_num FROM app.alembic_version")),
-                        "0019_merge_pdf_publications")
+                        "0017_document_shares")
                     self.assertIsNotNone(connection.scalar(text(
                         "SELECT to_regclass('app.document_organization')")))
                     self.assertIsNotNone(connection.scalar(text(

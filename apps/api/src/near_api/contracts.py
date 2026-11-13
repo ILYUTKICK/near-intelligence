@@ -1,5 +1,7 @@
 """Install common schemas and sanitized error handling without network/config I/O."""
 
+import logging
+from urllib.parse import unquote
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -29,6 +31,30 @@ _HTTP_ERRORS = {
     503: ("DEPENDENCY_UNAVAILABLE", "A required service is unavailable"),
 }
 
+_PUBLIC_SHARE_ROOT = "/api/shares"
+
+
+def _is_public_share(path: str) -> bool:
+    return path == _PUBLIC_SHARE_ROOT or path.startswith(_PUBLIC_SHARE_ROOT + "/")
+
+
+def _share_response_headers(path: str) -> dict[str, str]:
+    segments = path.split("/")
+    if _is_public_share(path) or (
+        len(segments) >= 5 and segments[1:3] == ["api", "documents"] and segments[4] == "shares"
+    ):
+        return {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
+    return {}
+
+
+class _ShareAccessLogFilter(logging.Filter):
+    """Exclude capability URLs from Uvicorn's request-path logging."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        return not (isinstance(args, tuple) and len(args) == 5 and isinstance(args[2], str)
+                    and _is_public_share(unquote(args[2].partition("?")[0])))
+
 
 def error_response(request: Request, status: int, code: str, message: str,
                    *, details: tuple[ErrorDetail, ...] | None = None) -> JSONResponse:
@@ -37,21 +63,28 @@ def error_response(request: Request, status: int, code: str, message: str,
         details=details, retryable=status in {429, 503},
     ))
     return JSONResponse(status_code=status, content=body.model_dump(mode="json", exclude_none=True),
-                        headers={"Cache-Control": "no-store", "X-Request-ID": str(body.error.request_id)})
+                        headers={"Cache-Control": "no-store", "X-Request-ID": str(body.error.request_id),
+                                 **_share_response_headers(request.url.path)})
 
 
 def install_contracts(app: FastAPI) -> None:
+    logging.getLogger("uvicorn.access").addFilter(_ShareAccessLogFilter())
+
     @app.middleware("http")
     async def request_identity(request: Request, call_next):
         request.state.request_id = uuid4()
+        path = request.url.path
+        if _is_public_share(path) and (path.endswith("/") or request.url.query):
+            return error_response(request, 404, *_HTTP_ERRORS[404])
         response = await call_next(request)
         response.headers["X-Request-ID"] = str(request.state.request_id)
         # Private workspace surfaces: owner-scoped content is never cached
         # publicly (NI-035 saved charts, NI-044 research snapshots).
-        if request.url.path == "/api/saved-charts" or request.url.path.startswith("/api/saved-charts/"):
+        if path == "/api/saved-charts" or path.startswith("/api/saved-charts/"):
             response.headers["Cache-Control"] = "no-store"
-        if request.url.path == "/api/snapshots" or request.url.path.startswith("/api/snapshots/"):
+        if path == "/api/snapshots" or path.startswith("/api/snapshots/"):
             response.headers["Cache-Control"] = "no-store"
+        response.headers.update(_share_response_headers(path))
         return response
 
     @app.exception_handler(RequestValidationError)

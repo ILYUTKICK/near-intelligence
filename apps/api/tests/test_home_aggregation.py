@@ -139,7 +139,13 @@ class HomeContractTests(unittest.TestCase):
                                                 "/api/documents/{document_id}/exports",
                                                 "/api/documents/{document_id}/exports/{job_id}",
                                                 "/api/documents/{document_id}/exports/{job_id}/download",
-                                            "/api/documents/{document_id}/model-blocks"})
+                                                "/api/documents/{document_id}/model-blocks",
+                                                "/api/documents/{document_id}/shares",
+                                                "/api/documents/{document_id}/shares/preview",
+                                                "/api/documents/{document_id}/shares/{share_id}",
+                                                "/api/shares/{token}",
+                                                "/api/shares/{token}/charts/{block_id}/view",
+                                                "/api/shares/{token}/charts/{block_id}/csv"})
         self.assertEqual(schema["paths"]["/api/home"]["get"]["operationId"], "getWorkspaceHome")
         response_schema = schema["components"]["schemas"]["HomeResponse"]
         # Every documented field is always present: empty arrays stay explicit

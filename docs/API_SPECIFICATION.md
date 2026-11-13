@@ -333,6 +333,24 @@ The frozen chart captions in Markdown ZIP and PDF identify the selected
 filters. Export chart CSV labels distinguish the compared series. The
 historical chart CSV `filters` column identifies the exact series on each row.
 
+## Document shares — revocable read-only publication (NI-060)
+
+| Method/path | Request → response | Auth / authorization | Errors |
+| --- | --- | --- | --- |
+| GET `/documents/{id}/shares/preview` | none → SharePreview (`projection` + `projection_sha256` + `scope` counts) | Owner | 404/422 (unresolvable pin → REFERENCE_INVALID) |
+| POST `/documents/{id}/shares` | `{acknowledged_revision, visible_scope, preview_sha256, expires_at?}` + `Idempotency-Key: UUID` → 201 ShareCreated (`share_token` returned ONCE) | Owner; explicit consent naming the revision and the visible scope, bound to the preview hash | 404; wrong revision → 409 REVISION_NOT_ACKNOWLEDGED; stale preview → 409 PREVIEW_MISMATCH; scope mismatch → 422 SCOPE_MISMATCH; past/beyond-bound expiry → 422; oversized projection → 422 PAYLOAD_TOO_LARGE; >100 shares → 422 SHARE_LIMIT_EXCEEDED; idempotency conflicts → 409 |
+| GET `/documents/{id}/shares` | none → DocumentShareList (id, revision, computed status active/expired/revoked, created/expires/revoked — never the token or its hash) | Owner | 404 |
+| DELETE `/documents/{id}/shares/{shareId}` | none → 204 (revoke; the stored bytes are cleared with the transition) | Owner | 404 |
+| GET `/shares/{token}` | none → ShareProjection | NO principal — the path token (SHA-256-stored digest) is the credential; every request re-checks live state | ONE generic 404 for unknown/revoked/expired/malformed/corrupt (no oracle) |
+| GET `/shares/{token}/charts/{blockId}/view` | none → frozen ChartView | token-gated, live state re-checked per request | ONE generic 404 |
+| GET `/shares/{token}/charts/{blockId}/csv` | none → exact-value CSV (`text/csv` attachment) | token-gated, live state re-checked per request | ONE generic 404 |
+
+**Implemented (NI-060).** The owner sees the exact allowlisted projection before consenting. The create transaction verifies the current acknowledged revision, scope counts and preview SHA-256. The shared content includes the pinned chart views and the verified published-model fields, including coefficients, sample and limitations. The projection excludes private identity, editorial metadata, evidence explanations and snapshot IDs.
+
+A share token is a 256-bit secret in the URL path. The server stores only its SHA-256 digest and returns the link on first creation. The owner-wide idempotency key binds the document and consent payload. Exact replay returns the share's current lifecycle status without a link. A different request with the same key returns 409. The owned document lock serializes creation and enforces the 100-share limit.
+
+The public routes select the active unexpired row matching the transaction-local token digest, then verify the stored projection size and SHA-256. Revocation clears the stored bytes and denies the next request for the page, chart view and CSV. Responses use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`. Capability paths are excluded from app request logs. See [ADR-021](DECISIONS.md#adr-021--revocable-read-only-sharing-of-one-frozen-revision-2026-11-12).
+
 ## Operational interfaces
 
 GET `/health/live` → `{status:"ok"}` with no auth/secrets. GET `/health/ready` → 200/503 `{status,checks:{database,migrations,artifact_store}}`; internal network only. Metrics/logs redact identities/content. Operator commands ingestion/research/publication/export-worker have validated config schemas in [pipeline](DATA_PIPELINE.md) and [reproduction](REPRODUCIBILITY.md). CI must lint OpenAPI, regenerate TS, reject contract drift, and test all private endpoint families with Alice/Bob.

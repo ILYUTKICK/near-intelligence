@@ -50,6 +50,7 @@ import {
   detailOf,
 } from "./ui-bridge";
 import { ExportDialog } from "./exports/export-dialog";
+import { ShareDialog } from "./shares/share-dialog";
 import { ConflictRecoveryDialog } from "./persistence/conflict-dialog";
 import { SaveStatusBar, formatSavedAt } from "./persistence/save-status";
 import { useDocumentSave } from "./persistence/use-document-save";
@@ -212,6 +213,8 @@ export function EditorShell({ documentId, title, revision, updatedAt,
   const [tabletOutlineOpen, setTabletOutlineOpen] = useState(false);
   const [exportVersionId, setExportVersionId] = useState<string | null>(null);
   const exportReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareReturnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
@@ -749,6 +752,11 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           live in the same row. The paper below starts higher on desktop. */}
       <header className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3">
         <div className="min-w-0 flex-1 basis-64">
+          <Button ref={shareReturnFocusRef} data-testid="share-open" variant="secondary" className="float-right ml-3"
+              disabled={controller.status.kind !== "clean" || !controller.versionId || Boolean(controller.draft)}
+              onClick={() => setShareOpen(true)}>
+              Share
+          </Button>
           <h1 className="font-serif text-title leading-title [overflow-wrap:anywhere]">{title}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
             <p className="text-metadata text-text-secondary">
@@ -1008,6 +1016,15 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         versionId={exportVersionId ?? ""}
         onAnnounce={announce}
         returnFocusRef={exportReturnFocusRef}
+      />
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        documentId={documentId}
+        revision={controller.revision}
+        canPublish={controller.status.kind === "clean" && Boolean(controller.versionId) && !controller.draft}
+        onAnnounce={announce}
+        returnFocusRef={shareReturnFocusRef}
       />
       <ConflictRecoveryDialog
         open={conflictDialogOpen}

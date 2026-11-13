@@ -14,6 +14,14 @@ async function handle(request: NextRequest, context: Context) {
   // (GET .../download) — the same document-nested implemented paths the API
   // serves; the download itself carries no query string.
   const exportJob = segments[1] === "exports" && segments.length >= 3 && uuid(segments[2]);
+  // NI-060 document shares: owner preview (GET .../shares/preview), consented
+  // create (POST .../shares) and owner list (GET .../shares) plus the revoke
+  // (DELETE .../shares/{shareId}) — no share route takes a query string, and
+  // the share token never travels through this owner plane.
+  const shares = segments[1] === "shares";
+  const responseHeaders: Record<string, string> = shares
+    ? { "cache-control": "no-store", "referrer-policy": "no-referrer" }
+    : { "cache-control": "no-store" };
   if (!segments.length) allowed = ["GET", "POST"];
   else if (uuid(segments[0])) {
     if (segments.length === 1) allowed = ["GET", "PATCH", "DELETE"];
@@ -31,6 +39,9 @@ async function handle(request: NextRequest, context: Context) {
     if (segments.length === 2 && segments[1] === "exports") allowed = ["POST"];
     if (exportJob && segments.length === 3) allowed = ["GET"];
     if (exportJob && segments.length === 4 && segments[3] === "download") allowed = ["GET"];
+    if (shares && segments.length === 2) allowed = ["GET", "POST"];
+    if (shares && segments.length === 3 && segments[2] === "preview") allowed = ["GET"];
+    if (shares && segments.length === 3 && uuid(segments[2])) allowed = ["DELETE"];
     if (segments.length === 6 && segments[1] === "versions" && uuid(segments[2])
       && segments[3] === "chart-blocks" && uuid(segments[4])
       && (segments[5] === "view" || segments[5] === "csv")) {
@@ -39,6 +50,10 @@ async function handle(request: NextRequest, context: Context) {
       allowed = ["GET"];
     }
   }
+  if (shares && request.nextUrl.search) {
+    return NextResponse.json({ error: "Share requests take no query string." },
+      { status: 422, headers: responseHeaders });
+  }
   if (segments.length === 2 && segments[1] === "chart-view") {
     const keys = new Set(["chart_definition_version_id", "start", "end", "dataset_version", "filters"]);
     const query = request.nextUrl.searchParams;
@@ -46,9 +61,9 @@ async function handle(request: NextRequest, context: Context) {
       return NextResponse.json({ error: "Unsupported chart query." }, { status: 422, headers: { "cache-control": "no-store" } });
     }
   }
-  if (!allowed.length) return NextResponse.json({ error: "Not found." }, { status: 404, headers: { "cache-control": "no-store" } });
+  if (!allowed.length) return NextResponse.json({ error: "Not found." }, { status: 404, headers: responseHeaders });
   if (!allowed.includes(request.method)) return new NextResponse(null, { status: 405,
-    headers: { allow: allowed.join(", "), "cache-control": "no-store" } });
+    headers: { ...responseHeaders, allow: allowed.join(", ") } });
   if (annotation && request.nextUrl.search) {
     const entries = [...request.nextUrl.searchParams];
     const keys = segments[1] === "evidence" ? ["version_id", "hypothesis_id"] : ["version_id"];
@@ -67,6 +82,8 @@ async function handle(request: NextRequest, context: Context) {
       return NextResponse.json({ error: "Unsupported evidence target query." }, { status: 422, headers: { "cache-control": "no-store" } });
     }
   }
-  return forwardPrivate(request, `/api/documents${segments.length ? `/${segments.join("/")}` : ""}`);
+  const response = await forwardPrivate(request, `/api/documents${segments.length ? `/${segments.join("/")}` : ""}`);
+  if (shares) response.headers.set("referrer-policy", "no-referrer");
+  return response;
 }
 export { handle as GET, handle as POST, handle as PATCH, handle as DELETE };

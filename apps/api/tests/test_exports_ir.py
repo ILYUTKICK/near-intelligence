@@ -68,6 +68,7 @@ from near_api.exports.worker import render_bundle
 from near_api.models import service as model_service
 from near_api.models.routes import get_model_run_manifest
 from near_api.schemas.export import ExportDataTableBlock, ExportInsightBlock, ExportIr
+from near_api.shares.projection import build_share_projection
 import test_chart_blocks as chart_fixtures
 import test_delivery_apis as data_fixture
 import test_documents as document_fixtures
@@ -857,6 +858,16 @@ class ExportIrDatabaseTests(unittest.TestCase):
         self.assertEqual(summary.manifest_url, f"/api/model-runs/{self.run_id}/manifest")
         self.assertEqual(list(summary.limitations.spec_limitation_notes),
                          self.fit_manifest["limitations"]["spec_limitation_notes"])
+        shared = build_share_projection(plan).model_dump(mode="json")
+        shared_block = next(block for block in shared["blocks"]
+                            if block["block_type"] == "modelResult")
+        public_summary = summary.model_dump(mode="json")
+        self.assertEqual(shared_block["model_run_id"], str(self.run_id))
+        self.assertEqual(shared_block["dataset_version_id"], str(dataset_id))
+        self.assertEqual(shared_block["coefficients"], public_summary["coefficients"])
+        self.assertEqual(shared_block["limitations"], public_summary["limitations"])
+        self.assertNotIn("diagnostics", shared_block)
+        self.assertNotIn("author", shared["document"])
         # The run reference joins the aggregated plan registry.
         self.assertEqual([run.run_id for run in plan.model_runs], [self.run_id])
         self.assertEqual([run.spec_id for run in plan.model_runs],
