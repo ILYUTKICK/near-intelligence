@@ -399,9 +399,23 @@
           },
           "filters": {
             "additionalProperties": {
-              "maxLength": 200,
-              "minLength": 1,
-              "type": "string"
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 32,
+                  "minItems": 1,
+                  "type": "array"
+                }
+              ]
             },
             "maxProperties": 32,
             "propertyNames": {
@@ -919,7 +933,7 @@
       },
       "DocumentCreateRequest": {
         "additionalProperties": false,
-        "description": "POST /documents body. `template_id` is P1: providing it is a typed 422.",
+        "description": "POST /documents body. `template_id` selects the starting structure:\nthe P1 `investment-v1` eight-heading template (NI-045) or the empty\ndefault. Unknown ids are a typed 422.",
         "properties": {
           "template_id": {
             "anyOf": [
@@ -1001,6 +1015,78 @@
         "title": "DocumentListResponse",
         "type": "object"
       },
+      "DocumentOrganizationResponse": {
+        "additionalProperties": false,
+        "description": "The verified owner's organization metadata for one document.",
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "favorite": {
+            "title": "Favorite",
+            "type": "boolean"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "tags",
+          "favorite",
+          "updated_at"
+        ],
+        "title": "DocumentOrganizationResponse",
+        "type": "object"
+      },
+      "DocumentOrganizationUpdateRequest": {
+        "additionalProperties": false,
+        "description": "PATCH /documents/{id}/organization body.\n\nPATCH semantics: an absent field is left unchanged, so a favorite toggle\nnever resends tags and a tag edit never resends the favorite. Raw tags\nare normalized server-side (trim + lower + dedupe) and re-bounded to\nMAX_TAG_LENGTH/MAX_TAGS_PER_DOCUMENT after normalization.",
+        "properties": {
+          "favorite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Favorite"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          }
+        },
+        "title": "DocumentOrganizationUpdateRequest",
+        "type": "object"
+      },
       "DocumentProgress": {
         "additionalProperties": false,
         "description": "Per-document work-completion counters (`{headings,charts,insights}`).\n\nBlock projection regeneration is owned by the document revision service\n(NI-036) and the chart/insight block taxonomy by NI-041/NI-046/NI-047.\nHome counts the canonical current-version heading/liveChart/insight\nprojection types. The counter semantics measure work completion only.",
@@ -1072,6 +1158,11 @@
             ],
             "title": "Current Version Id"
           },
+          "favorite": {
+            "default": false,
+            "title": "Favorite",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1094,6 +1185,15 @@
             "minimum": 1.0,
             "title": "Schema Version",
             "type": "integer"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tags",
+            "type": "array"
           },
           "title": {
             "maxLength": 200,
@@ -1230,7 +1330,7 @@
       },
       "DocumentSummary": {
         "additionalProperties": false,
-        "description": "Current-revision summary of an owned document.\n\n`revision`/`current_version_id` come from the live app.documents row, so\na summary always reflects the document's current revision. A document\nthat has no saved revision yet carries `current_version_id: null`.",
+        "description": "Current-revision summary of an owned document.\n\n`revision`/`current_version_id` come from the live app.documents row, so\na summary always reflects the document's current revision. A document\nthat has no saved revision yet carries `current_version_id: null`.\n\n`tags`/`favorite` (NI-072) are private organization metadata from\napp.document_organization, separate from the immutable research chain:\nthey carry defaults so every producer stays honest \u2014 a document without\norganization rows has no tags and is not favorited, never fabricated\nmetadata. Editing them never changes `revision`/`updated_at` or the list\norder.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -1249,6 +1349,11 @@
             ],
             "title": "Current Version Id"
           },
+          "favorite": {
+            "default": false,
+            "title": "Favorite",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1266,6 +1371,15 @@
             "minimum": 1.0,
             "title": "Schema Version",
             "type": "integer"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tags",
+            "type": "array"
           },
           "title": {
             "maxLength": 200,
@@ -1682,7 +1796,7 @@
       },
       "ExportJobResponse": {
         "additionalProperties": false,
-        "description": "The typed lifecycle state of one owned export job.\n\n``download_path`` is the same-origin owner-checked download route and is\nset only while the bundle is downloadable (``succeeded`` and unexpired);\n``error_code`` is set exactly when ``status`` is ``failed``. No field of\nthis response carries a server filesystem path or a credential.",
+        "description": "The typed lifecycle state of one owned export job.\n\n``download_path`` is the same-origin owner-checked download route and is\nset only while the artifact is downloadable (``succeeded`` and\nunexpired); ``error_code`` is set exactly when ``status`` is ``failed``.\nNo field of this response carries a server filesystem path or a\ncredential.",
         "properties": {
           "document_id": {
             "format": "uuid",
@@ -1726,7 +1840,10 @@
             "type": "string"
           },
           "format": {
-            "const": "markdown_zip",
+            "enum": [
+              "markdown_zip",
+              "pdf"
+            ],
             "title": "Format",
             "type": "string"
           },
@@ -2839,6 +2956,98 @@
         "title": "MetricResponse",
         "type": "object"
       },
+      "ModelBlockInsertRequest": {
+        "additionalProperties": false,
+        "description": "POST /documents/{id}/model-blocks body (If-Match carries the CAS).\n\n``model_run_id`` must reference a published immutable ``app.model_runs``\nrow (the picker lists the public catalog; the server re-verifies inside\nthe save transaction). ``dataset_version_id`` is the approved public\ndataset version the interpretation reads against \u2014 an unapproved one is\nrejected, never substituted with latest. ``after_block_id`` positions the\nnew block after an existing top-level block of the document; without it\nthe block is appended last.",
+        "properties": {
+          "after_block_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Block Id"
+          },
+          "dataset_version_id": {
+            "format": "uuid",
+            "title": "Dataset Version Id",
+            "type": "string"
+          },
+          "interpretation": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList-Input",
+                  "ordered_list": "#/components/schemas/RichTextList-Input",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList-Input"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Interpretation",
+            "type": "array"
+          },
+          "model_run_id": {
+            "format": "uuid",
+            "title": "Model Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_run_id",
+          "dataset_version_id",
+          "interpretation"
+        ],
+        "title": "ModelBlockInsertRequest",
+        "type": "object"
+      },
+      "ModelBlockMutationResponse": {
+        "additionalProperties": false,
+        "description": "``MutationResult<{block_id}>``: the new revision summary plus the block.\n\nThe new revision's content and resolved contexts (including the frozen\n``ModelContext`` of the inserted block, keyed by ``block_id``) are\nfetchable through ``GET /documents/{id}`` \u2014 the response never makes the\nclient guess the new revision (the ETag carries it).",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentSummary"
+          },
+          "value": {
+            "$ref": "#/components/schemas/ModelBlockValue"
+          }
+        },
+        "required": [
+          "document",
+          "value"
+        ],
+        "title": "ModelBlockMutationResponse",
+        "type": "object"
+      },
+      "ModelBlockValue": {
+        "additionalProperties": false,
+        "description": "The inserted block identity (API_SPECIFICATION ``MutationResult`` value).",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id"
+        ],
+        "title": "ModelBlockValue",
+        "type": "object"
+      },
       "ModelContext": {
         "additionalProperties": false,
         "description": "Frozen model-run inspection record (API_SPECIFICATION ``ModelContext``).",
@@ -3347,6 +3556,134 @@
         "title": "ProfileUpdateRequest",
         "type": "object"
       },
+      "PublicationDuplicateRequest": {
+        "additionalProperties": false,
+        "description": "POST /publications/{slug}/duplicate body.\n\n``publication_version`` pins the cloned release (never \"latest\" by\naccident \u2014 the client states the version it read); ``title`` defaults to\nthe publication's title when omitted.",
+        "properties": {
+          "publication_version": {
+            "minimum": 1.0,
+            "title": "Publication Version",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "publication_version"
+        ],
+        "title": "PublicationDuplicateRequest",
+        "type": "object"
+      },
+      "PublicationEvidenceRef": {
+        "additionalProperties": false,
+        "description": "One public evidence reference inside a publication's manifest.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "model_run",
+              "citation"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "PublicationEvidenceRef",
+        "type": "object"
+      },
+      "PublicationResponse": {
+        "additionalProperties": false,
+        "description": "GET /publications/{slug} response: one published release projection.",
+        "properties": {
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "evidence_manifest": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PublicationEvidenceRef"
+            },
+            "maxItems": 200,
+            "title": "Evidence Manifest",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "slug": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+            "title": "Slug",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "version",
+          "title",
+          "content",
+          "content_sha256",
+          "published_at"
+        ],
+        "title": "PublicationResponse",
+        "type": "object"
+      },
       "Reason": {
         "maxLength": 200,
         "minLength": 1,
@@ -3474,9 +3811,25 @@
       },
       "ResolvedSelectionFilters": {
         "additionalProperties": {
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            }
+          ]
         },
-        "description": "Chart-version-validated filters carried inside a resolved selection.\n\nRequest filters arrive as the urlencoded ``filters`` query parameter and\nare validated server-side against the resolved chart definition version's\nclosed ``filter_schema`` (the NI-031 versioned allowlist: string enums\nfrom approved source/recipient/price-basis mappings only). Unknown keys\nand unlisted values are rejected before any resolution happens, so this\npermissive container never serializes an unapproved filter value.",
+        "description": "Chart-version-validated filters carried inside a resolved selection.\n\nRequest filters arrive as the urlencoded ``filters`` query parameter and\nare validated server-side against the resolved chart definition version's\nclosed ``filter_schema`` (the NI-031 versioned allowlist: string enums\nfrom approved source/recipient/price-basis mappings only; NI-071 adds\nlist-valued multi-selections whose values fan out into one compared\nseries per selected value). Unknown keys and unlisted values are rejected\nbefore any resolution happens, so this permissive container never\nserializes an unapproved filter value. Singletons serialize as strings\nand comparisons as arrays, preserving historical selection hashes.",
         "properties": {},
         "title": "ResolvedSelectionFilters",
         "type": "object"
@@ -4117,9 +4470,23 @@
           },
           "filters": {
             "additionalProperties": {
-              "maxLength": 200,
-              "minLength": 1,
-              "type": "string"
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 32,
+                  "minItems": 1,
+                  "type": "array"
+                }
+              ]
             },
             "maxProperties": 32,
             "propertyNames": {
@@ -4361,7 +4728,7 @@
       },
       "ShareCreatedResponse": {
         "additionalProperties": false,
-        "description": "The owner's share record after create (or idempotent replay).\n\n``share_token`` is returned exactly ONCE \u2014 the first (non-replay) create.\nA replay identifies the same share but cannot re-emit the unrecoverable\ntoken; the owner revokes and creates a new share to obtain a new link.",
+        "description": "The owner's share record after create (or idempotent replay).\n\n``share_token`` is returned exactly ONCE \u2014 the first (non-replay) create.\nA replay identifies the same share but cannot re-emit the unrecoverable\ntoken; it returns the share's current lifecycle status. The owner can\nrevoke the original share and create a new one to obtain a new link.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -4427,7 +4794,11 @@
             "title": "Share Token"
           },
           "status": {
-            "const": "active",
+            "enum": [
+              "active",
+              "expired",
+              "revoked"
+            ],
             "title": "Status",
             "type": "string"
           }
@@ -4906,6 +5277,106 @@
         "title": "ShareListBlock",
         "type": "object"
       },
+      "ShareModelResultBlock": {
+        "additionalProperties": false,
+        "description": "Public fields of one verified published run and its pinned interpretation.",
+        "properties": {
+          "block_id": {
+            "format": "uuid",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_type": {
+            "const": "modelResult",
+            "title": "Block Type",
+            "type": "string"
+          },
+          "coefficients": {
+            "items": {
+              "$ref": "#/components/schemas/CoefficientResponse"
+            },
+            "minItems": 1,
+            "title": "Coefficients",
+            "type": "array"
+          },
+          "dataset_version_id": {
+            "format": "uuid",
+            "title": "Dataset Version Id",
+            "type": "string"
+          },
+          "gate_verdict": {
+            "enum": [
+              "READY",
+              "READY_WITH_LIMITS"
+            ],
+            "title": "Gate Verdict",
+            "type": "string"
+          },
+          "interpretation": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "bullet_list": "#/components/schemas/RichTextList-Output",
+                  "ordered_list": "#/components/schemas/RichTextList-Output",
+                  "paragraph": "#/components/schemas/RichTextParagraph"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RichTextParagraph"
+                },
+                {
+                  "$ref": "#/components/schemas/RichTextList-Output"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Interpretation",
+            "type": "array"
+          },
+          "limitations": {
+            "$ref": "#/components/schemas/LimitationsResponse"
+          },
+          "model_run_id": {
+            "format": "uuid",
+            "title": "Model Run Id",
+            "type": "string"
+          },
+          "sample": {
+            "$ref": "#/components/schemas/RunSampleResponse"
+          },
+          "spec_id": {
+            "pattern": "^[a-z][a-z0-9_]{2,79}$",
+            "title": "Spec Id",
+            "type": "string"
+          },
+          "spec_version": {
+            "minimum": 1.0,
+            "title": "Spec Version",
+            "type": "integer"
+          },
+          "tolerances": {
+            "$ref": "#/components/schemas/TolerancesResponse"
+          }
+        },
+        "required": [
+          "block_type",
+          "block_id",
+          "model_run_id",
+          "dataset_version_id",
+          "spec_id",
+          "spec_version",
+          "interpretation",
+          "gate_verdict",
+          "sample",
+          "tolerances",
+          "limitations",
+          "coefficients"
+        ],
+        "title": "ShareModelResultBlock",
+        "type": "object"
+      },
       "ShareModelRunReference": {
         "additionalProperties": false,
         "description": "One published model run referenced by the projection (NI-054).",
@@ -5016,6 +5487,7 @@
                   "hypothesis": "#/components/schemas/ShareHypothesisBlock",
                   "insight": "#/components/schemas/ShareInsightBlock",
                   "liveChart": "#/components/schemas/ShareChartBlock",
+                  "modelResult": "#/components/schemas/ShareModelResultBlock",
                   "ordered_list": "#/components/schemas/ShareListBlock",
                   "paragraph": "#/components/schemas/ShareParagraphBlock",
                   "risk": "#/components/schemas/ShareRiskBlock"
@@ -5049,6 +5521,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ShareRiskBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ShareModelResultBlock"
                 },
                 {
                   "$ref": "#/components/schemas/ShareDividerBlock"
@@ -5290,6 +5765,200 @@
           "revoked_at"
         ],
         "title": "ShareSummaryResponse",
+        "type": "object"
+      },
+      "SnapshotCalculationContext": {
+        "additionalProperties": false,
+        "description": "Frozen calculation inputs recorded at freeze time (immutable).",
+        "properties": {
+          "context_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Context Hash",
+            "type": "string"
+          },
+          "metric_definition_versions": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Metric Definition Versions",
+            "type": "array"
+          },
+          "renderer_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Renderer Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "context_hash",
+          "metric_definition_versions",
+          "renderer_version"
+        ],
+        "title": "SnapshotCalculationContext",
+        "type": "object"
+      },
+      "SnapshotCompareResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/snapshots/{id}/compare-live: frozen view plus the live view.\n\n``live_view`` resolves the SAME selection against the latest approved\ndataset for the explicit comparison only; the snapshot row itself is\nnever rewritten by a comparison.",
+        "properties": {
+          "dataset_changed": {
+            "title": "Dataset Changed",
+            "type": "boolean"
+          },
+          "frozen_view": {
+            "$ref": "#/components/schemas/ChartViewResponse"
+          },
+          "live_view": {
+            "$ref": "#/components/schemas/ChartViewResponse"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/SnapshotResponse"
+          }
+        },
+        "required": [
+          "snapshot",
+          "frozen_view",
+          "live_view",
+          "dataset_changed"
+        ],
+        "title": "SnapshotCompareResponse",
+        "type": "object"
+      },
+      "SnapshotCreateRequest": {
+        "additionalProperties": false,
+        "description": "POST /api/snapshots body (API_SPECIFICATION row, no owner field).",
+        "properties": {
+          "chart_definition_version_id": {
+            "format": "uuid",
+            "title": "Chart Definition Version Id",
+            "type": "string"
+          },
+          "dataset_version_id": {
+            "format": "uuid",
+            "title": "Dataset Version Id",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/SavedChartSelectionInput"
+          }
+        },
+        "required": [
+          "chart_definition_version_id",
+          "dataset_version_id",
+          "selection"
+        ],
+        "title": "SnapshotCreateRequest",
+        "type": "object"
+      },
+      "SnapshotDetailResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/snapshots/{id}: the snapshot plus its FROZEN ChartView.\n\n``view`` resolves the pinned dataset version and stored selection through\nthe shared NI-032 delivery service \u2014 never the latest dataset \u2014 so the\nfrozen evidence stays byte-identical through any later refresh.",
+        "properties": {
+          "snapshot": {
+            "$ref": "#/components/schemas/SnapshotResponse"
+          },
+          "view": {
+            "$ref": "#/components/schemas/ChartViewResponse"
+          }
+        },
+        "required": [
+          "snapshot",
+          "view"
+        ],
+        "title": "SnapshotDetailResponse",
+        "type": "object"
+      },
+      "SnapshotListResponse": {
+        "additionalProperties": false,
+        "description": "Owner-scoped snapshot list (bounded opaque offset cursor).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SnapshotResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "SnapshotListResponse",
+        "type": "object"
+      },
+      "SnapshotResponse": {
+        "additionalProperties": false,
+        "description": "One owned immutable research snapshot (DATABASE_SCHEMA row).",
+        "properties": {
+          "artifact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id"
+          },
+          "calculation_context": {
+            "$ref": "#/components/schemas/SnapshotCalculationContext"
+          },
+          "chart_definition_version_id": {
+            "format": "uuid",
+            "title": "Chart Definition Version Id",
+            "type": "string"
+          },
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dataset_version_id": {
+            "format": "uuid",
+            "title": "Dataset Version Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/SavedChartSelectionInput"
+          }
+        },
+        "required": [
+          "id",
+          "chart_definition_version_id",
+          "dataset_version_id",
+          "selection",
+          "calculation_context",
+          "artifact_id",
+          "content_sha256",
+          "created_at"
+        ],
+        "title": "SnapshotResponse",
         "type": "object"
       },
       "TolerancesResponse": {
@@ -5971,7 +6640,7 @@
     },
     "/api/documents": {
       "get": {
-        "description": "List the verified principal's documents, newest first, owner-scoped.",
+        "description": "List the verified principal's documents, newest first, owner-scoped.\n\nOptional private organization filters (NI-072): ``tag`` may repeat (AND\nsemantics \u2014 a document matches when it carries EVERY listed normalized\ntag; at most :data:`MAX_FILTER_TAGS` values), ``favorite`` filters to\nfavorited (``true``) or non-favorited (``false``) documents. Filters\ncompose with ``q`` and pagination inside one owner-scoped query; a tag\nno document carries is an honest empty page, never an error.",
         "operationId": "listDocuments",
         "parameters": [
           {
@@ -5989,6 +6658,42 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 40,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          },
+          {
+            "in": "query",
+            "name": "favorite",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Favorite"
             }
           },
           {
@@ -6131,7 +6836,7 @@
         ]
       },
       "post": {
-        "description": "Create an owned document whose first revision is the empty document.\n\nWith an ``Idempotency-Key`` header the created result is stored in the\nwrite transaction and a repeated identical owner/route/body request\nreplays the original 201 response (24h) instead of creating a second\ndocument; the same key with a different body is a 409 idempotency\ncollision.",
+        "description": "Create an owned document whose first revision is empty or templated.\n\nWith ``template_id: \"investment-v1\"`` the first revision carries the\ntemplate's eight section headings and nothing else (EDITOR_SPECIFICATION:\nno fabricated paragraphs or numerical placeholder claims). Unknown\ntemplate ids are rejected by the request contract (typed 422) before any\nwrite. ``template_id`` is part of the idempotent request fingerprint, so\na replayed creation with a template returns the SAME document.\n\nWith an ``Idempotency-Key`` header the created result is stored in the\nwrite transaction and a repeated identical owner/route/body request\nreplays the original 201 response (24h) instead of creating a second\ndocument; the same key with a different body is a 409 idempotency\ncollision.",
         "operationId": "createDocument",
         "parameters": [
           {
@@ -7753,7 +8458,7 @@
     },
     "/api/documents/{document_id}/exports": {
       "post": {
-        "description": "Queue one Markdown ZIP export of the owned document's current revision.\n\nThe frozen export plan is built in the same transaction that inserts the\njob (NI-056): the requested revision must be the document's acknowledged\ncurrent version \u2014 a valid but superseded revision is the typed 409\n``REVISION_NOT_ACKNOWLEDGED`` (save/rename again and export the new\ncurrent revision), and an unresolvable pin or reference is the typed 422.\nWith an ``Idempotency-Key: UUID`` a repeated identical owner/route/body\nrequest replays the ORIGINAL job instead of creating a second one; the\nsame key with a different body is a 409 idempotency collision.",
+        "description": "Queue one export (Markdown ZIP or PDF) of the owned document's current\nrevision.\n\nThe frozen export plan is built in the same transaction that inserts the\njob (NI-056): the requested revision must be the document's acknowledged\ncurrent version \u2014 a valid but superseded revision is the typed 409\n``REVISION_NOT_ACKNOWLEDGED`` (save/rename again and export the new\ncurrent revision), and an unresolvable pin or reference is the typed 422.\nThe format selects the worker's renderer only (``markdown_zip`` \u2192\nresearch.md + assets + manifest; ``pdf`` \u2192 the deterministic static\nreport); both formats freeze the SAME plan. With an ``Idempotency-Key:\nUUID`` a repeated identical owner/route/body request replays the ORIGINAL\njob instead of creating a second one; the same key with a different body\nis a 409 idempotency collision.",
         "operationId": "createDocumentExport",
         "parameters": [
           {
@@ -7881,7 +8586,7 @@
             "description": "Request failed validation or references an unavailable target"
           }
         },
-        "summary": "Create (idempotently) the Markdown ZIP export job of the acknowledged revision",
+        "summary": "Create (idempotently) the export job of the acknowledged revision in the requested documented format",
         "tags": [
           "exports"
         ]
@@ -8009,7 +8714,7 @@
     },
     "/api/documents/{document_id}/exports/{job_id}/download": {
       "get": {
-        "description": "Stream the stored ZIP of one succeeded, unexpired export job.\n\nThe bytes are re-verified against the job's recorded SHA-256 before they\nare returned; anything else (queued/running, failed, expired, corrupt)\nis a typed refusal \u2014 never a stale or altered file.",
+        "description": "Stream the stored artifact of one succeeded, unexpired export job.\n\nThe media type follows the job's recorded format (``application/zip``\nfor Markdown ZIP bundles, ``application/pdf`` for the static PDF\nreport). The bytes are re-verified against the job's recorded SHA-256\nbefore they are returned; anything else (queued/running, failed,\nexpired, corrupt) is a typed refusal \u2014 never a stale or altered file.",
         "operationId": "downloadDocumentExport",
         "parameters": [
           {
@@ -8054,6 +8759,12 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
               },
               "application/zip": {
                 "schema": {
@@ -8125,7 +8836,7 @@
             "description": "Request failed validation or references an unavailable target"
           }
         },
-        "summary": "Download the finished export ZIP (owner-only, unexpired)",
+        "summary": "Download the finished export artifact (owner-only, unexpired; ZIP or PDF by the job's format)",
         "tags": [
           "exports"
         ]
@@ -9346,6 +10057,298 @@
         "summary": "Edit an insight in the current owned document revision",
         "tags": [
           "insights"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/model-blocks": {
+      "post": {
+        "description": "Append one valid modelResult block with its frozen model context.\n\nWith an ``Idempotency-Key`` the response snapshot is stored in the write\ntransaction (NI-037 store), so a repeated identical owner/route/body\nrequest replays the original 201 (same revision, no second block)\ninstead of a spurious 409 against the advanced document.",
+        "operationId": "addModelBlock",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelBlockInsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelBlockMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Revision conflict (document moved) or Idempotency-Key reused with a different request"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Document exceeds a hard size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "If-Match precondition is required"
+          }
+        },
+        "summary": "Append one pinned model-result block to an owned document (compare-and-set via If-Match)",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/organization": {
+      "patch": {
+        "description": "Merge private organization metadata on the owned document (NI-072).\n\nPATCH semantics: absent fields stay unchanged; ``tags`` normalizes\nserver-side (trim + lower + dedupe) and ``tags: []`` clears them. This is\nmetadata-only \u2014 no revision is created, no content hash changes and\n``documents.updated_at`` (the list order) is untouched, so no If-Match\nprecondition applies. The document must exist and be owned (one generic\n404 otherwise).",
+        "operationId": "updateDocumentOrganization",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentOrganizationUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOrganizationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced target does not exist for this owner"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Revision conflict (document moved) or Idempotency-Key reused with a different request"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Document exceeds a hard size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or references an unavailable target"
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "If-Match precondition is required"
+          }
+        },
+        "summary": "Update an owned document's private tags and favorite flag",
+        "tags": [
+          "documents"
         ]
       }
     },
@@ -11261,6 +12264,196 @@
         ]
       }
     },
+    "/api/publications/{slug}": {
+      "get": {
+        "description": "Return the published release; unpublished identities are the same 404.",
+        "operationId": "getPublication",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Published release not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One published public research release",
+        "tags": [
+          "publications"
+        ]
+      }
+    },
+    "/api/publications/{slug}/duplicate": {
+      "post": {
+        "description": "Clone one pinned release into a new private document with attribution.\n\nThe clone allocates fresh private IDs, rebuilds and re-verifies every\nchart context from its immutable pins (an unavailable pinned dataset or\nchart definition is an explicit typed 422, never a latest substitution),\nkeeps public data/model pins verbatim and records the source release as\nretained attribution. The publication itself is immutable and unchanged.",
+        "operationId": "duplicatePublication",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicationDuplicateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Verified account is disabled"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Published release not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Idempotency-Key reused with a different request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed validation or a public pin is unavailable"
+          }
+        },
+        "summary": "Clone a published release into a new private document",
+        "tags": [
+          "publications"
+        ]
+      }
+    },
     "/api/saved-charts": {
       "get": {
         "operationId": "listSavedCharts",
@@ -11889,8 +13082,6 @@
             "name": "token",
             "required": true,
             "schema": {
-              "maxLength": 200,
-              "minLength": 1,
               "title": "Token",
               "type": "string"
             }
@@ -11915,9 +13106,9 @@
                 }
               }
             },
-            "description": "The share link is unknown, revoked or expired (one generic deny)"
+            "description": "The share or chart is unavailable (one generic deny)"
           },
-          "422": {
+          "default": {
             "content": {
               "application/json": {
                 "schema": {
@@ -11925,7 +13116,7 @@
                 }
               }
             },
-            "description": "Request failed validation"
+            "description": "Request failed"
           }
         },
         "summary": "Read one shared frozen revision by token (read-only)",
@@ -11944,8 +13135,6 @@
             "name": "token",
             "required": true,
             "schema": {
-              "maxLength": 200,
-              "minLength": 1,
               "title": "Token",
               "type": "string"
             }
@@ -11980,9 +13169,9 @@
                 }
               }
             },
-            "description": "The share link is unknown, revoked or expired (one generic deny)"
+            "description": "The share or chart is unavailable (one generic deny)"
           },
-          "422": {
+          "default": {
             "content": {
               "application/json": {
                 "schema": {
@@ -11990,7 +13179,7 @@
                 }
               }
             },
-            "description": "Request failed validation"
+            "description": "Request failed"
           }
         },
         "summary": "Download the exact chart data of a shared revision",
@@ -12009,8 +13198,6 @@
             "name": "token",
             "required": true,
             "schema": {
-              "maxLength": 200,
-              "minLength": 1,
               "title": "Token",
               "type": "string"
             }
@@ -12045,7 +13232,131 @@
                 }
               }
             },
-            "description": "The share link is unknown, revoked or expired (one generic deny)"
+            "description": "The share or chart is unavailable (one generic deny)"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request failed"
+          }
+        },
+        "summary": "Read one frozen chart view of a shared revision",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/api/snapshots": {
+      "get": {
+        "operationId": "listSnapshots",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -12055,12 +13366,464 @@
                 }
               }
             },
-            "description": "Request failed validation"
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
-        "summary": "Read one frozen chart view of a shared revision",
+        "summary": "List Snapshots",
         "tags": [
-          "shares"
+          "snapshots"
+        ]
+      },
+      "post": {
+        "operationId": "createSnapshot",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create Snapshot",
+        "tags": [
+          "snapshots"
+        ]
+      }
+    },
+    "/api/snapshots/{snapshot_id}": {
+      "delete": {
+        "operationId": "deleteSnapshot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete Snapshot",
+        "tags": [
+          "snapshots"
+        ]
+      },
+      "get": {
+        "operationId": "getSnapshot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Snapshot",
+        "tags": [
+          "snapshots"
+        ]
+      }
+    },
+    "/api/snapshots/{snapshot_id}/compare-live": {
+      "get": {
+        "operationId": "compareSnapshotWithLive",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotCompareResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Compare Snapshot",
+        "tags": [
+          "snapshots"
         ]
       }
     },

@@ -28,6 +28,7 @@ export type ShareFetchResult =
   | ShareFetchFailure;
 
 const REQUEST_TIMEOUT_MS = 10_000;
+const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 /**
  * GET /api/shares/{token} — the frozen projection behind one share link.
@@ -35,6 +36,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
  * renders one honest denied state for every failure.
  */
 export async function fetchSharedProjection(token: string): Promise<ShareFetchResult> {
+  if (!TOKEN_PATTERN.test(token)) return { ok: false, status: 404 };
   let response: Response;
   try {
     response = await globalThis.fetch(

@@ -43,6 +43,10 @@ from near_api.insights.schemas import (
 from near_api.schemas.chart_selection import ChartSelection
 from near_api.schemas.common import ContractModel
 from near_api.schemas.delivery import ChartViewResponse
+from near_api.schemas.models import (
+    CoefficientResponse, GateVerdict, LimitationsResponse, RunSampleResponse,
+    SPEC_ID_PATTERN, TolerancesResponse,
+)
 
 SHARE_PROJECTION_VERSION = 1
 """The only publication-projection version this builder emits. A future
@@ -183,6 +187,23 @@ class ShareRiskBlock(ContractModel):
     body: RichTextBody
 
 
+class ShareModelResultBlock(ContractModel):
+    """Public fields of one verified published run and its pinned interpretation."""
+
+    block_type: Literal["modelResult"]
+    block_id: UUID
+    model_run_id: UUID
+    dataset_version_id: UUID
+    spec_id: Annotated[str, StringConstraints(pattern=SPEC_ID_PATTERN)]
+    spec_version: int = Field(strict=True, ge=1)
+    interpretation: RichTextBody
+    gate_verdict: GateVerdict
+    sample: RunSampleResponse
+    tolerances: TolerancesResponse
+    limitations: LimitationsResponse
+    coefficients: tuple[CoefficientResponse, ...] = Field(min_length=1)
+
+
 class ShareDividerBlock(ContractModel):
     block_type: Literal["divider"]
     block_id: UUID
@@ -191,7 +212,7 @@ class ShareDividerBlock(ContractModel):
 ShareBlock = Annotated[
     ShareParagraphBlock | ShareHeadingBlock | ShareListBlock | ShareChartBlock
     | ShareDataTableBlock | ShareInsightBlock | ShareHypothesisBlock
-    | ShareEvidenceBlock | ShareRiskBlock | ShareDividerBlock,
+    | ShareEvidenceBlock | ShareRiskBlock | ShareModelResultBlock | ShareDividerBlock,
     Field(discriminator="block_type"),
 ]
 
@@ -267,19 +288,23 @@ class DocumentShareCreateRequest(ContractModel):
     expires_at: AwareDatetime | None = None
 
 
+ShareStatus = Literal["active", "expired", "revoked"]
+
+
 class ShareCreatedResponse(ContractModel):
     """The owner's share record after create (or idempotent replay).
 
     ``share_token`` is returned exactly ONCE — the first (non-replay) create.
     A replay identifies the same share but cannot re-emit the unrecoverable
-    token; the owner revokes and creates a new share to obtain a new link.
+    token; it returns the share's current lifecycle status. The owner can
+    revoke the original share and create a new one to obtain a new link.
     """
 
     id: UUID
     document_id: UUID
     document_version_id: UUID
     revision: int = Field(strict=True, ge=1)
-    status: Literal["active"]
+    status: ShareStatus
     created_at: ServerTimestamp
     expires_at: ServerTimestamp | None
     share_token: str | None = Field(default=None, min_length=32, max_length=200)
@@ -293,7 +318,7 @@ class ShareSummaryResponse(ContractModel):
     document_id: UUID
     document_version_id: UUID
     revision: int = Field(strict=True, ge=1)
-    status: Literal["active", "expired", "revoked"]
+    status: ShareStatus
     created_at: ServerTimestamp
     expires_at: ServerTimestamp | None
     revoked_at: ServerTimestamp | None

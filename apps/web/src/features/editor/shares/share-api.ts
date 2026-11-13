@@ -16,6 +16,7 @@ import { apiErrorResponseSchema } from "@/features/documents/list/documents-sche
  */
 
 export type SharePreviewResponse = components["schemas"]["SharePreviewResponse"];
+export type ShareConsent = components["schemas"]["DocumentShareCreateRequest"];
 export type ShareProjection = components["schemas"]["ShareProjection"];
 export type ShareScopeSummary = components["schemas"]["ShareScopeSummary"];
 export type ShareCreatedResponse = components["schemas"]["ShareCreatedResponse"];
@@ -57,12 +58,7 @@ export async function previewShare(documentId: string,
 }
 
 export async function createShare(documentId: string,
-                                  consent: {
-                                    acknowledged_revision: number;
-                                    preview_sha256: string;
-                                    visible_scope: ShareScopeSummary;
-                                    expires_at?: string | null;
-                                  },
+                                  consent: ShareConsent,
                                   idempotencyKey: string,
                                   signal: AbortSignal): Promise<ShareCreatedResponse> {
   const { data, response, error } = await api().POST(

@@ -14,9 +14,9 @@ recorded in DATABASE_SCHEMA.md). One row is one share:
   recorded ``projection_sha256``/``projection_byte_size`` pair.
 - ``token_hash`` stores ONLY the SHA-256 digest of the share token; the raw
   token is returned once in the create response and never persisted anywhere.
-- ``idempotency_key`` supports the NI-037-style create replay (unique per
-  owner); a replay re-identifies the SAME share but never re-emits the token
-  (it is unrecoverable from the digest by design).
+- ``idempotency_key`` is unique per owner and bound to the document and
+  consent body by ``idempotency_request_sha256``. A matching replay returns
+  the share's current lifecycle without re-emitting the token.
 
 Lifecycle: ``active`` -> ``revoked`` (owner revoke; the same UPDATE structurally
 clears the bytes — export-sweep semantics). Expiry is a live read-time
@@ -29,9 +29,8 @@ Ownership and roles (ADR-021):
   inserts/reads/revokes/deletes only its own rows with an active identity.
 - ``near_app`` token policy is the NEW capability pattern: it applies only
   when NO transaction-local identity is set (``app.current_user_id() IS NULL``)
-  and only to LIVE rows (``status = 'active'`` and unexpired). An
-  authenticated session therefore can never read another user's share through
-  it, and revoked/expired rows are invisible even to raw no-identity SQL.
+  and returns only the active, unexpired row matching the transaction-local
+  token digest. An unscoped or authenticated read cannot use this policy.
 - ``near_operator`` holds purge-only power (the saved_charts precedent): a
   lifecycle-columns-only SELECT (required by the purge WHERE) and DELETE —
   it cannot read token hashes or bytes and cannot write anything.
@@ -52,7 +51,7 @@ untouched.
 from alembic import op
 
 revision = "0017_document_shares"
-down_revision = "0012_export_jobs"
+down_revision = "0019_merge_pdf_publications"
 branch_labels = None
 depends_on = None
 
@@ -68,6 +67,7 @@ def upgrade():
             status varchar(16) NOT NULL DEFAULT 'active',
             revision integer NOT NULL,
             idempotency_key uuid,
+            idempotency_request_sha256 varchar(64),
             -- All three projection columns are nullable BY DESIGN: the
             -- pairing CHECK below is the invariant (an active share always
             -- carries all three; a revoked one none of them), and the
@@ -84,6 +84,10 @@ def upgrade():
             CONSTRAINT ck_document_shares_status CHECK (status IN ('active','revoked')),
             CONSTRAINT ck_document_shares_revision CHECK (revision > 0),
             CONSTRAINT ck_document_shares_token_hash CHECK (token_hash ~ '^[0-9a-f]{64}$'),
+            CONSTRAINT ck_document_shares_idempotency_request_hash CHECK (
+                idempotency_request_sha256 ~ '^[0-9a-f]{64}$'),
+            CONSTRAINT ck_document_shares_idempotency_pairing CHECK (
+                (idempotency_key IS NULL) = (idempotency_request_sha256 IS NULL)),
             CONSTRAINT ck_document_shares_projection_hash
                 CHECK (projection_sha256 ~ '^[0-9a-f]{64}$'),
             CONSTRAINT ck_document_shares_projection_size CHECK (
@@ -128,11 +132,11 @@ def upgrade():
         BEGIN
             IF (NEW.token_hash, NEW.owner_id, NEW.document_id,
                 NEW.document_version_id, NEW.revision, NEW.idempotency_key,
-                NEW.created_at)
+                NEW.idempotency_request_sha256, NEW.created_at)
                IS DISTINCT FROM
                (OLD.token_hash, OLD.owner_id, OLD.document_id,
                 OLD.document_version_id, OLD.revision, OLD.idempotency_key,
-                OLD.created_at) THEN
+                OLD.idempotency_request_sha256, OLD.created_at) THEN
                 RAISE EXCEPTION 'identity columns of a document share are immutable';
             END IF;
             IF NEW.status = 'active' AND (
@@ -182,13 +186,13 @@ def upgrade():
             USING (owner_id = app.current_user_id() AND app.identity_is_active());
 
         -- Runtime role, capability plane (ADR-021): WITHOUT a transaction
-        -- local identity, a caller holding a token digest reads LIVE shares
-        -- only — the service filters by token_hash; revoked/expired rows are
-        -- invisible even to raw SQL, and an authenticated session voids this
-        -- policy entirely, so one owner can never enumerate another's shares.
+        -- local identity, only the active, unexpired share matching the
+        -- transaction's verified token digest is readable. A missing setting
+        -- is NULL; a malformed digest cannot match the constrained column.
         CREATE POLICY document_shares_token_read ON app.document_shares
             FOR SELECT TO near_app
             USING (app.current_user_id() IS NULL
+                   AND token_hash = current_setting('app.share_token_sha256', true)
                    AND status = 'active'
                    AND (expires_at IS NULL OR expires_at > now()));
 
@@ -212,7 +216,8 @@ def upgrade():
         -- UPDATE of them is a permission denial, not a silent no-op.
         GRANT SELECT ON app.document_shares TO near_app;
         GRANT INSERT(id, owner_id, document_id, document_version_id, token_hash,
-                     revision, idempotency_key, projection, projection_sha256,
+                     revision, idempotency_key, idempotency_request_sha256,
+                     projection, projection_sha256,
                      projection_byte_size, expires_at)
             ON app.document_shares TO near_app;
         GRANT UPDATE(status, revoked_at, projection, projection_sha256,

@@ -7,7 +7,7 @@
  * of rendering it.
  */
 import { axe } from "jest-axe";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ShareViewer } from "@/features/shares/ShareViewer";
@@ -80,6 +80,7 @@ describe("ShareViewer (read-only rendering)", () => {
     // and its exact-value table carries the exact decimal strings.
     const chart = screen.getByTestId("share-chart");
     expect(chart).toHaveTextContent(/Frozen chart/);
+    expect(chart).toHaveTextContent("Historical — pinned version");
     expect(chart).toHaveTextContent("12.5");
     expect(chart).toHaveTextContent(/never refreshes/);
     // No chart data loading indicator: the view is controlled.
@@ -120,11 +121,56 @@ describe("ShareViewer (read-only rendering)", () => {
     expect(screen.queryByRole("button", { name: /refresh/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /latest/i })).not.toBeInTheDocument();
   });
+
+  it("renders frozen table cells with exact text and visible boolean values", () => {
+    const projection = viewerProjection();
+    projection.blocks.push({
+      block_type: "dataTable", block_id: "14141414-1414-4414-8414-141414141414",
+      columns: [{ key: "included", label: "Included", type: "string", unit: null },
+        { key: "amount", label: "Amount", type: "number", unit: "NEAR" }],
+      rows: [[false, "0.000000000000000001"], [true, null]],
+      dataset: null,
+    });
+    render(<ShareViewer projection={shareProjectionSchema.parse(projection)} />);
+    const table = screen.getByRole("region", { name: "Shared data table" });
+    expect(within(table).getByRole("cell", { name: "false" })).toBeVisible();
+    expect(within(table).getByRole("cell", { name: "true" })).toBeVisible();
+    expect(within(table).getByRole("cell", { name: "0.000000000000000001" })).toBeVisible();
+  });
 });
 
 describe("Share projection validation boundary", () => {
   it("accepts the exact fixture shape", () => {
     expect(shareProjectionSchema.safeParse(viewerProjection()).success).toBe(true);
+  });
+
+  it("accepts canonical comparison filters and renders a published model with its recorded limits", () => {
+    const fixture = viewerProjection();
+    const chart = fixture.blocks.find((block) => block.block_type === "liveChart");
+    if (!chart) throw new Error("Expected a fixture chart");
+    chart.selection.filters = { recipient: ["synthetic-a", "synthetic-b"] };
+    fixture.blocks.push({
+      block_type: "modelResult", block_id: "12121212-1212-4212-8212-121212121212",
+      model_run_id: "77777777-7777-4777-8777-777777777777",
+      dataset_version_id: chart.observed_dataset_version_id,
+      spec_id: "gross_fee_activity_v1", spec_version: 1,
+      interpretation: [
+        { type: "paragraph", content: [] },
+        { type: "paragraph", content: [{ type: "text", text: "Synthetic interpretation", marks: [] }] },
+      ],
+      gate_verdict: "READY_WITH_LIMITS",
+      sample: { start: "2026-11-01", end_exclusive: "2026-11-06", nobs: 5 },
+      tolerances: { coefficient_rtol: "0.001", coefficient_atol: "0.000001" },
+      limitations: { prohibited_labels: ["protocol revenue"], spec_limitation_notes: ["Synthetic limitation"], gate_limit_codes: [] },
+      coefficients: [{ name: "synthetic term", estimate: 0.125, std_error: 0.25, t_stat: 0.5,
+        p_value: 0.2, ci95_low: -0.25, ci95_high: 0.5 }],
+    });
+    render(<ShareViewer projection={shareProjectionSchema.parse(fixture)} />);
+    const model = screen.getByRole("heading", { name: "Published model gross_fee_activity_v1 v1" }).closest("section");
+    if (!model) throw new Error("Expected the model section");
+    expect(within(model).getByText("Synthetic limitation")).toBeVisible();
+    expect(within(model).getByText("Synthetic interpretation")).toBeVisible();
+    expect(within(model).getByRole("cell", { name: /^0\.125$/ })).toBeVisible();
   });
 
   it("rejects a payload carrying a private identifier key", () => {

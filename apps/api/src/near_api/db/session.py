@@ -37,6 +37,7 @@ def create_runtime_engine(database_url: str, *, pool_size: int = 5) -> Engine:
             with dbapi_connection.cursor() as cursor:
                 cursor.execute("RESET ROLE")
                 cursor.execute("SELECT set_config('app.user_id', '', false)")
+                cursor.execute("SELECT set_config('app.share_token_sha256', '', false)")
             dbapi_connection.commit()
 
     return engine

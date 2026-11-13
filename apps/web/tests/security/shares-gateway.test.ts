@@ -58,6 +58,7 @@ describe("Share segments of the same-origin document gateway", () => {
     const preview = await GET(request("GET", [DOC_ID, "shares", "preview"]), context([DOC_ID, "shares", "preview"]));
     expect(preview.status).toBe(200);
     expect(preview.headers.get("cache-control")).toBe("no-store");
+    expect(preview.headers.get("referrer-policy")).toBe("no-referrer");
     const list = await GET(request("GET", [DOC_ID, "shares"]), context([DOC_ID, "shares"]));
     expect(list.status).toBe(200);
     const [url, options] = fetcher.mock.calls[0] as unknown as [URL, RequestInit];
@@ -94,6 +95,7 @@ describe("Share segments of the same-origin document gateway", () => {
       const response = await GET(request("GET", segments, { search: "?token=leak-attempt" }), context(segments));
       expect(response.status).toBe(422);
       expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     }
     expect(fetcher).not.toHaveBeenCalled();
   });

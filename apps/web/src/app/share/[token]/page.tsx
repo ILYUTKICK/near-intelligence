@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { Brand } from "@/components/layout/Brand";
+import { SkipLink } from "@/components/layout/SkipLink";
 import { ShareViewer } from "@/features/shares/ShareViewer";
 import { fetchSharedProjection } from "@/features/shares/share-viewer-api";
 
@@ -24,28 +26,33 @@ export const metadata: Metadata = {
  */
 export default async function SharedRevisionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { token } = await params;
-  const result = await fetchSharedProjection(token);
-  if (!result.ok) {
-    return (
-      <div className="page-container">
-        <div className="paper-panel p-8" role="alert" data-testid="share-denied">
-          <h1 className="font-serif text-page leading-page">This share link is not available</h1>
-          <p className="text-body leading-body text-text-secondary mt-3">
-            The link may be wrong, or the owner may have revoked it or let it
-            expire. Revoked and expired links stop working immediately for
-            everyone — nothing is shown rather than partial or stale content.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const result = Object.keys(await searchParams).length
+    ? { ok: false as const }
+    : await fetchSharedProjection(token);
   return (
-    <div className="page-container">
-      <ShareViewer projection={result.projection} />
+    <div className="min-h-dvh">
+      <SkipLink />
+      <header className="border-b border-border bg-canvas">
+        <div className="mx-auto w-full max-w-(--width-content-max) px-(--page-gutter) py-4">
+          <Brand />
+        </div>
+      </header>
+      <main id="main-content" className="page-container">
+        {result.ok ? <ShareViewer projection={result.projection} /> : (
+          <div className="paper-panel p-8" role="alert" data-testid="share-denied">
+            <h1 className="font-serif text-page leading-page">This share link is not available</h1>
+            <p className="text-body leading-body text-text-secondary mt-3">
+              Check the link or ask the owner for access.
+            </p>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

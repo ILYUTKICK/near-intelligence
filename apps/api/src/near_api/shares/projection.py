@@ -19,10 +19,10 @@ from __future__ import annotations
 
 import json
 
+from near_api.exports.ir import ExportIrError
 from near_api.schemas.export import (
     ExportBlock,
     ExportChartBlock,
-    ExportCitationReference,
     ExportDataTableBlock,
     ExportDividerBlock,
     ExportEvidenceBlock,
@@ -31,9 +31,11 @@ from near_api.schemas.export import (
     ExportInsightBlock,
     ExportIr,
     ExportListBlock,
+    ExportModelResultBlock,
     ExportParagraphBlock,
     ExportRiskBlock,
 )
+from near_api.schemas.models import RunSampleResponse, TolerancesResponse
 from near_api.schemas.share import (
     SHARE_PROJECTION_VERSION,
     ShareBlock,
@@ -49,6 +51,7 @@ from near_api.schemas.share import (
     ShareHypothesisBlock,
     ShareInsightBlock,
     ShareListBlock,
+    ShareModelResultBlock,
     ShareModelRunReference,
     ShareParagraphBlock,
     ShareProjection,
@@ -114,9 +117,23 @@ def _project_block(block: ExportBlock) -> ShareBlock:
     if isinstance(block, ExportRiskBlock):
         return ShareRiskBlock(block_type="risk", block_id=block.block_id,
                               title=block.title, body=block.body)
+    if isinstance(block, ExportModelResultBlock):
+        summary = block.summary
+        return ShareModelResultBlock(
+            block_type="modelResult", block_id=block.block_id,
+            model_run_id=block.model_run_id, dataset_version_id=block.dataset_version_id,
+            spec_id=block.spec_id, spec_version=block.spec_version,
+            interpretation=block.interpretation, gate_verdict=summary.gate_verdict,
+            sample=RunSampleResponse(start=summary.sample_start,
+                                     end_exclusive=summary.sample_end_exclusive, nobs=summary.nobs),
+            tolerances=TolerancesResponse(coefficient_rtol=summary.coefficient_rtol,
+                                         coefficient_atol=summary.coefficient_atol),
+            limitations=summary.limitations, coefficients=summary.coefficients,
+        )
     if isinstance(block, ExportDividerBlock):
         return ShareDividerBlock(block_type="divider", block_id=block.block_id)
-    raise ValueError("Unsupported export block reached the share projection")
+    raise ExportIrError("The revision contains an unsupported share block",
+                        ((f"blocks.{block.block_id}", "unsupported_share_block"),))
 
 
 def build_share_projection(plan: ExportIr) -> ShareProjection:

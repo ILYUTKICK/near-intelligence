@@ -21,6 +21,7 @@ fake renderer scripts written at test runtime. Covered guarantees:
 Every fixture is visibly synthetic ("(fixture)"); no research data.
 """
 
+import csv
 import json
 import os
 import subprocess
@@ -28,10 +29,13 @@ import tempfile
 import time
 import unittest
 from datetime import date, datetime, timezone
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 from uuid import uuid4
 
+from near_api.charts.filter_registry import FILTER_TREASURY_RECIPIENTS
+from near_api.documents.routes import _chart_csv
 from near_api.exports import charts as charts_module
 from near_api.exports.charts import (
     RENDERER_ID,
@@ -356,6 +360,30 @@ class RendererSubprocessTests(unittest.TestCase):
         self.assertEqual(first.charts[0].csv, second.charts[0].csv)
         self.assertEqual(first.charts[0].svg_sha256, second.charts[0].svg_sha256)
         self.assertEqual(first.charts[0].csv_sha256, second.charts[0].csv_sha256)
+
+    def test_compared_series_keep_exact_values_and_distinct_labels_in_both_csv_paths(self):
+        base = chart_request()
+        chart = base.charts[0]
+        view = chart.view
+        recipients = FILTER_TREASURY_RECIPIENTS[:2]
+        selected = view.selection.model_copy(update={"filters": ResolvedSelectionFilters.model_validate(
+            {"recipient": list(recipients)})})
+        series = tuple(view.series[0].model_copy(update={"selection": view.selection.model_copy(update={
+            "filters": ResolvedSelectionFilters.model_validate({"recipient": recipient}),
+        })}) for recipient in recipients)
+        compared = view.model_copy(update={"selection": selected, "series": series})
+        request = base.model_copy(update={"charts": (chart.model_copy(update={"view": compared}),)})
+
+        asset, = render_chart_assets(request).charts
+        rows = list(csv.DictReader(StringIO(asset.csv)))
+        self.assertEqual(asset.series_count, 2)
+        self.assertEqual([row["value"] for row in rows[:2]], [HUGE_DECIMAL] * 2)
+        for row, recipient in zip(rows[:2], recipients, strict=True):
+            self.assertTrue(row["series"].endswith(f"recipient: {recipient}"))
+            self.assertIn(recipient, asset.svg)
+        historical = list(csv.DictReader(StringIO(_chart_csv(compared))))
+        self.assertEqual([json.loads(row["filters"]) for row in historical],
+                         [{"recipient": recipient} for recipient in recipients for _ in series[0].points])
 
     def test_refuses_a_chart_pinned_to_a_foreign_renderer(self):
         request = chart_request()

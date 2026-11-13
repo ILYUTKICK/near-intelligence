@@ -1,7 +1,9 @@
 "use client";
 
 import { ChartView } from "@/features/charts/renderer/ChartView";
+import { sanitizeSourceUrl } from "@/features/charts/SourceDrawer";
 import { formatUpdated } from "@/features/documents/list/format";
+import { recordedFloat } from "@/features/models/recorded";
 import type { ShareBlockPayload, ShareProjectionPayload } from "@/features/shares/share-schema";
 
 /**
@@ -34,11 +36,9 @@ function RichRuns({ runs }: { runs: RunList }) {
           } else if (mark.type === "italic") {
             node = <em>{node}</em>;
           } else {
-            // Canonical link mark: scheme/credential rules were enforced by
-            // the server's canonical rich-text parser; rel keeps the shared
-            // page's context out of the target.
-            node = (
-              <a href={mark.attrs.href} rel="noreferrer noopener"
+            const href = sanitizeSourceUrl(mark.attrs.href);
+            if (href !== null) node = (
+              <a href={href} rel="noreferrer noopener"
                 className="text-accent underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
                 {node}
               </a>
@@ -89,7 +89,7 @@ function ChartBlock({ block }: { block: Extract<ShareBlockPayload, { block_type:
   return (
     <figure className="mt-6 rounded-surface border border-border p-5" data-testid="share-chart">
       <ChartView definition={view.definition} selection={view.selection} view={view}
-        mode="live" height={320} />
+        mode="historical" height={320} />
       <figcaption className="mt-2 text-metadata leading-metadata text-text-secondary">
         Frozen chart: pinned dataset {view.dataset.dataset_key} v{view.dataset.version} ·
         context hash {view.context_hash.slice(0, 12)}… · resolved {formatUpdated(view.resolved_at)} UTC.
@@ -124,7 +124,7 @@ function DataTableBlock({ block }: { block: Extract<ShareBlockPayload, { block_t
               <tr key={rowIndex} className="border-t border-border">
                 {block.columns.map((column, columnIndex) => (
                   <td key={column.key} className="text-ui leading-ui px-3 py-2 font-medium">
-                    {row[columnIndex] ?? "—"}
+                    {String(row[columnIndex] ?? "—")}
                   </td>
                 ))}
               </tr>
@@ -182,6 +182,55 @@ function RiskBlock({ block }: { block: Extract<ShareBlockPayload, { block_type: 
   );
 }
 
+const coefficientColumns = [
+  ["estimate", "Estimate"], ["std_error", "Std. error"], ["t_stat", "t"],
+  ["p_value", "p"], ["ci95_low", "95% CI low"], ["ci95_high", "95% CI high"],
+] as const;
+
+function ModelResultBlock({ block }: { block: Extract<ShareBlockPayload, { block_type: "modelResult" }> }) {
+  const { limitations, sample, tolerances } = block;
+  return (
+    <section className="mt-6 rounded-surface border border-border p-5">
+      <h3 className="font-serif text-heading">Published model {block.spec_id} v{block.spec_version}</h3>
+      <p className="mt-2 break-all text-metadata text-text-secondary">
+        Run {block.model_run_id} · Pinned dataset {block.dataset_version_id}
+      </p>
+      <p className="mt-1 text-ui text-text-secondary">
+        {block.gate_verdict} · {sample.start} – {sample.end_exclusive} (end exclusive) · {sample.nobs} observations.
+      </p>
+      <p className="mt-3 font-medium">Recorded limitations</p>
+      <ul className="list-disc pl-5 text-ui text-text-secondary">
+        {limitations.spec_limitation_notes.map((note) => <li key={note}>{note}</li>)}
+        {limitations.prohibited_labels.map((label) => <li key={label}>Prohibited label: {label}</li>)}
+        {limitations.gate_limit_codes.map((code) => <li key={code}>Gate limit: {code}</li>)}
+      </ul>
+      <div className="mt-3 overflow-x-auto" role="region" aria-label="Published model coefficients" tabIndex={0}>
+        <table className="w-full text-left text-metadata tabular-nums">
+          <caption className="sr-only">Recorded coefficients of the pinned run</caption>
+          <thead>
+            <tr>
+              <th scope="col" className="p-2">Term</th>
+              {coefficientColumns.map(([key, title]) => <th key={key} scope="col" className="p-2">{title}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {block.coefficients.map((row) => (
+              <tr key={row.name} className="border-t border-border">
+                <th scope="row" className="p-2">{row.name}</th>
+                {coefficientColumns.map(([key]) => <td key={key} className="p-2">{recordedFloat(row[key])}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-metadata text-text-secondary">
+        Reproduction tolerances rtol {tolerances.coefficient_rtol} · atol {tolerances.coefficient_atol}.
+      </p>
+      <div className="mt-3"><BodyContent body={block.interpretation} /></div>
+    </section>
+  );
+}
+
 function Block({ block }: { block: ShareBlockPayload }) {
   switch (block.block_type) {
     case "paragraph":
@@ -214,17 +263,20 @@ function Block({ block }: { block: ShareBlockPayload }) {
       return <EvidenceBlock block={block} />;
     case "risk":
       return <RiskBlock block={block} />;
+    case "modelResult":
+      return <ModelResultBlock block={block} />;
     case "divider":
       return <hr className="mt-8 border-border" />;
   }
 }
 
-export function ShareViewer({ projection }: { projection: ShareProjectionPayload }) {
+export function ShareViewer({ projection, embedded = false }: { projection: ShareProjectionPayload; embedded?: boolean }) {
   const { document: meta } = projection;
+  const Title = embedded ? "h3" : "h1";
   return (
     <article className="paper-panel p-8" data-testid="share-viewer">
       <p className="eyebrow">Shared research · read-only frozen revision</p>
-      <h1 className="font-serif text-page leading-page mt-1 [overflow-wrap:anywhere]">{meta.title}</h1>
+      <Title className="font-serif text-page leading-page mt-1 [overflow-wrap:anywhere]">{meta.title}</Title>
       <p className="mt-2 text-metadata leading-metadata text-text-secondary">
         Revision {meta.revision} · Content frozen on {formatUpdated(meta.created_at)} UTC ·
         Content hash {meta.content_sha256.slice(0, 12)}…

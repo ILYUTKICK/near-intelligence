@@ -50,6 +50,7 @@ from near_api.documents.schema import (
     empty_document,
     parse_document,
 )
+from near_api.exports.ir import build_export_ir, export_ir_canonical_bytes
 from near_api.main import app
 from near_api.schemas.common import ErrorResponse
 import test_chart_blocks as chart_fixtures
@@ -166,6 +167,22 @@ def data_table_attrs(**changes) -> dict:
         table_attrs.pop("rows")  # authored rows and a dataset ref are exclusive
     table_attrs.update(changes)
     return {"type": "dataTable", "attrs": table_attrs}
+
+
+def model_result_attrs(**changes) -> dict:
+    """A modelResult block fixture: ids + rich-text interpretation only.
+
+    The block never carries coefficients or diagnostics (NI-055): summaries
+    are re-projected from the immutable published run row.
+    """
+    attrs = {
+        "block_id": str(uuid4()),
+        "model_run_id": str(uuid4()),
+        "dataset_version_id": str(uuid4()),
+        "interpretation": [paragraph_node("The recorded gate verdict is READY_WITH_LIMITS.")],
+    }
+    attrs.update(changes)
+    return {"type": "modelResult", "attrs": attrs}
 
 
 def full_document(*, insight_context: dict | None = None) -> dict:
@@ -413,6 +430,80 @@ class DocumentSchemaTests(unittest.TestCase):
         parsed = parse_document(model_context)
         self.assertEqual(len(parsed.insights), 1)
 
+    def test_09_model_result_block_canonicalization(self):
+        """NI-055: ids + interpretation round-trip; statistical values rejected."""
+        from uuid import UUID
+        document = full_document()
+        document["content"].append(model_result_attrs(
+            interpretation=[paragraph_node("Recorded verdict", marks=[{"type": "bold"}]),
+                            paragraph_node("Association only, never causality.")]))
+        parsed = parse_document(document)
+        self.assertEqual(parsed.blocks[-1].block_type, "modelResult")
+        model = parsed.model_results[-1]
+        self.assertEqual(model.model_run_id, UUID(
+            document["content"][-1]["attrs"]["model_run_id"]))
+        self.assertEqual(model.dataset_version_id, UUID(
+            document["content"][-1]["attrs"]["dataset_version_id"]))
+        self.assertEqual(len(model.interpretation), 2)
+        # Canonicalization is deterministic and UUIDs normalize to one spelling.
+        respelled = copy.deepcopy(document)
+        respelled["content"][-1]["attrs"]["model_run_id"] = \
+            respelled["content"][-1]["attrs"]["model_run_id"].upper()
+        respelled["content"][-1]["attrs"]["dataset_version_id"] = \
+            respelled["content"][-1]["attrs"]["dataset_version_id"].upper()
+        again = parse_document(respelled)
+        self.assertEqual(again.content_sha256, parsed.content_sha256)
+        self.assertEqual(again.canonical["content"][-1]["attrs"],
+                         parsed.canonical["content"][-1]["attrs"])
+        # The generic projection rides the top-level block map verbatim.
+        projections = build_projections(parsed)
+        self.assertEqual(projections.blocks[-1].attrs,
+                         parsed.blocks[-1].attrs)
+
+    def test_10_model_result_rejections(self):
+        """Unknown attrs (any statistical value), missing ids, bad rich text."""
+        cases = {
+            "coefficients_attr": lambda attrs: attrs.update({"coefficients": []}),
+            "estimate_attr": lambda attrs: attrs.update({"estimate": 0.5}),
+            "diagnostics_attr": lambda attrs: attrs.update({"diagnostics": {}}),
+            "context_attr": lambda attrs: attrs.update({"context": resolved_context()}),
+            "missing_run_id": lambda attrs: attrs.pop("model_run_id"),
+            "missing_dataset_id": lambda attrs: attrs.pop("dataset_version_id"),
+            "bad_run_id": lambda attrs: attrs.update({"model_run_id": "not-a-uuid"}),
+            "bad_dataset_id": lambda attrs: attrs.update({"dataset_version_id": 42}),
+            "content_key": lambda attrs: attrs.update({"content": []}),
+        }
+        for name, mutation in cases.items():
+            with self.subTest(case=name):
+                node = model_result_attrs()
+                mutation(node["attrs"])
+                with self.assertRaises(DocumentSchemaError):
+                    parse_document({"schema_version": SCHEMA_VERSION, "type": "doc",
+                                    "content": [node]})
+        # Interpretation follows the shared rich-text grammar: required, bounded,
+        # marks whitelisted.
+        rich_cases = {
+            "missing_interpretation": {"interpretation": None},
+            "empty_interpretation": {"interpretation": []},
+            "too_long_interpretation": {"interpretation": [paragraph_node("y" * 10_001)]},
+            "bad_mark": {"interpretation": [paragraph_node(
+                "x", marks=[{"type": "underline"}])]},
+            "javascript_link": {"interpretation": [paragraph_node(
+                "x", marks=[{"type": "link", "attrs": {"href": "javascript:alert(1)"}}])]},
+            "unsupported_node": {"interpretation": [{"type": "heading", "content": []}]},
+        }
+        for name, change in rich_cases.items():
+            with self.subTest(case=name):
+                with self.assertRaises(DocumentSchemaError):
+                    parse_document({"schema_version": SCHEMA_VERSION, "type": "doc",
+                                    "content": [model_result_attrs(**change)]})
+        # A duplicate block_id in a mixed document is still rejected.
+        document = full_document()
+        document["content"].append(model_result_attrs(
+            block_id=document["content"][0]["attrs"]["block_id"]))
+        with self.assertRaises(DocumentSchemaError):
+            parse_document(document)
+
 
 class DocumentRouteContractTests(unittest.TestCase):
     """Offline HTTP failure behavior; no database required."""
@@ -424,16 +515,21 @@ class DocumentRouteContractTests(unittest.TestCase):
     def test_01_document_routes_are_documented_in_openapi(self):
         schema = self.client.get("/openapi.json").json()
         # The contract grows with implemented routes (NI-032 public delivery,
-        # NI-054 public model routes, NI-041 chart-block insertion).
+        # NI-054 public model routes, NI-041 chart-block insertion,
+        # NI-044 snapshot routes).
         self.assertEqual(set(schema["paths"]), {
             "/health", "/api/home", "/api/me",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
+            "/api/snapshots", "/api/snapshots/{snapshot_id}",
+            "/api/snapshots/{snapshot_id}/compare-live",
             "/api/documents", "/api/documents/{document_id}",
+            "/api/documents/{document_id}/organization",
             "/api/documents/{document_id}/versions",
             "/api/documents/{document_id}/versions/{version_id}",
             "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/view",
             "/api/documents/{document_id}/versions/{version_id}/chart-blocks/{block_id}/csv",
             "/api/documents/{document_id}/chart-blocks",
+            "/api/documents/{document_id}/model-blocks",
             "/api/documents/{document_id}/chart-view",
             "/api/documents/{document_id}/exports",
             "/api/documents/{document_id}/exports/{job_id}",
@@ -460,6 +556,7 @@ class DocumentRouteContractTests(unittest.TestCase):
             "/api/model-definitions/{model_id}/readiness",
             "/api/model-runs", "/api/model-runs/{run_id}",
             "/api/model-runs/{run_id}/manifest",
+            "/api/publications/{slug}", "/api/publications/{slug}/duplicate",
         })
         self.assertEqual(schema["paths"]["/api/documents"]["post"]["operationId"],
                          "createDocument")
@@ -499,6 +596,27 @@ class DocumentRouteContractTests(unittest.TestCase):
             chart_blocks_path["post"]["responses"]["201"]["content"]["application/json"]
             ["schema"],
             {"$ref": "#/components/schemas/ChartBlockMutationResponse"})
+        # NI-072 organization row: metadata-only PATCH, no If-Match (never a
+        # revision), response is the bounded organization state.
+        organization_path = schema["paths"]["/api/documents/{document_id}/organization"]
+        self.assertEqual(set(organization_path), {"patch"})
+        self.assertEqual(organization_path["patch"]["operationId"],
+                         "updateDocumentOrganization")
+        self.assertEqual(
+            organization_path["patch"]["requestBody"]["content"]["application/json"]
+            ["schema"],
+            {"$ref": "#/components/schemas/DocumentOrganizationUpdateRequest"})
+        self.assertEqual(
+            organization_path["patch"]["responses"]["200"]["content"]["application/json"]
+            ["schema"],
+            {"$ref": "#/components/schemas/DocumentOrganizationResponse"})
+        list_parameters = {item["name"]: item for item
+                           in schema["paths"]["/api/documents"]["get"]["parameters"]
+                           if item["in"] == "query"}
+        self.assertEqual(set(list_parameters),
+                         {"q", "tag", "favorite", "cursor", "limit"})
+        self.assertTrue(all(not item.get("required")
+                            for item in list_parameters.values()))
         # NI-058 export rows: create/poll/download live inside the document's
         # owned namespace so ownership resolves through ONE compositional chain.
         exports_path = schema["paths"]["/api/documents/{document_id}/exports"]
@@ -531,6 +649,7 @@ class DocumentRouteContractTests(unittest.TestCase):
             ("post", "/api/documents", {"title": "Synthetic"}),
             ("get", f"/api/documents/{uuid4()}", None),
             ("patch", f"/api/documents/{uuid4()}", {"title": "Synthetic"}),
+            ("patch", f"/api/documents/{uuid4()}/organization", {"favorite": True}),
             ("delete", f"/api/documents/{uuid4()}", None),
             ("get", f"/api/documents/{uuid4()}/versions", None),
             ("get", f"/api/documents/{uuid4()}/versions/{uuid4()}", None),
@@ -1080,13 +1199,22 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             self.assertEqual(contexts.status_code, 422)
             self.assertEqual(ErrorResponse.model_validate(contexts.json()).error.code,
                              "REFERENCE_INVALID")
-            # Template selection is feature-gated.
+            # Template selection (NI-045): the eight-heading template creates
+            # real heading blocks; unknown template ids stay a typed 422.
             template = self.client.post("/api/documents",
                                         json={"title": "T", "template_id": "investment-v1"},
                                         headers=alice_headers)
-            self.assertEqual(template.status_code, 422)
-            self.assertEqual(ErrorResponse.model_validate(template.json()).error.code,
-                             "FEATURE_UNAVAILABLE")
+            self.assertEqual(template.status_code, 201)
+            template_content = template.json()["content"]["content"]
+            self.assertEqual([node["content"][0]["text"] for node in template_content],
+                             ["Executive Summary", "Investment Hypothesis",
+                              "Adoption Evidence", "Revenue Analysis",
+                              "Token Economics", "Econometric Results",
+                              "Risks", "Conclusion"])
+            unknown_template = self.client.post(
+                "/api/documents", json={"title": "T", "template_id": "unknown-v1"},
+                headers=alice_headers)
+            self.assertEqual(unknown_template.status_code, 422)
             # Bob's session cannot see or save Alice's document.
         bob_headers = {"Authorization": "Bearer t.bob"}
         with self.as_session(self.bob_id):
@@ -1602,6 +1730,262 @@ class DocumentServiceDatabaseTests(unittest.TestCase):
             recovered = self.client.get(f"/api/documents/{document_id}/versions",
                                         headers=alice_headers)
             self.assertEqual(recovered.status_code, 200)
+
+    # -- NI-072: private organization metadata (tags + favorite) ------------ #
+
+    def test_19_organization_normalization_bounds_and_frozen_research(self):
+        """Tags/favorites are metadata OUTSIDE the frozen research chain.
+
+        Normalization (trim + lower + dedupe) collapses duplicates; bounds
+        are typed 422s; and no accepted or rejected metadata write changes
+        the revision, the stored content hashes, documents.updated_at (the
+        list order) or the export IR bytes.
+        """
+        dataset_id = self.insert_dataset_version(f"synthetic.{uuid4().hex[:8]}.org-notes")
+        content = self.full_document()
+        content["content"][-1] = data_table_attrs(dataset_version_id=str(dataset_id))
+        detail = self.create_document(self.alice, "Synthetic organization")
+        saved = service.save_revision(self.engine, self.alice, detail.document.id,
+                                      expected_revision=1, document_payload=content)
+        plan_before = export_ir_canonical_bytes(build_export_ir(
+            self.engine, self.alice, detail.document.id, saved.version.id))
+        counts_before = self.table_counts(detail.document.id)
+        with self.admin.connect() as connection:
+            document_before = connection.execute(text(
+                "SELECT revision, updated_at, current_version_id FROM app.documents "
+                "WHERE id = :id"), {"id": detail.document.id}).mappings().one()
+            hashes_before = connection.execute(text(
+                "SELECT content_sha256 FROM app.document_versions "
+                "WHERE document_id = :id ORDER BY revision"),
+                {"id": detail.document.id}).scalars().all()
+        alice_headers = {"Authorization": "Bearer t.alice"}
+        with self.as_session(self.alice_id):
+            # Duplicate spellings collapse through the documented
+            # normalization (trim + lower, first occurrence order kept).
+            tagged = self.client.patch(
+                f"/api/documents/{detail.document.id}/organization",
+                json={"tags": [" NEAR ", "Near", "near  ", " DeFi "], "favorite": True},
+                headers=alice_headers)
+            self.assertEqual(tagged.status_code, 200)
+            self.assertEqual(tagged.headers["Cache-Control"], "no-store")
+            body = tagged.json()
+            self.assertEqual(body["document_id"], str(detail.document.id))
+            self.assertEqual(body["tags"], ["near", "defi"])
+            self.assertEqual(body["favorite"], True)
+            first_updated_at = body["updated_at"]
+            # Every list/get summary carries the same private metadata.
+            listing = self.client.get("/api/documents", headers=alice_headers)
+            self.assertEqual(listing.json()["items"][0]["tags"], ["near", "defi"])
+            self.assertEqual(listing.json()["items"][0]["favorite"], True)
+            # PATCH merge semantics: an absent field stays unchanged.
+            favorite_only = self.client.patch(
+                f"/api/documents/{detail.document.id}/organization",
+                json={"favorite": False}, headers=alice_headers)
+            self.assertEqual(favorite_only.json()["tags"], ["near", "defi"])
+            self.assertEqual(favorite_only.json()["favorite"], False)
+            self.assertGreater(favorite_only.json()["updated_at"], first_updated_at)
+            # Re-writing identical values does not even bump metadata recency.
+            identical = self.client.patch(
+                f"/api/documents/{detail.document.id}/organization",
+                json={"tags": ["near", "defi"], "favorite": False},
+                headers=alice_headers)
+            self.assertEqual(identical.json()["updated_at"],
+                             favorite_only.json()["updated_at"])
+            # tags: [] clears; an empty PATCH is an explicit no-op.
+            cleared = self.client.patch(
+                f"/api/documents/{detail.document.id}/organization",
+                json={"tags": []}, headers=alice_headers)
+            self.assertEqual(cleared.json()["tags"], [])
+            noop = self.client.patch(
+                f"/api/documents/{detail.document.id}/organization",
+                json={}, headers=alice_headers)
+            self.assertEqual(noop.status_code, 200)
+            self.assertEqual(noop.json()["tags"], [])
+            self.assertEqual(noop.json()["favorite"], False)
+            # Bounded payloads: too many tags, an overlong tag and a
+            # whitespace-only tag are typed 422s, never silent drops.
+            too_many = self.client.patch(
+                f"/api/documents/{detail.document.id}/organization",
+                json={"tags": [f"tag-{index:02d}" for index in range(21)]},
+                headers=alice_headers)
+            self.assertEqual(too_many.status_code, 422)
+            self.assertEqual(ErrorResponse.model_validate(too_many.json()).error.code,
+                             "VALIDATION_ERROR")
+            overlong = self.client.patch(
+                f"/api/documents/{detail.document.id}/organization",
+                json={"tags": ["x" * 41]}, headers=alice_headers)
+            self.assertEqual(overlong.status_code, 422)
+            blank = self.client.patch(
+                f"/api/documents/{detail.document.id}/organization",
+                json={"tags": ["   "]}, headers=alice_headers)
+            self.assertEqual(blank.status_code, 422)
+        # The frozen research chain is untouched by every accepted or
+        # rejected metadata write.
+        self.assertEqual(build_export_ir(self.engine, self.alice, detail.document.id,
+                                         saved.version.id).document.content_sha256,
+                         saved.version.content_sha256)
+        self.assertEqual(export_ir_canonical_bytes(build_export_ir(
+            self.engine, self.alice, detail.document.id, saved.version.id)), plan_before)
+        self.assertEqual(self.table_counts(detail.document.id), counts_before)
+        with self.admin.connect() as connection:
+            document_after = connection.execute(text(
+                "SELECT revision, updated_at, current_version_id FROM app.documents "
+                "WHERE id = :id"), {"id": detail.document.id}).mappings().one()
+            hashes_after = connection.execute(text(
+                "SELECT content_sha256 FROM app.document_versions "
+                "WHERE document_id = :id ORDER BY revision"),
+                {"id": detail.document.id}).scalars().all()
+        self.assertEqual(hashes_after, hashes_before)
+        self.assertEqual(document_after["revision"], document_before["revision"])
+        self.assertEqual(document_after["updated_at"], document_before["updated_at"])
+        self.assertEqual(document_after["current_version_id"],
+                         document_before["current_version_id"])
+        # Defense in depth: even a raw superuser write cannot store an
+        # unbounded or unnormalized tag set (the DB CHECK re-validates).
+        other = self.create_document(self.alice, "Synthetic raw probe")
+        with self.admin.connect() as connection:
+            for raw_tags in ("ARRAY['Not Normalized']", "ARRAY['ok', 'ok']",
+                             "ARRAY['x' || repeat('y', 60)]",
+                             "ARRAY[]::text[] || ARRAY['']"):
+                with self.subTest(raw_tags=raw_tags):
+                    with self.assertRaises(DBAPIError), connection.begin():
+                        connection.execute(text(
+                            "INSERT INTO app.document_organization(document_id, owner_id, tags) "
+                            "VALUES (:id, :owner, " + raw_tags + ")"),
+                            {"id": other.document.id, "owner": self.alice_id})
+            # The normalized bounds themselves accept the documented maximum.
+            with connection.begin():
+                connection.execute(text(
+                    "INSERT INTO app.document_organization(document_id, owner_id, tags) "
+                    "VALUES (:id, :owner, :tags)"),
+                    {"id": other.document.id, "owner": self.alice_id,
+                     "tags": [f"tag{index:02d}" for index in range(20)]})
+
+    def test_20_organization_owner_isolation_filters_and_pagination(self):
+        """Tag namespaces are per-owner private; filters compose and recover."""
+        alice_headers = {"Authorization": "Bearer t.alice"}
+        bob_headers = {"Authorization": "Bearer t.bob"}
+        ids = []
+        for index in range(3):
+            with self.as_session(self.alice_id):
+                created = self.client.post("/api/documents",
+                                           json={"title": f"Synthetic org {index}"},
+                                           headers=alice_headers)
+                ids.append(UUID(created.json()["id"]))
+        with self.as_session(self.alice_id):
+            self.assertEqual(self.client.patch(
+                f"/api/documents/{ids[0]}/organization",
+                json={"tags": ["fees"]}, headers=alice_headers).status_code, 200)
+            self.assertEqual(self.client.patch(
+                f"/api/documents/{ids[1]}/organization",
+                json={"tags": ["fees", "defi"], "favorite": True},
+                headers=alice_headers).status_code, 200)
+        # Bob tags his own document with the same tag text: tag vocabularies
+        # are per-owner private metadata, never shared state.
+        with self.as_session(self.bob_id):
+            bob_created = self.client.post("/api/documents",
+                                           json={"title": "Bob org"}, headers=bob_headers)
+            bob_id = UUID(bob_created.json()["id"])
+            self.assertEqual(self.client.patch(
+                f"/api/documents/{bob_id}/organization",
+                json={"tags": ["fees"]}, headers=bob_headers).status_code, 200)
+            # Alice's document is invisible: one generic 404 on the
+            # organization route, indistinguishable from a genuinely absent
+            # document (same code and message; only the per-request id
+            # differs, which identifies the request, not the resource).
+            foreign = self.client.patch(f"/api/documents/{ids[0]}/organization",
+                                        json={"favorite": True}, headers=bob_headers)
+            self.assertEqual(foreign.status_code, 404)
+            absent = self.client.patch(f"/api/documents/{uuid4()}/organization",
+                                       json={"favorite": True}, headers=bob_headers)
+            self.assertEqual(foreign.status_code, absent.status_code)
+            foreign_error = ErrorResponse.model_validate(foreign.json())
+            absent_error = ErrorResponse.model_validate(absent.json())
+            self.assertEqual(foreign_error.error.code, absent_error.error.code)
+            self.assertEqual(foreign_error.error.message, absent_error.error.message)
+            # Bob's filters only ever match Bob's rows.
+            bob_tagged = self.client.get("/api/documents", params={"tag": "fees"},
+                                         headers=bob_headers)
+            self.assertEqual([item["id"] for item in bob_tagged.json()["items"]],
+                             [str(bob_id)])
+            bob_favorites = self.client.get("/api/documents",
+                                            params={"favorite": "true"},
+                                            headers=bob_headers)
+            self.assertEqual(bob_favorites.json()["items"], [])
+        # RLS: Bob's runtime transaction cannot count Alice's metadata rows.
+        with user_transaction(self.engine, self.bob_id) as connection:
+            self.assertEqual(connection.scalar(text(
+                "SELECT count(*) FROM app.document_organization "
+                "WHERE document_id = :id"), {"id": ids[0]}), 0)
+        with self.as_session(self.alice_id):
+            order_before = [item["id"] for item in self.client.get(
+                "/api/documents", headers=alice_headers).json()["items"]]
+            self.assertEqual(len(order_before), 3)
+            tagged = self.client.get("/api/documents", params={"tag": "fees"},
+                                     headers=alice_headers)
+            self.assertEqual(sorted(item["id"] for item in tagged.json()["items"]),
+                             sorted(map(str, ids[:2])))
+            # Filter values normalize the same way as stored tags.
+            normalized = self.client.get("/api/documents", params={"tag": " FEES "},
+                                         headers=alice_headers)
+            self.assertEqual(sorted(item["id"] for item in normalized.json()["items"]),
+                             sorted(map(str, ids[:2])))
+            # Repeated tag params narrow with AND semantics.
+            both = self.client.get("/api/documents",
+                                   params=[("tag", "fees"), ("tag", "defi")],
+                                   headers=alice_headers)
+            self.assertEqual([item["id"] for item in both.json()["items"]], [str(ids[1])])
+            too_many_filters = self.client.get(
+                "/api/documents", params=[("tag", str(index)) for index in range(6)],
+                headers=alice_headers)
+            self.assertEqual(too_many_filters.status_code, 422)
+            favorites = self.client.get("/api/documents", params={"favorite": "true"},
+                                        headers=alice_headers)
+            self.assertEqual([item["id"] for item in favorites.json()["items"]],
+                             [str(ids[1])])
+            not_favorites = self.client.get("/api/documents", params={"favorite": "false"},
+                                            headers=alice_headers)
+            self.assertEqual(sorted(item["id"] for item in not_favorites.json()["items"]),
+                             sorted(map(str, (ids[0], ids[2]))))
+            # Filters compose with the title search inside one owner-scoped
+            # query (owner predicate before pagination and count).
+            composed = self.client.get("/api/documents",
+                                       params={"q": "org 0", "tag": "fees"},
+                                       headers=alice_headers)
+            self.assertEqual([item["id"] for item in composed.json()["items"]],
+                             [str(ids[0])])
+            # Paginating a filtered list pages exactly the matching rows.
+            page_one = self.client.get("/api/documents",
+                                       params={"tag": "fees", "limit": 1},
+                                       headers=alice_headers)
+            self.assertEqual(len(page_one.json()["items"]), 1)
+            self.assertIsNotNone(page_one.json()["next_cursor"])
+            page_two = self.client.get("/api/documents",
+                                       params={"tag": "fees", "limit": 1,
+                                               "cursor": page_one.json()["next_cursor"]},
+                                       headers=alice_headers)
+            combined = [page_one.json()["items"][0]["id"],
+                        page_two.json()["items"][0]["id"]]
+            self.assertEqual(sorted(combined), sorted(map(str, ids[:2])))
+            self.assertIsNone(page_two.json()["next_cursor"])
+            # An absent tag is an honest empty page, never an error.
+            empty = self.client.get("/api/documents", params={"tag": "no-such-tag"},
+                                    headers=alice_headers)
+            self.assertEqual(empty.status_code, 200)
+            self.assertEqual(empty.json()["items"], [])
+            self.assertIsNone(empty.json()["next_cursor"])
+            # Deleting the tag from every document recovers: the same filter
+            # then matches nothing, and the list order never moved.
+            for document_id in ids[:2]:
+                self.assertEqual(self.client.patch(
+                    f"/api/documents/{document_id}/organization", json={"tags": []},
+                    headers=alice_headers).status_code, 200)
+            deleted = self.client.get("/api/documents", params={"tag": "fees"},
+                                      headers=alice_headers)
+            self.assertEqual(deleted.json()["items"], [])
+            order_after = [item["id"] for item in self.client.get(
+                "/api/documents", headers=alice_headers).json()["items"]]
+            self.assertEqual(order_after, order_before)
 
     def _scientific_counts(self, dataset_id: UUID) -> dict:
         with self.admin.connect() as connection:

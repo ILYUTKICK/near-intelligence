@@ -7,6 +7,9 @@ async function handle(request: NextRequest, context: Context) {
   let allowed: string[] = [];
   const uuid = (value: string | undefined) => z.uuid().safeParse(value).success;
   const annotation = segments[1] === "insights" || segments[1] === "hypotheses" || segments[1] === "evidence";
+  // NI-072 document organization: the metadata-only PATCH (tags/favorite).
+  // The bare list GET's tag/favorite query filters flow through untouched.
+  const organization = segments[1] === "organization";
   // NI-058 export jobs: create (POST), owner poll (GET) and the ZIP download
   // (GET .../download) — the same document-nested implemented paths the API
   // serves; the download itself carries no query string.
@@ -16,11 +19,18 @@ async function handle(request: NextRequest, context: Context) {
   // (DELETE .../shares/{shareId}) — no share route takes a query string, and
   // the share token never travels through this owner plane.
   const shares = segments[1] === "shares";
+  const responseHeaders: Record<string, string> = shares
+    ? { "cache-control": "no-store", "referrer-policy": "no-referrer" }
+    : { "cache-control": "no-store" };
   if (!segments.length) allowed = ["GET", "POST"];
   else if (uuid(segments[0])) {
     if (segments.length === 1) allowed = ["GET", "PATCH", "DELETE"];
+    if (segments.length === 2 && organization) allowed = ["PATCH"];
     if (segments.length === 2 && segments[1] === "versions") allowed = ["GET", "POST"];
     if (segments.length === 2 && segments[1] === "chart-blocks") allowed = ["POST"];
+    // NI-055 model-result insertion: one POST per confirmed Add Model choice,
+    // same owner-checked forward as the chart-block segment.
+    if (segments.length === 2 && segments[1] === "model-blocks") allowed = ["POST"];
     if (segments.length === 2 && segments[1] === "chart-view") allowed = ["GET"];
     if (segments.length === 2 && annotation) allowed = ["GET", "POST"];
     if (segments.length === 3 && annotation && uuid(segments[2])) allowed = ["PATCH", "DELETE"];
@@ -42,7 +52,7 @@ async function handle(request: NextRequest, context: Context) {
   }
   if (shares && request.nextUrl.search) {
     return NextResponse.json({ error: "Share requests take no query string." },
-      { status: 422, headers: { "cache-control": "no-store" } });
+      { status: 422, headers: responseHeaders });
   }
   if (segments.length === 2 && segments[1] === "chart-view") {
     const keys = new Set(["chart_definition_version_id", "start", "end", "dataset_version", "filters"]);
@@ -51,9 +61,9 @@ async function handle(request: NextRequest, context: Context) {
       return NextResponse.json({ error: "Unsupported chart query." }, { status: 422, headers: { "cache-control": "no-store" } });
     }
   }
-  if (!allowed.length) return NextResponse.json({ error: "Not found." }, { status: 404, headers: { "cache-control": "no-store" } });
+  if (!allowed.length) return NextResponse.json({ error: "Not found." }, { status: 404, headers: responseHeaders });
   if (!allowed.includes(request.method)) return new NextResponse(null, { status: 405,
-    headers: { allow: allowed.join(", "), "cache-control": "no-store" } });
+    headers: { ...responseHeaders, allow: allowed.join(", ") } });
   if (annotation && request.nextUrl.search) {
     const entries = [...request.nextUrl.searchParams];
     const keys = segments[1] === "evidence" ? ["version_id", "hypothesis_id"] : ["version_id"];
@@ -72,6 +82,8 @@ async function handle(request: NextRequest, context: Context) {
       return NextResponse.json({ error: "Unsupported evidence target query." }, { status: 422, headers: { "cache-control": "no-store" } });
     }
   }
-  return forwardPrivate(request, `/api/documents${segments.length ? `/${segments.join("/")}` : ""}`);
+  const response = await forwardPrivate(request, `/api/documents${segments.length ? `/${segments.join("/")}` : ""}`);
+  if (shares) response.headers.set("referrer-policy", "no-referrer");
+  return response;
 }
 export { handle as GET, handle as POST, handle as PATCH, handle as DELETE };

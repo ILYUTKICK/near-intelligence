@@ -398,16 +398,18 @@ class ShareRlsProbeTests(unittest.TestCase):
     # -- the capability plane (no identity) ----------------------------------- #
 
     def test_capability_plane_reads_live_rows_only_by_digest(self):
-        with self.runtime.connect() as connection:
-            # A live row is readable by its digest...
-            live = connection.execute(text(
-                "SELECT count(*) FROM app.document_shares WHERE token_hash = :hash"),
-                {"hash": self.token_hash}).scalar_one()
-            self.assertEqual(live, 1)
-            # ...and a no-identity session can enumerate ONLY live rows.
-            total = connection.execute(text(
-                "SELECT count(*) FROM app.document_shares")).scalar_one()
-            self.assertEqual(total, 1)
+        another_share, _token, another_digest = self._alice_share()
+        visible = text("SELECT id FROM app.document_shares")
+        with user_transaction(self.runtime, None) as connection:
+            self.assertEqual(connection.scalars(visible).all(), [])
+            self._scope_digest(connection, "invalid")
+            self.assertEqual(connection.scalars(visible).all(), [])
+            self._scope_digest(connection, self.token_hash)
+            self.assertEqual(connection.scalars(visible).all(), [self.share_id])
+            self._scope_digest(connection, another_digest)
+            self.assertEqual(connection.scalars(visible).all(), [another_share])
+        with user_transaction(self.runtime, None) as connection:
+            self.assertEqual(connection.scalars(visible).all(), [])
         # A revoked row is invisible even to raw no-identity SQL.
         with self.admin.begin() as connection:
             connection.execute(text("""
@@ -417,19 +419,19 @@ class ShareRlsProbeTests(unittest.TestCase):
                        projection_byte_size = NULL
                  WHERE id = :id
             """), {"id": self.share_id})
-        with self.runtime.connect() as connection:
-            dead = connection.execute(text(
-                "SELECT count(*) FROM app.document_shares WHERE token_hash = :hash"),
-                {"hash": self.token_hash}).scalar_one()
-            self.assertEqual(dead, 0, "a revoked row must be invisible")
-            total = connection.execute(text(
-                "SELECT count(*) FROM app.document_shares")).scalar_one()
-            self.assertEqual(total, 0)
+        with user_transaction(self.runtime, None) as connection:
+            self._scope_digest(connection, self.token_hash)
+            self.assertEqual(connection.scalars(visible).all(), [])
+
+    def _scope_digest(self, connection, digest: str):
+        connection.execute(text("SELECT set_config('app.share_token_sha256', :digest, true)"),
+                           {"digest": digest})
 
     def test_capability_plane_is_voided_by_any_identity(self):
         # An authenticated session (Bob) cannot read Alice's share even with
         # the digest in hand: the token policy requires NO identity.
         with user_transaction(self.runtime, self.bob_id) as connection:
+            self._scope_digest(connection, self.token_hash)
             rows = connection.execute(text(
                 "SELECT count(*) FROM app.document_shares WHERE token_hash = :hash"),
                 {"hash": self.token_hash}).scalar_one()
@@ -440,7 +442,8 @@ class ShareRlsProbeTests(unittest.TestCase):
             connection.execute(text(
                 "UPDATE app.document_shares SET expires_at = now() - interval '1 minute'"
                 " WHERE id = :id"), {"id": self.share_id})
-        with self.runtime.connect() as connection:
+        with user_transaction(self.runtime, None) as connection:
+            self._scope_digest(connection, self.token_hash)
             rows = connection.execute(text(
                 "SELECT count(*) FROM app.document_shares WHERE token_hash = :hash"),
                 {"hash": self.token_hash}).scalar_one()
@@ -480,7 +483,8 @@ class ShareRlsProbeTests(unittest.TestCase):
                        projection_byte_size = NULL
                  WHERE id = :id
             """), {"id": self.share_id})
-        with self.runtime.connect() as connection:
+        with user_transaction(self.runtime, None) as connection:
+            self._scope_digest(connection, self.token_hash)
             rows = connection.execute(text(
                 "SELECT count(*) FROM app.document_shares WHERE token_hash = :hash"),
                 {"hash": self.token_hash}).scalar_one()

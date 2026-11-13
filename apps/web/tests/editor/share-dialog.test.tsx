@@ -157,6 +157,8 @@ describe("ShareDialog consent flow", () => {
     expect(await screen.findByTestId("share-preview-visible")).toHaveTextContent("Fixture shared research");
     expect(screen.getByTestId("share-preview-visible")).toHaveTextContent("revision 7");
     expect(screen.getByTestId("share-preview-hidden")).toHaveTextContent(/Your identity/);
+    await userEvent.click(screen.getByText("Read the exact shared content"));
+    expect(screen.getByTestId("share-viewer")).toHaveTextContent("Fixture intro paragraph");
     // The create control is disabled until the consent checkbox is ticked.
     expect(screen.getByTestId("share-create")).toBeDisabled();
     await userEvent.click(screen.getByTestId("share-consent"));
@@ -280,6 +282,28 @@ describe("ShareDialog consent flow", () => {
     expect(alert).toHaveTextContent(/changed since the preview/);
     expect(alert).toHaveTextContent(/Review the fresh preview/);
   });
+
+  it("retries the same consent and key after an uncertain response", async () => {
+    let writes = 0;
+    const calls = mockFetch([
+      ...BASE_ROUTES(),
+      { match: (m, p) => m === "POST" && p === SHARES_PATH,
+        respond: () => ++writes === 1
+          ? new Response(null, { status: 503 })
+          : Response.json(createdBody({ share_token: null, share_path: null }), { status: 201 }) },
+    ]);
+    render(<ShareDialog open onOpenChange={() => {}} documentId={DOC_ID} revision={7} />);
+    await userEvent.click(await screen.findByTestId("share-consent"));
+    await userEvent.click(screen.getByTestId("share-create"));
+    await userEvent.click(await screen.findByTestId("share-error-retry"));
+    await screen.findByText("This share is active. Its link is available only on first creation.");
+    const posts = calls.filter((call) => call.method === "POST");
+    expect(posts).toHaveLength(2);
+    expect(posts[0]?.init.body).toBe(posts[1]?.init.body);
+    expect(new Headers(posts[0]?.init.headers).get("idempotency-key"))
+      .toBe(new Headers(posts[1]?.init.headers).get("idempotency-key"));
+    expect(screen.queryByTestId("share-link")).toBeNull();
+  });
 });
 
 // --------------------------------------------------------------------------- //
@@ -323,7 +347,7 @@ describe("Share trigger in the workbench", () => {
     expect(button).toBeDisabled();
   });
 
-  it("opens the share dialog from the header of a clean editor", async () => {
+  it("opens the share dialog from the document controls of a clean editor", async () => {
     mockFetch([
       { match: (method, path) => method === "GET" && path === `/api/documents/${DOC_ID}`,
         respond: () => Response.json(documentResponse(PLAIN_DOC)) },

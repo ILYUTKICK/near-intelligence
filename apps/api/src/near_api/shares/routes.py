@@ -32,7 +32,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Path, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.engine import Engine
 
@@ -50,12 +50,11 @@ from near_api.schemas.share import (
     ShareCreatedResponse,
     SharePreviewResponse,
     ShareProjection,
-    ShareScopeSummary,
     ShareSummaryResponse,
 )
 from near_api.shares import service
+from near_api.shares.projection import share_scope_summary
 from near_api.shares.service import (
-    ShareCorrupt,
     ShareExpired,
     ShareLimitExceeded,
     ShareNotFound,
@@ -69,7 +68,6 @@ router = APIRouter(prefix="/api", tags=["shares"])
 
 PrincipalDependency = Annotated[Principal, Depends(get_principal)]
 RuntimeEngineDependency = Annotated[Engine, Depends(get_runtime_engine)]
-TokenPath = Annotated[str, Path(min_length=1, max_length=200)]
 
 _SHARE_ERROR_RESPONSES = {
     status: {"model": ErrorResponse, "description": description}
@@ -84,11 +82,9 @@ _SHARE_ERROR_RESPONSES = {
 }
 
 _PUBLIC_SHARE_ERROR_RESPONSES = {
-    status: {"model": ErrorResponse, "description": description}
-    for status, description in (
-        (404, "The share link is unknown, revoked or expired (one generic deny)"),
-        (422, "Request failed validation"),
-    )
+    404: {"model": ErrorResponse,
+          "description": "The share or chart is unavailable (one generic deny)"},
+    "default": {"model": ErrorResponse, "description": "Request failed"},
 }
 
 
@@ -126,19 +122,6 @@ def _summary(row: service.ShareRow) -> ShareSummaryResponse:
         expires_at=row.expires_at, revoked_at=row.revoked_at)
 
 
-def _scope_of(projection) -> ShareScopeSummary:
-    return ShareScopeSummary(
-        kind="frozen_revision_allowlist",
-        chart_blocks=sum(1 for block in projection.blocks
-                         if block.block_type == "liveChart"),
-        data_table_blocks=sum(1 for block in projection.blocks
-                              if block.block_type == "dataTable"),
-        insight_blocks=sum(1 for block in projection.blocks
-                           if block.block_type == "insight"),
-        source_references=len(projection.sources),
-    )
-
-
 @router.post("/documents/{document_id}/shares", response_model=ShareCreatedResponse,
              operation_id="createDocumentShare", status_code=201,
              summary="Publish the acknowledged revision after explicit consent "
@@ -159,14 +142,8 @@ def create_document_share(
     """
     try:
         outcome = service.create_share(
-            engine, principal, document_id,
-            acknowledged_revision=payload.acknowledged_revision,
-            preview_sha256=payload.preview_sha256,
-            scope=(payload.visible_scope.chart_blocks,
-                   payload.visible_scope.data_table_blocks,
-                   payload.visible_scope.insight_blocks,
-                   payload.visible_scope.source_references),
-            expires_at=payload.expires_at, idempotency_key=idempotency_key)
+            engine, principal, document_id, consent=payload,
+            idempotency_key=idempotency_key)
     except IdempotencyKeyInvalid:
         return error_response(
             request, 422, "VALIDATION_ERROR", "Idempotency-Key must be a UUID",
@@ -202,7 +179,7 @@ def create_document_share(
     return ShareCreatedResponse(
         id=outcome.share.id, document_id=outcome.share.document_id,
         document_version_id=outcome.share.document_version_id,
-        revision=outcome.share.revision, status="active",
+        revision=outcome.share.revision, status=outcome.share.reported_status(),
         created_at=outcome.share.created_at,
         expires_at=outcome.share.expires_at,
         share_token=outcome.token, share_path=outcome.share_path())
@@ -237,7 +214,7 @@ def preview_document_share(request: Request, principal: PrincipalDependency,
         document_id=preview.document_id, revision=preview.revision,
         projection=preview.projection,
         projection_sha256=preview.projection_sha256,
-        scope=_scope_of(preview.projection))
+        scope=share_scope_summary(preview.projection))
 
 
 @router.get("/documents/{document_id}/shares", response_model=DocumentShareListResponse,
@@ -286,7 +263,7 @@ def revoke_document_share(request: Request, principal: PrincipalDependency,
             responses=_PUBLIC_SHARE_ERROR_RESPONSES)
 def get_shared_revision(request: Request, engine: RuntimeEngineDependency,
                         response: Response,
-                        token: TokenPath) -> ShareProjection | JSONResponse:
+                        token: str) -> ShareProjection | JSONResponse:
     """Return the published projection behind one share link.
 
     Every request re-checks the live share state; revoked, expired and
@@ -294,39 +271,39 @@ def get_shared_revision(request: Request, engine: RuntimeEngineDependency,
     """
     try:
         projection = service.read_share_projection(engine, token)
-    except (ShareNotFound, ShareCorrupt):
+    except ShareNotFound:
         return _public_deny(request)
     response.headers.update(_share_headers())
     return projection
 
 
-@router.get("/shares/{token}/charts/{block_id}/view", response_model=ChartViewResponse,
+@router.get("/shares/{token}/charts/{block_id:uuid}/view", response_model=ChartViewResponse,
             operation_id="getSharedChartView",
             summary="Read one frozen chart view of a shared revision",
             responses=_PUBLIC_SHARE_ERROR_RESPONSES)
 def get_shared_chart_view(request: Request, engine: RuntimeEngineDependency,
-                          response: Response, token: TokenPath, block_id: UUID,
+                          response: Response, token: str, block_id: UUID,
                           ) -> ChartViewResponse | JSONResponse:
     """Return the pinned chart view stored in the shared projection."""
     try:
         view, _csv = service.read_share_chart(engine, token, block_id)
-    except (ShareNotFound, ShareCorrupt):
+    except ShareNotFound:
         return _public_deny(request)
     response.headers.update(_share_headers())
     return view
 
 
-@router.get("/shares/{token}/charts/{block_id}/csv", response_class=Response,
+@router.get("/shares/{token}/charts/{block_id:uuid}/csv", response_class=Response,
             operation_id="getSharedChartCsv",
             summary="Download the exact chart data of a shared revision",
             responses={**_PUBLIC_SHARE_ERROR_RESPONSES,
                        200: {"content": {"text/csv": {"schema": {"type": "string"}}}}})
 def get_shared_chart_csv(request: Request, engine: RuntimeEngineDependency,
-                         token: TokenPath, block_id: UUID) -> Response:
+                         token: str, block_id: UUID) -> Response:
     """Return the exact-value CSV derived from the frozen chart view."""
     try:
         _view, csv_text = service.read_share_chart(engine, token, block_id)
-    except (ShareNotFound, ShareCorrupt):
+    except ShareNotFound:
         return _public_deny(request)
     return Response(csv_text, media_type="text/csv", headers={
         **_share_headers(),

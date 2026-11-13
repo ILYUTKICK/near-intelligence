@@ -33,10 +33,11 @@ import json
 import os
 import tempfile
 import unittest
-from contextlib import ExitStack
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
+from threading import Barrier
+from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
 from alembic import command
@@ -47,13 +48,17 @@ from sqlalchemy.pool import NullPool
 
 from near_api.auth import principal as principal_module
 from near_api.auth.principal import Principal
+from near_api.auth.verification import TokenVerifier
 from near_api.db.session import create_runtime_engine, user_transaction
 from near_api.documents import service
 from near_api.main import app
 from near_api.schemas.common import ErrorResponse
+from near_api.schemas.share import DocumentShareCreateRequest
+from near_api.shares import service as share_service
 import test_chart_blocks as chart_fixtures
 import test_delivery_apis as data_fixture
 import test_documents as document_fixtures
+from test_jwt_verification import settings as synthetic_auth_settings
 
 SHA256 = "a" * 64
 NO_SHARE_HEADERS = {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
@@ -325,20 +330,59 @@ class ShareDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Test
         self.assertNotIn("share_token", records[0])
         self.assertNotIn("token_hash", json.dumps(records[0]))
 
-    def test_02_idempotent_replay_never_reemits_the_token(self):
+    def test_02_idempotent_replay_binds_consent_and_reports_current_status(self):
         dataset_id = self.stage_volume(self.dataset_key("intents"), "9")
         created, _saved = self.create_full_document(
             self.alice, dataset_id=dataset_id, table_dataset_id=dataset_id)
         key = str(uuid4())
         first = self.create_share(created.document.id, key=key)
         self.assertEqual(first.status_code, 201)
-        token = first.json()["share_token"]
-        self.assertIsNotNone(token)
+        first_share = first.json()
+        self.assertIsNotNone(first_share["share_token"])
         second = self.create_share(created.document.id, key=key)
         self.assertEqual(second.status_code, 201)
-        self.assertEqual(second.json()["id"], first.json()["id"])
+        self.assertEqual(second.json()["id"], first_share["id"])
         self.assertIsNone(second.json()["share_token"],
                           "a replay cannot re-emit the capability")
+        self.assertIsNone(second.json()["share_path"])
+        self.assertEqual(second.json()["status"], "active")
+
+        shown = self.preview(created.document.id)
+        for changed_consent in (
+            {"revision": shown["revision"] + 1},
+            {"preview_sha256": SHA256},
+            {"scope": dict(shown["scope"], chart_blocks=99)},
+            {"expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()},
+        ):
+            with self.subTest(changed_consent=changed_consent):
+                conflict = self.create_share(created.document.id, key=key, **changed_consent)
+                self.assertEqual(conflict.status_code, 409)
+                self.assertEqual(conflict.json()["error"]["code"], "IDEMPOTENCY_CONFLICT")
+
+        other = service.create_document(self.engine, self.alice, title="Other research")
+        conflict = self.create_share(other.document.id, key=key)
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.json()["error"]["code"], "IDEMPOTENCY_CONFLICT")
+
+        self.expire(UUID(first_share["id"]))
+        expired = self.create_share(created.document.id, key=key)
+        self.assertEqual(expired.status_code, 201)
+        self.assertEqual(expired.json()["status"], "expired")
+        self.assertIsNone(expired.json()["share_token"])
+        self.assertIsNone(expired.json()["share_path"])
+
+        with self.as_session(self.alice_id):
+            revoked = self.client.delete(
+                f"/api/documents/{created.document.id}/shares/{first_share['id']}",
+                headers=self.bearer(self.alice_id))
+        self.assertEqual(revoked.status_code, 204)
+        replay = self.create_share(created.document.id, key=key)
+        self.assertEqual(replay.status_code, 201)
+        self.assertEqual(replay.json()["status"], "revoked")
+        self.assertEqual(replay.json()["id"], first_share["id"])
+        self.assertIsNone(replay.json()["share_token"])
+        self.assertIsNone(replay.json()["share_path"])
+
         with self.admin.connect() as connection:
             count = connection.scalar(text(
                 "SELECT count(*) FROM app.document_shares WHERE owner_id = :owner"),
@@ -353,7 +397,29 @@ class ShareDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Test
         third = self.create_share(created.document.id, key=str(uuid4()))
         self.assertEqual(third.status_code, 201)
         self.assertIsNotNone(third.json()["share_token"])
-        self.assertNotEqual(third.json()["id"], first.json()["id"])
+        self.assertNotEqual(third.json()["id"], first_share["id"])
+
+    def test_concurrent_creates_preserve_the_document_share_limit(self):
+        created = service.create_document(self.engine, self.alice, title="Concurrent shares")
+        document_id = created.document.id
+        consent = DocumentShareCreateRequest.model_validate(self.consent_payload(document_id))
+        barrier = Barrier(2)
+
+        def create(engine, key):
+            barrier.wait(timeout=5)
+            try:
+                share_service.create_share(engine, self.alice, document_id,
+                                           consent=consent, idempotency_key=key)
+            except share_service.ShareLimitExceeded:
+                return False
+            return True
+
+        with patch.object(share_service, "MAX_SHARES_PER_DOCUMENT", 1):
+            with ThreadPoolExecutor(max_workers=2) as workers:
+                created_shares = list(workers.map(
+                    create, (self.engine, self.engine_b), (str(uuid4()), str(uuid4()))))
+        self.assertEqual(sorted(created_shares), [False, True])
+        self.assertEqual(len(share_service.list_shares(self.engine, self.alice, document_id)), 1)
 
     def test_03_consent_mismatches_are_refused(self):
         dataset_id = self.stage_volume(self.dataset_key("intents"), "7.25")
@@ -512,10 +578,14 @@ class ShareDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Test
         # The token is not an auth credential anywhere else.
         unauthenticated = self.client.get("/api/documents")
         self.assertEqual(unauthenticated.status_code, 401)
-        bob_document = self.client.get(
-            f"/api/documents/{created.document.id}",
-            headers={"Authorization": f"Bearer share-{token}"})
-        self.assertEqual(bob_document.status_code, 401)
+        signing_keys = Mock()
+        verifier = TokenVerifier(synthetic_auth_settings("ES256"), signing_keys)
+        with patch.object(principal_module, "_get_verifier", return_value=verifier):
+            share_as_session = self.client.get(
+                f"/api/documents/{created.document.id}",
+                headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(share_as_session.status_code, 401)
+        signing_keys.get_key.assert_not_called()
         # Anonymous hit on the private document route stays 401.
         self.assertEqual(self.client.get(
             f"/api/documents/{created.document.id}/versions").status_code, 401)
@@ -580,11 +650,13 @@ class ShareDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Test
             self.assertEqual(item.headers.get("Referrer-Policy"), "no-referrer")
 
     def test_10_migration_round_trip_and_mirror(self):
-        command.downgrade(self.config, "0012_export_jobs")
+        command.downgrade(self.config, "0019_merge_pdf_publications")
         with self.admin.connect() as connection:
             missing = connection.execute(text(
                 "SELECT count(*) FROM information_schema.tables "
                 "WHERE table_schema='app' AND table_name='document_shares'")).scalar_one()
+            self.assertIsNotNone(connection.scalar(text("SELECT to_regclass('app.export_jobs')")))
+            self.assertIsNotNone(connection.scalar(text("SELECT to_regclass('app.research_publications')")))
         self.assertEqual(missing, 0)
         command.upgrade(self.config, "head")
         command.check(self.config)  # the SQLAlchemy mirror matches the migration
@@ -594,7 +666,7 @@ class ShareDatabaseTests(chart_fixtures.ChartBlockDatabaseFixture, unittest.Test
                 "WHERE table_schema='app' AND table_name='document_shares'")).mappings()}
         self.assertEqual(columns, {
             "id", "owner_id", "document_id", "document_version_id", "token_hash",
-            "status", "revision", "idempotency_key", "projection",
+            "status", "revision", "idempotency_key", "idempotency_request_sha256", "projection",
             "projection_sha256", "projection_byte_size", "expires_at",
             "created_at", "updated_at", "revoked_at"})
 

@@ -68,6 +68,18 @@ export function decodeSignedPayload<T>(value: string | undefined): T | null {
   }
 }
 
+/** Subject of the bearer carried by an already verified session cookie. */
+export function sessionSubject(session: AuthSession): string | null {
+  const [, payload] = session.accessToken.split(".");
+  if (!payload) return null;
+  try {
+    const claims: { sub?: unknown } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return typeof claims.sub === "string" ? claims.sub : null;
+  } catch {
+    return null;
+  }
+}
+
 export function encodeSessionCookie(session: AuthSession): string {
   return encodeSignedPayload(session);
 }

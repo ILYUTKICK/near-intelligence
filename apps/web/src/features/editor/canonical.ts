@@ -21,6 +21,8 @@
 import type { JSONContent } from "@tiptap/core";
 import type { components } from "@near-intelligence/shared-types";
 
+import type { FilterValue } from "@/features/charts/filters/filter-values";
+
 export const CANONICAL_SCHEMA_VERSION = 1;
 export const MAX_TOP_LEVEL_BLOCKS = 200;
 export const MAX_RICH_DEPTH = 3;
@@ -37,7 +39,7 @@ export const MAX_METRIC_VERSIONS = 100;
 
 export const BLOCK_TYPES = [
   "paragraph", "heading", "bullet_list", "ordered_list", "liveChart",
-  "dataTable", "insight", "hypothesis", "evidence", "risk", "divider",
+  "dataTable", "insight", "hypothesis", "evidence", "risk", "modelResult", "divider",
 ] as const;
 export type BlockType = (typeof BLOCK_TYPES)[number];
 
@@ -105,6 +107,11 @@ export interface CanonicalRichList {
 
 export type RichFragment = Array<CanonicalParagraph | CanonicalRichList>;
 
+/**
+ * NI-071: document content preserves the submitted filter values verbatim
+ * (byte-exact revisions). A single value uses the existing string shape and
+ * a comparison can carry several values.
+ */
 export type CanonicalSelection = components["schemas"]["ChartSelection"];
 
 /** Frozen chart inspection record (API_SPECIFICATION ResolvedContext). */
@@ -223,6 +230,21 @@ export interface CanonicalRiskBlock extends BlockBase {
     related_hypothesis_id?: string;
   };
 }
+/**
+ * A pinned published model run with an editable interpretation (NI-055).
+ * Only identities and the authored narrative are stored — coefficients and
+ * diagnostics never live in the document JSON; the node view re-projects
+ * them from the immutable published run row.
+ */
+export interface CanonicalModelResultBlock extends BlockBase {
+  type: "modelResult";
+  attrs: {
+    block_id: string;
+    model_run_id: string;
+    dataset_version_id: string;
+    interpretation: RichFragment;
+  };
+}
 
 export type CanonicalBlock =
   | CanonicalParagraphBlock
@@ -234,7 +256,8 @@ export type CanonicalBlock =
   | CanonicalInsightBlock
   | CanonicalHypothesisBlock
   | CanonicalEvidenceBlock
-  | CanonicalRiskBlock;
+  | CanonicalRiskBlock
+  | CanonicalModelResultBlock;
 
 export interface CanonicalDocument {
   schema_version: typeof CANONICAL_SCHEMA_VERSION;
@@ -409,14 +432,22 @@ function parseSelection(value: unknown, path: string, issues: IssueCollector): C
   requireEnum(selection.frequency, `${path}.frequency`, ["day"], issues);
   const filters = requireObject(selection.filters, `${path}.filters`, issues);
   if (Object.keys(filters).length > 32) issues.add(`${path}.filters`, "too_many_filters");
-  const checked: Array<[string, string]> = [];
+  // NI-071: one value is a non-empty string of at most 200 characters; a
+  // multi-value selection is a non-empty list of such strings (at most 32).
+  // Values are preserved exactly — the API checks the immutable definition's
+  // domain, and persisted revisions stay byte-identical.
+  const isFilterValue = (value: unknown): boolean =>
+    typeof value === "string" && value.length > 0 && value.length <= 200;
+  const checked: Array<[string, FilterValue]> = [];
   for (const [key, value] of Object.entries(filters)) {
-    if (!key || key.length > 80 || typeof value !== "string" || !value || value.length > 200) {
+    const shapeOk = isFilterValue(value)
+      || (Array.isArray(value) && value.length > 0 && value.length <= 32
+        && value.every(isFilterValue));
+    if (!key || key.length > 80 || !shapeOk) {
       issues.add(`${path}.filters`, "invalid_filter_shape");
     }
-    checked.push([key, value as string]);
+    checked.push([key, value as FilterValue]);
   }
-  // Values are preserved exactly; the API checks the immutable definition's domain.
   return { start, end, frequency: "day", filters: Object.fromEntries(checked) };
 }
 
@@ -915,6 +946,25 @@ function parseRiskBlock(node: Record<string, unknown>, path: string, issues: Iss
   return { type: "risk", attrs: canonicalAttrs };
 }
 
+function parseModelResultBlock(node: Record<string, unknown>, path: string, issues: IssueCollector): CanonicalModelResultBlock {
+  // NI-055: ids + rich-text interpretation only — every other attr (any
+  // statistical value) is an unknown field and rejected, mirroring the
+  // server parser so summaries are always re-projected from the run row.
+  parseBlockKeys(node, path, { withContent: false }, issues);
+  const attrs = parseBlockAttrs(node, path, [
+    "block_id", "model_run_id", "dataset_version_id", "interpretation",
+  ], issues);
+  return {
+    type: "modelResult",
+    attrs: {
+      block_id: requireUuid(attrs.block_id, `${path}.attrs.block_id`, issues),
+      model_run_id: requireUuid(attrs.model_run_id, `${path}.attrs.model_run_id`, issues),
+      dataset_version_id: requireUuid(attrs.dataset_version_id, `${path}.attrs.dataset_version_id`, issues),
+      interpretation: requireRichBody(attrs.interpretation, `${path}.attrs.interpretation`, issues),
+    },
+  };
+}
+
 const BLOCK_PARSERS: Record<string, (node: Record<string, unknown>, path: string, issues: IssueCollector) => CanonicalBlock> = {
   paragraph: parseParagraphBlock,
   heading: parseHeadingBlock,
@@ -926,6 +976,7 @@ const BLOCK_PARSERS: Record<string, (node: Record<string, unknown>, path: string
   hypothesis: parseHypothesisBlock,
   evidence: parseEvidenceBlock,
   risk: parseRiskBlock,
+  modelResult: parseModelResultBlock,
   divider: parseDividerBlock,
 };
 

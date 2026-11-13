@@ -12,12 +12,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatUpdated } from "@/features/documents/list/format";
+import { ShareViewer } from "@/features/shares/ShareViewer";
+import { shareProjectionSchema, type ShareProjectionPayload } from "@/features/shares/share-schema";
 import {
   createShare,
   listShares,
   previewShare,
   revokeShare,
   ShareApiError,
+  type ShareConsent,
   type ShareCreatedResponse,
   type SharePreviewResponse,
   type ShareSummaryResponse,
@@ -58,6 +61,7 @@ export interface ShareDialogProps {
   documentId: string;
   /** The acknowledged revision the clean editor currently holds. */
   revision: number;
+  canPublish?: boolean;
   onAnnounce?: (message: string) => void;
   /** Focus-return target (the workbench Share button), NI-064 pattern. */
   returnFocusRef?: React.RefObject<HTMLButtonElement | null>;
@@ -96,90 +100,124 @@ export function ShareDialog({
   onOpenChange,
   documentId,
   revision,
+  canPublish = true,
   onAnnounce,
   returnFocusRef,
 }: ShareDialogProps) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [errorText, setErrorText] = useState<string | null>(null);
-  const [preview, setPreview] = useState<SharePreviewResponse | null>(null);
+  const [preview, setPreview] = useState<(Omit<SharePreviewResponse, "projection"> & { projection: ShareProjectionPayload }) | null>(null);
   const [consented, setConsented] = useState(false);
   const [expiry, setExpiry] = useState<ExpiryValue>("7");
   const [created, setCreated] = useState<ShareCreatedResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [shares, setShares] = useState<ShareSummaryResponse[] | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
+  const [refreshWarning, setRefreshWarning] = useState<string | null>(null);
   const runRef = useRef(0);
+  const request = useRef<AbortController | null>(null);
+  const attempt = useRef<{ key: string; consent: ShareConsent } | null>(null);
+  const mutationInFlight = useRef(false);
 
-  const load = useCallback(async (signalRun: number) => {
+  const startRequest = useCallback(() => {
+    request.current?.abort();
     const controller = new AbortController();
-    try {
-      setPhase("loading");
-      setErrorText(null);
-      setConsented(false);
-      setCreated(null);
-      setCopied(false);
-      const [fetchedPreview, fetchedShares] = await Promise.all([
-        previewShare(documentId, controller.signal),
-        listShares(documentId, controller.signal),
-      ]);
-      if (runRef.current !== signalRun) return;
-      setPreview(fetchedPreview);
-      setShares(fetchedShares);
-      setPhase("ready");
-    } catch (error) {
-      if (runRef.current !== signalRun
-        || (error instanceof DOMException && error.name === "AbortError")) {
-        return;
+    request.current = controller;
+    return { signal: controller.signal, run: ++runRef.current };
+  }, []);
+
+  const resetPreview = useCallback(() => {
+    setPhase("loading");
+    setErrorText(null);
+    setRefreshWarning(null);
+    setConsented(false);
+    setCreated(null);
+    setCopied(false);
+    setPreview(null);
+    setShares(null);
+  }, []);
+
+  const load = useCallback(() => {
+    const { signal, run } = startRequest();
+    return Promise.allSettled([
+      previewShare(documentId, signal),
+      listShares(documentId, signal),
+    ]).then(([fetchedPreview, fetchedShares]) => {
+      if (runRef.current !== run) return;
+      if (fetchedShares.status === "fulfilled") setShares(fetchedShares.value);
+      else setRefreshWarning("The existing links could not be loaded. Retry to manage them.");
+      if (fetchedPreview.status === "rejected") throw fetchedPreview.reason;
+      const projection = shareProjectionSchema.safeParse(fetchedPreview.value.projection);
+      if (!projection.success || fetchedPreview.value.document_id !== documentId
+        || projection.data.document.revision !== fetchedPreview.value.revision) {
+        throw new ShareApiError(502, "INVALID_PREVIEW", "The publication preview could not be verified.");
       }
+      setPreview({ ...fetchedPreview.value, projection: projection.data });
+      setPhase("ready");
+    }).catch((error: unknown) => {
+      if (runRef.current !== run) return;
       setErrorText(describeError(error));
       setPhase("error");
-    }
-  }, [documentId]);
+    });
+  }, [documentId, startRequest]);
 
   useEffect(() => {
     if (!open) return;
-    runRef.current += 1;
-    const signalRun = runRef.current;
-    void load(signalRun);
+    void load();
     return () => {
+      request.current?.abort();
       runRef.current += 1;
-      // The consent checkbox never survives a close: a reopened dialog
-      // always starts from a fresh preview and fresh consent.
-      setConsented(false);
-      setCreated(null);
+      mutationInFlight.current = false;
     };
   }, [open, load]);
 
+  const previewStale = preview !== null && (preview.document_id !== documentId
+    || preview.revision !== revision || !canPublish);
+
   const handleCreate = useCallback(async () => {
-    if (!preview) return;
-    runRef.current += 1;
-    const signalRun = runRef.current;
-    const controller = new AbortController();
-    try {
-      setPhase("creating");
-      setErrorText(null);
-      const response = await createShare(documentId, {
+    if (!preview || previewStale || !consented || mutationInFlight.current) return;
+    mutationInFlight.current = true;
+    const { signal, run } = startRequest();
+    const pending = attempt.current ?? {
+      key: crypto.randomUUID(),
+      consent: {
         acknowledged_revision: preview.revision,
         preview_sha256: preview.projection_sha256,
         visible_scope: preview.scope,
         expires_at: expiryDate(expiry),
-      }, crypto.randomUUID(), controller.signal);
-      if (runRef.current !== signalRun) return;
+      },
+    };
+    attempt.current = pending;
+    setPhase("creating");
+    setErrorText(null);
+    setRefreshWarning(null);
+    try {
+      const response = await createShare(documentId, pending.consent, pending.key, signal);
+      if (runRef.current !== run) return;
+      attempt.current = null;
       setCreated(response);
       setCopied(false);
-      setShares(await listShares(documentId, controller.signal));
-      if (runRef.current !== signalRun) return;
       setPhase("created");
-      onAnnounce?.("The share link was created. It is shown once — copy it now.");
+      onAnnounce?.(response.share_path
+        ? "The share link was created. It is shown once — copy it now."
+        : "This request already created a share. Its link cannot be shown again.");
     } catch (error) {
-      if (runRef.current !== signalRun
-        || (error instanceof DOMException && error.name === "AbortError")) {
-        return;
-      }
+      if (runRef.current !== run) return;
+      const definitive = error instanceof ShareApiError && error.status < 500;
+      if (definitive) attempt.current = null;
       setErrorText(describeError(error));
       setPhase("error");
+      return;
+    } finally {
+      if (runRef.current === run) mutationInFlight.current = false;
     }
-  }, [documentId, expiry, onAnnounce, preview]);
+    try {
+      const current = await listShares(documentId, signal);
+      if (runRef.current === run) setShares(current);
+    } catch {
+      if (runRef.current === run) setRefreshWarning("The link was recorded. The existing links list could not be refreshed.");
+    }
+  }, [consented, documentId, expiry, onAnnounce, preview, previewStale, startRequest]);
 
   const handleCopy = useCallback(async () => {
     const link = shareLink(created?.share_path ?? null);
@@ -196,27 +234,33 @@ export function ShareDialog({
   }, [created, onAnnounce]);
 
   const handleRevoke = useCallback(async (shareId: string) => {
-    const controller = new AbortController();
+    const { signal, run } = startRequest();
+    setRefreshWarning(null);
     try {
-      await revokeShare(documentId, shareId, controller.signal);
-      setShares(await listShares(documentId, controller.signal));
+      await revokeShare(documentId, shareId, signal);
+      if (runRef.current !== run) return;
+      setShares((items) => items?.map((item) => item.id === shareId ? { ...item, status: "revoked" } : item) ?? null);
+      setCreated((item) => item?.id === shareId ? { ...item, status: "revoked", share_path: null, share_token: null } : item);
       setRevokeTarget(null);
       onAnnounce?.("The share was revoked. Everyone with the link is denied from now on.");
     } catch (error) {
+      if (runRef.current !== run) return;
       setRevokeTarget(null);
-      setErrorText(describeError(error));
+      setRefreshWarning(describeError(error));
     }
-  }, [documentId, onAnnounce]);
+  }, [documentId, onAnnounce, startRequest]);
 
   const handleClose = useCallback((next: boolean) => {
     if (!next) {
+      if (phase === "creating") return;
+      request.current?.abort();
       runRef.current += 1;
+      attempt.current = null;
+      resetPreview();
       onAnnounce?.("Share dialog closed. Existing links stay active until revoked or expired.");
     }
     onOpenChange(next);
-  }, [onAnnounce, onOpenChange]);
-
-  const previewStale = preview !== null && preview.revision !== revision;
+  }, [onAnnounce, onOpenChange, phase, resetPreview]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -238,6 +282,7 @@ export function ShareDialog({
           time.
         </DialogDescription>
 
+        {refreshWarning ? <p role="alert" className="mt-4 text-ui text-warning">{refreshWarning}</p> : null}
         {phase === "loading" ? (
           <p role="status" data-testid="share-loading" className="text-ui leading-ui text-text mt-4">
             Preparing the publication preview…
@@ -250,7 +295,10 @@ export function ShareDialog({
               {errorText}
             </p>
             <div className="mt-3">
-              <Button variant="secondary" onClick={() => void load(runRef.current + 1)}
+              <Button variant="secondary" onClick={() => {
+                if (attempt.current && !previewStale) void handleCreate();
+                else { attempt.current = null; resetPreview(); void load(); }
+              }}
                 data-testid="share-error-retry">
                 Try again
               </Button>
@@ -265,9 +313,8 @@ export function ShareDialog({
             </h3>
             {previewStale ? (
               <p role="alert" data-testid="share-preview-stale" className="text-ui leading-ui text-warning mt-2">
-                The document is at revision {revision}, but this preview is of
-                revision {preview.revision}. Save your edits, then reopen Share
-                to publish the current revision.
+                Save your edits and refresh the preview before publishing.
+                This preview is revision {preview.revision} and the editor is at revision {revision}.
               </p>
             ) : null}
             <ul className="mt-2 text-ui leading-ui text-text" data-testid="share-preview-visible">
@@ -285,6 +332,10 @@ export function ShareDialog({
             <p className="mt-2 text-metadata leading-metadata text-text-secondary">
               {preview.projection.document.limitations}
             </p>
+            <details className="mt-4 rounded-control border border-border p-3">
+              <summary className="cursor-pointer text-ui font-medium">Read the exact shared content</summary>
+              <ShareViewer projection={preview.projection} embedded />
+            </details>
           </section>
         ) : null}
 
@@ -326,7 +377,7 @@ export function ShareDialog({
           </section>
         ) : null}
 
-        {phase === "created" && created ? (
+        {phase === "created" && created?.share_path ? (
           <section className="mt-4" aria-label="Share link" data-testid="share-created">
             <p role="status" className="text-ui leading-ui font-medium text-text">
               The share link was created. It is shown <strong>only this once</strong> —
@@ -349,6 +400,11 @@ export function ShareDialog({
               Revoke below to deny everyone at any time.
             </p>
           </section>
+        ) : null}
+        {phase === "created" && created && !created.share_path ? (
+          <p role="status" className="mt-4 text-ui">
+            This share is {created.status}. Its link is available only on first creation.
+          </p>
         ) : null}
 
         {shares !== null ? (
@@ -382,7 +438,7 @@ export function ShareDialog({
                         revokeTarget === share.id ? (
                           <span className="flex items-center gap-2">
                             <Button variant="destructive" data-testid="share-revoke-confirm"
-                              onClick={() => void handleRevoke(share.id)}>
+                              disabled={phase === "creating"} onClick={() => void handleRevoke(share.id)}>
                               Confirm revoke
                             </Button>
                             <Button variant="quiet" onClick={() => setRevokeTarget(null)}>
@@ -390,7 +446,7 @@ export function ShareDialog({
                             </Button>
                           </span>
                         ) : (
-                          <Button variant="secondary" data-testid="share-revoke"
+                          <Button variant="secondary" data-testid="share-revoke" disabled={phase === "creating"}
                             onClick={() => setRevokeTarget(share.id)}>
                             Revoke
                           </Button>
@@ -405,7 +461,7 @@ export function ShareDialog({
         ) : null}
 
         <div className="mt-5 flex justify-end">
-          <Button variant="quiet" onClick={() => handleClose(false)} data-testid="share-close">
+          <Button variant="quiet" disabled={phase === "creating"} onClick={() => handleClose(false)} data-testid="share-close">
             Done
           </Button>
         </div>

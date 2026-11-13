@@ -27,6 +27,7 @@ with no stale path, no signed URL and no cache to poison.
 from __future__ import annotations
 
 import hashlib
+import re
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -38,15 +39,21 @@ from near_api.auth.principal import Principal
 from near_api.db.models import DocumentShare
 from near_api.db.security import ResourceNotFound, principal_transaction
 from near_api.db.session import user_transaction
-from near_api.documents.idempotency import parse_idempotency_key
+from near_api.documents.idempotency import (
+    IdempotencyConflict,
+    parse_idempotency_key,
+    request_fingerprint,
+)
 from near_api.documents.routes import _chart_csv
-from near_api.exports.ir import ExportIrError, build_export_ir_in_transaction
+from near_api.documents.service import _locked_document
+from near_api.exports.ir import build_export_ir_in_transaction
 from near_api.repositories.documents import DocumentRow, get_document
 from near_api.schemas.delivery import ChartViewResponse
-from near_api.schemas.share import ShareProjection
+from near_api.schemas.share import DocumentShareCreateRequest, ShareProjection, ShareStatus
 from near_api.shares.projection import (
     build_share_projection,
     share_projection_canonical_bytes,
+    share_scope_summary,
 )
 
 SHARE_ROUTE_TEMPLATE = "POST /api/documents/{document_id}/shares"
@@ -65,6 +72,8 @@ MAX_EXPIRY_DAYS = 365
 
 TOKEN_BYTES = 32
 """256 bits of capability entropy (``secrets.token_urlsafe`` -> 43 chars)."""
+
+_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}")
 
 
 class ShareNotFound(LookupError):
@@ -117,7 +126,7 @@ class ShareRow:
     expires_at: datetime | None
     revoked_at: datetime | None
 
-    def reported_status(self, *, now: datetime | None = None) -> str:
+    def reported_status(self, *, now: datetime | None = None) -> ShareStatus:
         """The honest lifecycle state at read time.
 
         A row past its expiry reads as ``expired`` until revoked, exactly
@@ -189,25 +198,29 @@ def preview_share(engine: Engine, principal: Principal,
 
 
 def create_share(engine: Engine, principal: Principal, document_id: UUID,
-                 *, acknowledged_revision: int, preview_sha256: str,
-                 scope: tuple[int, int, int, int], expires_at: datetime | None,
+                 *, consent: DocumentShareCreateRequest,
                  idempotency_key: str | None = None) -> SharePublication:
     """Create (or replay) the share of the owned acknowledged revision.
 
-    One transaction: advisory serialization (key present), the replay check
-    over the share row, the frozen projection build (fail-closed on every
-    pin), the consent verification (revision, preview hash, scope counts) and
-    the insert with a fresh 256-bit token (stored as digest only).
+    The owned document lock holds the revision and share count stable through
+    insertion. An owner-wide key lock binds a retry to the same document and
+    consent body, even after revocation clears the projection.
     """
     key = parse_idempotency_key(idempotency_key)
+    request_hash = None
     with principal_transaction(engine, principal) as connection:
+        document = _locked_document(connection, principal, document_id)
         if key is not None:
-            _serialize_same_key(connection, principal.id, document_id, key)
-            existing = _existing_share(connection, principal.id, document_id, key)
+            request_hash = request_fingerprint(
+                SHARE_ROUTE_TEMPLATE.format(document_id=document_id), principal.id,
+                consent.model_dump(mode="json"))
+            _serialize_same_key(connection, principal.id, key)
+            existing = _existing_share(connection, principal.id, key, request_hash)
             if existing is not None:
                 return SharePublication(share=existing, token=None, replay=True)
-        document = _owned_document(connection, principal, document_id)
-        if document.revision != acknowledged_revision:
+        if document.current_version_id is None:
+            raise ResourceNotFound("Resource does not exist for this owner")
+        if document.revision != consent.acknowledged_revision:
             raise ShareRevisionMismatch(
                 "The consented revision is not the document's current "
                 "acknowledged revision; review the fresh preview and consent "
@@ -215,11 +228,11 @@ def create_share(engine: Engine, principal: Principal, document_id: UUID,
         projection, projection_bytes = _build_projection(
             connection, principal, document)
         digest = hashlib.sha256(projection_bytes).hexdigest()
-        if digest != preview_sha256:
+        if digest != consent.preview_sha256:
             raise SharePreviewMismatch(
                 "The consented preview does not match the revision's current "
                 "publication bytes; review the fresh preview and consent again")
-        if _scope_counts(projection) != scope:
+        if share_scope_summary(projection) != consent.visible_scope:
             raise ShareScopeMismatch(
                 "The consented visible scope does not match the revision's "
                 "current publication")
@@ -227,7 +240,7 @@ def create_share(engine: Engine, principal: Principal, document_id: UUID,
             raise ShareProjectionTooLarge(
                 f"The frozen publication is {len(projection_bytes)} bytes; the "
                 f"stored-projection cap is {MAX_PROJECTION_BYTES}")
-        _validate_expiry(expires_at)
+        _validate_expiry(consent.expires_at)
         _assert_share_limit(connection, principal.id, document_id)
         share_id = uuid4()
         token = secrets.token_urlsafe(TOKEN_BYTES)
@@ -236,8 +249,9 @@ def create_share(engine: Engine, principal: Principal, document_id: UUID,
             document_version_id=document.current_version_id,
             token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),
             revision=projection.document.revision, idempotency_key=key,
+            idempotency_request_sha256=request_hash,
             projection=projection_bytes, projection_sha256=digest,
-            projection_byte_size=len(projection_bytes), expires_at=expires_at))
+            projection_byte_size=len(projection_bytes), expires_at=consent.expires_at))
         return SharePublication(share=_share_row(connection, principal.id,
                                                  document_id, share_id),
                                 token=token, replay=False)
@@ -367,15 +381,6 @@ def _build_projection(connection: Connection, principal: Principal,
     return projection, share_projection_canonical_bytes(projection)
 
 
-def _scope_counts(projection: ShareProjection) -> tuple[int, int, int, int]:
-    return (
-        sum(1 for block in projection.blocks if block.block_type == "liveChart"),
-        sum(1 for block in projection.blocks if block.block_type == "dataTable"),
-        sum(1 for block in projection.blocks if block.block_type == "insight"),
-        len(projection.sources),
-    )
-
-
 def _validate_expiry(expires_at: datetime | None) -> None:
     if expires_at is None:
         return
@@ -402,23 +407,25 @@ def _assert_share_limit(connection: Connection, owner_id: UUID,
             f"A document carries at most {MAX_SHARES_PER_DOCUMENT} shares")
 
 
-def _serialize_same_key(connection: Connection, owner_id: UUID,
-                        document_id: UUID, key: UUID) -> None:
-    """Advisory-lock the (owner, document, key) triple for this transaction."""
+def _serialize_same_key(connection: Connection, owner_id: UUID, key: UUID) -> None:
+    """Serialize the owner-wide idempotency key for the transaction."""
     connection.execute(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:material, 0))"),
-        {"material": f"document-share:{owner_id}:{document_id}:{key}"})
+        {"material": f"document-share:{owner_id}:{key}"})
 
 
-def _existing_share(connection: Connection, owner_id: UUID, document_id: UUID,
-                    key: UUID) -> ShareRow | None:
+def _existing_share(connection: Connection, owner_id: UUID, key: UUID,
+                    request_hash: str) -> ShareRow | None:
     row = connection.execute(
-        select(*_SHARE_COLUMNS).where(
+        select(*_SHARE_COLUMNS, DocumentShare.idempotency_request_sha256).where(
             DocumentShare.owner_id == owner_id,
-            DocumentShare.document_id == document_id,
             DocumentShare.idempotency_key == key)
-    ).mappings().first()
-    return _row_to_share(row) if row is not None else None
+    ).mappings().one_or_none()
+    if row is None:
+        return None
+    if row["idempotency_request_sha256"] != request_hash:
+        raise IdempotencyConflict("The share key was used for a different consent request")
+    return _row_to_share(row)
 
 
 def _share_row(connection: Connection, owner_id: UUID, document_id: UUID,
@@ -451,8 +458,13 @@ def _live_share_bytes(engine: Engine, token: str) -> bytes:
     and verify the byte identity against the recorded hash/size before
     anything is served.
     """
-    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    if not _TOKEN_PATTERN.fullmatch(token):
+        raise ShareNotFound("Share is not available")
+    digest = hashlib.sha256(token.encode("ascii")).hexdigest()
     with user_transaction(engine, None) as connection:
+        connection.execute(
+            text("SELECT set_config('app.share_token_sha256', :digest, true)"),
+            {"digest": digest})
         row = connection.execute(
             select(DocumentShare.projection, DocumentShare.projection_sha256,
                    DocumentShare.projection_byte_size, DocumentShare.status,
