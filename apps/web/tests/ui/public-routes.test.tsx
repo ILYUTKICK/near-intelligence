@@ -29,7 +29,7 @@ describe("Overview", () => {
     expect(screen.getAllByRole("link", { name: "Read the research" }).map((link) => link.getAttribute("href"))).toEqual(["/blog", "/research"]);
     expect(screen.getByRole("link", { name: "Our methodology" })).toHaveAttribute("href", "/methodology");
     expect(screen.getByRole("link", { name: "Open workspace" })).toHaveAttribute("href", "/workspace");
-    expect(screen.getByRole("link", { name: "Explore Intents activity" })).toHaveAttribute("href", "/data/intents");
+    expect(screen.getByRole("link", { name: "Explore data: Intents activity" })).toHaveAttribute("href", "/data/intents");
     expect(screen.getByText(/Historical datasets/)).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/Selected approved metrics|Unavailable — this is not zero/);
     expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();

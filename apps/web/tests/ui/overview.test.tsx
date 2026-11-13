@@ -36,9 +36,9 @@ describe("Approved editorial Overview", () => {
     render(<HomePage />);
     const directions = screen.getByRole("list", { name: "Data exploration directions" });
     expect(within(directions).getAllByRole("listitem")).toHaveLength(3);
-    expect(within(directions).getByRole("link", { name: "Explore Intents activity" })).toHaveAttribute("href", "/data/intents");
-    expect(within(directions).getByRole("link", { name: "Explore Revenue & fees" })).toHaveAttribute("href", "/data/revenue");
-    expect(within(directions).getByRole("link", { name: "Explore Token economics" })).toHaveAttribute("href", "/data/token-economics");
+    expect(within(directions).getByRole("link", { name: "Explore data: Intents activity" })).toHaveAttribute("href", "/data/intents");
+    expect(within(directions).getByRole("link", { name: "Explore data: Revenue & fees" })).toHaveAttribute("href", "/data/revenue");
+    expect(within(directions).getByRole("link", { name: "Explore data: Token economics" })).toHaveAttribute("href", "/data/token-economics");
     expect(screen.getByText("Historical datasets · coverage varies by source")).toBeInTheDocument();
   });
 
