@@ -13,7 +13,6 @@ import { createDocument } from "@/features/documents/list/documents-api";
 import { formatUpdated } from "@/features/documents/list/format";
 import { AUTH_CHANGE, AUTH_CHANGE_STORAGE } from "@/lib/auth/change";
 import { getHome, type Home } from "./api";
-import { HomeIndicators } from "./HomeIndicators";
 
 /** Revalidate identity on focus/auth signals before displaying retained private state. */
 export function WorkspaceHome() {
@@ -171,7 +170,6 @@ function HomeContent({ suspended }: { suspended: boolean }) {
           {home.recent_insights.length ? <ul className="mt-3 divide-y divide-border">{home.recent_insights.map((note) => <li key={`${note.document_id}:${note.block_id}`} className="min-w-0 py-3"><p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{note.excerpt || "Insight note"}</p><p className="mt-1 text-metadata text-text-secondary">{note.type} · {note.classification} · Updated {formatUpdated(note.modified_at)} UTC</p><Link className="inline-flex min-h-11 items-center text-link underline [overflow-wrap:anywhere]" href={`/workspace/research/${note.document_id}`}>Open document: {note.document_title}</Link></li>)}</ul> : <p role="status" className="mt-3 text-text-secondary">No insight notes in your current document revisions. Notes appear here after they have been saved in a document.</p>}
         </section>
       </div>
-      <HomeIndicators indicators={home.indicators} />
     </> : null}
   </div>;
 }

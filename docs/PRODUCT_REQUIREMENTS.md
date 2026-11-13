@@ -10,6 +10,25 @@ Primary audiences: hackathon reviewer reproducing a finding; individual analyst 
 
 The public thesis is mandatory. A generic workspace without published research does not meet the challenge. A static presentation with no working analytics/editor does not meet the product requirement.
 
+**Owner direction — 14 November 2026 (NI-084):** organize the public experience
+around an accumulating library of research articles, with a separate Blog catalog
+(working label). The current full research is the first publication and remains
+intact. New investigations and dated follow-ups will extend the library; charts
+and evidence remain part of the research. This is an accepted product direction
+documented in [BLOG_PUBLICATIONS.md](BLOG_PUBLICATIONS.md). NI-085 implements the
+local catalog, curated article registry and compatible routing after the owner
+explicitly requested implementation. Blog does not automatically publish text or
+refresh data. Private research tools and existing release/evidence requirements
+remain in scope.
+
+**Owner-approved Overview — 14 November 2026 (NI-086):** the public homepage
+uses the accepted editorial mockup: product introduction, one real featured
+article, data directions, reader workflow, methodology band and workspace CTA.
+This explicitly replaces the earlier NI-012 on-home metric/claim/model-status
+presentation. Detailed financial evidence and model status remain inspectable
+in research/data/methodology/models; the underlying services and research gates
+are unchanged. Homepage content does not depend on the data API being online.
+
 ## Requirements and traceability
 
 | ID | Requirement | Priority | Acceptance outcome | Owning tasks |

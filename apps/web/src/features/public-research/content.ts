@@ -155,6 +155,7 @@ export const verifiedExternalLinks = [
  */
 export const internalHrefAllowlist = [
   "/",
+  "/blog",
   "/research",
   "/methodology",
   "/models",
@@ -1017,7 +1018,7 @@ export const methodology = {
         id: "SRC-NEAR-RPC",
         provides: "NEAR block headers and account/protocol state from public mainnet RPC",
         access:
-          "One bounded finalized-header probe on 2026-11-06 (HTTP 200, 18,496 bytes at a 65,536-byte cap, final height 223357966). Scheduled polling is approved within 1 request/minute and at most 1,440 requests/day but is not wired yet; no SLA and no numeric provider quota are established.",
+          "One bounded finalized-header probe on 2026-11-06 (HTTP 200, 18,496 bytes at a 65,536-byte cap, final height 223357966). The bounded refresh adapter is implemented, but scheduled collection remains disabled by default and requires operator-approved source and request budgets. The approved polling cap is 1 request/minute and at most 1,440 requests/day; no SLA or numeric provider quota is established.",
         rights:
           "Approved via the OQ-03 resolution: free tier, no account or key, header-only responses with byte caps, public on-chain header data, derived-metric publication permitted. No bulk calls.",
       },

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ProductIcon } from "@/components/layout/ProductIcon";
 import { claimRegistry, type ClaimQuantity, type ThesisClaim } from "./content";
+import { RecordedQuantityPlot } from "./RecordedQuantityPlot";
 
 /**
  * Recorded-evidence figures (NI-078, resolving NI-076 finding D2).
@@ -57,14 +58,6 @@ function quantityAt(claim: ThesisClaim, index: number, unitPart: string): ClaimQ
 }
 
 /** Zero-based relative width; exact strings never pass through Number. */
-function barFraction(value: string, maximum: number): number {
-  const parsed = Number(value.replaceAll(",", ""));
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Recorded quantity ${value} cannot be drawn as a positive bar`);
-  }
-  return Math.min(1, parsed / maximum);
-}
-
 interface FigureBar {
   readonly label: string;
   readonly srLabel: string;
@@ -77,8 +70,9 @@ const claimLinkClasses =
   "flex items-center gap-1.5 font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
 function QuantityBars({ bars, unit }: { readonly bars: readonly FigureBar[]; readonly unit: string }) {
-  const maximum = Math.max(...bars.map((bar) => Number(bar.value.value.replaceAll(",", ""))));
   return (
+    <>
+    <RecordedQuantityPlot labels={bars.map((bar) => bar.label)} values={bars.map((bar) => bar.value.value)} unit={unit} title="Recorded evidence comparison" />
     <ul className="mt-3 space-y-4">
       {bars.map((bar) => (
         <li key={bar.label} className="grid items-center gap-x-4 sm:grid-cols-[11rem_minmax(0,1fr)]">
@@ -91,15 +85,10 @@ function QuantityBars({ bars, unit }: { readonly bars: readonly FigureBar[]; rea
             {bar.value.unit.startsWith("USD") ? <span className="sr-only">approximately </span> : null}
             {bar.value.value} <span className="font-medium text-text-secondary">{unit}</span>
           </span>
-          <div aria-hidden="true" className="mt-1 h-5 overflow-hidden rounded-full bg-sage/50">
-            <div
-              className="h-full rounded-full bg-accent"
-              style={{ width: `${barFraction(bar.value.value, maximum) * 100}%` }}
-            />
-          </div>
         </li>
       ))}
     </ul>
+    </>
   );
 }
 

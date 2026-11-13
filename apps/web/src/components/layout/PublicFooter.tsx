@@ -13,6 +13,7 @@ export function PublicFooter() {
       <div className="mx-auto flex w-full max-w-(--width-content-max) flex-wrap items-center justify-between gap-4 px-(--page-gutter) py-7 text-metadata text-text-secondary">
         <p>NEAR Intelligence · Independent, evidence-first research.</p>
         <nav aria-label="Footer" className="flex flex-wrap gap-5">
+          <Link href="/blog" className="hover:underline">Blog</Link>
           <Link href={editorialAnchors.sources} className="hover:underline">Sources &amp; definitions</Link>
           <Link href={editorialAnchors.reproduce} className="hover:underline">Reproduction</Link>
           <Link href="/research" className="hover:underline">Read the thesis</Link>

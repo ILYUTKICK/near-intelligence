@@ -37,6 +37,7 @@ import type { ComposeOption } from "echarts/core";
 import type {
   AriaComponentOption,
   AxisPointerComponentOption,
+  DataZoomComponentOption,
   GridComponentOption,
   LegendComponentOption,
   TooltipComponentOption,
@@ -56,6 +57,7 @@ export type ChartOption = ComposeOption<
   | AriaComponentOption
   | LegendComponentOption
   | AxisPointerComponentOption
+  | DataZoomComponentOption
 >;
 
 type SeriesList = Extract<NonNullable<ChartOption["series"]>, unknown[]>;
@@ -223,8 +225,8 @@ function unitGroups(seriesList: SeriesResponse[]): SeriesResponse[][] {
   return groups;
 }
 
-function panelLayout(panelCount: number, legendSpace: number): { top: string; height: string }[] {
-  const budget = 92 - legendSpace;
+function panelLayout(panelCount: number, legendSpace: number, zoomSpace = 0): { top: string; height: string }[] {
+  const budget = 92 - legendSpace - zoomSpace;
   const band = budget / panelCount;
   return Array.from({ length: panelCount }, (_, index) => ({
     top: `${(4 + legendSpace + index * band).toFixed(2)}%`,
@@ -307,12 +309,13 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
   const { view, gridDates, interactions, animation, summary } = build;
   const groups = unitGroups(view.series);
   const legendSpace = view.series.length > 1 ? 10 : 0;
-  const layout = panelLayout(groups.length, legendSpace);
+  const zoomable = interactions && gridDates.length > 1;
+  const layout = panelLayout(groups.length, legendSpace, zoomable ? 13 : 0);
 
   // NI-071: compared fan-out series carry their distinguishing filter values.
   const labels = describeSeries(view);
   // Exact-value lookup per series/grid index for the tooltip formatter.
-  const exactSeries: ExactCell[][] = view.series.map((seriesResponse, index) => {
+  const exactBySeries: ExactCell[][] = view.series.map((seriesResponse, index) => {
     const byDate = pointsByDate(seriesResponse);
     return gridDates.map((date) =>
       exactCell(byDate.get(date), labels[index].name, seriesResponse.metric.unit, date),
@@ -320,9 +323,11 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
   });
 
   const series: SeriesList = [];
-  let seriesIndex = 0;
+  const exactSeries: ExactCell[][] = [];
   for (const [gridIndex, group] of groups.entries()) {
     for (const seriesResponse of group) {
+      const seriesIndex = view.series.indexOf(seriesResponse);
+      exactSeries.push(exactBySeries[seriesIndex]);
       const byDate = pointsByDate(seriesResponse);
       const isBar = view.definition.visualization_type === "bar";
       const data: (number | null)[] = gridDates.map((date) => {
@@ -354,6 +359,7 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
           connectNulls: false,
           symbol: "circle",
           symbolSize: 6,
+          ...(interactions && gridDates.length > 90 ? { showSymbol: false } : {}),
           lineStyle: { color: seriesColor(seriesIndex) },
           itemStyle: { color: seriesColor(seriesIndex) },
           ...(view.definition.visualization_type === "area"
@@ -361,7 +367,6 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
             : {}),
         });
       }
-      seriesIndex += 1;
     }
   }
 
@@ -396,6 +401,21 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
       splitLine: { lineStyle: { color: AXIS_LINE } },
     })),
     series,
+    ...(zoomable ? {
+      dataZoom: [
+        {
+          type: "inside" as const, xAxisIndex: groups.map((_, index) => index),
+          filterMode: "none" as const, zoomOnMouseWheel: "shift" as const,
+          moveOnMouseMove: true, moveOnMouseWheel: false, start: 0, end: 100,
+        },
+        {
+          type: "slider" as const, xAxisIndex: groups.map((_, index) => index),
+          filterMode: "none" as const, bottom: 0, height: 24,
+          start: 0, end: 100, textStyle: { color: AXIS_TEXT },
+          borderColor: AXIS_LINE, fillerColor: "rgba(33,77,59,0.12)",
+        },
+      ],
+    } : {}),
     legend:
       view.series.length > 1
         ? {
@@ -407,6 +427,7 @@ function buildCartesianOption(build: CartesianBuild): ChartOption {
     axisPointer: { link: [{ xAxisIndex: "all" }] },
     tooltip: {
       trigger: "axis",
+      renderMode: "richText",
       confine: true,
       formatter: interactions
         ? (params) => {
@@ -579,12 +600,13 @@ export function buildChart(view: ChartViewResponse, options: BuildOptions = {}):
       }),
     };
   } else {
+    const lookups = view.series.map(pointsByDate);
     table = {
       columns: view.series.map((s, index) => ({ label: displayNames[index], unit: s.metric.unit })),
       rows: gridDates.map((date) => ({
         date,
-        cells: view.series.map((seriesResponse) => {
-          const point = pointsByDate(seriesResponse).get(date);
+        cells: view.series.map((_, index) => {
+          const point = lookups[index].get(date);
           return point ? valueCell(point) : missingCell("no observation");
         }),
       })),

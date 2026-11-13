@@ -27,6 +27,26 @@ The registry is implemented (NI-031, `near_api.charts.registry`, migration 0007)
 
 ## Query/render contract
 
+**NI-083 — long-history research (14 November 2026):** `intents-volume` and
+`gross-fees` append version 2 definitions with a 730-day maximum. Existing
+versions retain their original 366-day bound and identity. The public research
+history uses source-qualified canonical approved views and a pinned long-history
+dataset; its independently pinned purchase cohort keeps its own shorter dates.
+The research page's server-calculated monthly/quarterly observed subtotals show
+coverage and partial periods. Effective gross fee rate is the ratio of summed
+fees to summed volume on matched dates, multiplied by 10,000 basis points; it
+is not an average of daily rates or attributable protocol capture.
+
+Browser Cartesian charts provide a linked timeline slider, Shift+wheel zoom,
+drag panning and keyboard Zoom in/out/reset controls. The visible plot dates
+are announced; zoom changes the viewport only, not the resolved period, exact
+table, calculations or pins. Original decimal strings back tooltip/table values.
+Long line charts hide idle symbols while keeping every observation. Static
+exports use `interactions: false`, retain their original layout and omit zoom
+controls. Recorded categorical thesis comparisons use the same ECharts runtime
+with original claim strings and accessible text; they do not fabricate daily
+observations or dataset identities.
+
 ChartView resolves one approved prepared dataset containing required metric versions. `start/end/frequency/filters` are validated centrally; date range≤366 days initially. Default presets7/30/90 days relative to latest complete observation, not wall-clock if historical. A custom range outside coverage shows missing values, explains overlap and does not silently shrink. Supported filters include approved recipient/source mappings only; unknown options rejected. Currency switch chooses an actual alternative metric/calculation context.
 
 **Multi-value comparison (NI-071, 2026-11-12):** a chart version's filter schema may mark a dimension `multi_value` (registered only from the immutable approved mappings in `near_api.charts.filter_registry`, which also declares per-dimension reconciliation identities and the NI-031 single-value enums). A selection carries a string for one value and a list for a comparison. One ChartView resolves **one compared series per selected value combination — server-side fan-out** (the recorded design decision: one coherent series table/legend/CSV instead of K parallel client queries). Canonical value order is the dimension's declared option order, never the request order; duplicates collapse once. Each fan-out series echoes its own exact-match single-value filters while the view-level selection and context hash capture the exact multi-selection. When a chart declares a reconcilable dimension (the verified universe of the bound metric — treasury `recipient`) and the selection covers the full declared universe, the per-value series must sum to the declared aggregate metric definition of the SAME dataset version at exact Decimal precision; a missing, non-exact or disagreeing period is replaced with explicit unavailable points carrying the reason. Cross-source (`source`) sums stay forbidden — that dimension is never `multi_value` and never reconcilable. No integrator/customer/collector classification exists. The compared series of one bound metric are distinguished in the legend and exact-value table by their selected filter values. The same shared controls (`features/charts/filters/`) render the checkbox comparison group on the chart detail and in the editor live-chart block edit (draft-local until Apply), and the URL selection round-trips the exact multi-selection through `filters` JSON (one selected value serializes as the bare string).
@@ -70,3 +90,21 @@ NI-035 review correction: authenticated action attempts are keyed by the verifie
 Editor chart nodes reuse the same `ChartView` and exact-data table as the explorer. Their live policy requires explicit Refresh to adopt a new dataset. Default loads reconstruct the observed immutable pin. A pinned frame says Historical while the surrounding block says Live chart / saved observation. Range/filter drafts are local until explicitly applied and successfully resolved through the owner-scoped `/documents/{id}/chart-view`. Canonical server validation, query bounds and context hashes are shared with public delivery. Saving unchanged prose carries context JSON verbatim. NI-043 verifies submitted inspections and exposes the compatible approved dataset pointer as a working-view notice. Historical views and CSV reconstruct exclusively from the saved revision. NI-047 Add Insight freezes the inspected context in the new annotation. Snapshot management (NI-044) is implemented separately from revision pins: a saved chart in snapshot mode renders exactly its referenced frozen snapshot and compare-to-live is always an explicit additional read.
 
 NI-064 desktop accessibility correction (13 November 2026): repeated editor chart exact-data regions retain their chart title, region role, keyboard focus and exact caption, and add the current human top-level research-block ordinal. Labels follow insert/move transactions; historical saved-chart regions carry the same context. This affects accessible names only, never chart definitions, financial values or frozen pins.
+
+
+NI-080 default-date correction (13 November 2026): an implicit default on the
+shared detail/featured-category screens resolves latest approved dataset coverage
+before choosing its preset. A bounded bootstrap view discovers `dataset.end`;
+when its dates differ from the bootstrap, the actual view is requested against
+that immutable dataset ID, avoiding a latest-pointer race. Explicit date selections
+are retained verbatim, including out-of-coverage selections; historical pinned
+ranges keep their existing immutable coverage anchor. No date is shifted silently.
+
+NI-080 initial-range correction (13 November 2026): when a detail or featured
+chart has no explicit dates and resolves `latest`, one bounded view request
+first discovers the approved dataset coverage. If the preset window differs,
+the server fetches the preset anchored to that coverage end against the
+immutable discovered dataset ID. Concurrent publication cannot switch the
+second request's input. Explicit user dates, including an out-of-coverage
+custom window, are never moved; pinned historical resolution is unchanged.
+The same shared screen/helper serves public and workspace mounts.

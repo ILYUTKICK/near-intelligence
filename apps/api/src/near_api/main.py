@@ -27,6 +27,7 @@ from near_api.integrity.routes import router as integrity_router
 from near_api.metrics.routes import router as metrics_router
 from near_api.models.routes import router as models_router
 from near_api.publications.routes import router as publications_router
+from near_api.research.routes import router as research_router
 from near_api.schemas.common import ErrorResponse, HealthResponse
 from near_api.settings import SettingsError, get_settings
 from near_api.shares.routes import router as shares_router
@@ -80,6 +81,7 @@ app.include_router(snapshots_router)
 app.include_router(datasets_router)
 app.include_router(models_router)
 app.include_router(publications_router)
+app.include_router(research_router)
 
 
 @app.get("/health", response_model=HealthResponse, operation_id="getHealth",

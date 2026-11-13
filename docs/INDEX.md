@@ -5,6 +5,7 @@ Version 1.0, 5 November 2026. Normative implementation specification; applicatio
 ## Product and experience
 
 - [PRODUCT_REQUIREMENTS.md](PRODUCT_REQUIREMENTS.md) — purpose, requirements, release outcomes.
+- [BLOG_PUBLICATIONS.md](BLOG_PUBLICATIONS.md) — article-library direction, first publication, local Blog implementation and authoring guide (NI-084/085).
 - [USER_JOURNEYS.md](USER_JOURNEYS.md) — complete research workflows and recovery.
 - [INFORMATION_ARCHITECTURE.md](INFORMATION_ARCHITECTURE.md) — canonical routes/navigation.
 - [FEATURE_SPECIFICATIONS.md](FEATURE_SPECIFICATIONS.md) — behavior and acceptance.

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PageIntro } from "@/components/layout/PageIntro";
 import { ClaimCard } from "@/features/public-research/ClaimCard";
 import { DuplicateReleaseAction } from "@/features/public-research/DuplicateReleaseAction";
 import { MechanismFlow } from "@/features/public-research/MechanismFlow";
 import { RecordedPurchases } from "@/features/public-research/RecordedPurchases";
+import { InteractiveHistory } from "@/features/public-research/InteractiveHistory";
 import { SupplyScaleFigure, UsdWindowsFigure } from "@/features/public-research/ResearchFigures";
 import {
   claimRegistry,
@@ -149,6 +151,7 @@ function ThesisBody() {
       <DuplicateReleaseAction slug={thesisReleaseSlug} nextPath="/research" />
 
       <MechanismFlow />
+      <InteractiveHistory />
 
       {/* 1. Executive summary */}
       <section id={executiveSummary.id} aria-labelledby={`${executiveSummary.id}-heading`} className={sectionClasses}>
@@ -404,6 +407,7 @@ function ThesisBody() {
 export default function ResearchPage() {
   return (
     <article className="page-container">
+      <Link href="/blog" className="mb-6 inline-flex min-h-11 items-center text-ui text-accent underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">← Back to Blog</Link>
       <PageIntro
         eyebrow="The original research · November 2026"
         title={<>{thesis.title}<br /><em className="text-accent">{thesis.emphasis}</em></>}

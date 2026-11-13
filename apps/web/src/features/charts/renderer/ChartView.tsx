@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 import {
   EmptyState,
@@ -161,6 +162,8 @@ export function ChartView({
 
   const plotHostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<EChartsLike | null>(null);
+  const zoomRef = useRef({ start: 0, end: 100 });
+  const [zoomWindow, setZoomWindow] = useState({ start: 0, end: 100 });
 
   const controlled = controlledView !== undefined;
   const activeView = controlled ? controlledView : fetchedView;
@@ -255,6 +258,7 @@ export function ChartView({
     }
     let disposed = false;
     let instance: EChartsLike | null = null;
+    let unsubscribeZoom: (() => void) | undefined;
     const option = built.option;
     const host = plotHostRef.current;
     Promise.resolve().then(() => factory(host, {
@@ -268,6 +272,12 @@ export function ChartView({
       instance = created;
       chartRef.current = created;
       created.setOption(option);
+      zoomRef.current = { start: 0, end: 100 };
+      setZoomWindow(zoomRef.current);
+      unsubscribeZoom = created.onZoom?.((start, end) => {
+        zoomRef.current = { start, end };
+        setZoomWindow({ start, end });
+      });
       setRenderError(null);
     }).catch(() => {
       if (!disposed) {
@@ -277,6 +287,7 @@ export function ChartView({
     });
     return () => {
       disposed = true;
+      unsubscribeZoom?.();
       if (instance) {
         instance.dispose();
       }
@@ -301,6 +312,21 @@ export function ChartView({
   }, [width, visible, plottable]);
 
   const refreshing = loading && activeView !== null;
+  const zoomable = built?.kind === "ok" && Boolean(built.option.dataZoom);
+  const zoomDates = built?.kind === "ok" && built.table.rows.length ? [
+    built.table.rows[Math.floor((built.table.rows.length - 1) * zoomWindow.start / 100)].date,
+    built.table.rows[Math.ceil((built.table.rows.length - 1) * zoomWindow.end / 100)].date,
+  ] : null;
+  const navigatePlot = (factor: number | "reset") => {
+    const current = zoomRef.current;
+    const span = factor === "reset" ? 100 : Math.min(100, Math.max(1, (current.end - current.start) * factor));
+    const center = (current.start + current.end) / 2;
+    const start = factor === "reset" ? 0 : Math.max(0, Math.min(100 - span, center - span / 2));
+    const next = { start, end: start + span };
+    zoomRef.current = next;
+    setZoomWindow(next);
+    chartRef.current?.zoom?.(next.start, next.end);
+  };
   const metadata = activeView ? metadataOf(activeView, definition) : undefined;
   const savedPreview = presentation === "saved-preview";
   const previewValues = savedPreview && plottable && built?.kind === "ok"
@@ -351,6 +377,15 @@ export function ChartView({
         ) : null}
         {error ? <ErrorPanel message={error} onRetry={retry} /> : null}
         {renderError ? <ErrorPanel message={renderError} onRetry={retry} /> : null}
+        {zoomable ? (
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label={`${definition.title} — plot navigation`}>
+            <Button variant="secondary" onClick={() => navigatePlot(0.5)} disabled={zoomWindow.end - zoomWindow.start <= 1}>Zoom in</Button>
+            <Button variant="secondary" onClick={() => navigatePlot(2)}>Zoom out</Button>
+            <Button variant="secondary" onClick={() => navigatePlot("reset")}>Reset zoom</Button>
+            {zoomDates ? <span role="status" className="text-metadata text-text-secondary">Plot view: {zoomDates[0]} → {zoomDates[1]} UTC.</span> : null}
+            <span className="text-metadata text-text-secondary">Drag the timeline or Shift + scroll to zoom. Plot zoom leaves period totals unchanged.</span>
+          </div>
+        ) : null}
         <div
           ref={plotHostRef}
           role="img"

@@ -113,7 +113,7 @@ export function shiftIsoDate(isoDate: string, days: number): string {
   return shifted.toISOString().slice(0, 10);
 }
 
-/** Current UTC day as "YYYY-MM-DD" (the live-view preset anchor). */
+/** Current UTC day as "YYYY-MM-DD" (used only to bootstrap latest coverage). */
 export function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -121,9 +121,8 @@ export function todayUtc(): string {
 /**
  * The default range for a chart version: its largest preset anchored to the
  * caller-provided selection end (the latest complete observation context the
- * page resolves — current UTC day for live views, the pinned dataset's
- * coverage end for historical ones). Anchoring is never wall-clock for
- * historical views (CHART_SYSTEM.md query/render contract).
+ * page resolves — approved dataset coverage end for live and historical
+ * views). Explicit URL ranges are never shifted (CHART_SYSTEM.md query/render contract).
  */
 export function defaultRangeFor(definition: ChartDefinitionResponse, anchorEnd: string): UrlRange {
   const presets = [...definition.available_ranges.presets_days].sort((a, b) => b - a);

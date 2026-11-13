@@ -136,7 +136,7 @@ export function SavedCharts() {
   return <div className="min-w-0 space-y-6">
     <PageIntro compact eyebrow="Saved Charts" title="Evidence worth keeping."
       description="Return to a saved range and filters. Live selections resolve the latest approved dataset."
-      action={<Button asChild><Link href="/charts">Explore charts <ProductIcon name="arrow" /></Link></Button>} />
+      action={<Button asChild><Link href="/workspace/charts">Explore charts <ProductIcon name="arrow" /></Link></Button>} />
     <form role="search" className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); setCursor(null); setQuery(search.trim()); }}>
       <div><Label htmlFor="saved-search">Search saved charts</Label><Input id="saved-search" type="search" value={search} maxLength={200}
         className="rounded-full text-ui" placeholder="Search by label" onChange={(event) => setSearch(event.target.value)} /></div>
@@ -150,7 +150,7 @@ export function SavedCharts() {
         <ProductIcon name={query ? "search" : "chart"} className="mx-auto mb-3 size-7 text-accent" />
         <p role="status" className="font-serif text-heading">No saved charts match this selection.</p>
         <p className="mt-2 text-ui text-text-secondary">
-          {query ? "Clear the search to see the other saved selections." : <><Link href="/charts" className="underline">Explore the chart library</Link> to save a chart.</>}
+          {query ? "Clear the search to see the other saved selections." : <><Link href="/workspace/charts" className="underline">Explore the chart library</Link> to save a chart.</>}
         </p>
       </div>
     ) : null}

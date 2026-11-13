@@ -27,7 +27,7 @@ describe("Route registry", () => {
   it("matches the canonical IA exactly", () => {
     expect(publicNav.map((item) => [item.label, item.href])).toEqual([
       ["Overview", "/"],
-      ["Research", "/research"],
+      ["Blog", "/blog"],
       ["Data", "/data"],
       ["Methodology", "/methodology"],
       ["Models", "/models"],
@@ -54,7 +54,7 @@ describe("Route registry", () => {
     ]);
   });
 
-  it("has unique hrefs, only enabled P0 entries, and no excluded routes", () => {
+  it("has unique hrefs, enabled scope priorities and no excluded routes", () => {
     const all = [...publicNav, ...workspaceNav, ...authNav];
     for (const navigation of [publicNav, workspaceNav, authNav]) {
       const hrefs = navigation.map((item) => item.href);
@@ -62,31 +62,22 @@ describe("Route registry", () => {
     }
     for (const item of all) {
       expect(item.enabled).toBe(true);
-      expect(item.priority).toBe("P0");
+      expect(item.priority).toBe(item.href === "/blog" ? "P1" : "P0");
       // Strategy/Portfolio screens from the legacy plan stay excluded.
       expect(item.href).not.toMatch(/strategy|portfolio/i);
       expect(item.label).not.toMatch(/strategy|portfolio/i);
     }
   });
 
-  it("never points the workspace sidebar at unimplemented route aliases", () => {
-    // NI-024 regression: `/workspace/data/*` and `/workspace/models` had no
-    // implemented pages, so the sidebar prefetched 404s. The Data Explorer and
-    // Analytics entries must target the implemented public routes.
+  it("keeps explorer and analytics links inside implemented workspace routes", () => {
     for (const item of workspaceNav) {
-      expect(item.href, `${item.label} href`).not.toMatch(/^\/workspace\/(data|models)/);
+      expect(item.href, `${item.label} href`).toMatch(/^\/workspace(?:\/|$)/);
     }
-    const explorerHrefs = workspaceNav
-      .filter((item) => item.group === "Data Explorer")
-      .map((item) => item.href);
-    expect(explorerHrefs).toEqual([
-      "/data/network",
-      "/data/intents",
-      "/data/revenue",
-      "/data/token-economics",
-      "/data/ecosystem",
+    expect(workspaceNav.filter((item) => item.group === "Data Explorer").map((item) => item.href)).toEqual([
+      "/workspace/data/network", "/workspace/data/intents", "/workspace/data/revenue",
+      "/workspace/data/token-economics", "/workspace/data/ecosystem",
     ]);
-    expect(workspaceNav.find((item) => item.label === "Econometric Models")?.href).toBe("/models");
+    expect(workspaceNav.find((item) => item.label === "Econometric Models")?.href).toBe("/workspace/models");
   });
 });
 
@@ -112,7 +103,7 @@ describe("Public header", () => {
     vi.mocked(usePathname).mockReturnValue("/");
     render(<PublicHeader />);
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    expect(within(nav).getByRole("link", { name: "Research" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Blog" })).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open site menu" })).toBeInTheDocument();
@@ -129,7 +120,7 @@ describe("Mobile navigation drawer", () => {
     expect(trigger).toHaveFocus();
     await user.keyboard("{Enter}");
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("link", { name: "Research" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Blog" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();

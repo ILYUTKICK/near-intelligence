@@ -15,6 +15,10 @@ export function WorkspaceHeader() {
   let label = current?.label ?? "Home";
   if (pathname?.startsWith("/workspace/research/")) {
     label = pathname.endsWith("/versions") ? "Revision history" : "Research editor";
+  } else if (pathname?.startsWith("/workspace/charts")) {
+    label = "Chart library";
+  } else if (pathname?.startsWith("/workspace/data") && !current) {
+    label = "Data explorer";
   } else if (pathname?.startsWith("/workspace/saved-charts/")) {
     label = "Saved chart";
   }

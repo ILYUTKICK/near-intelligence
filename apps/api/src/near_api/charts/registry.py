@@ -41,7 +41,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Mapping
 from uuid import UUID
 
@@ -80,6 +80,7 @@ DATA_STATUSES = ("available", "unavailable")
 # CHART_SYSTEM query/render contract: "date range <= 366 days initially";
 # default presets are 7/30/90 days relative to the latest complete observation.
 MAX_RANGE_DAYS = 366
+MAX_HISTORY_RANGE_DAYS = 730
 DEFAULT_PRESET_DAYS = (7, 30, 90)
 
 # Approved source/recipient/price-basis filter mappings live in the NI-071
@@ -438,6 +439,11 @@ CHARTS: tuple[ChartDefinition, ...] = (
     ),
 )
 
+# NI-083: append immutable long-history versions; v1 remains byte-for-byte.
+CHARTS += tuple(replace(chart, version=2,
+    allowed_ranges={"presets_days": [30, 90, 365, 730], "max_days": MAX_HISTORY_RANGE_DAYS})
+    for chart in CHARTS if chart.chart_id in {"intents-volume", "gross-fees"})
+
 _CHARTS_BY_CHART_ID: dict[str, ChartDefinition] = {}
 for _chart_item in CHARTS:
     _previous = _CHARTS_BY_CHART_ID.get(_chart_item.chart_id)
@@ -481,8 +487,8 @@ def _validate_allowed_ranges(chart: ChartDefinition) -> None:
             f"{chart.chart_id}: presets_days must be unique and ascending")
     max_days = ranges["max_days"]
     _reject(not isinstance(max_days, int) or isinstance(max_days, bool)
-            or not 1 <= max_days <= MAX_RANGE_DAYS,
-            f"{chart.chart_id}: max_days must be an integer within {MAX_RANGE_DAYS}")
+            or not 1 <= max_days <= MAX_HISTORY_RANGE_DAYS,
+            f"{chart.chart_id}: max_days must be an integer within {MAX_HISTORY_RANGE_DAYS}")
     _reject(any(day > max_days for day in presets),
             f"{chart.chart_id}: a preset exceeds max_days")
 

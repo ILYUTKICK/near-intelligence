@@ -58,7 +58,7 @@ class ResolvedSelection(Selection):
     """The resolved selection echoed back on series/chart-view responses.
 
     Same window rules as the shared bootstrap ``Selection`` (ISO dates,
-    frequency ``day``, non-empty half-open window of at most 366 days), but
+    frequency ``day``, non-empty half-open window of at most 730 days), but
     ``filters`` carries the chart-version-validated values instead of the
     strict-empty bootstrap object.
     """
@@ -96,7 +96,7 @@ class AvailableRanges(ContractModel):
     """Bounded query ranges of a chart definition (registry ``allowed_ranges``)."""
 
     presets_days: tuple[int, ...] = Field(min_length=1, max_length=8)
-    max_days: int = Field(strict=True, ge=1, le=366)
+    max_days: int = Field(strict=True, ge=1, le=730)
 
     @model_validator(mode="after")
     def presets_within_bound(self):

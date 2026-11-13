@@ -54,3 +54,25 @@ Availability codes: **A** saved observed data usable after import/rights validat
 P0 means implement the metric or its explicit honest unavailability/gate, not fabricate its values. Core usable charts use A/P/B metrics with appropriate labels. P1 network/ecosystem additions require actual verified history first. Preserve source-qualified definitions rather than silently replacing one provider with another. Source disagreement and bound quality must propagate through charts, insight contexts, model readiness, public claims and exports.
 
 A metric-definition change increments version and forces new prepared datasets/chart definitions where affected. A source-only observation revision creates a new dataset version with unchanged definition version and a changed-date report. Do not use the old name “buybacks” indiscriminately for observed_near_purchases. All additions need formula/unit/time/source/quality tests and an explicit explanatory limitation.
+
+
+## NI-083 descriptive history extension
+
+The saved-history operator preparation emits existing immutable provider volume
+and gross-fee metric definitions over their actual source-specific coverage,
+with `dimensions.source` preserved. It does not relabel gross fees as revenue or
+splice providers. Missing pre-history and absent dates generate missing delivery
+points, while source-reported fee zeros remain observations with an explicit
+quality note. The full prepared source files and their recorded manifest hashes
+are bound through NI-028 inputs; generated records stay local.
+
+The research summary computes **10,000 × sum(gross fees) / sum(volume)** on the
+intersection of observed dates of the same qualified source. A zero denominator
+or empty intersection yields null. This is a descriptive effective gross fee
+rate, not protocol capture, tariff, margin or causal effect. Whole-range volume
+and fee subtotals can cover different dates; matched subtotals and day counts are
+shown separately for the ratio. Complete-month/quarter comparisons require all
+calendar days in both series; clipped edge buckets remain partial. No fitted
+model, retention estimate or attribution gate changes. See the
+[extension audit](verification/ni-082/README.md) and
+[backend verification](verification/ni-083/BACKEND.md).

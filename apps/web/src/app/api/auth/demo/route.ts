@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
 
+import { loadServerEnv } from "@/lib/env";
 import { checkRateLimit, clientKey } from "@/lib/auth/rate-limit";
 import { AuthConfigError, loadPublicAuthConfig, loadServerAuthConfig } from "@/lib/auth/config";
 import {
@@ -17,9 +20,10 @@ import {
  * Demo sign-in (NI-017): a real provider session without a password, for
  * friction-free evaluation. Supabase anonymous sign-ins create a genuine
  * identity (own sub, own rows, full RLS ownership) — but it is an ephemeral
- * demo account, and the optional email is stored as a display label in
+ * demo account, and the supplied email is stored as a display label in
  * user_metadata only. It never authenticates anything and is never treated
- * as a verified address. The primary path remains password signup.
+ * as a verified address. A starter investment template belongs to the new
+ * verified anonymous identity; permanent accounts retain their separate path.
  */
 export async function POST(request: NextRequest) {
   let allowedOrigins: string[];
@@ -48,14 +52,18 @@ export async function POST(request: NextRequest) {
 
   let parsed: { displayEmail?: unknown; returnTo?: unknown } = {};
   try {
-    parsed = (await request.json().catch(() => ({}))) as { displayEmail?: unknown; returnTo?: unknown };
+    const value: unknown = await request.json();
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      parsed = value;
+    }
   } catch {
     parsed = {};
   }
-  const displayEmail = typeof parsed.displayEmail === "string" ? parsed.displayEmail : "";
-  if (displayEmail.length > 254) {
-    return NextResponse.json({ error: "The demo email label is too long." }, { status: 400 });
+  const email = z.string().trim().max(254).email().safeParse(parsed.displayEmail);
+  if (!email.success) {
+    return NextResponse.json({ error: "Enter a valid email address to label your demo." }, { status: 400 });
   }
+  const displayEmail = email.data;
 
   let response: Response;
   try {
@@ -68,6 +76,7 @@ export async function POST(request: NextRequest) {
         data: displayEmail ? { demo_email_label: displayEmail } : {},
       }),
       credentials: "omit",
+      signal: AbortSignal.timeout(10_000),
     });
   } catch {
     return NextResponse.json(
@@ -99,9 +108,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Demo sign-in failed. Try again shortly." }, { status: 503 });
   }
 
+  // Seed through the normal authenticated document endpoint: the verified
+  // anonymous subject owns the template, never the unverified email label.
+  try {
+    const { API_INTERNAL_URL } = loadServerEnv();
+    const starter = await fetch(new URL("/api/documents", API_INTERNAL_URL), {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${body.access_token}`,
+        "content-type": "application/json",
+        "idempotency-key": randomUUID(),
+      },
+      body: JSON.stringify({ title: "My demo research", template_id: "investment-v1" }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!starter.ok) {
+      throw new Error("Starter research unavailable");
+    }
+  } catch {
+    return NextResponse.json({ error: "Your demo workspace could not be prepared. Try again shortly." }, { status: 503 });
+  }
+
   const secure = secureCookies();
-  const sessionResponse = NextResponse.json({ status: "session", demo: true, returnTo: safeInternalReturnTo(
-    typeof parsed.returnTo === "string" && parsed.returnTo.length <= 4096 ? parsed.returnTo : null) });
+  const requestedReturnTo = safeInternalReturnTo(
+    typeof parsed.returnTo === "string" && parsed.returnTo.length <= 4096 ? parsed.returnTo : null);
+  const sessionResponse = NextResponse.json({ status: "session", demo: true,
+    returnTo: requestedReturnTo === "/" ? "/workspace" : requestedReturnTo });
   sessionResponse.cookies.set(SESSION_COOKIE, encodeSessionCookie({
     accessToken: body.access_token,
     refreshToken: body.refresh_token,

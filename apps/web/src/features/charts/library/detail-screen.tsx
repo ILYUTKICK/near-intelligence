@@ -23,6 +23,7 @@ import type { DroppedParam, SerializedSelection } from "@/features/charts/librar
 import { firstValue, toPairs } from "@/features/charts/library/search-values";
 import type { SearchValues } from "@/features/charts/library/search-values";
 import { categoryWordings } from "./wording";
+import { fetchLatestDefaultView } from "./default-view";
 
 /**
  * Shared chart-detail screen (NI-015 extraction of the NI-034 detail flow).
@@ -117,11 +118,12 @@ export async function ChartDetailScreen({
 
   // Range resolution: an explicit validated range, or the version's default
   // preset anchored to the pinned dataset's coverage end (historical) or the
-  // current UTC day (live). Anchoring is never silent — the default-source
+  // resolved latest approved dataset (live). Anchoring is never silent — the default-source
   // note is rendered.
   let range = parsed.range;
   let rangeNote: string | null = null;
   let datasetFailure: DroppedParam | null = null;
+  let defaultViewResult: Awaited<ReturnType<typeof fetchChartView>> | null = null;
   if (range === null) {
     const pinnedDataset = parsed.datasetVersion !== null && parsed.datasetVersion !== "latest"
       ? parsed.datasetVersion
@@ -139,6 +141,14 @@ export async function ChartDetailScreen({
           reason:
             "the pinned dataset version could not be resolved, so no view can be rendered for it",
         };
+      }
+    } else if (definition.data_status === "available") {
+      const latest = await fetchLatestDefaultView(definition, parsed.filters);
+      range = latest.range;
+      defaultViewResult = latest.result;
+      if (latest.result.ok) {
+        rangeNote = `No range was given in the URL; the chart version's default preset is anchored `
+          + `to the latest approved dataset's coverage end (${latest.result.data.dataset.end} UTC).`;
       }
     } else {
       range = defaultRangeFor(definition, todayUtc());
@@ -164,7 +174,7 @@ export async function ChartDetailScreen({
   // Resolved view — only for available charts and a resolvable selection.
   const viewResult =
     definition.data_status === "available" && selection !== null && datasetFailure === null
-      ? await fetchChartView(chartId, {
+      ? defaultViewResult ?? await fetchChartView(chartId, {
           definitionVersion: definition.version,
           start: selection.start,
           end: selection.end,
@@ -184,7 +194,7 @@ export async function ChartDetailScreen({
     : null;
   const category = {
     label: links.categoryLabel ?? categoryWordings[definition.category] ?? definition.category,
-    href: links.categoryHref ?? `/charts?category=${definition.category}`,
+    href: links.categoryHref ?? `${links.basePath}?category=${definition.category}`,
   };
 
   return (

@@ -10,17 +10,18 @@ import { Label } from "@/components/ui/label";
 
 /**
  * Demo sign-in (NI-017): one real provider session without a password. The
- * email field is an optional display label stored as user metadata — it is
+ * email field is a display label stored as user metadata — it is
  * never verified and never used for authentication. Clearly labeled as demo
  * so it cannot be mistaken for a production account path.
  */
-export function DemoSignIn({ returnTo = "/" }: { returnTo?: string }) {
+export function DemoSignIn({ returnTo = "/workspace" }: { returnTo?: string }) {
   const router = useRouter();
   const [displayEmail, setDisplayEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  async function handleDemo() {
+  async function handleDemo(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (pending) {
       return;
     }
@@ -44,7 +45,7 @@ export function DemoSignIn({ returnTo = "/" }: { returnTo?: string }) {
         return;
       }
       announceAuthChange();
-      router.push(body.returnTo ?? "/");
+      router.push(body.returnTo ?? "/workspace");
     } catch {
       setError("The authentication service is unavailable. Try again shortly.");
     } finally {
@@ -53,18 +54,20 @@ export function DemoSignIn({ returnTo = "/" }: { returnTo?: string }) {
   }
 
   return (
-    <div className="mt-8 max-w-sm rounded-surface border border-border bg-surface-muted p-4">
-      <p className="font-ui text-ui leading-ui font-medium text-text">Demo sign-in</p>
+    <form onSubmit={handleDemo} className="mt-6 flex flex-col gap-4">
       <p className="text-metadata leading-metadata text-text-secondary mt-1">
-        No password and no verification email: a temporary demo account is created for this
-        browser. The address below is only a label.
+        Use any email to explore your own demo workspace. No password or verification
+        email is needed. The address is only a label, and each sign-in starts a separate demo.
       </p>
       <div className="mt-3 flex flex-col gap-1.5">
-        <Label htmlFor="demo-email">Email (label only)</Label>
+        <Label htmlFor="demo-email">Email</Label>
         <Input
           id="demo-email"
           name="displayEmail"
           type="email"
+          autoComplete="email"
+          required
+          maxLength={254}
           placeholder="you@example.com"
           value={displayEmail}
           onChange={(event) => setDisplayEmail(event.target.value)}
@@ -75,9 +78,9 @@ export function DemoSignIn({ returnTo = "/" }: { returnTo?: string }) {
           {error}
         </p>
       ) : null}
-      <Button variant="secondary" className="mt-3" onClick={handleDemo} pending={pending}>
-        Enter demo
+      <Button type="submit" pending={pending}>
+        Enter demo workspace
       </Button>
-    </div>
+    </form>
   );
 }

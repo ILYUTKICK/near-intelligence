@@ -75,6 +75,7 @@ import jwt  # noqa: E402
 import uvicorn  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
 from fastapi.responses import JSONResponse, RedirectResponse  # noqa: E402
+from fastapi import Request  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
 from sqlalchemy.engine import URL  # noqa: E402
 from sqlalchemy.pool import NullPool  # noqa: E402
@@ -404,6 +405,60 @@ def main() -> int:
             log(f"synthetic dataset published: version {result.dataset_version_id} "
                 "(latest approved for its metric)")
 
+            # NI-083 opt-in: real saved evidence only in an isolated local DB.
+            # Default regression mode remains visibly synthetic; no automatic fetch.
+            research_archive = environment.get("NI_RESEARCH_ARCHIVE_ROOT")
+            research_dataset_id = None
+            if research_archive:
+                from near_api.research.archive import prepare_history_manifest
+                from near_api.metrics.loaders import load_metric_inputs
+                from near_api.metrics.emit import DatasetSpec, ManifestInputSpec, build_manifest
+                root = Path(research_archive).resolve(strict=True)
+                flows = root / "near-longitudinal/data/flows_90d_raw.json"
+                daily = root / "near-dollar/analysis/daily.json"
+                supply = root / "near-supply/analysis/summary.json"
+                metric_inputs = load_metric_inputs(
+                    window_start=dt.date(2026, 8, 6), window_end_exclusive=dt.date(2026, 11, 4),
+                    flows_path=flows, daily_flows_path=daily, supply_path=supply)
+                cohort_metadata_path = root / "near-longitudinal/manifest.json"
+                cohort_metadata = json.loads(cohort_metadata_path.read_text())
+                if cohort_metadata.get("end_exclusive") is not True or cohort_metadata.get("window_utc") != [
+                        metric_inputs.window_start.isoformat(), metric_inputs.window_end_exclusive.isoformat()]:
+                    raise RuntimeError("Saved cohort metadata does not match the declared UTC window")
+                # The extract has no retrieval timestamp. Use its recorded
+                # observation cutoff, never the current recomputation clock
+                # or an unrelated provider's HTTP retrieval time.
+                observed_cutoff = dt.datetime.combine(metric_inputs.window_end_exclusive,
+                                                       dt.time.min, tzinfo=dt.timezone.utc)
+                spec = DatasetSpec(pipeline_version="ni083-saved-cohort-v1",
+                    source_as_of=observed_cutoff,
+                    quality={"note": "Real saved 90-day cohort; not full-market fee funding",
+                             "source_as_of_basis": "Recorded UTC end-exclusive observation cutoff; retrieval timestamp unavailable"})
+                bindings = (ManifestInputSpec("flows", flows, "raw", "SRC-BQ"),
+                            ManifestInputSpec("daily", daily, "normalized", "SRC-PRICE"),
+                            ManifestInputSpec("supply", supply, "normalized", "SRC-FASTNEAR"),
+                            ManifestInputSpec("cohort-metadata", cohort_metadata_path, "config"))
+                # Only daily research is needed here; no unpopulated snapshot metrics.
+                for key in ("metrics.flows.daily",):
+                    cohort_manifest = build_manifest(metric_inputs, dataset_key=key,
+                                                     dataset_spec=spec, manifest_inputs=bindings)
+                    cohort_path = fixture_dir / (key + ".json")
+                    cohort_path.write_text(json.dumps(cohort_manifest, sort_keys=True) + "\n")
+                    cohort_result = stage(operator, cohort_path, storage_root)
+                    if cohort_result.status != "validated":
+                        raise RuntimeError(f"Saved cohort did not validate: {cohort_result.validation}")
+                    publish(operator, cohort_result.dataset_version_id)
+                history_manifest = prepare_history_manifest(root)
+                history_path = fixture_dir / "research-history.json"
+                history_path.write_text(json.dumps(history_manifest, sort_keys=True) + "\n")
+                history_result = stage(operator, history_path, storage_root)
+                if history_result.status != "validated":
+                    raise RuntimeError(f"Saved history did not validate: {history_result.validation}")
+                publish(operator, history_result.dataset_version_id)
+                research_dataset_id = str(history_result.dataset_version_id)
+                delivery.reset_delivery_caches()
+                log("NI-083 real saved history and original cohort published to isolated DB")
+
             # ---- synthetic ES256 verifier (production gateway pattern) ---- #
             secret = secrets.token_urlsafe(32)
             csrf_secret = secrets.token_urlsafe(32)
@@ -415,7 +470,7 @@ def main() -> int:
                                 "APP_ENV": "test", "APP_ORIGIN": web_url,
                                 "API_INTERNAL_URL": api_url,
                                 "NEXT_TELEMETRY_DISABLED": "1",
-                                "NEXT_PUBLIC_SUPABASE_URL": "https://synthetic.supabase.co",
+                                "NEXT_PUBLIC_SUPABASE_URL": api_url,
                                 "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_synthetic_0123456789",
                                 "SUPABASE_JWT_ISSUER": issuer,
                                 "SUPABASE_JWKS_URL": issuer + "/.well-known/jwks.json",
@@ -441,6 +496,60 @@ def main() -> int:
             principal._get_engine = lambda: runtime  # noqa: SLF001
 
             users = {name: uuid4() for name in ("alice", "bob")}
+
+            # Loopback-only GoTrue transport for the normal demo gateway.
+            # No auth bypass enters product code: ES256 verification,
+            # principal bootstrap, ownership and cookies remain unchanged.
+            demo_refresh_sessions: dict[str, tuple[UUID, float]] = {}
+            demo_lock = threading.Lock()
+
+            def demo_tokens(subject: UUID) -> dict:
+                now = int(time.time())
+                token = jwt.encode({"sub": str(subject), "iss": issuer,
+                                    "aud": "authenticated", "iat": now,
+                                    "exp": now + 3600}, key, algorithm="ES256",
+                                   headers={"kid": "ni063-synthetic"})
+                refresh = secrets.token_urlsafe(32)
+                demo_refresh_sessions[refresh] = (subject, time.time() + 86400)
+                return {"access_token": token, "refresh_token": refresh,
+                        "expires_in": 3600}
+
+            @app.post("/auth/v1/signup", include_in_schema=False)
+            async def demo_signup(request: Request):
+                body = await request.json()
+                if not isinstance(body, dict) or body.get("is_anonymous") is not True:
+                    return JSONResponse({"error": "Only anonymous demo signup is supported"},
+                                        status_code=422)
+                with demo_lock:
+                    return demo_tokens(uuid4())
+
+            @app.post("/auth/v1/token", include_in_schema=False)
+            async def demo_refresh(request: Request):
+                body = await request.json()
+                if request.query_params.get("grant_type") != "refresh_token" \
+                        or not isinstance(body, dict):
+                    return JSONResponse({"error": "Unsupported grant"}, status_code=400)
+                raw = body.get("refresh_token")
+                if not isinstance(raw, str):
+                    return JSONResponse({"error": "Invalid refresh token"}, status_code=400)
+                with demo_lock:
+                    session = demo_refresh_sessions.pop(raw, None)
+                    if session is None or session[1] <= time.time():
+                        return JSONResponse({"error": "Expired refresh token"}, status_code=400)
+                    return demo_tokens(session[0])
+
+            @app.post("/auth/v1/logout", include_in_schema=False)
+            async def demo_logout(request: Request):
+                bearer = request.headers.get("authorization", "")
+                try:
+                    identity = verifier.verify(bearer.removeprefix("Bearer "))
+                except Exception:
+                    return JSONResponse({"error": "Invalid session"}, status_code=401)
+                with demo_lock:
+                    for refresh, session in list(demo_refresh_sessions.items()):
+                        if session[0] == identity.subject:
+                            del demo_refresh_sessions[refresh]
+                return JSONResponse({"ok": True})
 
             # ---- NI-064 performance document (real service + identity) ---- #
             perf_alice = bootstrap_principal(runtime, VerifiedToken(
@@ -600,6 +709,8 @@ def main() -> int:
             args.handoff.write_text(json.dumps({
                 "web_url": web_url,
                 "api_url": api_url,
+                "research_dataset_version_id": research_dataset_id,
+                "research_mode": "saved_archive" if research_archive else "synthetic",
                 "dataset_version_id": str(result.dataset_version_id),
                 "dataset_key": manifest["dataset_key"],
                 "window": {"start": WINDOW_START.isoformat(),

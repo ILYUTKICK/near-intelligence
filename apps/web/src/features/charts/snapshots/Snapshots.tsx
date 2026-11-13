@@ -106,7 +106,7 @@ export function Snapshots() {
         <ProductIcon name="shield" className="mx-auto mb-3 size-7 text-accent" />
         <p role="status" className="font-serif text-heading">No snapshots yet.</p>
         <p className="mt-2 text-ui text-text-secondary">
-          Freeze one from any <Link href="/charts" className="underline">chart detail</Link> once you have resolved a view.
+          Freeze one from any <Link href="/workspace/charts" className="underline">chart detail</Link> once you have resolved a view.
         </p>
       </div>
     ) : null}

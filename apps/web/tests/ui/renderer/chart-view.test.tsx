@@ -132,6 +132,19 @@ afterEach(() => {
 });
 
 describe("ChartView — plot and accessible table integration", () => {
+  it("offers keyboard zoom controls that navigate the plot without changing exact rows", async () => {
+    const zoom = vi.fn();
+    const factory: ChartFactory = () => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn(), zoom });
+    renderChart({ factory });
+    const navigation = screen.getByRole("group", { name: /plot navigation/ });
+    within(navigation).getByRole("button", { name: "Zoom in" }).focus();
+    await userEvent.keyboard("{Enter}");
+    expect(zoom).toHaveBeenLastCalledWith(25, 75);
+    within(navigation).getByRole("button", { name: "Reset zoom" }).focus();
+    await userEvent.keyboard("{Enter}");
+    expect(zoom).toHaveBeenLastCalledWith(0, 100);
+    expect(screen.getByRole("region", { name: /exact data table/ })).toHaveTextContent("2026-11-01");
+  });
   it("distinguishes repeated exact table landmarks with human instance context", () => {
     const { factory } = recordingFactory();
     render(<>

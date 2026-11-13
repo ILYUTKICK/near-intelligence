@@ -1,450 +1,109 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
-import { EmptyState, StaleNotice, UnavailableState } from "@/components/data-state/DataState";
-import { QualityBadge } from "@/components/data-state/QualityBadge";
-import type { DataMetadata } from "@/components/data-state/quality";
-import { ProductIcon } from "@/components/layout/ProductIcon";
+import { ProductIcon, type ProductIconName } from "@/components/layout/ProductIcon";
 import { Button } from "@/components/ui/button";
-import { MechanismFlow } from "@/features/public-research/MechanismFlow";
-import { ClaimCard } from "@/features/public-research/ClaimCard";
-import {
-  landingDatasetHref,
-  landingDefinitionHref,
-  landingSelectionWindow,
-} from "@/features/public-research/landing-metrics";
-import { fetchLandingMetrics, type LandingMetricState } from "@/features/public-research/landing-metrics";
-import { getLandingClaim, landingFindings } from "@/features/public-research/landing-findings";
-import { landing, releaseStatus } from "@/features/public-research/content";
-import { RecordedPurchases } from "@/features/public-research/RecordedPurchases";
-import { ResearchIllustration } from "@/features/public-research/ResearchIllustration";
+import { PublicationCard } from "@/features/blog/PublicationCard";
+import { publicationBySlug } from "@/features/blog/publications";
+import { OverviewArtwork } from "@/features/public-research/OverviewArtwork";
+import { thesisReleaseSlug } from "@/features/public-research/content";
+
+export const metadata: Metadata = {
+  title: "Overview — NEAR Intelligence",
+  description: "Original research, interactive data and the evidence behind every conclusion. Understand NEAR and build your own thesis.",
+};
+
+const sectionHeading = "font-serif text-title leading-title lg:text-[2.75rem] lg:leading-[1.08]";
+const textLink = "inline-flex min-h-11 items-center gap-2 rounded-control text-ui font-medium text-accent underline underline-offset-4 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus";
+
+const dataDirections: readonly { title: string; description: string; href: string; icon: ProductIconName }[] = [
+  { title: "Intents activity", description: "Explore how Intents is being used across the NEAR ecosystem.", href: "/data/intents", icon: "layers" },
+  { title: "Revenue & fees", description: "Follow fee generation and examine which revenue can be attributed to NEAR.", href: "/data/revenue", icon: "chart" },
+  { title: "Token economics", description: "Understand token flows, supply dynamics and key design choices.", href: "/data/token-economics", icon: "leaf" },
+];
+
+const workflow = [
+  { title: "Read the research", body: "Start with an argument and its limits." },
+  { title: "Inspect the evidence", body: "Explore the charts, definitions and sources." },
+  { title: "Build your thesis", body: "Save charts, add notes and connect your conclusions." },
+] as const;
 
 /**
- * Landing (NI-012): an evidence-bearing introduction. The shell and editorial
- * copy come from NI-011; the metric strip is fetched server-side from the
- * NI-032 delivery APIs (latest approved dataset semantics), the for/against
- * findings reuse the NI-014 claim registry through the shared ClaimCard, and
- * every quantitative value links its definition/dataset references. The
- * NI-070 release-status section states the honest model-research state: no
- * fitted values anywhere, the real-archive fit run pending operator execution,
- * and the public model catalog honestly empty until a reviewed run is
- * published.
- *
- * force-dynamic: approved-dataset resolution is a live read through the API's
- * own 60s latest-pointer cache; a statically prerendered landing could show
- * unavailability while approved data exists. All failure modes render as
- * typed fallback states — never zeros, never placeholder values.
+ * NI-086: the approved editorial Overview. This public introduction has no
+ * data/API dependency; financial observations and model status remain in their
+ * owning research/data views. All featured content comes from the curated Blog
+ * registry. Legacy landing anchors now lead to the corresponding discovery
+ * sections and retain explicit routes to their detailed evidence.
  */
-export const dynamic = "force-dynamic";
+export default function HomePage() {
+  const featured = publicationBySlug(thesisReleaseSlug);
+  if (!featured) throw new Error("The featured public research must be registered.");
 
-const linkClasses =
-  "press-feedback inline-flex h-11 items-center rounded-full border border-control-border bg-surface px-4 text-ui leading-ui text-text hover:bg-surface-muted";
-const textLinkClasses =
-  "text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
-const sectionClasses = "mt-12";
-const cardWrapperClasses =
-  "paper-panel h-full min-w-0 p-5";
-const metaLabelClasses = "font-medium text-text";
-
-function DefinitionDatasetLinks() {
-  return (
-    <p className="text-ui leading-ui text-text-secondary mt-3 flex flex-wrap gap-x-4 gap-y-1">
-      <a href={landingDefinitionHref} className={textLinkClasses}>
-        Definition and availability vocabulary
-      </a>
-      <a href={landingDatasetHref} className={textLinkClasses}>
-        Dataset staging and provenance
-      </a>
-    </p>
-  );
-}
-
-function ArchiveDateLine({ asOf }: { readonly asOf: string | null }) {
-  return (
-    <p className="text-ui leading-ui text-text-secondary mt-1">
-      <span className={metaLabelClasses}>Data as of: </span>
-      {asOf !== null ? (
-        <>
-          <span className="text-text">{asOf}</span> (recorded archive timestamp, UTC)
-        </>
-      ) : (
-        "no archive timestamp is recorded for this dataset"
-      )}
-      {/* No live badge: the saved evidence carries no recorded freshness
-          guarantee, so only the "as of" archive date is shown (NI-012). */}
-    </p>
-  );
-}
-
-function DatasetLine({
-  datasetKey,
-  datasetVersion,
-  datasetStatus,
-  start,
-  end,
-}: {
-  readonly datasetKey: string;
-  readonly datasetVersion: number;
-  readonly datasetStatus: string;
-  readonly start: string;
-  readonly end: string;
-}) {
-  return (
-    <p className="text-ui leading-ui text-text-secondary mt-1">
-      <span className={metaLabelClasses}>Dataset: </span>
-      {datasetKey} v{datasetVersion} ({datasetStatus}), covering {start} through {end} (UTC,
-      end exclusive)
-    </p>
-  );
-}
-
-function ObservationCard({ state }: { readonly state: Extract<LandingMetricState, { kind: "observation" }> }) {
-  const stale =
-    state.latest.quality.status === "stale" || state.dataset.quality.status === "stale";
-  const metadata: DataMetadata = {
-    units: state.latest.unit,
-    period: `${state.latest.start} … ${state.latest.end} (UTC half-open period)`,
-    asOf: state.asOf ?? undefined,
-    limitation: state.metric.limitations[0],
-  };
-  return (
-    <article aria-labelledby={`${state.metricId}-metric-heading`} className={cardWrapperClasses}>
-      <h3 id={`${state.metricId}-metric-heading`} className="text-heading leading-heading">
-        {state.metric.title}
-      </h3>
-      <p className="font-ui text-ui leading-ui text-text-secondary mt-1">
-        <span className="font-medium text-text">{state.metric.metric_id}</span> v
-        {state.metric.version} — availability {state.metric.availability}
-      </p>
-
-      {stale ? (
-        <div className="mt-3">
-          <StaleNotice quality={state.latest.quality} metadata={metadata} />
+  return <div className="page-container">
+    <section aria-labelledby="overview-heading" className="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-12">
+      <div>
+        <p className="eyebrow">Independent research · NEAR ecosystem</p>
+        <h1 id="overview-heading" className="mt-6 font-serif text-[clamp(3rem,4.5vw,4.25rem)] leading-[1.02] tracking-[-0.045em]">
+          Understand NEAR.<br /><em className="text-accent">Build your own thesis.</em>
+        </h1>
+        <p className="mt-6 max-w-[39ch] text-body leading-body text-text-secondary lg:text-[1.25rem] lg:leading-[1.5]">Original research, interactive data and the evidence behind every conclusion.</p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Button asChild><Link href="/blog">Read the research <ProductIcon name="arrow" /></Link></Button>
+          <Button asChild variant="secondary"><Link href="/data">Explore data</Link></Button>
         </div>
-      ) : null}
-
-      <p className="text-ui leading-ui text-text-secondary mt-3">
-        Latest approved observation in {landingSelectionWindow.scope}:
-      </p>
-      <p className="text-title leading-title text-text mt-1 [overflow-wrap:anywhere]">
-        {state.latest.value} <span className="text-body leading-body">{state.latest.unit}</span>
-      </p>
-
-      <dl className="text-ui leading-ui text-text-secondary mt-3 grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-[max-content_minmax(0,1fr)]">
-        <div className="contents">
-          <dt className={metaLabelClasses}>Observation period</dt>
-          <dd>
-            {state.latest.start} … {state.latest.end} (UTC half-open period)
-          </dd>
-        </div>
-        <div className="contents">
-          <dt className={metaLabelClasses}>Coverage of the selection</dt>
-          <dd>
-            {state.observationCount} of {state.totalPeriods} periods hold a value; the rest are
-            explicit gaps, never zeros
-          </dd>
-        </div>
-      </dl>
-
-      <div className="mt-3">
-        <QualityBadge quality={state.latest.quality} />
       </div>
+      <OverviewArtwork />
+    </section>
 
-      <ArchiveDateLine asOf={state.asOf} />
-      <DatasetLine
-        datasetKey={state.dataset.dataset_key}
-        datasetVersion={state.dataset.version}
-        datasetStatus={state.dataset.status}
-        start={state.dataset.start}
-        end={state.dataset.end}
-      />
-      <DefinitionDatasetLinks />
-    </article>
-  );
-}
-
-function NoObservationsCard({
-  state,
-}: {
-  readonly state: Extract<LandingMetricState, { kind: "no-observations" }>;
-}) {
-  return (
-    <article aria-labelledby={`${state.metricId}-metric-heading`} className={cardWrapperClasses}>
-      <h3 id={`${state.metricId}-metric-heading`} className="text-heading leading-heading">
-        {state.metricTitle}
-      </h3>
-      <p className="font-ui text-ui leading-ui text-text-secondary mt-1">
-        No unambiguous approved value is available in {landingSelectionWindow.scope}.
-      </p>
-      <div className="mt-3">
-        <EmptyState
-          metadata={{
-            units: state.unit,
-            period: state.dataset
-              ? `approved dataset ${state.dataset.dataset_key} v${state.dataset.version} covers ${state.dataset.start} through ${state.dataset.end} (UTC, end exclusive)`
-              : undefined,
-            limitation:
-              "No unambiguous value can be displayed for the recorded selection window. See the source-quality reasons below. This is not zero.",
-          }}
-        />
+    <section id="findings" aria-labelledby="featured-research-heading" className="mt-14 border-t border-border pt-9 lg:mt-16">
+      <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
+        <h2 id="featured-research-heading" className={sectionHeading}>The research, in focus.</h2>
+        <Link href="/blog" className={textLink}>Visit the Blog <ProductIcon name="arrow" /></Link>
       </div>
-      {state.reasons.length > 0 ? (
-        <ul className="text-ui leading-ui text-text-secondary mt-2 list-disc pl-5">
-          {state.reasons.map((reason) => (
-            <li key={reason}>{reason}</li>
-          ))}
-        </ul>
-      ) : null}
-      <DefinitionDatasetLinks />
-    </article>
-  );
-}
+      <PublicationCard publication={featured} />
+    </section>
 
-function UnavailableCard({
-  state,
-}: {
-  readonly state: Extract<LandingMetricState, { kind: "unavailable" }>;
-}) {
-  return (
-    <article aria-labelledby={`${state.metricId}-metric-heading`} className={cardWrapperClasses}>
-      <h3 id={`${state.metricId}-metric-heading`} className="text-heading leading-heading">
-        {state.metricTitle}
-      </h3>
-      <div className="mt-3">
-        <UnavailableState
-          quality={{
-            status: "unavailable",
-            bound_kind: null,
-            reasons: [state.reason],
-            coverage: { observed: 0, expected: 0 },
-            freshness_target_seconds: null,
-          }}
-          metadata={{
-            limitation:
-              "No approved value is shown because the delivery API could not provide one. This is not zero.",
-          }}
-        />
+    <section id="evidence" aria-labelledby="evidence-heading" className="mt-14 border-t border-border pt-9 lg:mt-16">
+      <h2 id="evidence-heading" className={sectionHeading}>Explore the evidence.</h2>
+      <p className="mt-3 text-body leading-body text-text-secondary">Follow the activity, fees and token flows behind the research.</p>
+      <ul aria-label="Data exploration directions" className="mt-7 grid gap-4 lg:grid-cols-3">
+        {dataDirections.map((direction) => <li key={direction.href} className="rounded-surface border border-border p-6 lg:p-7">
+          <ProductIcon name={direction.icon} className="size-8 text-accent" />
+          <h3 className="mt-5 font-serif text-heading leading-heading">{direction.title}</h3>
+          <p className="mt-3 max-w-[36ch] text-ui leading-ui text-text-secondary">{direction.description}</p>
+          <Link href={direction.href} className={`${textLink} mt-3`} aria-label={`Explore ${direction.title}`}>Explore data <ProductIcon name="arrow" /></Link>
+        </li>)}
+      </ul>
+      <p className="mt-4 text-metadata leading-metadata text-text-secondary">Historical datasets · coverage varies by source</p>
+    </section>
+
+    <section id="mechanism" aria-labelledby="workflow-heading" className="mt-12 border-t border-border pt-9 lg:mt-14">
+      <h2 id="workflow-heading" className={sectionHeading}>From a question to your own thesis.</h2>
+      <ol className="mt-8 grid gap-7 lg:grid-cols-3 lg:gap-0">
+        {workflow.map((step, index) => <li key={step.title} className="lg:px-7 lg:first:pl-0 lg:last:pr-0 lg:not-first:border-l lg:not-first:border-border">
+          <span className="inline-flex size-8 items-center justify-center rounded-control bg-sage font-serif text-ui font-semibold text-accent">0{index + 1}</span>
+          <h3 className="mt-4 font-serif text-heading leading-heading">{step.title}</h3>
+          <p className="mt-3 max-w-[34ch] text-ui leading-ui text-text-secondary">{step.body}</p>
+        </li>)}
+      </ol>
+      <p className="mt-5 text-metadata text-text-secondary">Trace the mechanism in the <Link href="/research#mechanism" className="text-accent underline underline-offset-4">full research</Link>.</p>
+    </section>
+
+    <section id="release-status" aria-labelledby="methodology-heading" className="mt-12 flex flex-wrap items-center justify-between gap-5 border-y border-border py-8 lg:mt-14">
+      <div>
+        <h2 id="methodology-heading" className="font-serif text-heading leading-heading lg:text-[2rem]">Sources first. Assumptions visible.</h2>
+        <p className="mt-2 text-ui leading-ui text-text-secondary">Every conclusion has a scope. Every number has a source.</p>
       </div>
-      <DefinitionDatasetLinks />
-    </article>
-  );
-}
+      <div className="flex flex-wrap items-center gap-x-6">
+        <Link href="/methodology" className={textLink}>Our methodology <ProductIcon name="arrow" /></Link>
+        <Link href="/research#econometrics" className="inline-flex min-h-11 items-center text-metadata text-accent underline underline-offset-4">Research status</Link>
+      </div>
+    </section>
 
-function MetricCard({ state }: { readonly state: LandingMetricState }) {
-  switch (state.kind) {
-    case "observation":
-      return <ObservationCard state={state} />;
-    case "no-observations":
-      return <NoObservationsCard state={state} />;
-    case "unavailable":
-      return <UnavailableCard state={state} />;
-  }
-}
-
-export default async function HomePage() {
-  const metricStates = await fetchLandingMetrics();
-
-  return (
-    <div className="page-container">
-      <section className="grid items-center gap-10 lg:grid-cols-[1fr_1.06fr]">
-        <div>
-          <p className="eyebrow flex items-center gap-2.5">
-            <span aria-hidden="true" className="size-2.5 rounded-full bg-accent" />
-            Independent research · NEAR ecosystem
-          </p>
-          <h1 className="overview-title mt-5 font-medium">
-            {landing.title}<br /><em className="text-accent">{landing.emphasis}</em>
-          </h1>
-          <p className="mt-6 max-w-[45ch] text-text-secondary lg:mt-8">
-            {landing.standfirst}
-          </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Button asChild>
-              <Link href="/research">Read the research <ProductIcon name="arrow" /></Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link href="/data">Explore the data</Link>
-            </Button>
-          </div>
-          <p className="mt-6 flex items-center gap-2.5 text-metadata text-text-secondary">
-            <ProductIcon name="shield" /> Sources first. Assumptions visible.
-          </p>
-        </div>
-        <div className="editorial-art relative grid min-h-[29rem] items-end overflow-hidden rounded-[2.25rem] border border-border p-5 lg:p-6">
-          <ResearchIllustration eager className="pointer-events-none absolute inset-x-0 bottom-0 h-full w-full object-cover object-bottom" />
-          <div className="paper-panel relative max-w-[13rem] self-start p-4 lg:p-5">
-            <p className="eyebrow">The research question</p>
-            <p className="mt-2 font-serif text-heading text-text">Can activity create durable value?</p>
-          </div>
-          <div className="relative mt-12 w-full max-w-[21rem] justify-self-end">
-            <RecordedPurchases compact />
-          </div>
-        </div>
-      </section>
-
-      <aside aria-label="Recorded evidence period" className="paper-panel mt-8 grid items-center gap-5 p-5 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_auto] lg:px-7">
-        <div>
-          <p className="eyebrow">The recorded evidence</p>
-          <p className="mt-1 text-ui text-text-secondary">6 Aug–3 Nov 2026 UTC · Treasury-linked cohort</p>
-        </div>
-        <div>
-          <p className="font-serif text-heading">90 days</p>
-          <p className="text-metadata text-text-secondary">Historical observation window</p>
-        </div>
-        <div>
-          <p className="font-serif text-heading">3 windows</p>
-          <p className="text-metadata text-text-secondary">Separate 30-day comparisons</p>
-        </div>
-        <Link href="/methodology" className="flex items-center gap-2 text-ui font-medium hover:underline">
-          Read the methodology <ProductIcon name="arrow" />
-        </Link>
-      </aside>
-
-      {/* Evidence metric strip: at most three approved delivery-API metrics. */}
-      <section id="evidence" aria-labelledby="evidence-heading" className={sectionClasses}>
-        <h2 id="evidence-heading" className="font-serif text-title leading-title">
-          Selected approved metrics
-        </h2>
-        <p className="text-body leading-body text-text-secondary max-w-(--width-prose) mt-2">
-          Three registry metrics carry the mechanism stages this project measures: observed
-          conversions into NEAR, matched treasury payouts, and provider-reported gross fees. They
-          are different metrics — purchases, payouts and fees are never added together, and gross
-          fees are not protocol revenue. Values come from one approved dataset version per metric
-          (latest approved, resolved by the delivery API) and render exactly as delivered.
-        </p>
-        <p className="text-ui leading-ui text-text-secondary max-w-(--width-prose) mt-2 rounded-surface border border-border bg-surface p-3">
-          Selection: {landingSelectionWindow.scope}. A value appears only where an approved dataset
-          covers it; unavailable sources show explicit states, not zeros. No live badge is shown —
-          the recorded evidence carries no freshness guarantee, only archive dates.
-        </p>
-        <ul className="mt-6 grid gap-4 lg:grid-cols-3">
-          {metricStates.map((state) => (
-            <li key={state.metricId}>
-              <MetricCard state={state} />
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* For/against findings from the claim registry (NI-014 consumption). */}
-      <section
-        id={landingFindings.id}
-        aria-labelledby={`${landingFindings.id}-heading`}
-        className={sectionClasses}
-      >
-        <h2 id={`${landingFindings.id}-heading`} className="font-serif text-title leading-title">
-          {landingFindings.heading}
-        </h2>
-        <p className="text-body leading-body text-text-secondary max-w-(--width-prose) mt-2">
-          {landingFindings.intro}
-        </p>
-        <p className="text-ui leading-ui text-text mt-3 max-w-(--width-prose) rounded-surface border border-border bg-surface p-4">
-          {landingFindings.recordedBasis}
-        </p>
-
-        <div className="mt-6 max-w-(--width-prose)">
-          <h3 className="text-heading leading-heading">{landingFindings.forSide.heading}</h3>
-          <p className="text-body leading-body text-text-secondary mt-1">
-            {landingFindings.forSide.lead}
-          </p>
-          <ol aria-label="Supporting claims" className="mt-4 flex flex-col gap-6 list-none pl-0">
-            {landingFindings.forSide.claimIds.map((id) => (
-              <li key={id}>
-                <ClaimCard claim={getLandingClaim(id)} />
-              </li>
-            ))}
-          </ol>
-          <p className="text-ui leading-ui mt-3">
-            <a href={landingFindings.forSide.thesisAnchor} className={textLinkClasses}>
-              {landingFindings.forSide.anchorLabel}
-            </a>
-          </p>
-        </div>
-
-        <div className="mt-8 max-w-(--width-prose)">
-          <h3 className="text-heading leading-heading">{landingFindings.againstSide.heading}</h3>
-          <p className="text-body leading-body text-text-secondary mt-1">
-            {landingFindings.againstSide.lead}
-          </p>
-          <ol aria-label="Contrary claims" className="mt-4 flex flex-col gap-6 list-none pl-0">
-            {landingFindings.againstSide.claimIds.map((id) => (
-              <li key={id}>
-                <ClaimCard claim={getLandingClaim(id)} />
-              </li>
-            ))}
-          </ol>
-          <p className="text-ui leading-ui text-text-secondary mt-3">
-            {landingFindings.againstSide.note}
-          </p>
-          <p className="text-ui leading-ui mt-3">
-            <a href={landingFindings.againstSide.thesisAnchor} className={textLinkClasses}>
-              {landingFindings.againstSide.anchorLabel}
-            </a>
-          </p>
-        </div>
-      </section>
-
-      <MechanismFlow />
-
-      {/* NI-070 release status: the honest model-research state. No numbers
-          beyond the recorded verdict strings; the model catalog stays empty
-          until a reviewed run is published. */}
-      <section
-        id={releaseStatus.id}
-        aria-labelledby={`${releaseStatus.id}-heading`}
-        className={sectionClasses}
-      >
-        <h2 id={`${releaseStatus.id}-heading`} className="font-serif text-title leading-title">
-          {releaseStatus.heading}
-        </h2>
-        {releaseStatus.paragraphs.map((paragraph) => (
-          <p key={paragraph.slice(0, 64)} className="text-body leading-body text-text-secondary max-w-(--width-prose) mt-2">
-            {paragraph}
-          </p>
-        ))}
-        <ul aria-label="Release status links" className="mt-3 flex flex-col gap-1 max-w-(--width-prose) list-disc pl-5">
-          {releaseStatus.links.map((link) => (
-            <li key={link.href}>
-              <a href={link.href} className={textLinkClasses}>
-                {link.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Closing CTAs: the documented destinations, honestly labeled. */}
-      <section aria-labelledby="continue-heading" className={sectionClasses}>
-        <h2 id="continue-heading" className="font-serif text-title leading-title">
-          Continue
-        </h2>
-        <ul className="mt-4 flex flex-wrap gap-2 list-none pl-0">
-          <li>
-            <Link href="/research" className={linkClasses}>
-              Read the full thesis
-            </Link>
-          </li>
-          <li>
-            <Link href="/methodology" className={linkClasses}>
-              Check the methodology
-            </Link>
-          </li>
-          <li>
-            <Link href="/data" className={linkClasses}>
-              Open the data explorer
-            </Link>
-          </li>
-          <li>
-            <Link href="/workspace" className={linkClasses}>
-              Open the workspace
-            </Link>
-          </li>
-        </ul>
-        <p className="text-ui leading-ui text-text-secondary max-w-(--width-prose) mt-3">
-          The workspace requires signing in; unauthenticated visits are redirected to the login
-          route. The public data explorer renders the registered charts from approved datasets,
-          with explicit unavailability when a source cannot be resolved.
-        </p>
-      </section>
-    </div>
-  );
+    <section aria-labelledby="workspace-heading" className="mt-6 rounded-surface bg-accent px-7 py-10 text-center text-on-accent lg:py-12">
+      <h2 id="workspace-heading" className="font-serif text-title leading-title text-on-accent lg:text-[2.75rem] lg:leading-[1.08]">Make the research your own.</h2>
+      <p className="mt-3 text-ui leading-ui">Save charts, add notes and build a thesis you can trace.</p>
+      <Button asChild className="mt-6 border-transparent bg-surface text-accent hover:bg-sage focus-visible:outline-on-accent"><Link href="/workspace">Open workspace <ProductIcon name="arrow" /></Link></Button>
+    </section>
+  </div>;
 }

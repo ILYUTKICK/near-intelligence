@@ -1,38 +1,14 @@
 /**
- * NI-012 landing evidence metrics.
- *
- * Matrix driven through the real fetch → validate → render path:
- * - approved saved input renders exact decimal strings with definition and
- *   dataset references and archive dates (API-to-render integration against
- *   a fixture shaped exactly like the implemented NI-032 contract; the true
- *   cluster/HTTP integration lives in apps/api/tests/test_landing_integration.py);
- * - 503 DATA_NOT_READY, all-null series, unreachable API and malformed or
- *   contract-invalid payloads render typed fallback states — never zeros;
- * - stale data keeps the values and shows the stale notice;
- * - claim citations trace into the thesis anchors and the claim registry;
- * - CTAs reach /research, /methodology, /data and /workspace; no live badge
- *   exists; the NI-070 release-status section states the honest fit-pending
- *   state;
- * - content-width discipline, DOM order, axe and private-metadata checks.
- *
- * Fixtures are synthetic and visibly labeled (ni012-fixture dataset keys);
- * they never stand in for real production metrics.
+ * Retained NI-012 financial loader contracts. NI-086 makes Overview a static
+ * editorial introduction; source validation and exact data delivery are still
+ * independently tested here, without requiring obsolete cards on the homepage.
+ * Every value in these tests is a labeled synthetic fixture.
  */
-import { axe } from "jest-axe";
 import { NextResponse } from "next/server";
-import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import HomePage from "@/app/(public)/page";
-import { claimRegistry, releaseStatus, thesisToc } from "@/features/public-research/content";
 import {
-  getLandingClaim,
-  landingFindings,
-} from "@/features/public-research/landing-findings";
-import {
-  landingDatasetHref,
-  landingDefinitionHref,
-  landingMetricSources,
+  fetchLandingMetrics,
   landingSelectionWindow,
 } from "@/features/public-research/landing-metrics";
 
@@ -220,327 +196,107 @@ function approvedResponder(): Responder {
   };
 }
 
-async function renderLanding() {
-  const { container } = render(await HomePage());
-  return container;
-}
+beforeEach(() => vi.unstubAllGlobals());
+afterEach(() => vi.unstubAllGlobals());
 
-beforeEach(() => {
-  vi.unstubAllGlobals();
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-describe("Approved saved input renders source-qualified values", () => {
-  it("renders the exact decimal strings with definition/dataset references and archive dates", async () => {
-    stubSeriesFetch(approvedResponder());
-    const container = await renderLanding();
-
-    for (const source of landingMetricSources) {
-      const meta = fixtureMetrics[source.metricId as FixtureMetricId];
-      const card = document.getElementById(`${source.metricId}-metric-heading`)?.closest("article");
-      expect(card, `card for ${source.metricId}`).not.toBeNull();
-      const scope = within(card as HTMLElement);
-      // Registry title and the exact metric identity + availability letter.
-      expect(scope.getByRole("heading", { name: meta.title })).toBeInTheDocument();
-      expect(scope.getByText(source.metricId)).toBeInTheDocument();
-      expect(scope.getByText(`v1 — availability ${meta.availability}`)).toBeInTheDocument();
-      // The exact decimal string, verbatim, with its unit and half-open period.
-      const value = Object.values(fixtureValues[source.metricId as FixtureMetricId])[0]!;
-      expect(scope.getByText(value)).toBeInTheDocument();
-      expect(scope.getByText(new RegExp(`^${meta.unit.replace(/[()]/g, "\\$&")}$`))).toBeInTheDocument();
-      expect(container.textContent).toMatch(/UTC half-open period/);
-      // Definition/dataset links and the recorded archive date ("as of").
-      const links = Array.from(card!.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-      expect(links).toContain(landingDefinitionHref);
-      expect(links).toContain(landingDatasetHref);
-      expect(scope.getByText("Data as of:")).toBeInTheDocument();
-      expect(scope.getByText(fixtureDataset.source_as_of)).toBeInTheDocument();
-      // Dataset identity: key, immutable version, approved status, coverage.
-      expect(
-        scope.getByText(
-          `${fixtureDataset.dataset_key} v${fixtureDataset.version} (${fixtureDataset.status}), covering ${fixtureDataset.start} through ${fixtureDataset.end} (UTC, end exclusive)`,
-        ),
-      ).toBeInTheDocument();
+describe("Retained exact landing-series loader contract", () => {
+  it("resolves approved exact decimal strings, definitions, immutable dataset and source cutoff", async () => {
+    const fetcher = stubSeriesFetch(approvedResponder());
+    const states = await fetchLandingMetrics();
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    for (const state of states) {
+      expect(state.kind).toBe("observation");
+      if (state.kind !== "observation") throw new Error("Expected approved observation");
+      const metricId = state.metricId as FixtureMetricId;
+      expect(state.latest.value).toBe(Object.values(fixtureValues[metricId])[0]);
+      expect(state.metric.version).toBe(1);
+      expect(state.dataset.id).toBe(fixtureDataset.id);
+      expect(state.dataset.version).toBe(fixtureDataset.version);
+      expect(state.asOf).toBe(fixtureDataset.source_as_of);
+      expect(state.observationCount).toBe(1);
+      expect(state.totalPeriods).toBe(90);
     }
-    expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });
 
-  it("never shows a live badge — only the as-of archive date", async () => {
-    stubSeriesFetch(approvedResponder());
-    await renderLanding();
-    // No element presents itself as a live indicator; the only freshness
-    // language is the "as of" archive line. (The prose may honestly explain
-    // that no live badge exists, so the assertion is structural.)
-    for (const label of [/^live$/i, /^live data$/i, /^real-?time$/i]) {
-      expect(screen.queryByText(label)).toBeNull();
-    }
-    expect(screen.getAllByText("Data as of:")).toHaveLength(3);
-    expect(screen.getAllByText(/recorded archive timestamp, UTC/)).toHaveLength(3);
-  });
-
-  it("counts observation coverage without inventing aggregate values", async () => {
-    stubSeriesFetch(approvedResponder());
-    await renderLanding();
-    // 90 daily periods in the recorded window; each fixture metric carries one value.
-    const coverageLines = screen.getAllByText(/1 of 90 periods hold a value/);
-    expect(coverageLines).toHaveLength(3);
-  });
-});
-
-describe("Unavailable-source cases render honest fallbacks, never zeros", () => {
-  it("renders the typed unavailable state for 503 DATA_NOT_READY", async () => {
-    stubSeriesFetch(() => ({
-      status: 503,
-      body: {
-        error: {
-          code: "DATA_NOT_READY",
-          message: "No approved dataset exists for latest",
-          request_id: "fixture-request",
-          retryable: true,
-        },
-      },
-    }));
-    const container = await renderLanding();
-    expect(screen.getAllByText(/Unavailable — this is not zero/)).toHaveLength(3);
-    for (const values of Object.values(fixtureValues)) {
-      for (const value of Object.values(values)) {
-        expect(document.body.textContent).not.toContain(value);
+  it("keeps the latest available observation rather than summing financial values", async () => {
+    stubSeriesFetch((url) => {
+      const id = url.pathname.match(/([a-z_]+)\/series$/)![1] as FixtureMetricId;
+      return { status: 200, body: seriesFixture(id, { "2026-11-01": "1000000.1234567890123456789", "2026-11-03": "0" }) };
+    });
+    const states = await fetchLandingMetrics();
+    for (const state of states) {
+      expect(state.kind).toBe("observation");
+      if (state.kind === "observation") {
+        expect(state.latest.value).toBe("0");
+        expect(state.observationCount).toBe(2);
+        expect(state.latest.start).toBe("2026-11-03T00:00:00Z");
       }
     }
-    // No metric card claims a resolved observation.
-    expect(screen.queryAllByText(/Latest approved observation in/)).toHaveLength(0);
-    expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });
 
-  it("renders the empty state when an approved dataset covers no period with a value", async () => {
+  it("keeps source-qualified stale data and exact original values", async () => {
     stubSeriesFetch((url) => {
-      const metricId = url.pathname.match(/([a-z_]+)\/series$/)![1] as FixtureMetricId;
-      return { status: 200, body: seriesFixture(metricId, {}) };
+      const id = url.pathname.match(/([a-z_]+)\/series$/)![1] as FixtureMetricId;
+      return { status: 200, body: seriesFixture(id, fixtureValues[id], { qualityStatus: "stale" }) };
     });
-    await renderLanding();
-    expect(screen.getAllByText(/No data for this selection/)).toHaveLength(3);
-    expect(screen.getAllByText(/An empty result is not zero/).length).toBeGreaterThanOrEqual(3);
-    expect(document.body.textContent).not.toContain("1234.567890123456789012345678");
+    for (const state of await fetchLandingMetrics()) {
+      expect(state.kind).toBe("observation");
+      if (state.kind === "observation") {
+        expect(state.latest.quality.status).toBe("stale");
+        expect(state.latest.value).toBe(Object.values(fixtureValues[state.metricId as FixtureMetricId])[0]);
+      }
+    }
   });
 
-  it("preserves and deduplicates point-level provider ambiguity reasons", async () => {
+  it("distinguishes all-null observations from economic zero and deduplicates provider ambiguity", async () => {
     const reason = "Synthetic fixture: multiple provider variants require an approved filter";
     stubSeriesFetch((url) => {
-      const metricId = url.pathname.match(/([a-z_]+)\/series$/)![1] as FixtureMetricId;
-      const body = seriesFixture(metricId, {});
+      const id = url.pathname.match(/([a-z_]+)\/series$/)![1] as FixtureMetricId;
+      const body = seriesFixture(id, {});
       body.points.forEach((point) => { point.quality.reasons = [reason]; });
       return { status: 200, body };
     });
-    await renderLanding();
-    expect(screen.getAllByText(reason)).toHaveLength(3);
-    expect(screen.queryAllByText(/Latest approved observation in/)).toHaveLength(0);
-    expect(screen.getAllByText(/No unambiguous approved value/)).toHaveLength(3);
+    for (const state of await fetchLandingMetrics()) {
+      expect(state.kind).toBe("no-observations");
+      if (state.kind === "no-observations") {
+        expect(state.reasons).toEqual([reason]);
+        expect(state.dataset?.id).toBe(fixtureDataset.id);
+      }
+    }
   });
 
-  it("renders the unavailable state when the delivery API is unreachable", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        throw new Error("connection refused");
-      }),
-    );
-    await renderLanding();
-    expect(screen.getAllByText(/Data failed to load|Unavailable — this is not zero/).length).toBe(3);
-    expect(document.body.textContent).toMatch(/could not be reached/);
+  it.each([503, 404, 500])("preserves unavailable state for HTTP %s without a numeric fallback", async (status) => {
+    stubSeriesFetch(() => ({ status, body: { error: { code: "DATA_NOT_READY" } } }));
+    for (const state of await fetchLandingMetrics()) {
+      expect(state.kind).toBe("unavailable");
+      if (state.kind === "unavailable") expect(state.reason).toContain("not zero");
+      expect(state).not.toHaveProperty("latest");
+    }
   });
 
-  it("fails contract validation into the unavailable state instead of rendering a numeric value", async () => {
-    // A numeric value (0) violates the decimal-string contract; rendering it
-    // would silently turn a missing value into a zero.
+  it("returns typed unavailability when the API is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("connection refused"); }));
+    for (const state of await fetchLandingMetrics()) {
+      expect(state.kind).toBe("unavailable");
+      if (state.kind === "unavailable") expect(state.reason).toMatch(/could not be reached/);
+    }
+  });
+
+  it("rejects numeric values that violate exact decimal-string transport", async () => {
     stubSeriesFetch((url) => {
-      const metricId = url.pathname.match(/([a-z_]+)\/series$/)![1] as FixtureMetricId;
-      const body = seriesFixture(metricId, { "2026-11-03": "42.5" }) as Record<string, unknown>;
+      const id = url.pathname.match(/([a-z_]+)\/series$/)![1] as FixtureMetricId;
+      const body = seriesFixture(id, { "2026-11-03": "42.5" }) as Record<string, unknown>;
       (body.points as { value: unknown }[])[89].value = 0;
       return { status: 200, body };
     });
-    await renderLanding();
-    expect(screen.getAllByText(/Unavailable — this is not zero/)).toHaveLength(3);
-    expect(document.body.textContent).not.toContain("42.5");
+    for (const state of await fetchLandingMetrics()) {
+      expect(state.kind).toBe("unavailable");
+      if (state.kind === "unavailable") expect(state.reason).toMatch(/contract validation/);
+    }
   });
 
-  it("renders the unavailable state for a non-JSON response body", async () => {
+  it("rejects malformed JSON instead of substituting data", async () => {
     stubSeriesFetch(() => new NextResponse("<html>maintenance</html>", { status: 200 }));
-    await renderLanding();
-    expect(screen.getAllByText(/Unavailable — this is not zero/)).toHaveLength(3);
-  });
-});
-
-describe("Stale data keeps values and shows the stale notice", () => {
-  it("renders the stale notice with the last verified values", async () => {
-    stubSeriesFetch((url) => {
-      const metricId = url.pathname.match(/([a-z_]+)\/series$/)![1] as FixtureMetricId;
-      return {
-        status: 200,
-        body: seriesFixture(metricId, fixtureValues[metricId], { qualityStatus: "stale" }),
-      };
-    });
-    const container = await renderLanding();
-    expect(screen.getAllByText(/Showing the last verified values/)).toHaveLength(3);
-    expect(document.body.textContent).toContain("1234.567890123456789012345678");
-    expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
-  });
-});
-
-describe("For/against findings cite the claim registry", () => {
-  it("renders the four landing claims with their full quantity tables", async () => {
-    stubSeriesFetch(approvedResponder());
-    await renderLanding();
-    const expectedIds = [
-      ...landingFindings.forSide.claimIds,
-      ...landingFindings.againstSide.claimIds,
-    ];
-    expect(expectedIds).toEqual(["CL-001", "CL-003", "CL-002", "CL-007"]);
-    for (const id of expectedIds) {
-      const claim = getLandingClaim(id);
-      expect(screen.getByRole("heading", { level: 3, name: claim.title })).toBeInTheDocument();
-      expect(
-        screen.getByText(`${id} recorded quantities, scopes and sources`),
-      ).toBeInTheDocument();
-      // The rendered claim is the registry object itself (trace, not a copy).
-      const registryClaim = claimRegistry.find((entry) => entry.id === id);
-      expect(registryClaim).toBeDefined();
-      expect(screen.getByText(claim.observation)).toBeInTheDocument();
-    }
-  });
-
-  it("links each side into the thesis section that owns the claims", async () => {
-    stubSeriesFetch(approvedResponder());
-    const container = await renderLanding();
-    const tocIds = new Set(thesisToc.map((entry) => entry.id));
-    for (const side of [landingFindings.forSide, landingFindings.againstSide]) {
-      const anchor = screen.getByRole("link", { name: side.anchorLabel });
-      expect(anchor.getAttribute("href")).toBe(side.thesisAnchor);
-      const sectionId = side.thesisAnchor.split("#")[1];
-      expect(tocIds.has(sectionId), `${side.thesisAnchor} is a real thesis section`).toBe(true);
-      expect(
-        thesisToc.find((entry) => entry.id === sectionId),
-      ).toBeDefined();
-    }
-    // Every internal href on the landing resolves to an implemented route,
-    // a recorded methodology anchor, a thesis section anchor or the NI-070
-    // release-status links.
-    const allowed = new Set<string>([
-      "/research",
-      "/research#CL-002-heading",
-      "/methodology",
-      "/workspace",
-      "/data",
-      ...releaseStatus.links.map((link) => link.href),
-      landingDefinitionHref,
-      landingDatasetHref,
-      landingFindings.forSide.thesisAnchor,
-      landingFindings.againstSide.thesisAnchor,
-      ...claimRegistry.flatMap((claim) => claim.evidence.map((link) => link.href)),
-    ]);
-    const hrefs = Array.from(container.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    for (const href of hrefs) {
-      expect(
-        allowed.has(href as string),
-        `unexpected landing link ${href}`,
-      ).toBe(true);
-    }
-  });
-
-  it("keeps the recorded basis statement and never claims live data", async () => {
-    stubSeriesFetch(approvedResponder());
-    await renderLanding();
-    expect(screen.getByText(new RegExp(landingFindings.recordedBasis.slice(0, 60), "i"))).toBeInTheDocument();
-    expect(document.body.textContent).toMatch(/2026-08-06/);
-    expect(document.body.textContent).toMatch(/2026-11-04/);
-    // No rendered element presents live data; only archive dates are claimed.
-    expect(screen.queryByText(/^live/i)).toBeNull();
-  });
-});
-
-describe("CTAs reach the correct destinations", () => {
-  it("links research, methodology and the gated workspace", async () => {
-    stubSeriesFetch(approvedResponder());
-    await renderLanding();
-    const research = screen.getAllByRole("link", { name: /Read the (research|full thesis)/ });
-    expect(research.map((a) => a.getAttribute("href"))).toEqual(["/research", "/research"]);
-    expect(screen.getByRole("link", { name: "Read the methodology" }).getAttribute("href")).toBe("/methodology");
-    expect(screen.getByRole("link", { name: "Check the methodology" }).getAttribute("href")).toBe("/methodology");
-    expect(screen.getByRole("link", { name: "Open the workspace" })).toHaveAttribute("href", "/workspace");
-  });
-
-  it("offers the implemented public data explorer instead of a promise", async () => {
-    stubSeriesFetch(approvedResponder());
-    await renderLanding();
-    expect(screen.getByRole("link", { name: "Open the data explorer" }).getAttribute("href")).toBe("/data");
-    // The stale "arrives with" announcement is gone (the explorer shipped).
-    expect(document.body.textContent).not.toMatch(/arrives with the analytics explorer/);
-  });
-});
-
-describe("NI-070 release status section", () => {
-  it("states the honest fit-pending status and links the honest empty catalog", async () => {
-    stubSeriesFetch(approvedResponder());
-    await renderLanding();
-    expect(
-      screen.getByRole("heading", { level: 2, name: releaseStatus.heading }),
-    ).toBeInTheDocument();
-    const section = document.getElementById(releaseStatus.id);
-    expect(section).not.toBeNull();
-    const text = section!.textContent as string;
-    expect(text).toMatch(/real-archive fit run is pending operator execution/);
-    expect(text).toMatch(/no fitted coefficient, interval or diagnostic exists anywhere/);
-    expect(text).toMatch(/public model catalog stays empty until a reviewed run is published/);
-    expect(text).toMatch(/never as protocol revenue/);
-    // All four status links resolve to implemented routes/anchors.
-    for (const link of releaseStatus.links) {
-      expect(screen.getByRole("link", { name: link.label }).getAttribute("href")).toBe(link.href);
-    }
-  });
-});
-
-describe("Layout discipline and DOM order", () => {
-  it("keeps content-width classes and the documented section order", async () => {
-    stubSeriesFetch(approvedResponder());
-    const container = await renderLanding();
-    const root = (container as HTMLElement).firstElementChild as HTMLElement;
-    expect(root).toHaveClass("page-container");
-    // Prose width on the editorial blocks.
-    expect(root.querySelector("p.max-w-\\(--width-prose\\)")).not.toBeNull();
-    const strip = document.getElementById("evidence")?.querySelector("ul");
-    expect(strip).toHaveClass("lg:grid-cols-3");
-
-    const order = (a: Element | null, b: Element | null) =>
-      a !== null && b !== null && Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-    const evidence = document.getElementById("evidence");
-    const findings = document.getElementById(landingFindings.id);
-    const mechanism = document.getElementById("mechanism");
-    const heading = screen.getByRole("heading", { level: 1, name: /Follow the evidence/ });
-    expect(order(heading, evidence), "h1 before evidence").toBe(true);
-    expect(order(evidence, findings), "evidence before findings").toBe(true);
-    expect(order(findings, mechanism), "findings before mechanism").toBe(true);
-  });
-});
-
-describe("No private editor metadata on the public landing", () => {
-  const privateMetadataPatterns: RegExp[] = [
-    /document[_-]?id/i,
-    /revision[_-]?id/i,
-    /user[_-]?id/i,
-    /owner[_-]?id/i,
-    /\bsupabase\b/i,
-    /\bBearer\b/,
-    /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i,
-  ];
-
-  it("keeps identifiers out of the rendered page even when the fixture carries them", async () => {
-    stubSeriesFetch(approvedResponder());
-    const container = await renderLanding();
-    const text = (container.textContent ?? "") + " " + container.innerHTML;
-    for (const pattern of privateMetadataPatterns) {
-      expect(text).not.toMatch(pattern);
-    }
+    for (const state of await fetchLandingMetrics()) expect(state.kind).toBe("unavailable");
   });
 });

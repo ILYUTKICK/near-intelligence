@@ -4,6 +4,7 @@ import { ProductIcon } from "@/components/layout/ProductIcon";
 import { cn } from "@/lib/utils";
 import { getLandingClaim } from "./landing-findings";
 import { scopePeriodLabel as periodLabel } from "./ResearchFigures";
+import { RecordedQuantityPlot } from "./RecordedQuantityPlot";
 
 /** Fixed-window editorial illustration of the recorded NI-014 claim. */
 export function RecordedPurchases({ compact = false }: { compact?: boolean }) {
@@ -30,6 +31,7 @@ export function RecordedPurchases({ compact = false }: { compact?: boolean }) {
         </span>
       </figcaption>
       <p className="mt-2 text-metadata text-text-secondary">NEAR · Three 30-day windows · Aug–Nov 2026 UTC</p>
+      {!compact ? <RecordedQuantityPlot labels={windows.map((quantity) => periodLabel(quantity.scope))} values={windows.map((quantity) => quantity.value)} unit="NEAR" title="Observed purchases in three 30-day windows" /> : null}
       <ul className={cn("mt-3", compact ? "space-y-2" : "space-y-4")}>
         {windows.map((quantity, index) => (
           <li key={quantity.scope} className={cn(
@@ -43,9 +45,9 @@ export function RecordedPurchases({ compact = false }: { compact?: boolean }) {
             <span className={cn("tabular-nums font-semibold", compact ? "col-start-2 row-start-1 text-right text-metadata" : "text-ui")}>
               {quantity.value}
             </span>
-            <div aria-hidden="true" className={cn("overflow-hidden rounded-full bg-sage/50", compact ? "col-span-2 h-1" : "mt-1 h-5")}>
+            {compact ? <div aria-hidden="true" className="col-span-2 h-1 overflow-hidden rounded-full bg-sage/50">
               <div className="h-full rounded-full bg-accent" style={{ width: `${(lengths[index] / maxLength) * 100}%` }} />
-            </div>
+            </div> : null}
           </li>
         ))}
       </ul>
