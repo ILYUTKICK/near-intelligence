@@ -2817,6 +2817,25 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Testing requirements:** data-explorer category tests updated and green; full web suite serial green; lint/typecheck clean; live verification on the deploy stack.
 
+### NI-094 — Resolve charts whose required metrics span multiple approved datasets
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P2 (honest fallback renders today; discovered by NI-093 live verification)
+- **Dependencies:** NI-028, NI-029, NI-032
+- **Complexity:** M
+- **Status:** TODO
+- **Execution role:** A (data-model decision may route parts to B)
+
+**Description:** `supply-context` binds `observed_near_purchases` (in the published `metrics.flows.daily`) and `net_supply_change_near` (in `metrics.windows.snapshot`). The NI-032 latest resolution requires ONE approved dataset containing every required metric, so the chart answers the honest "no approved dataset exists for this selection" fallback although both datasets are published. The NI-029 emitter intentionally emits two manifest families by structure (daily flows vs window snapshots).
+
+**Implementation steps (owner decision needed on the approach):** either (a) extend the delivery latest-resolution to compose views across approved datasets per bound metric, with the context hash recording every contributing dataset version, or (b) emit a dedicated supply-context dataset in the NI-029 pipeline staging both member metrics at their shared boundary semantics. No substitution across window semantics is acceptable.
+
+**Acceptance criteria:** supply-context renders real values by default on the deployment stack; the pinned context records every contributing dataset version; reconciliation tests cover the composed or combined dataset.
+
+**Testing requirements:** delivery suite cases for the chosen approach; NI-073/NI-079 evidence updated where affected.
+
+**Identified by:** NI-093 live verification (2026-11-14).
+
 ### NI-092 — Implicit chart defaults: coverage-clamped window and first-approved filter preselection
 
 - **Epic:** 07 — Public Data Delivery
