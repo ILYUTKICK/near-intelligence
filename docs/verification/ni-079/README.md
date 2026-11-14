@@ -15,8 +15,8 @@
 | A3 | Web unit suite (serial) | **PASS** | `pnpm --filter web test --maxWorkers=1`: **66 files / 681 tests pass, exit 0** |
 | A4 | Production build | **PASS** | `pnpm --filter web build`: exit 0 (static prerender + dynamic server routes) |
 | A5 | lint / typecheck / contracts / doc-links / contrast / client-secrets / uv lock | **PASS** | below |
-| B1 | Real-stack workflow e2e (public→chart→login→saved→research→insight→evidence→save/reopen→ZIP) | pending | — |
-| B2 | Alice/Bob denial + source-outage editing | pending | — |
+| B1 | Real-stack workflow e2e (public→chart→login→saved→research→insight→evidence→save/reopen→ZIP) | **PASS (synthetic leg)** | `pnpm --filter web exec playwright test --config e2e/playwright.config.ts`: **26 passed, exit 0, 2.6 min** — the NI-063 journey covers the full workflow incl. outage and export on the real loopback stack. The real-data leg of the end-to-end trace is Gate G2. |
+| B2 | Alice/Bob denial + source-outage editing | **PASS (synthetic leg)** | covered by the same e2e run (journey outage step, two-user denial specs) and the DB-suite ownership matrix (A2). |
 | C1 | Real research data import (stage→validate→approve→publish) | pending | — |
 | C2 | Real-data provenance/rights/quality audit | pending | — |
 | D1 | Real deterministic model fit + publish gate | pending | — |
@@ -44,3 +44,5 @@ Notes: root `check:contrast` / `check:client-secrets` wrappers fail with exit 12
 ## Gate C/D/E — real-data prerequisites (operator scope)
 
 The deployment DB (`near-deploy`, localhost:15433) currently holds the registered registries (20 metric definitions, 14 chart definitions, 6 documented sources seeded 2026-11-14) and **no approved datasets** — delivery endpoints answer the honest 503/unavailable states. Gates C/D/E require the owner's machine-local research archive and one operator decision (permitted-source refresh authorization); recorded here as they land, never fabricated.
+
+**Archive import preparation (2026-11-14):** a strict `shasum -a 256` manifest was generated over the machine-local archive `/Users/ilyutkinn/Desktop/Near/research` (395 files incl. macOS Finder junk). Dry-run findings against the shipped NI-027 cohort registry (`archive_cohorts.json`): byte verification passes; the batch is rejected only because root-level `.DS_Store` files (11) belong to no cohort directory. The importer scopes its extra/missing-file tree comparison to the manifest's common leading directory, so the sanctioned import shape is **per-cohort manifests** (each manifest covering one cohort directory). Plan: import chart-relevant cohorts (`near-treasury`, `near-supply`, `near-weekly`, `near-dollar`, `near-longitudinal`, `near-pilot`, `near-provenance`) via `python -m near_api.ingestion.archive` as `near_operator` into the deployment DB, then `python -m near_api.metrics build` (NI-029) and `python -m near_api.datasets stage-from-import → validate → publish` (NI-028) per the recorded DATA_PIPELINE.md contract. No archive byte is modified; the archive tree hash is recorded before/after.
