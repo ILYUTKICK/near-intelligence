@@ -23,7 +23,7 @@ test("shares one acknowledged revision by consent and revokes it for another use
   await dialog.getByText("Read the exact shared content", { exact: true }).click();
   const preview = dialog.getByTestId("share-viewer");
   await expect(preview.getByText(/NI-064 performance fixture paragraph 1/).first()).toBeVisible();
-  await expect(preview.getByTestId("share-chart").first()).toContainText("Historical — pinned version");
+  await expect(preview.getByTestId("share-chart").first()).toContainText("Pinned version");
   await dialog.getByTestId("share-consent").check();
   await dialog.getByTestId("share-create").click();
   const secretLink = dialog.getByRole("textbox", { name: "Share link" });

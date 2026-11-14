@@ -95,11 +95,10 @@ async function setOutage(enabled: boolean, page: Page): Promise<void> {
 }
 
 async function expectRecordedDataset(page: Page) {
-  await page.getByRole("button", { name: "Sources & definitions" }).click();
-  const sources = page.getByRole("dialog", { name: "Sources and definitions" });
-  await expect(sources.getByText(state.dataset_version_id, { exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(sources).toBeHidden();
+  // NI-096: provenance is announced nonvisually (sr-only), never a drawer.
+  const provenance = page.getByText(state.dataset_version_id, { exact: true });
+  await expect(provenance).toBeAttached();
+  await expect(provenance.locator("xpath=ancestor::*[contains(@class, 'sr-only')]").first()).toBeAttached();
 }
 
 async function inspectDocumentVersion(page: Page, documentId: string) {
@@ -200,7 +199,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
     .toContain(`start=${anchoredStart}&end=${state.window.end}`);
 
   // -- 3. Sign-in continuation preserves the inspected selection --------- //
-  const continueButton = page.getByRole("button", { name: "Sign in to add it to research" });
+  const continueButton = page.getByRole("button", { name: "+ Add to research" });
   await continueButton.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/login\?next=/);

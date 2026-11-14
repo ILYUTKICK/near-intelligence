@@ -75,7 +75,7 @@ test("custom range: Apply resolves the requested window and survives reload, sig
   await expect(page.getByText(state.day_values[CUSTOM_START]).first()).toBeVisible();
 
   // -- 4. The sign-in continuation carries the custom range ---------------- //
-  await page.getByRole("button", { name: "Sign in to add it to research" }).click();
+  await page.getByRole("button", { name: "+ Add to research" }).click();
   await expect(page).toHaveURL(/\/login\?next=/);
   const nextPath = new URL(page.url()).searchParams.get("next") ?? "";
   const nextSelection = new URL(nextPath, state.web_url).searchParams;
