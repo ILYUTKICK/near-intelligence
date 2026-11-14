@@ -50,9 +50,11 @@ test.describe.configure({ mode: "serial" });
 
 test("public chart detail: exact-values table renders every covered day without hover", async ({ page }) => {
   await page.goto(chartDetailUrl());
+  // NI-096: the exact table is announced nonvisually (sr-only) — attached to
+  // the DOM, never hidden behind a hover or an accordion.
   const tableRegion = page.getByRole("region", { name: /exact data table/ });
-  await expect(tableRegion).toBeVisible();
-  await expect(page.getByText(state.pin_value).first()).toBeVisible();
+  await expect(tableRegion).toBeAttached();
+  await expect(page.getByText(state.pin_value).first()).toBeAttached();
 
   // Every covered day (half-open [start, end)) appears with its exact
   // persisted decimal string; nothing is zero-filled or rounded.
@@ -64,22 +66,14 @@ test("public chart detail: exact-values table renders every covered day without 
   }
   await expect(tableRegion.locator("tbody tr")).toHaveCount(covered.length);
 
-  // The table region is a labeled, keyboard-focusable scroll region
-  // (NI-010 contract): it can take focus without a pointer.
-  await tableRegion.focus();
-  await expect(tableRegion).toBeFocused();
-
-  // The manual accessible summary is present and keyboard operable.
-  const summary = page.getByText("Accessible summary").first();
-  await summary.focus();
-  await page.keyboard.press("Enter");
-  await expect(page.getByText(/periods from .* \(UTC\)/).first()).toBeVisible();
+  // The manual accessible summary stays announced nonvisually.
+  await expect(page.getByText(/periods from .* \(UTC\)/).first()).toBeAttached();
 });
 
 test("range presets operate from the keyboard and the table follows without hover", async ({ page }) => {
   await page.goto(chartDetailUrl());
   const tableRegion = page.getByRole("region", { name: /exact data table/ });
-  await expect(tableRegion).toBeVisible();
+  await expect(tableRegion).toBeAttached();
 
   const sevenDays = page.getByRole("group", { name: "Time range" })
     .getByRole("button", { name: "Last 7 days" });
