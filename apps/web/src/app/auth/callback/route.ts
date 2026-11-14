@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { AuthConfigError, loadServerAuthConfig } from "@/lib/auth/config";
+import { loadServerEnv } from "@/lib/env";
 import { ProviderAuthError, exchangeOtp } from "@/lib/auth/provider";
 import {
   CSRF_COOKIE,
@@ -20,7 +21,9 @@ import {
  * generic error flag, never with provider details.
  */
 export async function GET(request: NextRequest) {
+  let appOrigin: string;
   try {
+    appOrigin = loadServerEnv().APP_ORIGIN;
     loadServerAuthConfig();
   } catch (error) {
     return NextResponse.json(
@@ -33,13 +36,13 @@ export async function GET(request: NextRequest) {
   const returnTo = safeInternalReturnTo(request.nextUrl.searchParams.get("return_to"));
 
   if (!tokenHash || (type !== "signup" && type !== "recovery")) {
-    return NextResponse.redirect(new URL("/login?error=invalid_link", request.nextUrl.origin));
+    return NextResponse.redirect(new URL("/login?error=invalid_link", appOrigin));
   }
 
   try {
     const session = await exchangeOtp(tokenHash, type);
     const secure = secureCookies();
-    const response = NextResponse.redirect(new URL(returnTo, request.nextUrl.origin));
+    const response = NextResponse.redirect(new URL(returnTo, appOrigin));
     response.cookies.set(SESSION_COOKIE, encodeSessionCookie(session), {
       httpOnly: true,
       sameSite: "lax",
@@ -56,8 +59,8 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     if (error instanceof ProviderAuthError && error.kind === "expired_token") {
-      return NextResponse.redirect(new URL("/login?error=expired_link", request.nextUrl.origin));
+      return NextResponse.redirect(new URL("/login?error=expired_link", appOrigin));
     }
-    return NextResponse.redirect(new URL("/login?error=unavailable", request.nextUrl.origin));
+    return NextResponse.redirect(new URL("/login?error=unavailable", appOrigin));
   }
 }

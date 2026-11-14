@@ -101,3 +101,7 @@ routes without receiving gateway signing secrets. Both provider URLs require HTT
 issuer and audience matching remain exact and only ES256/RS256/EdDSA are accepted.
 The isolated API configuration regression runs without a root `.env` or inherited
 web settings, matching the production Compose credential allowlist.
+
+Callback redirects use the validated configured `APP_ORIGIN`, never the
+internal standalone request origin or untrusted Host/X-Forwarded-Host headers.
+`safeInternalReturnTo` still limits the post-login path to the application.
