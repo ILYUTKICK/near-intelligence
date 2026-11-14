@@ -2798,6 +2798,25 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Identified by:** NI-079 acceptance (2026-11-14); evidence in docs/verification/ni-079/README.md Gate D1.
 
+### NI-093 — Category pages render every available chart inline with its own save continuation
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P1 (owner product decision 2026-11-14: "в каждой вкладке графики должны отображаться сразу на экране… рядом с каждым графиком кнопка Save chart")
+- **Dependencies:** NI-015, NI-033, NI-034, NI-092
+- **Complexity:** S
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T17:00:00+03:00
+- **Execution role:** A
+
+**Description:** Category pages rendered inline figures only for hand-picked featured charts and left the rest as headings. The owner decided every AVAILABLE chart in a category renders its implicit default view immediately, each with its own Save chart continuation, and the full detail page stays one click away. Unavailable (gated) charts keep their honest reason cards.
+
+**Implementation steps:** category-screen renders `fetchLatestDefaultView` for every available item (NI-092 defaults), each figure carries Inspect-range plus ChartAuthActions (signed-in Save chart / anonymous sign-in continuation) built from the resolved default view's pinned dataset and selection; failed default fetches fall back to an honest card with an "Open chart" link; gated charts stay listed with their recorded reason.
+
+**Acceptance criteria:** All three analytical categories render their available charts inline with save actions; gated charts stay honestly listed; the workspace variant behaves identically under /workspace/data.
+
+**Testing requirements:** data-explorer category tests updated and green; full web suite serial green; lint/typecheck clean; live verification on the deploy stack.
+
 ### NI-092 — Implicit chart defaults: coverage-clamped window and first-approved filter preselection
 
 - **Epic:** 07 — Public Data Delivery
