@@ -452,6 +452,14 @@ CHARTS += tuple(replace(chart, version=2,
     allowed_ranges={"presets_days": [30, 90, 365, 730], "max_days": MAX_HISTORY_RANGE_DAYS})
     for chart in CHARTS if chart.chart_id in {"intents-volume", "gross-fees"})
 
+# NI-094: the price_basis filter applies to the USD series only (the purchases
+# series carries no price dimension and must not be blanked by it); v1 remains
+# byte-for-byte.
+CHARTS += tuple(replace(chart, version=2,
+    filter_schema=_filter_enum("price_basis", FILTER_PRICE_BASES,
+                               applies_to=("required_secondary",)))
+    for chart in CHARTS if chart.chart_id == "quantity-usd-sensitivity")
+
 _CHARTS_BY_CHART_ID: dict[str, ChartDefinition] = {}
 for _chart_item in CHARTS:
     _previous = _CHARTS_BY_CHART_ID.get(_chart_item.chart_id)
