@@ -209,8 +209,8 @@ class InsightContractMatrixTests(unittest.TestCase):
                 ResolvedContext.model_validate({**base, **changes})
         for selection in ({"start": "2025-02-01", "end": "2025-01-01", "frequency": "day",
                            "filters": {}},
-                          {"start": "2025-01-01", "end": "2026-01-03", "frequency": "day",
-                           "filters": {}},  # 367 days > the Selection bound
+                          {"start": "2024-01-01", "end": "2026-01-03", "frequency": "day",
+                           "filters": {}},  # 733 days > the 730-day Selection bound (NI-083)
                           {"start": "2025-01-01", "end": "2025-02-01", "frequency": "week",
                            "filters": {}},
                           {"start": "2025-01-01", "end": "2025-02-01", "frequency": "day",
