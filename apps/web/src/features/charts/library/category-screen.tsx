@@ -133,7 +133,7 @@ export async function DataCategoryScreen({
         </div>
       ) : (
         <>
-          {inlineViews.length > 0 ? (
+          {inlineViews.length > 0 || unavailableItems.length > 0 ? (
             <div className="mt-8 grid items-start gap-5 lg:grid-cols-2">
               {inlineViews.map(({ definition, range, result }) => {
                 const href = detailHrefFor(`${routePrefix}/data/${slug}`, definition.chart_id, {
@@ -167,7 +167,7 @@ export async function DataCategoryScreen({
                   <ChartView key={definition.id} definition={definition} view={result.data}
                     selection={range} mode="live" height={240} actions={actions} />
                 ) : (
-                  <section key={definition.id} className="paper-panel p-6">
+                  <section key={definition.id} className="paper-panel h-full p-6">
                     <p className="eyebrow">Data unavailable</p>
                     <h2 className="mt-2 text-heading">{definition.title}</h2>
                     <p className="my-3 text-ui text-text-secondary">{result.message ?? "The selected chart could not be resolved."}</p>
@@ -180,17 +180,10 @@ export async function DataCategoryScreen({
                   </section>
                 );
               })}
+              {unavailableItems.map((item) => (
+                <ChartCatalogEntry key={item.chart_id} chart={item} href={`${routePrefix}/data/${slug}/${item.chart_id}`} />
+              ))}
             </div>
-          ) : null}
-          {unavailableItems.length > 0 ? (
-            <>
-              <h2 className="mt-10 text-heading">Registered charts</h2>
-              <ul className="mt-3 grid gap-4 sm:grid-cols-2">
-                {unavailableItems.map((item) => (
-                  <ChartCatalogEntry key={item.chart_id} chart={item} href={`${routePrefix}/data/${slug}/${item.chart_id}`} />
-                ))}
-              </ul>
-            </>
           ) : null}
         </>
       )}
