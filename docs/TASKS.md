@@ -2823,8 +2823,11 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P2 (honest fallback renders today; discovered by NI-093 live verification)
 - **Dependencies:** NI-028, NI-029, NI-032
 - **Complexity:** M
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14)
+- **Started at:** 2026-11-14T17:20:00+03:00
 - **Execution role:** A (data-model decision may route parts to B)
+- **Decision:** option (b) — the owner instructed the chart must render now; a dedicated combined dataset avoids touching the delivery resolution contract.
 
 **Description:** `supply-context` binds `observed_near_purchases` (in the published `metrics.flows.daily`) and `net_supply_change_near` (in `metrics.windows.snapshot`). The NI-032 latest resolution requires ONE approved dataset containing every required metric, so the chart answers the honest "no approved dataset exists for this selection" fallback although both datasets are published. The NI-029 emitter intentionally emits two manifest families by structure (daily flows vs window snapshots).
 
