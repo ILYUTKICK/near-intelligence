@@ -191,18 +191,25 @@ class ChartDefinition:
                 for s in self.series]
 
 
-def _filter_enum(name: str, options: tuple[str, ...]) -> dict:
+def _filter_enum(name: str, options: tuple[str, ...],
+                 applies_to: tuple[str, ...] | None = None) -> dict:
     """The closed NI-031 single-value filter schema for one dimension.
 
     Built from the NI-071 filter registry declaration so the mapping cannot
-    drift; the produced property shape stays exactly ``{"type", "enum"}``.
+    drift. ``applies_to`` (NI-094) optionally scopes the dimension to specific
+    series roles: a series whose role is not listed is never filtered by it —
+    the filter exists to disambiguate that dimension's variants, not to blank
+    sibling series that do not carry it.
     """
     dimension = FILTER_DIMENSIONS[name]
     if tuple(dimension.options) != tuple(options):
         raise ChartRegistryError(
             f"filter dimension {name!r} options disagree with the filter registry")
+    bound: dict = {"type": "string", "enum": list(options)}
+    if applies_to is not None:
+        bound["applies_to"] = list(applies_to)
     return {"type": "object",
-            "properties": {name: {"type": "string", "enum": list(options)}},
+            "properties": {name: bound},
             "additionalProperties": False}
 
 
@@ -332,7 +339,8 @@ CHARTS: tuple[ChartDefinition, ...] = (
         category="activity", visualization_type="line", update_frequency="daily",
         series=_series(("observed_near_purchases", "required_primary"),
                        ("estimated_purchase_usd", "required_secondary")),
-        filter_schema=_filter_enum("price_basis", FILTER_PRICE_BASES),
+        filter_schema=_filter_enum("price_basis", FILTER_PRICE_BASES,
+                                   applies_to=("required_secondary",)),
         unit_schema={"required_primary": "NEAR", "required_secondary": "USD"},
         source_lineage={"sources": ["SRC-BQ", "SRC-PRICE"],
                         "note": "The USD series is a daily saved-price valuation "
@@ -506,14 +514,21 @@ def _validate_filter_schema(chart: ChartDefinition) -> None:
             or len(properties) > MAX_FILTER_PROPERTIES,
             f"{chart.chart_id}: at most {MAX_FILTER_PROPERTIES} filter properties")
     for name, bound in properties.items():
+        extra_keys = set(bound) - {"type", "enum"} if isinstance(bound, dict) else set()
         _reject(not isinstance(name, str) or not name or not isinstance(bound, dict)
-                or set(bound) not in ({"type", "enum"},
-                                      {"type", "enum", "multi_value"},
-                                      {"type", "enum", "multi_value",
-                                       "reconciliation"})
+                or not {"type", "enum"} <= set(bound)
+                or extra_keys - {"multi_value", "reconciliation", "applies_to"}
+                or ("reconciliation" in extra_keys) > ("multi_value" in extra_keys)
                 or bound["type"] != "string",
                 f"{chart.chart_id}: filter {name!r} must be a string enum (with the "
-                "optional NI-071 multi_value/reconciliation markers)")
+                "optional NI-071 multi_value/reconciliation and NI-094 applies_to "
+                "markers)")
+        applies_to = bound.get("applies_to")
+        _reject(applies_to is not None
+                and (not isinstance(applies_to, list) or not applies_to
+                     or any(role not in SERIES_ROLES for role in applies_to)),
+                f"{chart.chart_id}: filter {name!r} applies_to must list known "
+                "series roles")
         options = bound["enum"]
         _reject(not isinstance(options, list) or not options
                 or len(options) > MAX_FILTER_OPTIONS
