@@ -198,6 +198,7 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 | 86 | [NI-067](docs/TASKS.md) | Deploy staging and production with safe configuration | P0 | A |
 | 87 | [NI-068](docs/TASKS.md) | Verify backups, restore and operational monitoring | P0 | A |
 | 88 | [NI-069](docs/TASKS.md) | Run hackathon demo and reviewer reproduction | P0 | A |
+| 89 | [NI-098](docs/TASKS.md) | Explain the product and document reproducible self-hosting | P0 | A |
 
 ## 9. Изменение самого плана
 
@@ -258,3 +259,6 @@ NI-089 (role A), requested by the owner: restore the current Blog/Overview exper
 
 
 **Owner instruction — 14 November 2026, VPS preparation:** prepare the current Blog/Overview release for the existing VPS and near-intelligence.me. NI-090 covers repository configuration, explicit environment validation, HTTPS proxy, backup/recovery/export-worker tooling, a reproducible source handoff and local disposable verification. No remote login, provisioning, DNS mutation, public rollout or source collection is requested yet. Preparation may proceed under DEPLOYMENT.md without closing NI-079; NI-067/068 retain real remote acceptance and missing data/model gates remain explicit.
+
+
+**Owner request — 14 November2026, README and self-hosting:** NI-098 rewrites the reader-facing product overview and documents a complete reproducible local/own-domain deployment using existing packaging. Accurately describe authoring, curated public publication and search/AI discoverability intent; do not invent an AI thesis generator, guaranteed indexing, public data bundle or a new deployment capability. Documentation may proceed directly after its DONE dependencies; no remote rollout or new collection is authorized.

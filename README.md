@@ -1,205 +1,279 @@
 # NEAR Intelligence
 
-Evidence-first blockchain investment research: **Read Research → Explore Data → Save Charts → Add Insights → Build Thesis → Validate Evidence → Export Research**.
+**Build an investment thesis. Connect it to evidence. Publish research people can find and verify.**
 
-The investment question is whether cross-chain adoption translates into sustainable revenue and measurable NEAR token value capture. The product must show contrary evidence and distinguish activity, fees, attributable revenue, observed purchases, treasury transfers and supply changes.
+NEAR Intelligence is a browser-based platform for investment research, thesis
+authoring and public research publishing. It brings articles, interactive charts,
+sources, quantitative models and a private writing workspace into one workflow.
 
-## Product direction — 14 November 2026
+The current research focuses on **NEAR and NEAR Intents**: whether growing
+cross-chain activity translates into revenue and measurable value for the token.
 
-The public product is organized around a collection of original research articles,
-with a **Blog** catalog implemented locally in NI-085. The current complete
-research at `/research` is the first article; later publications can add new
-investigations and dated updates through the shared publication registry/template.
-Interactive charts, sources and reproducible calculations support each article,
-and the private workspace remains available for readers' own research.
-The [Blog/publication brief](docs/BLOG_PUBLICATIONS.md) records the direction
-(NI-084) and local implementation. `/blog/near-thesis-2026-11` redirects to the
-original `/research`; existing anchors and evidence remain intact. The
-Overview homepage follows the owner-approved editorial design (NI-086), with
-featured research, data directions, methodology and workspace entry. Detailed
-financial evidence remains in the article/data views; the homepage works even
-when the data API is unavailable.
+[Open the platform](https://near-intelligence.me) ·
+[Read the research](https://near-intelligence.me/research) ·
+[Explore data](https://near-intelligence.me/data) ·
+[Self-hosting guide](docs/SELF_HOSTING.md)
 
-## Current state — 10 November 2026
+## What you can do
 
-The repository is published privately at [ILYUTKICK/near-intelligence](https://github.com/ILYUTKICK/near-intelligence). **GitHub sharing covers documentation, visual mockups, dependency manifests and new application source/tests/configuration created by authorized NI-tasks.** Participant A authorized role A on 5 November and participant B authorized role B on 6 November; claims and actual acceptance are recorded in [TASKS.md](docs/TASKS.md) through [PLAN.md](PLAN.md). The P0 application is implemented through the research workflow (public data → auth → saved charts → documents → export); the P0 runtime is packaged: NI-066 adds production web/API images (digest-pinned bases, Node renderer included), the Compose deployment with explicit one-shot migrate/worker/refresh actions, and the tested clean-clone sequence in [JUDGE_SETUP.md](docs/JUDGE_SETUP.md). Docker execution was verified locally on macOS ARM64; the final integrated local Linux-container rehearsal is required by NI-079 before rollout, and deployed judge reproduction remains NI-069. Raw historical research inputs, SQL and legacy scripts stay outside GitHub and are absent from a fresh clone; linked offline evidence needs a separately authorized file/hash handoff. Historical findings principally cover 6 August–3 November 2026 UTC and must retain their actual dates.
+| For | Built capabilities |
+| --- | --- |
+| Readers | Browse the Blog, read the investment thesis and methodology, inspect interactive charts and follow their sources. |
+| Researchers | Create a private research document, start from a thesis template, add charts, notes, hypotheses, risks and supporting or opposing evidence. |
+| Analysts | Inspect published model results and diagnostics, compare supported chart selections and keep an exact record of the data behind a conclusion. |
+| Authors | Save and reopen versioned research, freeze chart snapshots, create revocable read-only shares and export a saved revision as Markdown ZIP or PDF. |
+| Editors | Add reviewed public articles through the publication registry and shared article template. Private drafts are published only through an explicit reviewed workflow. |
 
-- **[Mandatory agent execution plan](PLAN.md)** — read before selecting or implementing any task.
-- [Latest correction-batch handoff (NI-080–086)](docs/LOCAL_CORRECTIONS_HANDOFF.md) — branch, checks, local archive and continuation boundaries.
-- [Collaboration and repository setup](docs/COLLABORATION.md)
-- [Python dependency baseline](docs/DEPENDENCIES.md) and [judge setup checklist](docs/JUDGE_SETUP.md)
-- [Documentation index](docs/INDEX.md)
-- [Repository audit](docs/REPOSITORY_AUDIT.md) and [source verification](docs/SOURCE_VERIFICATION.md)
-- [Product requirements](docs/PRODUCT_REQUIREMENTS.md), [strict MVP](docs/MVP_SCOPE.md)
-- [Architecture](docs/ARCHITECTURE.md), [database](docs/DATABASE_SCHEMA.md), [API](docs/API_SPECIFICATION.md)
-- [Thesis and existing findings](docs/INVESTMENT_THESIS.md), [methodology](docs/ECONOMETRIC_METHODOLOGY.md)
-- [Roadmap](docs/IMPLEMENTATION_ROADMAP.md), [task backlog](docs/TASKS.md), [two-person team plan](docs/TEAM_PLAN.md), [open questions](docs/OPEN_QUESTIONS.md)
-- [Agent instructions](AGENTS.md), [contributing](CONTRIBUTING.md), [documentation validation](docs/VALIDATION.md)
+A thesis is assembled in the editor from your writing, templates and selected
+evidence. Charts keep their definitions, source references and dataset versions;
+saved revisions and exports preserve the evidence that was actually used.
 
-## Selected stack
+### Research publishing, SEO and AI discovery
 
-Next.js App Router, React, TypeScript, Tailwind, shadcn/ui primitives, Apache ECharts, Tiptap, TanStack Query, Zod; FastAPI/Pydantic, SQLAlchemy/Alembic, PostgreSQL; pandas/NumPy/SciPy/statsmodels. Supabase Auth issues sessions; FastAPI enforces resource ownership. A single Python CLI runs ingestion and research outside HTTP requests. [Decision log](docs/DECISIONS.md) records alternatives.
+The publishing direction is simple: turn research into public web articles that
+people can read in a browser and discover through Google or AI-assisted search.
+Current public pages use server-rendered text, stable routes, page titles and
+descriptions, linked sources and a browsable Blog.
 
-## Existing offline research
+Search indexing and AI citations depend on external crawlers and are not
+guaranteed. Dedicated sitemap, structured-data and AI-discovery feeds are not
+implemented in this release. Public articles are curated in
+[the publication registry](apps/web/src/features/blog/publications.ts);
+a private draft or share link does not automatically become a Blog article.
 
-Inspect each research README before running it. These commands read saved inputs and rewrite derived outputs, so use a disposable copy when auditing:
+The core workflow needs **no LLM API key**. An optional grounded-commentary
+adapter exists but is disabled by default; it is not an automatic full-thesis
+generator. See [feature scope](docs/FEATURE_SPECIFICATIONS.md).
 
-```sh
-python3 research/near-longitudinal/scripts/analyze.py
-python3 research/near-dollar/scripts/analyze.py
-python3 research/near-supply/scripts/analyze.py
-python3 research/near-treasury/scripts/analyze.py
-```
+## The research workflow
 
-These four analysis scripts use Python standard-library modules. Optional plotting and future econometrics need pinned scientific dependencies. Do not run `fetch_*`, cloud SQL, stopped balance collection or archival mint collection to reproduce existing findings. [Detailed reproduction](docs/REPRODUCIBILITY.md) covers provenance scripts and caveats.
+1. **Read** a public investment case and its assumptions.
+2. **Explore** a chart, select the period and inspect the underlying evidence.
+3. **Build** your own thesis in a private workspace.
+4. **Connect** charts, model results, notes and contrary evidence to your claims.
+5. **Save** a revision with its exact data references.
+6. **Share or export** that revision; publish reviewed public research separately.
 
-## Available now — Python dependencies
+Missing data is shown as unavailable. Historical observations retain their actual
+dates. Gross fees, attributable revenue, treasury payouts, purchases, issuance
+and burns remain separate measures.
 
-Preferred path (uv, frozen lock):
+## Run locally with Docker
 
-```sh
-uv sync --project apps/api --frozen
-uv lock --check --project apps/api
-```
+This starts the application with a new local database. **It does not download
+the deployed research database or populate charts with invented values.**
+You can sign in, write research and export prose without a research data bundle.
 
-pip/venv path from the generated export (judges without uv):
+### 1. Prerequisites and repository access
 
-```sh
-python3.13 -m venv .venv
-.venv/bin/python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
-.venv/bin/python -m pip check
-```
+- Git, Docker Engine with the Compose plugin, and Python 3.12+ for the small
+  configuration snippet below. Docker Desktop also supplies Compose.
+- A Supabase project for authentication.
+- Read access to this currently private repository.
 
-[apps/api/uv.lock](apps/api/uv.lock) is the exact frozen environment at the cutoff recorded in [apps/api/pyproject.toml](apps/api/pyproject.toml); [requirements.txt](requirements.txt) is its generated hash-pinned export. This installs dependencies only; it does not launch an application or supply the unshared research archive. See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for tested platforms and [JUDGE_SETUP.md](docs/JUDGE_SETUP.md) for the remaining deployment gates.
+Node, pnpm, Python application packages and the chart renderer are installed
+inside the Docker images; host-side frontend/Python installs are not required
+for this path.
 
-NI-004 API contract checks (after frozen Python/pnpm install): `pnpm api:generate`,
-`pnpm api:check`, `pnpm --filter @near-intelligence/shared-types typecheck` and
-`pnpm --filter @near-intelligence/shared-types test`. These generate from local
-Pydantic/FastAPI source without starting data collection. See the
-[API contract workflow](docs/API_CONTRACT.md).
+~~~sh
+git clone https://github.com/ILYUTKICK/near-intelligence.git
+cd near-intelligence
+~~~
 
-## Run the application
+### 2. Create a private local configuration
 
-Full prerequisites, configuration (four DB role secrets, a Supabase dev
-project for auth) and the tested clean-clone sequence — including images,
-migrations, and one real export through the worker — live in
-[JUDGE_SETUP.md](docs/JUDGE_SETUP.md). The short forms:
+Run this **once in a new checkout**. It copies the template, generates four
+different database passwords and two signing secrets, and refuses to overwrite
+an existing `.env`. It does not print secrets.
 
-**Compose mode** (images built from [Dockerfile.web](Dockerfile.web) and
-[Dockerfile.api](Dockerfile.api); base images are digest-pinned — see
-[deployment/README.md](deployment/README.md)):
+~~~sh
+python3 - <<'PY'
+import os
+from pathlib import Path
+import secrets
 
-```sh
-cp .env.example .env             # then set the secrets per JUDGE_SETUP section 4
-docker compose build             # web + api images
-docker compose up -d             # db + api + web; nothing else starts, ever
-docker compose run --rm migrate  # explicit Alembic upgrade head (near_migrator)
-docker compose ps                # all three services healthy
-```
+values = {
+    key: secrets.token_hex(32)
+    for key in (
+        "DB_BOOTSTRAP_PASSWORD", "DB_RUNTIME_PASSWORD",
+        "DB_MIGRATION_PASSWORD", "DB_OPERATOR_PASSWORD",
+    )
+}
+values["AUTH_COOKIE_SIGNING_SECRET"] = secrets.token_urlsafe(48)
+values["CSRF_SIGNING_SECRET"] = secrets.token_urlsafe(48)
+for key, role, secret in (
+    ("DATABASE_URL", "near_app", "DB_RUNTIME_PASSWORD"),
+    ("MIGRATION_DATABASE_URL", "near_migrator", "DB_MIGRATION_PASSWORD"),
+    ("OPERATOR_DATABASE_URL", "near_operator", "DB_OPERATOR_PASSWORD"),
+):
+    values[key] = (
+        "postgresql+psycopg://" + role + ":" + values[secret]
+        + "@localhost:5432/near_intelligence"
+    )
+lines = Path(".env.example").read_text().splitlines()
+body = chr(10).join(
+    line.split("=", 1)[0] + "=" + values[line.split("=", 1)[0]]
+    if "=" in line and line.split("=", 1)[0] in values else line
+    for line in lines
+) + chr(10)
+fd = os.open(".env", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(fd, "w") as file:
+    file.write(body)
+print("Created private .env. Configure your own Supabase project next.")
+PY
+~~~
 
-One-shot operator actions, all explicit and never auto-started:
-`docker compose run --rm worker` (process queued exports once) and
-`docker compose --profile refresh run --rm refresh` (ONE guarded refresh
-attempt; refuses before any request while the source allowlist is empty, as
-it is in every fresh environment).
+### 3. Configure your own Supabase project
 
-**Native mode** (alternative; same database, host processes):
+Edit `.env` and replace the remaining authentication placeholders:
 
-```sh
-cp .env.example .env
-docker compose up -d db          # or your own PostgreSQL 18 via scripts/db/010-roles.sql
+~~~dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_BROWSER_SAFE_PUBLISHABLE_KEY
+SUPABASE_JWT_ISSUER=https://YOUR_PROJECT.supabase.co/auth/v1
+SUPABASE_JWKS_URL=https://YOUR_PROJECT.supabase.co/auth/v1/.well-known/jwks.json
+SUPABASE_JWT_AUDIENCE=authenticated
+SUPABASE_JWT_ALGORITHM=ES256
+~~~
+
+Use the asymmetric signing algorithm actually configured in your project
+(ES256, RS256 or EdDSA). A browser-safe legacy `anon` key is also accepted;
+never use a `service_role` or `sb_secret_` key.
+
+Keep these local values:
+
+~~~dotenv
+APP_ENV=development
+APP_ORIGIN=http://localhost:3000
+AUTH_ALLOWED_REDIRECT_ORIGINS=http://localhost:3000
+API_INTERNAL_URL=http://api:8000
+~~~
+
+In Supabase Authentication:
+
+- Set **Site URL** to `http://localhost:3000`.
+- Add `http://localhost:3000/auth/callback` to **Redirect URLs**.
+- Enable **Anonymous Sign-Ins** to use the Demo entry. Its email field is only
+  a display label, not proof of ownership of that email address.
+- Configure email/password signup, confirmation and email delivery for
+  persistent accounts.
+
+Detailed provider setup and references:
+[authentication configuration](docs/SELF_HOSTING.md#authentication).
+
+### 4. Build, migrate and start
+
+Run from the repository root. Selecting the file explicitly prevents a local
+`docker-compose.override.yml` from changing this recipe.
+
+~~~sh
+docker compose --env-file .env -f docker-compose.yml build api web
+docker compose --env-file .env -f docker-compose.yml up -d --wait db
+docker compose --env-file .env -f docker-compose.yml run --rm -T migrate
+docker compose --env-file .env -f docker-compose.yml up -d --wait api web
+docker compose --env-file .env -f docker-compose.yml ps
+
+curl --fail http://localhost:3000/health
+curl --fail http://localhost:8000/health
+~~~
+
+Open **[localhost:3000](http://localhost:3000)**. The local web, API and database
+ports bind to loopback. Supabase must be reachable for sign-in; there is no
+product fake-auth mode.
+
+### 5. Verify a document and an export
+
+Open `/login`, sign in, create a document, write a paragraph, save and reopen
+it. Queue a Markdown or PDF export, then run one worker pass:
+
+~~~sh
+docker compose --env-file .env -f docker-compose.yml run --rm -T worker
+~~~
+
+Return to the export dialog to download the result. The worker is not an
+automatically running daemon in local mode.
+
+Stop the local stack while keeping its volumes:
+
+~~~sh
+docker compose --env-file .env -f docker-compose.yml down
+~~~
+
+Changing a password in `.env` does not rotate a password in an existing
+PostgreSQL volume. Avoid `down -v` unless you intentionally want to destroy
+that local database. Port conflicts and other fixes are covered in
+[troubleshooting](docs/SELF_HOSTING.md#troubleshooting).
+
+## Deploy on your own server
+
+Follow **[the complete self-hosting guide](docs/SELF_HOSTING.md)** for:
+
+- Ubuntu, Docker, DNS and HTTPS setup;
+- adapting the existing production profile to your own domain;
+- private environment initialization and verified source bundles;
+- persistent PostgreSQL and artifact storage;
+- explicit migrations, export processing and systemd timers;
+- backup, safe updates, rollback boundaries and troubleshooting.
+
+Use the hardened production Compose profile for an internet-facing installation,
+not the local Compose file above. The current production profile is tied to
+`near-intelligence.me`; the guide explains the required four-file domain
+adaptation before packaging. There is no `--domain` option.
+
+## Research data and models
+
+A clone includes application code, the public article, model specifications and
+documentation. It does **not** include the production database, raw historical
+archive, private documents or a pre-populated published model catalog.
+
+A separate authorized data handoff must preserve source rights, exact values,
+definition/dataset versions, model manifests and file hashes. See
+[data provisioning](docs/SELF_HOSTING.md#research-data-and-models).
+Collectors and automatic source refresh remain off by default.
+
+## Architecture and development
+
+| Layer | Technology |
+| --- | --- |
+| Web and same-origin auth gateway | Next.js, React, strict TypeScript |
+| Research editor and charts | Tiptap, Apache ECharts |
+| API and data processing | FastAPI, Pydantic, SQLAlchemy, Python |
+| Storage and identity | PostgreSQL, Supabase Auth |
+| Models and reproducibility | pandas, NumPy, SciPy, statsmodels; versioned manifests |
+| Packaging | Docker Compose; frozen pnpm and uv locks |
+
+For native development, use **Node 24**, **pnpm 12.16.1** and **Python 3.13**:
+
+~~~sh
 pnpm install --frozen-lockfile
 uv sync --project apps/api --frozen
-export MIGRATION_DATABASE_URL="postgresql+psycopg://near_migrator:<DB_MIGRATION_PASSWORD>@localhost:5432/near_intelligence"
-uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
-export DATABASE_URL="postgresql+psycopg://near_app:<DB_RUNTIME_PASSWORD>@localhost:5432/near_intelligence"
-uv run --project apps/api uvicorn near_api.main:app --port 8000
-API_INTERNAL_URL=http://localhost:8000 pnpm --filter web start   # or: pnpm --filter web dev
-```
-
-Configure distinct credentials using the [database setup
-runbook](docs/DATABASE_SETUP.md). Both services expose `/health`, which
-returns 200 when configured and a readable 503 naming the missing required
-variables otherwise. Missing research data renders as explicit unavailable
-states — nothing is fabricated; see [JUDGE_SETUP.md](docs/JUDGE_SETUP.md)
-section 5 for the input-bundle boundary. Development hot-reload:
-`pnpm --filter web dev` and `uv run --project apps/api uvicorn
-near_api.main:app --reload --port 8000`.
-
-Developer checks (NI-005; CI runs them on every pull request — web, API and a disposable PostgreSQL 18 database job):
-
-```sh
-pnpm lint && pnpm typecheck && pnpm test
-pnpm check:contracts && pnpm check:doc-links
-pnpm test:api:unit          # offline API suites
-pnpm test:api:db            # needs local PostgreSQL 18 binaries
-```
-
-The landing integration (updated in NI-086) uses production Next.js and FastAPI
-over loopback HTTP with a fresh disposable PostgreSQL 18 cluster. It checks the
-editorial Overview before/after dataset publication and during an API outage,
-while independently preserving exact metric-delivery and approval checks:
-
-```sh
-pnpm install --frozen-lockfile
 pnpm build
-uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --suite landing
-# Optional offline reproduction with the separately supplied local research archive:
-NI_LANDING_ARCHIVE_ROOT=/absolute/path/to/research uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --suite landing
-```
 
-Use your PostgreSQL 18 binary directory (Homebrew macOS:
-`/opt/homebrew/opt/postgresql@18/bin`). The default run stages visibly synthetic
-regression data; the opt-in archive run reads the existing longitudinal flows
-and daily analysis, stages them only in the disposable test database, and
-checks both source files remain byte-identical. Neither mode contacts providers
-or supplies production seed data. The test checks exact metric API values and
-explicit unavailable data independently; the editorial homepage and its research
-entry links stay unchanged during publication and API outage.
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm check:contracts
+pnpm check:doc-links
+pnpm test:api:unit
+~~~
 
-Compose mode and native mode are alternatives; do not start both on the same ports. Native mode starts only `docker compose up -d db` before migrations and app processes. Web `.env` loading is implemented explicitly in [apps/web/src/lib/env.ts](apps/web/src/lib/env.ts) and API loading in [apps/api/src/near_api/settings.py](apps/api/src/near_api/settings.py); missing required configuration makes `/health` return a readable 503 on both services. Production settings, health gates and the scheduler opt-in contract: [deployment](docs/DEPLOYMENT.md). Credentials are placeholders in [.env.example](.env.example); the image digest pins and packaging decisions are recorded in [deployment/README.md](deployment/README.md).
+Start the native processes using
+[the contributor setup](docs/JUDGE_SETUP.md#7-run--native-mode-alternative).
+Database integration tests additionally require PostgreSQL 18 binaries:
+[testing strategy](docs/TESTING_STRATEGY.md).
 
-## Delivery gates
+| Path | Contents |
+| --- | --- |
+| `apps/web` | Public website, workspace, editor and auth gateway |
+| `apps/api` | Domain services, migrations, datasets, models and export worker |
+| `packages/shared-types` | Generated OpenAPI TypeScript contracts |
+| `deployment/vps` | Hardened Compose, HTTPS proxy and operator tooling |
+| `research` | Research documentation/specifications; permitted local inputs stay separate |
+| `docs` | Architecture, contracts, methodology, setup and verification |
 
-**Owner sequence — 12 November 2026:** preserve the largely completed desktop design, implement all registered P0/P1/P2 (NI-044/045/055/059/071/072 and working NI-060/065), complete targeted NI-078 fixes, then pass final integrated **local** chart/workflow acceptance in NI-079, then deploy through NI-067 → NI-068 → NI-069. NI-067 has an explicit dependency on NI-079; earlier task results and a synthetic review preview do not establish release readiness. [Current agent handoff](docs/FINISH_BEFORE_DEPLOY_PROMPT.md), [mandatory order](PLAN.md#10-завершение-до-размещения--обязательный-порядок). TASKS remains the only status registry. Remote TLS/auth/restore/demo checks still happen after deployment.
+[Documentation index](docs/INDEX.md) · [Architecture](docs/ARCHITECTURE.md) ·
+[Reproducibility](docs/REPRODUCIBILITY.md) · [Dependency pins](docs/DEPENDENCIES.md)
 
-P0 requires real attributable data, public thesis/methodology, a reproducible statistical analysis, authentication, private persisted research, interactive charts, Add Chart/Add Insight, Markdown export and a deployed end-to-end workflow. Full H1 revenue econometrics remains gated on an adequate revenue series. An exploratory model on a clearly named observable proxy does not establish protocol revenue; see the fallback rules in [MVP_SCOPE.md](docs/MVP_SCOPE.md).
-
-NI-035 saved charts HTTP integration (production web build, disposable PostgreSQL, synthetic data/auth transport only):
-
-```sh
-pnpm build
-uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --saved-charts-http
-```
-
-Use your PostgreSQL 18 binary directory (macOS Homebrew: `/opt/homebrew/opt/postgresql@18/bin`). The saved suite exercises real cookie/CSRF forwarding, ES256 JWT verification, identity bootstrap, RLS, idempotent save/reopen and Bob's denied access. The six saved-chart API/DB regressions also run in the default database suite. The provider JWKS transport uses an ephemeral synthetic key and never contacts Supabase.
-
-NI-041 insertion HTTP integration (after the same frozen production build):
-
-```sh
-uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --chart-insertion-http
-```
-
-The isolated suite exercises chart-block race/retry/ownership cases, then the actual web gateway and ES256 principal/RLS path. NI-042 adds the shared editor chart inspection route, explicit range/filter save/reopen, latest adoption, old-pin preservation and chart-outage/prose-save checks. A newer dataset is published between inspection and insertion; the original pin survives insertion, replay, prose save and reopen. Bob cannot read or append to Alice's document. No external provider/account or research archive is used.
-
-NI-024 Home continuation integration (after the production web build):
-
-```sh
-uv run --project apps/api python scripts/run-db-tests.py --pg-bin /usr/lib/postgresql/18/bin --workspace-home-http
-```
-
-This runs the Home aggregation checks and production cookie/CSRF gateway against
-isolated PostgreSQL with synthetic auth/data only. It verifies an empty first-use
-workspace, persisted creation/current-revision continuation, owned saved charts
-and notes, and an indicator SQL outage that leaves documents available. Home's
-Create action saves an empty document immediately; Continue opens the newest
-owned document. The checklist counts work in that document, without assessing
-the truth of its claims. Indicators reuse one day from each latest approved
-dataset and preserve dates, exact decimals, quality and provenance.
-
-## Existing VPS handoff (NI-090)
-
-For the current Overview/Blog release and `near-intelligence.me`, use the
-[dedicated VPS runbook](docs/VPS_DEPLOYMENT.md). Its isolated production Compose,
-secret initializer, source bundle, operator commands and backup/restore checks
-are separate from the local/judge Compose. Remote rollout still requires NI-079.
+Contributor and agent execution follows [PLAN.md](PLAN.md), with task status and
+acceptance in [TASKS.md](docs/TASKS.md). Deployment evidence and remaining
+operational work are recorded in [the release report](docs/verification/ni-067.md).

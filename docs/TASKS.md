@@ -2975,3 +2975,29 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Reviewer:** /root/vps_config independent read-only review requested exact bundle extra-file whitelist, rejection of added unhashed build inputs and stable cross-candidate locks. Fixed all three with negative tests; re-review approved within preparation scope. Root additionally guards orphan one-shot writers before backup. No missing release criterion was reclassified as completed.
 - **Remaining:** NI-079 TODO, NI-067/068 not closed. VPS OS/resources/IP/SSH, DNS/TLS/Supabase final-origin checks, actual full-user frozen export, real research/model gates and offsite encrypted backup/alerts remain separate. Current long API-backed article history remains unavailable. No provider/RPC/cloud SQL, collector or raw evidence transfer.
 - **Completed at:** 2026-11-14T15:26:10+03:00
+
+
+### NI-098 — Explain the product and document reproducible self-hosting
+
+- **Epic:** 14 — Deployment and contributor documentation
+- **Priority:** P0, explicit owner documentation request
+- **Dependencies:** NI-067, NI-066, NI-085
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat01a1db7f-9b8c-70e3-a57e-004e7f89f5e6
+- **Execution role:** A
+- **Started at:** 2026-11-14T23:25:54+03:00
+- **Branch/worktree:** codex/ni-098-readme-deployment, /Users/ilyutkinn/Desktop/near-deploy, fresh main3ec3137 (includes PR103). Preserve local developer Compose override.
+- **Authorization:** Owner asks for a clear product README describing implemented investment-thesis authoring/publication, visibility in browsers/search/AI tools, and complete instructions so another person can deploy. Documentation and bounded offline command/config verification only; no SEO feature implementation, LLM generation, new cloud rollout, data collection or research-data publication.
+- **Handoff:** /root/ni067_review audits fresh-clone and own-domain command paths read-only; root authors README/self-host guide and verifies docs/config snippets.
+
+**Acceptance criteria:** README describes the actual product, reader/author workflow, delivered capabilities and stack in plain English; separates search/AI discoverability intent from unimplemented indexing/LLM claims. A newcomer can follow prerequisites→repository access→own Supabase setup→private environment→Docker build→DB/bootstrap/migrate→app→health/login/prose export. A linked full self-host guide covers own domain/TLS, existing fixed-origin helper adaptation, artifact volumes/approved data handoff, worker/scheduling, persistence, safe updates/backup and troubleshooting. A fresh clone is not represented as containing the real historical datasets/model or a production seed/AI generator. Commands match implemented paths/flags; placeholders/required edits are explicit, no secrets or private host-specific configuration copied. Preserve operational/data gates.
+
+**Expected files:** README.md, docs/SELF_HOSTING.md, directly affected onboarding links/docs, PLAN/TASKS/TEAM.
+
+**Verification:** Check relative links and whitespace; inspect actual CLI entry points/options and env/Compose contracts; exercise self-contained environment/domain-customization snippets only in disposable directories with synthetic values. Cite previous runtime evidence accurately; do not claim a new fresh-runtime/remote deployment unless actually performed. No unnecessary application tests for editorial changes.
+
+- **Result:** Replaced the historical/status-heavy root README with a plain-English product overview, implemented reader/researcher/editor workflows, Google/AI-search direction and actual metadata/public-page foundations, stack and a complete Docker quickstart. Added SELF_HOSTING.md covering own Supabase, first VPS, exact four-file custom-domain adaptation before bundling, source-manifest validation, private env, migrations, TLS, workers/systemd, data/model handoff, persistence/backup/update/rollback boundaries and troubleshooting. Corrected native build-before-start and DB-first migration order in JUDGE_SETUP; linked the new guide and removed directly conflicting unbuilt/unknown-deployment wording from the engineering index/deployment introduction.
+- **Verification:** Executed the README env-generation snippet in a disposable tracked-source copy:0600, six distinct secrets, four64-hex DB passwords, matching DSNs, existing env overwrite refused unchanged. Resolved the explicit local Compose file with synthetic provider settings; only db/api/web active, internal DB host correct, no override. Executed own-domain snippet against research.ni098.test in that copy; all26 existing VPS configuration/negative tests pass, private initializer and both env and actual hardened Compose validations pass. Direct node documentation-link check resolves1035 relative links; git diff --check passes. No container/application start, DB modification, provider request or remote deployment was performed in this documentation task.
+- **Reviewer:** /root/ni067_review read-only review found local-vs-production env wording and cross-shell release_dir ambiguity; both corrected, then snippets rechecked. Independent acceptance remains skipped by user instruction2026-11-09; root owns final verification.
+- **Limitations:** Private repository access remains required; complete raw datasets and production DB/model state are not distributed. No automatic whole-thesis generation, new SEO/sitemap/structured-data/AI feed, guaranteed indexing, source collection or generic --domain feature was implemented or claimed. Own-domain procedure is explicit bounded source-profile adaptation, tested as config only.
+- **Completed at:** 2026-11-14T23:40:30+03:00
