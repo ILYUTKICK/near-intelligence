@@ -43,7 +43,8 @@ test("email demo opens starter research, retains the cabinet, rotates and isolat
   await expect(page).toHaveURL(`${state.web_url}/workspace/data/intents`);
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await expectNoSeriousViolations(page, "NI-080 workspace explorer");
-  await page.getByRole("link", { name: "Open chart: Provider-reported Intents gross volume", exact: true }).click();
+  // NI-095: the card title itself links into the full chart detail page.
+  await page.getByRole("link", { name: "Provider-reported Intents gross volume", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace\/data\/intents\/intents-volume/);
   await expect(page.locator("figure [role=img] svg")).toBeVisible();
   await page.getByRole("button", { name: "Custom range" }).click();
