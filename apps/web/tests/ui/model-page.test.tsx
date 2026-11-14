@@ -524,8 +524,9 @@ describe("Model run detail page — limits before coefficients, recorded values 
     const scopeLimit = screen.getByText(/Gross fees are calculated from volume through a fee rate/);
     const coefficients = container.querySelector('details[aria-label^="Exact data table"]');
     expect(coefficients).not.toBeNull();
+    const coefficientsNode = coefficients as HTMLElement;
     expect(
-      scopeLimit.compareDocumentPosition(coefficients) & Node.DOCUMENT_POSITION_FOLLOWING,
+      scopeLimit.compareDocumentPosition(coefficientsNode) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
     const limitsText = container.textContent ?? "";
@@ -534,7 +535,7 @@ describe("Model run detail page — limits before coefficients, recorded values 
     }
     const mechanical = screen.getAllByText(/Mechanical construction warning \(fixture\)/)[0];
     expect(
-      mechanical.compareDocumentPosition(coefficients) & Node.DOCUMENT_POSITION_FOLLOWING,
+      mechanical.compareDocumentPosition(coefficientsNode) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     for (const code of LIMITATIONS.gate_limit_codes) {
       expect(limitsText).toContain(code);
