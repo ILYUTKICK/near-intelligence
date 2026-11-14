@@ -96,7 +96,7 @@ async function setOutage(enabled: boolean, page: Page): Promise<void> {
 
 async function expectRecordedDataset(page: Page) {
   // NI-096: provenance is announced nonvisually (sr-only), never a drawer.
-  const provenance = page.getByText(state.dataset_version_id, { exact: true });
+  const provenance = page.getByText(`Dataset version: ${state.dataset_version_id}`);
   await expect(provenance).toBeAttached();
   await expect(provenance.locator("xpath=ancestor::*[contains(@class, 'sr-only')]").first()).toBeAttached();
 }

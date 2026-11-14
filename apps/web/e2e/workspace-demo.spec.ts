@@ -54,9 +54,11 @@ test("email demo opens starter research, retains the cabinet, rotates and isolat
   await range.getByRole("button", { name: "Apply range" }).click();
   await expect(page).toHaveURL(/\/workspace\/data\/intents\/intents-volume\?.*start=2026-01-03/);
   await expect(page.getByRole("region", { name: /exact data table/ })).toContainText("200.25");
-  await page.getByRole("button", { name: "Save chart", exact: true }).click();
-  await page.getByRole("link", { name: "Open saved chart" }).click();
-  await expect(page).toHaveURL(/\/workspace\/saved-charts\//);
+  await page.getByRole("button", { name: "Add to research", exact: true }).click();
+  const addDialog = page.getByRole("dialog");
+  await expect(addDialog.getByText("Inspected dataset")).toBeVisible();
+  await addDialog.getByRole("button", { name: "Confirm Add Chart" }).click();
+  await expect(page).toHaveURL(/\/workspace\/research\//);
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await expect(page.getByRole("region", { name: /exact data table/ })).toContainText("200.25");
 
