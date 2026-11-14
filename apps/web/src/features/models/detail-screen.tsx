@@ -113,10 +113,32 @@ export async function ModelDetailScreen({
             <dd className="mt-0.5 font-medium text-text">{sourceLine(run)}</dd>
           </div>
         </dl>
-        <p className="mt-5 max-w-prose text-ui leading-ui text-text-secondary">
-          <span className="font-medium text-text">Read the result within its scope.</span>{" "}
+      {presentation.variables ? (
+        <dl className="mt-6 grid gap-4 max-w-[70rem] sm:grid-cols-2">
+          {presentation.variables.map((variable) => (
+            <div key={variable.role} className="paper-panel p-5">
+              <dt>
+                <p className="text-metadata leading-metadata uppercase tracking-wide text-accent font-medium">
+                  {variable.role === "dependent" ? "Fee measure" : "Activity measure"}
+                </p>
+                <h2 className="mt-1 font-serif text-heading leading-heading font-semibold text-text">
+                  {variable.heading}
+                </h2>
+              </dt>
+              <dd className="mt-2">
+                <p className="text-ui leading-ui text-text">{variable.description}</p>
+                <p className="mt-1 text-ui leading-ui text-text-secondary">{variable.transform}</p>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      <div className="mt-6 max-w-[70rem]">
+        <h2 className="text-ui leading-ui font-semibold text-text">The important limit</h2>
+        <p className="mt-1 max-w-prose text-ui leading-ui text-text-secondary">
           {presentation.scopeLimit}
         </p>
+      </div>
       </header>
       <div className="mt-8">
         <ModelRunDetail
