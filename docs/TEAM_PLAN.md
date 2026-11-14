@@ -212,3 +212,13 @@ NI-076 owner review: role A /root coordinates isolated local deployment and desk
 **NI-085 — 14 November 2026:** dedicated task agent owns Blog web implementation, curated publication metadata/routing, public navigation and focused UI tests. Root owns plan/contracts documentation, local production build, real archive/API browser verification and acceptance. Coordinate before editing shared files; preserve NI-080–084 and the Git hold.
 
 **NI-086 — 14 November 2026:** dedicated task agent owns Overview web layout/copy and affected frontend tests. Root owns approved mockup/hero asset handoff, legacy landing HTTP integration acceptance updates, documentation and production/browser verification. No shared-file edits without coordination. Research article, Blog, private workspace and all prior batches remain preserved; Git hold remains.
+
+
+## NI-089 local-preview recovery
+
+Role A: Codex /root applies bounded current-checkout recovery and verifies local containers/browser. /root/current_design_review independently checks preservation of the approved Overview/Blog/article structure and the source-qualified editorial delta. Do not edit another task's active Overview/chart-detail files or change data services.
+
+
+## NI-090 VPS preparation
+
+Role A: Codex /root coordinates the current checkout, source handoff and operator runbook. /root/vps_config implements isolated production Compose/Caddy/environment validation in a staging directory; /root reviews security/credentials/network boundaries and verifies in disposable local containers. Independent review follows before DONE. No remote mutation or takeover of NI-067/079.

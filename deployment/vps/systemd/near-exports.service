@@ -1,0 +1,13 @@
+[Unit]
+Description=NEAR bounded export batch (no data collection)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=near
+Group=near
+WorkingDirectory=/opt/near-intelligence
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/near-intelligence/deployment/vps/ops.py worker
+TimeoutStartSec=15min

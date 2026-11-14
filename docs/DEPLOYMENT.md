@@ -1,10 +1,10 @@
 # Development and deployment
 
-Planned topology; no resources are provisioned and no deployment has occurred. Baseline is deliberately portable: reverse proxy + Next.js + FastAPI on one VM, managed PostgreSQL and Supabase Auth, persistent artifact volume, scheduled Python CLI/worker. No hosting purchase or account creation is part of this documentation work.
+Portable deployment topology; current images/local Compose are implemented (NI-066), and the existing VPS handoff is prepared in NI-090. No remote deployment is claimed. Baseline is deliberately portable: reverse proxy + Next.js + FastAPI on one VM, managed PostgreSQL and Supabase Auth, persistent artifact volume, scheduled Python CLI/worker. No hosting purchase or account creation is part of this documentation work.
 
 ## Dependency baseline and judge handoff
 
-[DEPENDENCIES.md](DEPENDENCIES.md) defines the tested CPython3.13 hash-pinned requirements baseline and migration to the future uv.lock. Python dependencies are installable now; application services are not implemented. [JUDGE_SETUP.md](JUDGE_SETUP.md) is the mandatory clean-clone deployment/reproduction runbook for NI-066/NI-069, including frontend locks, database/auth configuration and explicitly authorized evidence input access. A dependency-only smoke test does not satisfy deployment acceptance.
+[DEPENDENCIES.md](DEPENDENCIES.md) defines the tested CPython3.13 hash-pinned requirements baseline and migration to the future uv.lock. The frozen application images and local/judge setup are implemented; remote release acceptance remains separate. [JUDGE_SETUP.md](JUDGE_SETUP.md) is the mandatory clean-clone deployment/reproduction runbook for NI-066/NI-069, including frontend locks, database/auth configuration and explicitly authorized evidence input access. A dependency-only smoke test does not satisfy deployment acceptance.
 
 ## Local development contract
 
@@ -18,7 +18,7 @@ Create volumes, start db, migrate with the dedicated migration role, start API/w
 
 **Owner release order — 12 November 2026:** no remote staging/production rollout until NI-079 final local acceptance is DONE for the actual release candidate. First finish all registered P0/P1/P2 and targeted NI-078 fixes, preserving the existing design, then local production build/full workflow/real-research gates/container/restore rehearsal. Deployment configuration and runbook preparation may proceed without remote mutation. After this local gate, NI-067 performs staging and final-origin checks, NI-068 actual remote backups/restore/monitoring and NI-069 the deployed demonstration. These remote checks are not claimed by local acceptance. See [the current agent assignment](FINISH_BEFORE_DEPLOY_PROMPT.md) and [PLAN](../PLAN.md). Existing resource/budget/access permissions and owner-only merge still apply.
 
-One public HTTPS origin, Caddy or equivalent reverse proxy to web; API/DB not internet-exposed. Web gateway forwards to API over the private network. Managed PostgreSQL in the same region, TLS required, pooled connection budget fits all web/API/worker processes. Persistent ARTIFACT_ROOT mounted read/write for importer/worker and controlled read for API; chart export runtime includes pinned Node/ECharts code plus Python worker.
+One public HTTPS origin, Caddy or equivalent reverse proxy to web; API/DB not internet-exposed. Web gateway forwards to API over the private network. Managed PostgreSQL remains an option (TLS required). The owner’s existing-VPS handoff uses a dedicated private PostgreSQL18 container with durable storage and explicit backup/restore tooling (ADR-025); its connection budget must fit all API/worker processes. Persistent ARTIFACT_ROOT mounted read/write for importer/worker and controlled read for API; chart export runtime includes pinned Node/ECharts code plus Python worker.
 
 Build immutable images tagged with Git commit and include lockfiles, migrations, generated OpenAPI client and model code/configs. Release process: checks → build → staging migration/health/E2E → DB+artifact backup → reviewed migration → app rollout → smoke test → enable approved scheduler. Never apply destructive automatic migrations on HTTP startup. Default collector allowlist is empty in every new environment.
 
@@ -40,8 +40,15 @@ Target backups: nightly DB and daily incremental artifact copy to offsite encryp
 
 ## Hosting alternatives and unresolved inputs
 
-Vercel may host web or combined services later; current platform capabilities and limits must be rechecked before choosing it. Do not infer that scientific jobs/persistent files will work on any request runtime. Moving storage to object storage requires an adapter, scoped downloads and the same content hashes. OQ-04 records budget/provider/region; OQ-07 records residency/retention. No deadline, cloud budget or production domain was provided.
+Vercel may host web or combined services later; current platform capabilities and limits must be rechecked before choosing it. Do not infer that scientific jobs/persistent files will work on any request runtime. Moving storage to object storage requires an adapter, scoped downloads and the same content hashes. OQ-04 records budget/provider/region; OQ-07 records residency/retention. The owner supplied near-intelligence.me on14 November2026 and confirmed an existing VPS; host OS/resources/IP/SSH details and production Supabase configuration are still unknown.
 
 ## Deployment acceptance
 
 TLS, callback allowlist and cookies work at the final origin; migration from empty DB passes; fresh user can complete public→private→export workflow; public raw artifacts obey license restrictions; last-good metrics survive a provider failure; clean offline model reproduction and restored artifact hashes match; health and logs redact secrets; production fixtures are disabled. Record exact URLs/commit/versions and real test results in a release report.
+
+## Existing VPS handoff — NI-090
+
+The [VPS runbook](VPS_DEPLOYMENT.md) contains exact preparation/rollout steps,
+scoped production configuration, source-bundle checks and isolated restore.
+The [local preparation report](verification/ni-090.md) records only executed checks.
+Root Compose remains the local/judge path; use the dedicated VPS file explicitly.

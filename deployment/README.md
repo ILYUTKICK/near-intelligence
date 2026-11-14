@@ -120,3 +120,21 @@ flags at connect time. Provider credentials from `.env` are injected only into
 the `api`/`web` containers via `env_file` and are read by no startup path;
 `worker`/`migrate`/`refresh` receive only their database URLs and renderer
 seams.
+
+## Production VPS preparation — NI-090
+
+Use [the VPS runbook](../docs/VPS_DEPLOYMENT.md) and [isolated Compose](vps/compose.yaml)
+for `near-intelligence.me`; do not merge the root developer override.
+Caddy2.11.9-alpine is pinned to the official multi-architecture index
+`sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0`,
+verified from the official release/Docker Hub and registry on2026-11-14.
+Caddy is an actively maintained Apache-2.0 reverse proxy with automatic HTTPS;
+we use it instead of adding a separate certificate-renewal daemon. Existing
+Node/Python/Postgres/uv pins and app locks are reused. This adds no app package.
+
+Sources: [release](https://github.com/caddyserver/caddy/releases/tag/v2.11.9),
+[official image](https://hub.docker.com/_/caddy),
+[Docker production guidance](https://docs.docker.com/compose/how-tos/production/),
+[Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https).
+See [actual local preparation checks](../docs/verification/ni-090.md); no remote
+DNS/TLS/provider/restore claim follows from config validation.

@@ -1,0 +1,10 @@
+[Unit]
+Description=Process queued NEAR exports every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+Unit=near-exports.service
+
+[Install]
+WantedBy=timers.target

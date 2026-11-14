@@ -1,0 +1,178 @@
+# NI-090: production-only topology. Always select this file explicitly; do not
+# merge the developer override. Migrations and export batches are operator actions.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-api-image: &api-image
+  image: near-intelligence-api:${RELEASE_TAG:?Set the audited unique RELEASE_TAG in .env.vps}
+  pull_policy: never
+  build:
+    context: ../..
+    dockerfile: Dockerfile.api
+
+x-disabled-collection: &disabled-collection
+  INGESTION_ENABLED: "false"
+  INGESTION_SOURCE_ALLOWLIST: ""
+  BIGQUERY_MAX_BYTES_BILLED: "0"
+  PROVIDER_REQUESTS_PER_MINUTE: "0"
+  PROVIDER_MAX_DAILY_REQUESTS: "0"
+
+services:
+  db:
+    image: postgres:18.6-bookworm@sha256:f1ea2a1a4fb7b68d4836be1fdcb8a6466a89b072158bf9d97663600538c294c5
+    environment:
+      POSTGRES_DB: near_intelligence
+      POSTGRES_USER: near_bootstrap
+      POSTGRES_PASSWORD: ${DB_BOOTSTRAP_PASSWORD:?Initialize .env.vps}
+      DB_BOOTSTRAP_PASSWORD: ${DB_BOOTSTRAP_PASSWORD:?Initialize .env.vps}
+      DB_RUNTIME_PASSWORD: ${DB_RUNTIME_PASSWORD:?Initialize .env.vps}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:?Initialize .env.vps}
+      DB_OPERATOR_PASSWORD: ${DB_OPERATOR_PASSWORD:?Initialize .env.vps}
+    volumes:
+      # PostgreSQL18 stores its versioned cluster below this directory.
+      - near_db_data:/var/lib/postgresql
+      - ../../scripts/db/010-roles.sql:/docker-entrypoint-initdb.d/010-roles.sql:ro
+    healthcheck:
+      # Accepting connections only; not a migration/schema readiness assertion.
+      test: ["CMD-SHELL", "pg_isready -U near_bootstrap -d near_intelligence"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+    restart: unless-stopped
+    stop_grace_period: 60s
+    logging: *logging
+
+  migrate:
+    <<: *api-image
+    profiles: [migrate]
+    command: [".venv/bin/python", "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql+psycopg://near_migrator:${DB_MIGRATION_PASSWORD:?Initialize .env.vps}@db:5432/near_intelligence
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    networks: [backend]
+    restart: "no"
+    logging: *logging
+
+  api:
+    <<: *api-image
+    command: [".venv/bin/python", "-m", "uvicorn", "near_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *disabled-collection
+      APP_ENV: production
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env.vps}
+      API_INTERNAL_URL: http://api:8000
+      DATABASE_URL: postgresql+psycopg://near_app:${DB_RUNTIME_PASSWORD:?Initialize .env.vps}@db:5432/near_intelligence
+      SUPABASE_JWT_ISSUER: ${SUPABASE_JWT_ISSUER:?Configure Supabase in .env.vps}
+      SUPABASE_JWKS_URL: ${SUPABASE_JWKS_URL:?Configure Supabase in .env.vps}
+      SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:?Configure Supabase in .env.vps}
+      SUPABASE_JWT_ALGORITHM: ${SUPABASE_JWT_ALGORITHM:?Configure Supabase in .env.vps}
+      ARTIFACT_ROOT: /var/lib/near-intelligence/artifacts
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - near_artifacts:/var/lib/near-intelligence/artifacts:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    # The image's /health checks configuration only. The operator separately
+    # verifies DB grants, migration revision and artifact permissions.
+    networks: [backend]
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *logging
+
+  web:
+    image: near-intelligence-web:${RELEASE_TAG:?Set the audited unique RELEASE_TAG in .env.vps}
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: Dockerfile.web
+    environment:
+      APP_ENV: production
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env.vps}
+      API_INTERNAL_URL: http://api:8000
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?Configure Supabase in .env.vps}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:?Configure Supabase in .env.vps}
+      SUPABASE_JWT_ISSUER: ${SUPABASE_JWT_ISSUER:?Configure Supabase in .env.vps}
+      SUPABASE_JWKS_URL: ${SUPABASE_JWKS_URL:?Configure Supabase in .env.vps}
+      SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:?Configure Supabase in .env.vps}
+      SUPABASE_JWT_ALGORITHM: ${SUPABASE_JWT_ALGORITHM:?Configure Supabase in .env.vps}
+      AUTH_ALLOWED_REDIRECT_ORIGINS: ${AUTH_ALLOWED_REDIRECT_ORIGINS:?Configure final HTTPS origin in .env.vps}
+      AUTH_COOKIE_SIGNING_SECRET: ${AUTH_COOKIE_SIGNING_SECRET:?Initialize .env.vps}
+      CSRF_SIGNING_SECRET: ${CSRF_SIGNING_SECRET:?Initialize .env.vps}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [edge, backend]
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *logging
+
+  worker:
+    <<: *api-image
+    profiles: [worker]
+    # One bounded pass, then exit. No polling daemon or collection scheduler.
+    # $$ leaves expansion to this container so secrets are absent from the
+    # resolved Compose command. The worker CLI itself requires DSN arguments.
+    command:
+      - /bin/sh
+      - -ec
+      - 'exec .venv/bin/python -m near_api.exports.worker --database-url "$${DATABASE_URL}" --operator-database-url "$${OPERATOR_DATABASE_URL}" --worker-id vps-worker --max-jobs 10 --lease-seconds 300 --timeout 60'
+    environment:
+      <<: *disabled-collection
+      DATABASE_URL: postgresql+psycopg://near_app:${DB_RUNTIME_PASSWORD:?Initialize .env.vps}@db:5432/near_intelligence
+      OPERATOR_DATABASE_URL: postgresql+psycopg://near_operator:${DB_OPERATOR_PASSWORD:?Initialize .env.vps}@db:5432/near_intelligence
+      ARTIFACT_ROOT: /var/lib/near-intelligence/artifacts
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - near_artifacts:/var/lib/near-intelligence/artifacts
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    networks: [backend]
+    init: true
+    restart: "no"
+    stop_grace_period: 90s
+    logging: *logging
+
+  proxy:
+    image: ${CADDY_IMAGE:?Set verified Caddy tag and sha256 digest in .env.vps}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    networks: [edge]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *logging
+
+networks:
+  edge:
+    driver: bridge
+  backend:
+    # Private service reachability, with outbound JWKS/auth HTTPS available.
+    # Neither the API nor the database publishes any host port.
+    driver: bridge
+
+volumes:
+  near_db_data:
+  near_artifacts:
+  caddy_data:
+  caddy_config:

@@ -43,6 +43,7 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=prod-deps /app/packages/shared-types/node_modules ./packages/shared-types/node_modules
 COPY --from=build /app/apps/web/.next ./apps/web/.next
+COPY --from=build /app/apps/web/public ./apps/web/public
 COPY --from=build /app/apps/web/package.json ./apps/web/package.json
 COPY --from=build /app/apps/web/next.config.ts ./apps/web/next.config.ts
 COPY --from=build /app/packages/shared-types/package.json ./packages/shared-types/package.json
