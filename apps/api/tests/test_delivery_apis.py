@@ -699,14 +699,13 @@ class DeliveryDatabaseTests(unittest.TestCase):
         self.assertEqual(by_id["intents-volume"]["available_ranges"]["max_days"], 730)
 
         searched = self.get_json("/api/charts", q="fees")
-        # the search covers title, description and chart_id, so the gated
-        # fee/buyback charts (whose descriptions mention fees) match too
+        # NI-096: the gated charts were removed from the registry — the search
+        # matches only the fee charts that still exist.
         self.assertEqual({item["chart_id"] for item in searched.json()["items"]},
-                         {"gross-fees", "fee-volume-association", "protocol-revenue",
-                          "fee-funded-buybacks"})
+                         {"gross-fees", "fee-volume-association"})
         categorized = self.get_json("/api/charts", category="treasury")
         self.assertEqual({item["chart_id"] for item in categorized.json()["items"]},
-                         {"treasury-payouts", "fee-funded-buybacks"})
+                         {"treasury-payouts"})
         self.assertEqual(self.get_json("/api/charts", category="nope").status_code, 422)
         self.assertEqual(self.get_json("/api/charts/unknown-chart").status_code, 404)
 
@@ -919,9 +918,11 @@ class DeliveryDatabaseTests(unittest.TestCase):
                                    definition_version=1, start="2024-01-01",
                                    end="2027-01-01", dataset_version=version_id)
         self.assertEqual(long_range.status_code, 422)
-        # gated charts are never advertised as live: no approved dataset
-        # carries their metrics, so latest is a typed not-ready answer
-        for chart_id in ("protocol-revenue", "model-diagnostics"):
+        # gated/unavailable charts are never advertised as live: no approved
+        # dataset carries their metrics, so latest is a typed not-ready answer
+        # (NI-096: the gated charts themselves were removed from the registry;
+        # the model-artifact chart keeps the recorded unavailable state)
+        for chart_id in ("model-diagnostics",):
             with self.subTest(chart_id=chart_id):
                 response = self.get_json(f"/api/charts/{chart_id}/view",
                                          definition_version=1, start=WINDOW[0],
