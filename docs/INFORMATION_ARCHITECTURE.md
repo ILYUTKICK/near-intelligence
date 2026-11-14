@@ -24,7 +24,7 @@ Canonical product name: NEAR Intelligence. Labels and routes below override the 
 
 | Label | Route | Content / authentication |
 | --- | --- | --- |
-| Overview | `/` | Editorial product introduction, one real featured research article, data directions, workflow and workspace entry; public (NI-086) |
+| Overview | `/` | Product introduction, the featured research, data directions and `/#how-it-works` with links to the hypotheses, charts and workspace (NI-086, NI-088) |
 | Blog | `/blog` | Public research-article catalog; active on article pages and `/research` (NI-085) |
 | Original research | `/research` | First full article, canonical stable H1–H4/claim/evidence anchors; linked from Blog |
 | Article | `/blog/[slug]` | Curated editorial article; first original-research slug aliases `/research`; unknown slug 404 |
@@ -32,7 +32,7 @@ Canonical product name: NEAR Intelligence. Labels and routes below override the 
 | Data category | `/data/[category]` | `network`, `intents`, `revenue`, `token-economics`, `ecosystem`; same analytical components as workspace; public (NI-015) |
 | Data chart | `/data/[category]/[chartId]` | Chart detail through the same shared implementation as `/charts/[chartId]`, mounted under the category; public (NI-015) |
 | Chart library | `/charts` | Search and category filters over compact chart rows. Unavailable entries are labeled. Descriptions, units and availability reasons are on the chart detail (NI-034, NI-087). |
-| Chart | `/charts/[chartId]` | Shareable public chart detail with validated selection URL; public |
+| Chart | `/charts/[chartId]` | Shareable chart detail with a validated selection URL, exact values and a Sources & definitions drawer (NI-088) |
 | Methodology | `/methodology` | Definitions, sources, diagnostics and reproduction; public |
 | Models | `/models` | Catalog of published model runs with the honest "no published model yet" empty state; public (NI-054) |
 | Model run | `/models/[runId]` | One published run: limits and prohibited labels before any coefficient, recorded values verbatim, mechanical question/readiness, manifest download with offline verify pointer; public (NI-054) |

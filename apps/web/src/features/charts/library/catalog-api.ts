@@ -26,7 +26,6 @@ import {
   chartListResponseSchema,
   chartViewResponseSchema,
   datasetResponseSchema,
-  metricResponseSchema,
 } from "./catalog-schema";
 
 /** One honest fetch failure carried to the page for rendering. */
@@ -130,23 +129,6 @@ export async function fetchDataset(
   const parsed = datasetResponseSchema.safeParse(result.data);
   return parsed.success
     ? { ok: true, data: parsed.data as Schemas["DatasetResponse"] }
-    : failure(result.response.status, null);
-}
-
-/** GET /api/metrics/{metric_id} — bound metric definitions for the quality panel. */
-export async function fetchMetric(
-  metricId: string,
-): Promise<ApiResult<Schemas["MetricResponse"]>> {
-  const { GET } = apiClient();
-  const result = await GET("/api/metrics/{metric_id}", {
-    params: { path: { metric_id: metricId } },
-  });
-  if (!result.response.ok) {
-    return failure(result.response.status, result.error);
-  }
-  const parsed = metricResponseSchema.safeParse(result.data);
-  return parsed.success
-    ? { ok: true, data: parsed.data as Schemas["MetricResponse"] }
     : failure(result.response.status, null);
 }
 
