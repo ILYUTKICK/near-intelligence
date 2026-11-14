@@ -520,6 +520,8 @@ describe("Data category page — real charts through the catalog category filter
   it("serves the mapped registry category and links into the explorer", async () => {
     const requests = installApiMock([
       catalogRouteFor("activity", [activityChart]),
+      // NI-093: the available chart renders its implicit default view inline.
+      viewRoute("intents-volume", activityChart),
     ]);
     const ui = await DataCategoryPage({
       params: Promise.resolve({ category: "intents" }),
@@ -534,9 +536,10 @@ describe("Data category page — real charts through the catalog category filter
 
     // The visible mapping line names the registry category.
     expect(screen.getByText(/Registry categories mapped here: Activity/)).toBeInTheDocument();
+    // The chart renders inline; the detail page stays one click away.
     expect(
-      await screen.findByRole("link", { name: "Open chart: Synthetic intents volume (fixture)" }),
-    ).toHaveAttribute("href", "/data/intents/intents-volume");
+      await screen.findByRole("link", { name: /Inspect range and data/ }),
+    ).toHaveAttribute("href", expect.stringMatching(/^\/data\/intents\/intents-volume\?/));
   });
 
   it("lists unavailable charts with their reason and never hides them", async () => {
@@ -680,13 +683,17 @@ describe("Data category page — real charts through the catalog category filter
   });
 
   it("passes axe on a loaded category", async () => {
-    installApiMock([catalogRouteFor("activity", [activityChart])]);
+    installApiMock([
+      catalogRouteFor("activity", [activityChart]),
+      // NI-093: the available chart renders its implicit default view inline.
+      viewRoute("intents-volume", activityChart),
+    ]);
     const ui = await DataCategoryPage({
       params: Promise.resolve({ category: "intents" }),
       searchParams: Promise.resolve({}),
     });
     const { container } = render(ui);
-    await screen.findByRole("link", { name: "Open chart: Synthetic intents volume (fixture)" });
+    await screen.findByRole("region", { name: /exact data table/ });
     expect(await axe(container, axeConfig)).toHaveNoViolations();
   });
 });
@@ -1065,9 +1072,15 @@ describe("NI-080 workspace explorer context", () => {
 
   it("links Intents charts into the workspace detail rather than the public layout", async () => {
     const chart = definitionFixture({ chart_id: "intents-volume", category: "activity" });
-    installApiMock([catalogRouteFor("activity", [chart])]);
+    installApiMock([
+      catalogRouteFor("activity", [chart]),
+      viewRoute("intents-volume", chart),
+    ]);
     render(await WorkspaceDataCategoryPage({ params: Promise.resolve({ category: "intents" }), searchParams: Promise.resolve({}) }));
-    expect(screen.getByRole("link", { name: `Open chart: ${chart.title}` })).toHaveAttribute("href", "/workspace/data/intents/intents-volume");
+    expect(screen.getByRole("link", { name: /Inspect range and data/ })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/workspace\/data\/intents\/intents-volume\?/),
+    );
   });
 
   it("keeps catalog search, category tabs and chart links inside workspace", async () => {

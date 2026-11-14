@@ -6,6 +6,7 @@ import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { PageIntro } from "@/components/layout/PageIntro";
 import { ProductIcon } from "@/components/layout/ProductIcon";
 import { Button } from "@/components/ui/button";
+import { ChartAuthActions } from "@/features/charts/library/ChartAuthActions";
 import { ChartCatalogEntry } from "@/features/charts/library/ChartCatalogEntry";
 import { fetchChartCatalog } from "@/features/charts/library/catalog-api";
 import { explorerCategoryBySlug } from "@/features/charts/library/explorer-categories";
@@ -68,13 +69,17 @@ export async function DataCategoryScreen({
   );
   const failure = results.find((result): result is Extract<typeof result, { ok: false }> => !result.ok);
   const items = results.flatMap((result) => (result.ok ? result.data.items : []));
-  const featured = failure ? [] : await Promise.all(
-    (explorer.featuredChartIds ?? []).flatMap((chartId) => {
-      const definition = items.find((item) => item.chart_id === chartId && item.data_status === "available");
-      if (!definition) return [];
-      return [fetchLatestDefaultView(definition)
-        .then(({ range, result }) => ({ definition, range, result }))];
-    }),
+  // NI-093: every AVAILABLE chart in the category renders its implicit default
+  // view inline (NI-092 defaults — coverage-clamped window, preselected first
+  // approved filter) with its own save continuation; a visitor only follows a
+  // chart into the full detail page when they want the complete context.
+  const unavailableItems = items.filter((item) => item.data_status !== "available");
+  const inlineViews = failure ? [] : await Promise.all(
+    items
+      .filter((item) => item.data_status === "available")
+      .map((definition) =>
+        fetchLatestDefaultView(definition)
+          .then(({ range, result }) => ({ definition, range, result }))),
   );
 
   return (
@@ -128,36 +133,65 @@ export async function DataCategoryScreen({
         </div>
       ) : (
         <>
-          {featured.length > 0 ? (
-            <div className={`mt-8 grid items-start gap-5 ${featured.length > 1 ? "lg:grid-cols-2" : ""}`}>
-              {featured.map(({ definition, range, result }) => {
+          {inlineViews.length > 0 ? (
+            <div className="mt-8 grid items-start gap-5 lg:grid-cols-2">
+              {inlineViews.map(({ definition, range, result }) => {
                 const href = detailHrefFor(`${routePrefix}/data/${slug}`, definition.chart_id, {
                   ...range,
                   version: definition.version,
                   datasetVersion: result.ok ? result.data.dataset.id : "latest",
                   filters: {},
                 });
-                const action = <Button asChild variant="secondary"><Link href={href}>Inspect range and data <ProductIcon name="arrow" /></Link></Button>;
+                const actions = (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button asChild variant="secondary">
+                      <Link href={href}>Inspect range and data <ProductIcon name="arrow" /></Link>
+                    </Button>
+                    {result.ok ? (
+                      <ChartAuthActions
+                        nextPath={href}
+                        basePath={`${routePrefix}/data/${slug}/`}
+                        saveInput={{
+                          chart_definition_version_id: definition.id,
+                          label: null,
+                          mode: "live",
+                          selection: result.data.selection,
+                          dataset_version_id: result.data.dataset.id,
+                          snapshot_id: null,
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                );
                 return result.ok ? (
                   <ChartView key={definition.id} definition={definition} view={result.data}
-                    selection={range} mode="live" height={240} actions={action} />
+                    selection={range} mode="live" height={240} actions={actions} />
                 ) : (
                   <section key={definition.id} className="paper-panel p-6">
                     <p className="eyebrow">Data unavailable</p>
                     <h2 className="mt-2 text-heading">{definition.title}</h2>
                     <p className="my-3 text-ui text-text-secondary">{result.message ?? "The selected chart could not be resolved."}</p>
-                    {action}
+                    <Link
+                      href={href}
+                      className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                    >
+                      Open chart: {definition.title}
+                    </Link>
                   </section>
                 );
               })}
             </div>
           ) : null}
-          <h2 className="mt-10 text-heading">Registered charts</h2>
-          <ul className="mt-3 grid gap-4 sm:grid-cols-2">
-            {items.map((item) => (
-              <ChartCatalogEntry key={item.chart_id} chart={item} href={`${routePrefix}/data/${slug}/${item.chart_id}`} />
-            ))}
-          </ul>
+          {unavailableItems.length > 0 ? (
+            <>
+              <h2 className="mt-10 text-heading">Registered charts</h2>
+              <ul className="mt-3 grid gap-4 sm:grid-cols-2">
+                {unavailableItems.map((item) => (
+                  <ChartCatalogEntry key={item.chart_id} chart={item} href={`${routePrefix}/data/${slug}/${item.chart_id}`} />
+                ))}
+              </ul>
+            </>
+          ) : null}
         </>
       )}
       <p className="mt-6 max-w-(--width-prose) text-ui text-text-secondary">{explorer.scopeNote}</p>
