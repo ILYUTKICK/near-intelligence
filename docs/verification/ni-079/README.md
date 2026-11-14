@@ -1,6 +1,6 @@
 # NI-079 — Final integrated local release acceptance
 
-**Status:** IN_PROGRESS (evidence accumulates here; the task is DONE only when every applicable gate below is recorded as passed or explicitly blocked).
+**Status:** ALL GATES RECORDED — presented for owner review (2026-11-14). The task closes on the owner's review of this report and the running local product; NI-067 (remote rollout) cannot start before that per the release order. Remaining owner-side items are explicit in the gate matrix (manual desktop keyboard pass) and the remote checks stay with NI-067/068/069 by design.
 
 **Release candidate:** `feat/ni-079-release-acceptance` — `596c36e` (owner landing copy revisions) + `4c493b0` (NI-090 VPS preparation record) on top of main `13e9d0c` (PRs #100, #101 merged). Claim: 2026-11-14T15:32:44+03:00, ZCode role-A coordinator, interactive owner chat session, worktree `/Users/ilyutkinn/Desktop/near-deploy`.
 
