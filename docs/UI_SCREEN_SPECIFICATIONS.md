@@ -98,3 +98,20 @@ Curated future articles share a template with optional verified dates/authorship
 source sections and existing related-article links. Unknown article slugs have
 a generic 404 with a route back to Blog. The original slug redirects to its
 canonical `/research`; no private document appears by enumeration.
+
+## Published model pages — readable presentation (NI-097)
+
+The public /models catalog and /models/{run_id} result pages render through the NI-097
+presentation layer (features/models/presentation.ts): the recorded run remains the single
+source of truth, and a curated mapping exists only for the published
+gross_fee_activity_v1 specification. The result page answers, in order: what the model
+compares, what it found, what the numbers mean, which conclusions are allowed, and where
+the diagnostics/method/reproduction live — via four keyboard-accessible tabs (Result /
+Diagnostics / Specification / Reproduction). The summary surface rounds for display and is
+marked as rounded; the recorded floats, every gate limit code, the admission reasons and
+the verbatim specification/estimation/diagnostics/environment blocks stay reachable in the
+Exact-coefficients, All-recorded-limitations and raw-verbatim disclosures. The finding text
+is sign-aware: it is selected from the recorded slope's confidence interval, so a positive
+finding is never presented for a negative or unresolved result. Unknown specifications get
+an identity-preserving fallback built from their recorded fields. The manifest download,
+Add to research and the anonymous sign-in continuation behave exactly as before.
