@@ -2798,6 +2798,26 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Identified by:** NI-079 acceptance (2026-11-14); evidence in docs/verification/ni-079/README.md Gate D1.
 
+### NI-092 — Implicit chart defaults: coverage-clamped window and first-approved filter preselection
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P1 (owner product decision 2026-11-14: "по дефолту все графики готовы, ничего не нужно выбирать")
+- **Dependencies:** NI-033, NI-071, NI-080
+- **Complexity:** S
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T16:20:00+03:00
+- **Execution role:** A
+
+**Description:** Category cards and explorer defaults rendered the honest multi-variant "Unavailable" state until the visitor picked a filter and narrowed the range. The owner decided the implicit default must render data with zero interaction: the window clamps to the approved dataset coverage and the first approved option of each registered filter dimension is preselected. Providers are still never summed (the preselection is one provider, disclosed by the chips); explicit `filters`/range URL parameters stay authoritative.
+
+**Implementation steps:** `selection-url.ts` gains `defaultFiltersFor`/`hasNoExplicitFilters`; `default-view.ts` clamps the re-anchored window to the latest approved dataset's coverage start and applies the preselection; the detail screen carries the preselection into the serialized selection (chips disclose it) with an updated honest note. Explicit-URL behavior unchanged.
+
+**Acceptance criteria:** Category cards and explorer defaults render real values with no interaction; explicit URL selections behave exactly as before; the preselection is visible and switchable.
+
+**Testing requirements:** chart-library + data-explorer unit expectations updated and green; full web suite serial green; e2e journey note updated; NI-079 report records the release-affecting recheck.
+
+
 
 ### NI-090 — Prepare the current release for VPS deployment
 
