@@ -1130,8 +1130,10 @@ it("NI-080 featured chart resolves its default range against the same old approv
   expect(views).toHaveLength(2);
   expect(views[1].searchParams.get("end")).toBe("2026-01-15");
   expect(views[1].searchParams.get("dataset_version")).toBe(DATASET_ID);
+  // NI-095: the card title links to the clean detail URL — the detail page
+  // recomputes the same deterministic implicit default itself.
   const link = screen.getByRole("link", { name: "Synthetic gross fees (fixture)" });
   expect(link.getAttribute("href")).toContain("/workspace/data/intents/observed-conversions?");
-  expect(link.getAttribute("href")).toContain("end=2026-01-15");
-  expect(link.getAttribute("href")).toContain(`dataset_version=${DATASET_ID}`);
+  expect(link.getAttribute("href")).toContain("version=1");
+  expect(link.getAttribute("href")).not.toContain("dataset_version=");
 });

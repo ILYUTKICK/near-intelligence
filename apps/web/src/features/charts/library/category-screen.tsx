@@ -142,6 +142,12 @@ export async function DataCategoryScreen({
                   datasetVersion: result.ok ? result.data.dataset.id : "latest",
                   filters: {},
                 });
+                // The card title links to the clean detail URL: the detail page
+                // recomputes the same deterministic implicit default (and its
+                // honest anchoring note) — the resolved default is not baked
+                // into the address. The Add continuation keeps the full
+                // pinned context instead.
+                const titleHref = `${routePrefix}/data/${slug}/${encodeURIComponent(definition.chart_id)}?version=${definition.version}`;
                 // NI-095: exactly ONE visible action per dashboard card.
                 const actions = result.ok ? (
                   <CategoryChartActions
@@ -160,7 +166,7 @@ export async function DataCategoryScreen({
                 return result.ok ? (
                   <ChartView key={definition.id} definition={definition} view={result.data}
                     selection={range} mode="live" height={240} actions={actions}
-                    variant="card" titleHref={href} />
+                    variant="card" titleHref={titleHref} />
                 ) : (
                   <section key={definition.id} className="paper-panel h-full p-6">
                     <p className="eyebrow">Data unavailable</p>
