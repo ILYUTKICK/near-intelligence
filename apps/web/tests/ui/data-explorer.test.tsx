@@ -522,6 +522,7 @@ describe("Data category page — real charts through the catalog category filter
       catalogRouteFor("activity", [activityChart]),
       // NI-093: the available chart renders its implicit default view inline.
       viewRoute("intents-volume", activityChart),
+      ANONYMOUS_SESSION,
     ]);
     const ui = await DataCategoryPage({
       params: Promise.resolve({ category: "intents" }),
@@ -536,10 +537,12 @@ describe("Data category page — real charts through the catalog category filter
 
     // The visible mapping line names the registry category.
     expect(screen.getByText(/Registry categories mapped here: Activity/)).toBeInTheDocument();
-    // The chart renders inline; the detail page stays one click away.
+    // The chart renders inline; the card title links into the detail page and
+    // the single card action is the Add-to-research continuation (NI-095).
     expect(
-      await screen.findByRole("link", { name: /Inspect range and data/ }),
+      await screen.findByRole("link", { name: "Synthetic intents volume (fixture)" }),
     ).toHaveAttribute("href", expect.stringMatching(/^\/data\/intents\/intents-volume\?/));
+    expect(await screen.findByRole("button", { name: "+ Add to research" })).toBeInTheDocument();
   });
 
   it("lists unavailable charts with their reason and never hides them", async () => {
@@ -1077,7 +1080,7 @@ describe("NI-080 workspace explorer context", () => {
       viewRoute("intents-volume", chart),
     ]);
     render(await WorkspaceDataCategoryPage({ params: Promise.resolve({ category: "intents" }), searchParams: Promise.resolve({}) }));
-    expect(screen.getByRole("link", { name: /Inspect range and data/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: chart.title })).toHaveAttribute(
       "href",
       expect.stringMatching(/^\/workspace\/data\/intents\/intents-volume\?/),
     );
@@ -1127,7 +1130,7 @@ it("NI-080 featured chart resolves its default range against the same old approv
   expect(views).toHaveLength(2);
   expect(views[1].searchParams.get("end")).toBe("2026-01-15");
   expect(views[1].searchParams.get("dataset_version")).toBe(DATASET_ID);
-  const link = screen.getByRole("link", { name: /Inspect range and data/ });
+  const link = screen.getByRole("link", { name: "Synthetic gross fees (fixture)" });
   expect(link.getAttribute("href")).toContain("/workspace/data/intents/observed-conversions?");
   expect(link.getAttribute("href")).toContain("end=2026-01-15");
   expect(link.getAttribute("href")).toContain(`dataset_version=${DATASET_ID}`);

@@ -6,7 +6,7 @@ import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { PageIntro } from "@/components/layout/PageIntro";
 import { ProductIcon } from "@/components/layout/ProductIcon";
 import { Button } from "@/components/ui/button";
-import { ChartAuthActions } from "@/features/charts/library/ChartAuthActions";
+import { CategoryChartActions } from "@/features/charts/library/CategoryChartActions";
 import { ChartCatalogEntry } from "@/features/charts/library/ChartCatalogEntry";
 import { fetchChartCatalog } from "@/features/charts/library/catalog-api";
 import { explorerCategoryBySlug } from "@/features/charts/library/explorer-categories";
@@ -142,30 +142,25 @@ export async function DataCategoryScreen({
                   datasetVersion: result.ok ? result.data.dataset.id : "latest",
                   filters: {},
                 });
-                const actions = (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button asChild variant="secondary">
-                      <Link href={href}>Inspect range and data <ProductIcon name="arrow" /></Link>
-                    </Button>
-                    {result.ok ? (
-                      <ChartAuthActions
-                        nextPath={href}
-                        basePath={`${routePrefix}/data/${slug}/`}
-                        saveInput={{
-                          chart_definition_version_id: definition.id,
-                          label: null,
-                          mode: "live",
-                          selection: result.data.selection,
-                          dataset_version_id: result.data.dataset.id,
-                          snapshot_id: null,
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                );
+                // NI-095: exactly ONE visible action per dashboard card.
+                const actions = result.ok ? (
+                  <CategoryChartActions
+                    nextPath={href}
+                    basePath={`${routePrefix}/data/${slug}/`}
+                    saveInput={{
+                      chart_definition_version_id: definition.id,
+                      label: null,
+                      mode: "live",
+                      selection: result.data.selection,
+                      dataset_version_id: result.data.dataset.id,
+                      snapshot_id: null,
+                    }}
+                  />
+                ) : null;
                 return result.ok ? (
                   <ChartView key={definition.id} definition={definition} view={result.data}
-                    selection={range} mode="live" height={240} actions={actions} />
+                    selection={range} mode="live" height={240} actions={actions}
+                    variant="card" titleHref={href} />
                 ) : (
                   <section key={definition.id} className="paper-panel h-full p-6">
                     <p className="eyebrow">Data unavailable</p>

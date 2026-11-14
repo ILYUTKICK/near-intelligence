@@ -73,6 +73,10 @@ export interface ChartViewProps {
   height?: number;
   /** Saved previews show one context line and put exact values under the summary. */
   presentation?: ChartPresentation;
+  /** NI-095: the minimalist dashboard card chrome (default: full detail chrome). */
+  variant?: "card" | "full";
+  /** NI-095: when set, the card title links into the full detail page. */
+  titleHref?: string;
   /** Injectable ECharts mount (tests inject a recording fake). */
   factory?: ChartFactory;
   className?: string;
@@ -149,6 +153,8 @@ export function ChartView({
   width,
   height,
   presentation,
+  variant = "full",
+  titleHref,
   factory = defaultChartFactory,
   className,
   instanceLabel,
@@ -377,7 +383,9 @@ export function ChartView({
         ) : null}
         {error ? <ErrorPanel message={error} onRetry={retry} /> : null}
         {renderError ? <ErrorPanel message={renderError} onRetry={retry} /> : null}
-        {zoomable ? (
+        {/* NI-095: the dashboard card drops the zoom buttons — the plot keeps
+            its direct drag/scroll dataZoom interaction. */}
+        {zoomable && variant !== "card" ? (
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label={`${definition.title} — plot navigation`}>
             <Button variant="secondary" onClick={() => navigatePlot(0.5)} disabled={zoomWindow.end - zoomWindow.start <= 1}>Zoom in</Button>
             <Button variant="secondary" onClick={() => navigatePlot(2)}>Zoom out</Button>
@@ -393,10 +401,38 @@ export function ChartView({
           className="w-full"
           style={{ height: height ?? 320, ...(width !== undefined ? { maxWidth: width } : {}) }}
         />
-        {savedPreview ? null : <SeriesTable model={built.table} title={definition.title} instanceLabel={instanceLabel} />}
+        {savedPreview ? null : variant === "card" ? (
+          // NI-095: the exact-value table stays available to assistive
+          // technology; the dashboard card hides it visually.
+          <div className="sr-only">
+            <SeriesTable model={built.table} title={definition.title} instanceLabel={instanceLabel} />
+          </div>
+        ) : (
+          <SeriesTable model={built.table} title={definition.title} instanceLabel={instanceLabel} />
+        )}
       </div>
     );
   };
+
+  // NI-095 compact axis explanation: the actual variables the chart plots.
+  // Scatter charts plot metric-on-metric (first binding on X); time-series
+  // plot the date axis against every bound series.
+  const axisExplanation = (() => {
+    if (variant !== "card" || !activeView || activeView.series.length === 0) {
+      return undefined;
+    }
+    const named = activeView.series.map(
+      (series) => `${series.metric.title} (${series.metric.unit})`);
+    const scatter = definition.visualization_type === "scatter";
+    const xLabel = scatter ? named[0] ?? "X" : "Date (UTC)";
+    const yLabel = scatter ? named[1] ?? named[0] ?? "Y" : named.join(" · ") || "Y";
+    return (
+      <p className="text-metadata leading-metadata text-text-secondary">
+        <span className="font-medium text-text">X</span> — {xLabel}.{" "}
+        <span className="font-medium text-text">Y</span> — {yLabel}.
+      </p>
+    );
+  })();
 
   return (
     <ChartFrame
@@ -423,6 +459,9 @@ export function ChartView({
       stale={activeView?.quality.status === "stale"}
       presentation={presentation}
       previewValues={previewValues}
+      variant={variant}
+      titleHref={titleHref}
+      axisExplanation={axisExplanation}
       className={className}
     >
       {plot()}

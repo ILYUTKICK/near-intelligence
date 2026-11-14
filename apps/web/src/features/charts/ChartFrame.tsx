@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { QualityBadge } from "@/components/data-state/QualityBadge";
 import { StaleNotice } from "@/components/data-state/DataState";
@@ -21,6 +22,14 @@ import { cn } from "@/lib/utils";
  *
  * Freshness and bound metadata always render (wrapping, never hidden) —
  * they survive small screens; the source drawer reflows instead.
+ *
+ * NI-095 `variant="card"`: the minimalist dashboard card. One serif title
+ * (optionally a link into the full detail page), one units subtitle, one
+ * compact Live badge, one right-aligned action slot above the plot and one
+ * compact axis-explanation footer. The long mode pill, quality badge,
+ * period/last-observed line, source drawer and the visible summary/table
+ * collapse into visually-hidden nonvisual semantics — the underlying data
+ * model is unchanged and the honest unavailable/stale states stay visible.
  */
 export function ChartFrame({
   title,
@@ -41,6 +50,9 @@ export function ChartFrame({
   stale,
   presentation,
   previewValues,
+  variant = "full",
+  titleHref,
+  axisExplanation,
   children,
   className,
 }: {
@@ -68,9 +80,90 @@ export function ChartFrame({
   presentation?: ChartPresentation;
   /** In a saved-card preview the exact table shares the summary disclosure. */
   previewValues?: ReactNode;
+  /** NI-095: the minimalist dashboard card chrome. */
+  variant?: "card" | "full";
+  /** When set, the card title links into the full chart detail page. */
+  titleHref?: string;
+  /** NI-095 compact axis/series explanation rendered under the plot. */
+  axisExplanation?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
+  const card = variant === "card";
+  const liveBadge = card ? (
+    mode === "live" && quality?.status === "ok" ? (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-sage px-2.5 py-0.5 text-metadata font-medium text-accent">
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
+        Live
+      </span>
+    ) : quality?.status === "stale" ? (
+      <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-metadata font-medium text-warning">
+        Last good values
+      </span>
+    ) : (
+      <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-metadata font-medium text-text-secondary">
+        {mode === "live" ? "Unavailable" : "Pinned version"}
+      </span>
+    )
+  ) : null;
+
+  if (card) {
+    return (
+      <figure className={cn("paper-panel min-w-0 p-6 lg:p-8", className)}>
+        <figcaption className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1.5">
+            <div className="min-w-0">
+              {presentation ? null : titleHref ? (
+                <Link
+                  href={titleHref}
+                  className="font-serif text-heading leading-heading font-semibold text-text hover:underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                >
+                  {title}
+                </Link>
+              ) : (
+                <p className="font-serif text-heading leading-heading font-semibold text-text">{title}</p>
+              )}
+              {units ? (
+                <p className="text-ui leading-ui text-text-secondary">{units}</p>
+              ) : null}
+            </div>
+            {liveBadge}
+          </div>
+          {stale && quality ? <StaleNotice quality={quality} metadata={metadata} /> : null}
+        </figcaption>
+
+        {actions ? (
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
+            {actions}
+          </div>
+        ) : null}
+
+        <div className="mt-3">{children}</div>
+
+        {axisExplanation ? (
+          <div className="mt-4 rounded-control bg-surface-muted px-3 py-2">
+            {axisExplanation}
+          </div>
+        ) : null}
+
+        {/* Nonvisual semantics: the summary and the exact-value table stay in
+            the DOM for assistive technology; the dashboard card hides them
+            visually (NI-095) instead of dropping the accessibility contract. */}
+        <div className="sr-only">
+          <p>{summary}</p>
+          {previewValues}
+          {tableRows ? (
+            <DataTable
+              caption={`${title} — equivalent data`}
+              rows={tableRows}
+              valueHeader={units ? `Value (${units})` : valueHeader}
+            />
+          ) : null}
+        </div>
+      </figure>
+    );
+  }
+
   return (
     <figure className={cn("paper-panel min-w-0 p-5 lg:p-7", className)}>
       <figcaption className="flex flex-col gap-2">
