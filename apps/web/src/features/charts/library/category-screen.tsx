@@ -188,12 +188,11 @@ export async function DataCategoryScreen({
           ) : null}
         </>
       )}
-      <p className="mt-6 max-w-(--width-prose) text-ui text-text-secondary">{explorer.scopeNote}</p>
-      <p className="mt-2 text-metadata text-text-secondary">
-        {explorer.registryCategories.length === 0
-          ? "No registry category is mapped to this explorer category yet."
-          : `Registry categories mapped here: ${explorer.registryCategories.map((category) => categoryWordings[category] ?? category).join(", ")}.`}
-      </p>
+      {/* NI-096 addendum: the bottom scope/registry-mapping paragraphs were
+          removed by owner decision — the pages end after the final chart card
+          or empty-state container. The category metadata (scopeNote,
+          registryCategories) stays in explorer-categories.ts and drives the
+          catalog fetch. */}
     </div>
   );
 }

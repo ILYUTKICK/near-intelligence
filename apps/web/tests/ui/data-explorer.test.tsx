@@ -535,8 +535,9 @@ describe("Data category page — real charts through the catalog category filter
     expect(catalogRequests[0].searchParams.get("category")).toBe("activity");
     expect([...catalogRequests[0].searchParams.keys()]).toEqual(["category"]);
 
-    // The visible mapping line names the registry category.
-    expect(screen.getByText(/Registry categories mapped here: Activity/)).toBeInTheDocument();
+    // NI-096 addendum: the bottom scope/registry-mapping paragraphs are gone.
+    expect(screen.queryByText(/Registry categories mapped here/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Charts from the registry activity category/)).not.toBeInTheDocument();
     // The chart renders inline; the card title links into the detail page and
     // the single card action is the Add-to-research continuation (NI-095).
     expect(
@@ -605,8 +606,9 @@ describe("Data category page — real charts through the catalog category filter
       await screen.findByText("No network-level chart is registered yet"),
     ).toBeInTheDocument();
     expect(screen.getByText(/This is not zero/)).toBeInTheDocument();
-    expect(screen.getByText(/No registry category is mapped to this explorer category yet/))
-      .toBeInTheDocument();
+    // NI-096 addendum: the registry-mapping paragraph below the empty-state
+    // card was removed by owner decision.
+    expect(screen.queryByText(/No registry category is mapped/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Browse the chart library" })).toHaveAttribute(
       "href",
       "/charts",
