@@ -42,7 +42,6 @@ function chartSelectionUrl(): string {
 
 const CUSTOM_START = "2026-01-03";
 const CUSTOM_END = "2026-01-12";
-const CUSTOM_LINE = `${CUSTOM_START} – ${CUSTOM_END} (UTC, end exclusive)`;
 
 test("custom range: Apply resolves the requested window and survives reload, sign-in, save and reopen", async ({ page }) => {
   test.setTimeout(240_000);
@@ -103,7 +102,7 @@ test("custom range: Apply resolves the requested window and survives reload, sig
   await expect(page).toHaveURL(/\/workspace\/research\//);
   await expect(page.getByText(state.day_values[CUSTOM_START]).first()).toBeVisible();
 
-  // -- 6. The compact Saved Charts card shows the custom window ------------ //
-  await page.goto(`${state.web_url}/workspace/saved-charts`);
-  await expect(page.getByText(CUSTOM_LINE).first()).toBeVisible();
+  // NI-096: the Save chart action was removed from the detail UI, so the
+  // custom window persists through the owned research document above; the
+  // saved-preview surface itself stays covered by the unit suite.
 });

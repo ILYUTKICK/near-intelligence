@@ -214,14 +214,22 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await expect.poll(() => page.url()).toContain("/data/intents/intents-volume");
   await expect.poll(() => page.url()).toContain(`start=${anchoredStart}`);
   await expect.poll(() => page.url()).toContain(`dataset_version=${state.dataset_version_id}`);
-  await expect(page.getByRole("button", { name: "Save chart", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add to research", exact: true })).toBeVisible();
 
-  // -- 4. Save the chart and reopen it from the workspace ---------------- //
-  await page.getByRole("button", { name: "Save chart", exact: true }).click();
-  await expect(page.getByText("Chart saved. Your range and filters are preserved.")).toBeVisible();
-  await page.getByRole("link", { name: "Open saved chart" }).click();
-  await expect(page).toHaveURL(/\/workspace\/saved-charts\//);
-  // The saved instance is a live view over the inspected 7-day selection
+  // -- 4. Add the chart to an owned research document --------------------- //
+  // NI-096: the Save chart action was removed from the detail UI; the owned
+  // persistence flow is Add to research with the pinned context.
+  await page.getByRole("button", { name: "Add to research", exact: true }).click();
+  const saveDialog = page.getByRole("dialog");
+  await expect(saveDialog.getByText(/Inspected dataset: /)).toBeVisible();
+  await saveDialog.getByRole("button", { name: "Confirm Add Chart" }).click();
+  await expect(saveDialog).toBeHidden();
+  await page.goto(`${state.web_url}/workspace`);
+  const savedResearch = page.getByRole("link", { name: /Continue research/ }).first();
+  await expect(savedResearch).toBeVisible();
+  await savedResearch.click();
+  await expect(page).toHaveURL(/\/workspace\/research\//);
+  // The added chart is a live view over the inspected 7-day selection
   // (UTC [start, end)); the first day carries the persisted exact value.
   await expect(page.getByText(state.day_values[anchoredStart]).first()).toBeVisible();
 
