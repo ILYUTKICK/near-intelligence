@@ -2836,6 +2836,10 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Acceptance criteria:** all seven charts render in the unified card system on the category pages with real data; detail pages unchanged; full web suite + lint/typecheck/build green; live browser verification.
 
+- **Implementation (2026-11-14):** ChartFrame gained the `variant="card"` chrome (serif title link, units subtitle, compact Live badge with honest unavailable/stale fallbacks, right-aligned single action slot under a divider, plot, compact axis-explanation footer, visually-hidden nonvisual summary + exact-value table). ChartView suppresses the zoom button group in card mode (direct drag/scroll dataZoom stays) and renders the axis footer from the actual bound series names/units (scatter: first binding on X; time-series: Date axis). Category pages pass one `CategoryChartActions` action (signed-in AddChartToResearch / anonymous "+ Add to research" continuation) and a clean detail URL for the title link — the detail page recomputes the same deterministic implicit default and its honest anchoring note. Commits `a5ac01d`, `ea94844`, `32000d8`.
+- **Verification (2026-11-14):** web suite serial **681/681** (category tests updated to the card design), lint/typecheck clean, production build green, **e2e 26/26** (journey + workspace demo updated for the title-link navigation), live browser verification of /data/revenue: 0 long mode pills, 0 "Complete" badges, 0 period/last-observed lines, 0 Inspect buttons, 0 zoom buttons, 3 compact Live badges, 3 "+ Add to research", 3 sr-only exact tables in the DOM, axis footers on all three cards; detail pages keep the full chrome.
+- **Completed at:** 2026-11-14T19:00:00+03:00
+
 ### NI-094 — Resolve charts whose required metrics span multiple approved datasets
 
 - **Epic:** 07 — Public Data Delivery
