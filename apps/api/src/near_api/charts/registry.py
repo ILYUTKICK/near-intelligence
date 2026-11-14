@@ -339,8 +339,7 @@ CHARTS: tuple[ChartDefinition, ...] = (
         category="activity", visualization_type="line", update_frequency="daily",
         series=_series(("observed_near_purchases", "required_primary"),
                        ("estimated_purchase_usd", "required_secondary")),
-        filter_schema=_filter_enum("price_basis", FILTER_PRICE_BASES,
-                                   applies_to=("required_secondary",)),
+        filter_schema=_filter_enum("price_basis", FILTER_PRICE_BASES),
         unit_schema={"required_primary": "NEAR", "required_secondary": "USD"},
         source_lineage={"sources": ["SRC-BQ", "SRC-PRICE"],
                         "note": "The USD series is a daily saved-price valuation "
