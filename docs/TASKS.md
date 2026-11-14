@@ -2817,6 +2817,23 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Testing requirements:** data-explorer category tests updated and green; full web suite serial green; lint/typecheck clean; live verification on the deploy stack.
 
+### NI-096 — Remove the gated charts from the registry and catalog; unified detail-page redesign
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P0 (owner release decision 2026-11-14: the gated charts must not appear before the recorded demo; the detail pages follow the supplied redesign brief)
+- **Dependencies:** NI-095, NI-071, NI-032
+- **Complexity:** M
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T19:10:00+03:00
+- **Execution role:** A
+
+**Description (two owner decisions):** (1) the three OQ-gated charts (protocol-revenue, capture-rate, fee-funded-buybacks) are removed from the registry and catalog entirely — the owner release decision supersedes the "listed unavailable" presentation; the OQ gates stay recorded on the metric definitions. (2) The seven chart DETAIL pages get the unified editorial redesign: page header (breadcrumbs, uppercase category label, large serif title), one main analytics card (units left, compact Live badge right, divider, toolbar with time-range presets / source selector / one primary "+ Add to research" action), the plot as the focal point, compact axis footer, and removal of Save chart / Freeze snapshot / Add Insight / Sources & definitions / Inspect / zoom buttons / visible data tables / accessible-summary accordions (a11y semantics stay nonvisually).
+
+**Integrity:** no API/data/model changes; presets, custom range, source switching, tooltips, loading/error/empty states preserved; the detail page keeps the NI-092 anchoring note.
+
+**Acceptance criteria:** the three chart ids answer 404 in delivery and appear nowhere; all seven detail pages render the unified layout with real data; Add to research works; suites green; live verification.
+
 ### NI-095 — Unified minimalist redesign of the seven analytics chart cards
 
 - **Epic:** 07 — Public Data Delivery
