@@ -17,11 +17,11 @@ type SearchValues = Record<string, string | string[] | undefined>;
 const CURSOR_PATTERN = /^[A-Za-z0-9_-]{1,64}={0,2}$/;
 
 /**
- * The public model catalog at /models (NI-054 handoff, contract point 1):
- * the catalog of published model runs. The pagination cursor is the only
- * URL parameter — anything else is dropped with an honest note and never
- * forwarded. The empty catalog is the honest "no published model yet"
- * state; a placeholder result is never rendered in its place.
+ * The public model catalog at /models (NI-054 contract point 1; NI-097
+ * presentation): the catalog of published model runs. The pagination cursor
+ * is the only URL parameter — anything else is dropped with an honest note
+ * and never forwarded. The empty catalog is the honest "no published model
+ * yet" state; a placeholder result is never rendered in its place.
  */
 export async function ModelCatalogScreen({
   routePrefix = "",
@@ -54,13 +54,14 @@ export async function ModelCatalogScreen({
   }
 
   const result = await fetchModelRunCatalog(cursor !== null ? { cursor } : {});
+  const itemCount = result.ok ? result.data.items.length : 0;
 
   return (
     <div className="page-container">
       <PageIntro
         eyebrow="Econometric evidence"
-        title="Models with their limits attached."
-        description="Published runs include the data, specification, diagnostics and recorded approval behind each result."
+        title="Models"
+        description="What the data can tell us about NEAR’s economics. Published results, with the methods and limits behind them."
       />
 
       {dropped.length > 0 ? (
@@ -86,6 +87,12 @@ export async function ModelCatalogScreen({
           />
         ) : (
           <>
+            <div className="mt-10 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 className="text-heading">Published models</h2>
+              <p className="text-ui leading-ui text-text-secondary">
+                {itemCount} {itemCount === 1 ? "model" : "models"}
+              </p>
+            </div>
             <ModelRunList items={result.data.items} basePath={`${routePrefix}/models`} />
             {result.data.next_cursor ? (
               <p className="mt-6 max-w-prose">
@@ -97,6 +104,31 @@ export async function ModelCatalogScreen({
                 </Link>
               </p>
             ) : null}
+            <section aria-labelledby="inside-each-model-heading" className="mt-14 max-w-prose">
+              <h2 id="inside-each-model-heading" className="font-serif text-heading leading-heading font-semibold text-text">
+                Inside each model
+              </h2>
+              <dl className="mt-4 space-y-3">
+                <div>
+                  <dt className="text-ui leading-ui font-medium text-text">The finding</dt>
+                  <dd className="text-ui leading-ui text-text-secondary">
+                    The estimated relationship, its uncertainty and what it means.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-ui leading-ui font-medium text-text">The checks</dt>
+                  <dd className="text-ui leading-ui text-text-secondary">
+                    Sample, diagnostics and sensitivity to the declared assumptions.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-ui leading-ui font-medium text-text">The record</dt>
+                  <dd className="text-ui leading-ui text-text-secondary">
+                    Specification, sources and the frozen reproduction bundle.
+                  </dd>
+                </div>
+              </dl>
+            </section>
           </>
         )
       ) : (

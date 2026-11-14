@@ -1,19 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { ModelRunDetail } from "@/features/models/ModelRunDetail";
 import {
   fetchModelDefinition,
   fetchModelReadiness,
   fetchModelRunDetail,
 } from "@/features/models/models-api";
+import {
+  formatPublishedDay,
+  presentRun,
+} from "@/features/models/presentation";
 
 
 /**
- * The published run detail at /models/{run_id} (NI-054 handoff, contract
- * point 2). The run is fetched server-side and validated against the
- * render-boundary schemas before any rendering; a 404 or a validation
+ * The published run detail at /models/{run_id} (NI-054 contract point 2;
+ * NI-097 presentation). The run is fetched server-side and validated against
+ * the render-boundary schemas before any rendering; a 404 or a validation
  * failure of the identity lands on the generic not-found boundary with no
  * existence leak (an unpublished run is indistinguishable from an absent
  * one). The public definition and the recorded readiness verdict are
@@ -56,6 +59,7 @@ export async function ModelDetailScreen({
     );
   }
   const run = result.data;
+  const presentation = presentRun(run);
 
   // The specification record and the recorded gate verdict are independent
   // GETs; each may fail alone with an honest in-panel note.
@@ -66,22 +70,101 @@ export async function ModelDetailScreen({
 
   return (
     <div className="page-container">
-      <Breadcrumbs
-        items={[{ label: "Overview", href: routePrefix || "/" }, { label: "Models", href: `${routePrefix}/models` }, { label: `Model run ${run.model_id} v${run.model_version}` }]}
-      />
-      <ModelRunDetail
-        run={run}
-        definition={definitionResult.ok ? definitionResult.data : null}
-        readiness={readinessResult.ok ? readinessResult.data : null}
-      />
-      <p className="mt-10 max-w-prose">
+      <p className="mt-5">
         <Link
           href={`${routePrefix}/models`}
-          className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="text-ui leading-ui text-text-secondary hover:text-text hover:underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
-          All published model runs
+          ← All models
         </Link>
       </p>
+      <header className="mt-4 max-w-[70rem]">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <p className="eyebrow">{presentation.categoryLabel}</p>
+          <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-metadata font-medium text-text-secondary">
+            {run.gate_verdict === "READY_WITH_LIMITS" ? "Published with limits" : "Published"}
+          </span>
+        </div>
+        <h1 className="mt-2 font-serif text-page leading-page font-semibold text-text">
+          {presentation.headline}
+        </h1>
+        {presentation.subtitle.map((line) => (
+          <p key={line} className="mt-1 text-body leading-body text-text-secondary">{line}</p>
+        ))}
+        <p className="mt-3 text-metadata leading-metadata text-text-secondary">
+          {run.model_id} · version {run.model_version} · Published{" "}
+          {formatPublishedDay(run.published_at)}
+        </p>
+        <dl className="mt-5 grid gap-x-8 gap-y-3 border-y border-border py-4 text-ui leading-ui sm:grid-cols-4">
+          <div>
+            <dt className="text-metadata leading-metadata text-text-secondary">Fitted observations</dt>
+            <dd className="mt-0.5 font-medium text-text">{run.sample.nobs}</dd>
+          </div>
+          <div>
+            <dt className="text-metadata leading-metadata text-text-secondary">Fitted sample</dt>
+            <dd className="mt-0.5 font-medium text-text">{fittedSpan(run)}</dd>
+          </div>
+          <div>
+            <dt className="text-metadata leading-metadata text-text-secondary">Method</dt>
+            <dd className="mt-0.5 font-medium text-text">{methodLine(run)}</dd>
+          </div>
+          <div>
+            <dt className="text-metadata leading-metadata text-text-secondary">Source</dt>
+            <dd className="mt-0.5 font-medium text-text">{sourceLine(run)}</dd>
+          </div>
+        </dl>
+        <p className="mt-5 max-w-prose text-ui leading-ui text-text-secondary">
+          <span className="font-medium text-text">Read the result within its scope.</span>{" "}
+          {presentation.scopeLimit}
+        </p>
+      </header>
+      <div className="mt-8">
+        <ModelRunDetail
+          run={run}
+          definition={definitionResult.ok ? definitionResult.data : null}
+          readiness={readinessResult.ok ? readinessResult.data : null}
+        />
+      </div>
     </div>
   );
+}
+
+/** "7 Aug – 3 Nov 2026" — the fitted sample (one day lost to differencing). */
+function fittedSpan(run: Parameters<typeof presentRun>[0]): string {
+  const end = new Date(`${run.sample.end_exclusive}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() - 1);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const startShort = formatMonthDay(run.sample.start, months);
+  return `${startShort} – ${end.getUTCDate()} ${months[end.getUTCMonth()]} ${end.getUTCFullYear()}`;
+}
+
+function formatMonthDay(iso: string, months: string[]): string {
+  const [, month, day] = iso.split("-").map((part) => Number(part));
+  return `${day} ${months[month - 1] ?? month}`;
+}
+
+/** "OLS / HAC · 7 lags" from the recorded estimation block. */
+function methodLine(run: Parameters<typeof presentRun>[0]): string {
+  const estimation = run.estimation as Record<string, unknown>;
+  const covariance = (estimation.covariance ?? {}) as Record<string, unknown>;
+  return `${estimation.method ?? "OLS"} / ${covariance.type ?? "HAC"} · ${covariance.maxlags ?? "?"} lags`;
+}
+
+/** The recorded source dimension(s) of the bound variables. */
+function sourceLine(run: Parameters<typeof presentRun>[0]): string {
+  const specification = run.specification as Record<string, unknown>;
+  const sources = new Set<string>();
+  const dependent = specification.dependent_variable as { dimension?: string } | undefined;
+  const explanatory = specification.explanatory_variables as
+    Array<{ dimension?: string }> | undefined;
+  if (typeof dependent?.dimension === "string") {
+    sources.add(dependent.dimension);
+  }
+  for (const variable of explanatory ?? []) {
+    if (typeof variable.dimension === "string") {
+      sources.add(variable.dimension);
+    }
+  }
+  return [...sources].join(", ") || "—";
 }

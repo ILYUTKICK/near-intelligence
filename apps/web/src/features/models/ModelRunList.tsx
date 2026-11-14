@@ -1,63 +1,86 @@
 import Link from "next/link";
 
-import { gateVerdictWording } from "@/features/models/recorded";
 import type { ModelRunSummary } from "@/features/models/models-schema";
+import {
+  fittedSampleSpan,
+  presentSummary,
+} from "@/features/models/presentation";
 
 /**
- * The catalog cards of published model runs (NI-054 handoff, contract
- * point 1). Pure presentation: the page validates the payload first, so a
- * card never renders an unvalidated field. Every recorded value is shown as
- * served — the empty catalog case is handled by the page as the honest
- * "no published model yet" state, never as placeholder content here.
+ * The catalog cards of published model runs (NI-054 contract point 1,
+ * NI-097 presentation): one wide readable card per published run. The
+ * recorded technical identity (spec id · version) stays as secondary text;
+ * run ids, commits, tolerances and the full publication timestamp live on
+ * the result page. Pure presentation: the page validates the payload first,
+ * so a card never renders an unvalidated field.
  */
 export function ModelRunList({ items, basePath = "/models" }: { items: ModelRunSummary[]; basePath?: string }) {
   return (
-    <ul className="mt-8 grid gap-5 lg:grid-cols-2">
-      {items.map((item) => (
-        <li
-          key={item.run_id}
-          className="paper-panel flex min-w-0 flex-col gap-4 p-6"
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h2 className="text-heading">
+    <ul className="mt-6 grid gap-5">
+      {items.map((item) => {
+        const presentation = presentSummary(item);
+        const href = `${basePath}/${encodeURIComponent(item.run_id)}`;
+        return (
+          <li key={item.run_id} className="paper-panel flex min-w-0 flex-col gap-4 p-6 lg:p-8">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <p className="eyebrow">{presentation.categoryLabel}</p>
+              <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-metadata font-medium text-text-secondary">
+                {presentation.statusLabel}
+              </span>
+            </div>
+            <h2 className="font-serif text-heading leading-heading font-semibold text-text">
               <Link
-                href={`${basePath}/${encodeURIComponent(item.run_id)}`}
-                className="hover:underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                href={href}
+                className="hover:underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
-                Model run {item.model_id} v{item.model_version}
+                {presentation.cardTitle}
               </Link>
             </h2>
-            <span className="font-ui text-ui leading-ui font-medium text-text-secondary">
-              {gateVerdictWording(item.gate_verdict)}
-            </span>
-          </div>
-          <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-4 gap-y-1 text-ui leading-ui">
-            <dt className="text-text-secondary">Run id</dt>
-            <dd className="font-mono break-all">{item.run_id}</dd>
-            <dt className="text-text-secondary">Sample</dt>
-            <dd>
-              {`${item.sample.start} to ${item.sample.end_exclusive} (end exclusive) · ${item.sample.nobs} observations`}
-            </dd>
-            <dt className="text-text-secondary">Reproduction tolerances</dt>
-            <dd>
-              {`rtol ${item.tolerances.coefficient_rtol} / atol ${item.tolerances.coefficient_atol} (recorded)`}
-            </dd>
-            <dt className="text-text-secondary">Published</dt>
-            <dd>{`${item.published_at} by ${item.published_by}`}</dd>
-            <dt className="text-text-secondary">Code commit</dt>
-            <dd className="font-mono break-all">{item.code_commit}</dd>
-          </dl>
-          <div>
-            <Link
-              href={`${basePath}/${encodeURIComponent(item.run_id)}`}
-              aria-label={`Open model run: ${item.model_id} v${item.model_version}`}
-              className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            >
-              Open run
-            </Link>
-          </div>
-        </li>
-      ))}
+            <p className="max-w-prose text-body leading-body text-text">
+              {presentation.question}
+            </p>
+            <p className="max-w-prose text-ui leading-ui text-text-secondary">
+              {item.gate_verdict === "READY_WITH_LIMITS"
+                ? "This model describes the recorded relationship; read its recorded limits before using the result."
+                : "The published result carries the methods and limits behind it."}
+            </p>
+            <dl className="mt-1 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
+              <div>
+                <dt className="text-metadata leading-metadata text-text-secondary">Input window · UTC</dt>
+                <dd className="mt-0.5 text-ui leading-ui font-medium text-text">
+                  {fittedSampleSpan(item)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-metadata leading-metadata text-text-secondary">Fitted sample</dt>
+                <dd className="mt-0.5 text-ui leading-ui font-medium text-text">
+                  {item.sample.nobs} observations
+                </dd>
+              </div>
+              {presentation.methodLabel ? (
+                <div>
+                  <dt className="text-metadata leading-metadata text-text-secondary">Method</dt>
+                  <dd className="mt-0.5 text-ui leading-ui font-medium text-text">
+                    {presentation.methodLabel}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            <p className="text-metadata leading-metadata text-text-secondary">
+              {item.model_id} · version {item.model_version}
+            </p>
+            <div>
+              <Link
+                href={href}
+                className="inline-flex h-11 items-center gap-2 rounded-control border border-control-border bg-surface px-5 font-ui text-ui font-medium text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              >
+                View results
+                <span aria-hidden="true">↗</span>
+              </Link>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
