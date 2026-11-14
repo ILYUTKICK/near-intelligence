@@ -92,7 +92,7 @@ test("custom range: Apply resolves the requested window and survives reload, sig
   // persistence flow is Add to research (the pinned selection rides along).
   await page.getByRole("button", { name: "Add to research", exact: true }).click();
   const addDialog = page.getByRole("dialog");
-  await expect(addDialog.getByText("Inspected dataset")).toBeVisible();
+  await expect(addDialog.getByText(/Inspected dataset: /)).toBeVisible();
   await addDialog.getByRole("button", { name: "Confirm Add Chart" }).click();
   await expect(page).toHaveURL(/\/workspace\/research\//);
   await expect(page.getByText(state.day_values[CUSTOM_START]).first()).toBeVisible();

@@ -56,7 +56,7 @@ test("email demo opens starter research, retains the cabinet, rotates and isolat
   await expect(page.getByRole("region", { name: /exact data table/ })).toContainText("200.25");
   await page.getByRole("button", { name: "Add to research", exact: true }).click();
   const addDialog = page.getByRole("dialog");
-  await expect(addDialog.getByText("Inspected dataset")).toBeVisible();
+  await expect(addDialog.getByText(/Inspected dataset: /)).toBeVisible();
   await addDialog.getByRole("button", { name: "Confirm Add Chart" }).click();
   await expect(page).toHaveURL(/\/workspace\/research\//);
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
