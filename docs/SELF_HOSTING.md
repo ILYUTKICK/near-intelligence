@@ -17,7 +17,8 @@ over an existing database or replace its secrets.
 | Publish an HTTPS installation on your own domain | Production steps below |
 | Reproduce the deployed charts or empirical model | [Research data and models](#research-data-and-models), in addition to app deployment |
 
-The repository currently requires read access. You need your own server,
+A public repository can be cloned without GitHub authentication; private copies
+require granted read access. You need your own server,
 domain and Supabase project; no owner credentials or production database are
 included in a clone. The core application does not need an LLM, trading or wallet
 key.
@@ -419,7 +420,7 @@ commands and rollback constraints are in [VPS deployment](VPS_DEPLOYMENT.md).
 
 | Symptom | Check |
 | --- | --- |
-| Repository clone is denied | Obtain read access to the private repository and authenticate Git on your workstation. Do not copy a personal token into README or the server image. |
+| Repository clone is denied | Check the repository URL and connectivity. Public repositories need no GitHub login; for a private copy, obtain read access and authenticate Git on your workstation. Do not copy a personal token into README or the server image. |
 | `/health` returns 503 | Replace required placeholders; compare the canonical URLs and configured Supabase algorithm. A green health response alone does not prove data/import readiness. |
 | Demo entry fails | Enable anonymous sign-ins in your own Supabase project; check issuer/JWKS/algorithm and provider reachability. There is no production synthetic-auth toggle. |
 | Callback points to localhost | Use a release containing NI-067, set APP_ORIGIN and Supabase URL Configuration to your final origin, and rebuild the web image. |

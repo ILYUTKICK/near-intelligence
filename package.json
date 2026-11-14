@@ -2,7 +2,7 @@
   "name": "near-intelligence",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "Evidence-first NEAR investment research product (pnpm workspace root).",
   "scripts": {
     "lint": "pnpm --filter web lint",

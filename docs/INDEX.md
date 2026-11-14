@@ -43,6 +43,7 @@ Project specifications, setup and research references. The application is implem
 - [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) — dependency phases.
 - [TASKS.md](TASKS.md) — actionable work with acceptance tests.
 - [TEAM_PLAN.md](TEAM_PLAN.md) — two-person ownership, handoffs and integration sequence.
+- [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md) — hackathon licensing, public-clone scope, bounded history review and owner release procedure.
 - [COLLABORATION.md](COLLABORATION.md) — repository access, cloning, branches and contributor setup.
 - [DECISIONS.md](DECISIONS.md) — architecture decisions.
 - [RISKS.md](RISKS.md) — mitigations and release triggers.

@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "NEAR Intelligence FastAPI backend (runtime skeleton, NI-002)."
 readme = "README.md"
 requires-python = ">=3.13"
-license = { text = "UNLICENSED" }
+license = { text = "MIT" }
 # Direct dependencies migrated from the reviewed requirements.in baseline
 # (2026-11-05 resolution). apps/api/uv.lock is the exact frozen source; the
 # lock was resolved with the baseline cutoff recorded in docs/DEPENDENCIES.md.

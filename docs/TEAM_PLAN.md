@@ -231,3 +231,5 @@ deployment guide and verification record; B supports read-only review of
 configuration, data/model handoff and credential boundaries. Root coordinates
 NI-098; /root/ni067_review audits commands. Status/acceptance remain in TASKS.
 No application/SEO feature, new data collection or remote rollout is included.
+
+NI-098 follow-up15 November2026: root handles published-history audit and release record; /root/ni067_review implements the approved original-code MIT/third-party notices and public-clone README adjustments. No visibility mutation or research-data publication.

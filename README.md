@@ -69,7 +69,7 @@ You can sign in, write research and export prose without a research data bundle.
 - Git, Docker Engine with the Compose plugin, and Python 3.12+ for the small
   configuration snippet below. Docker Desktop also supplies Compose.
 - A Supabase project for authentication.
-- Read access to this currently private repository.
+- Network access to GitHub, container/package registries and Supabase.
 
 Node, pnpm, Python application packages and the chart renderer are installed
 inside the Docker images; host-side frontend/Python installs are not required
@@ -79,6 +79,9 @@ for this path.
 git clone https://github.com/ILYUTKICK/near-intelligence.git
 cd near-intelligence
 ~~~
+
+A public repository can be cloned without signing in. If you are using a private
+copy, your GitHub account needs read access to that copy.
 
 ### 2. Create a private local configuration
 
@@ -230,6 +233,15 @@ A separate authorized data handoff must preserve source rights, exact values,
 definition/dataset versions, model manifests and file hashes. See
 [data provisioning](docs/SELF_HOSTING.md#research-data-and-models).
 Collectors and automatic source refresh remain off by default.
+
+## License
+
+Original application source code, tooling, tests and associated developer
+documentation use the [MIT License](LICENSE). Dependencies and bundled fonts
+retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).
+Research datasets, provider outputs, third-party content, artwork and trademarks
+are not relicensed by the code license. A source clone does not grant rights to
+redistribute provider data or include the production research database.
 
 ## Architecture and development
 

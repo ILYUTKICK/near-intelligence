@@ -53,8 +53,8 @@ test-results/
 artifacts/
 private-exports/
 
-# GitHub sharing scope explicitly selected by the user: documentation and mockups only.
-# Keep local research bytes; track Markdown explanations without raw inputs/code.
+# Research sharing boundary: keep raw local inputs, captures and generated state out of Git.
+# Track Markdown and only the explicitly authorized deterministic model code/configs below.
 /research/**
 !/research/**/
 !/research/**/*.md

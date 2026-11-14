@@ -262,3 +262,5 @@ NI-089 (role A), requested by the owner: restore the current Blog/Overview exper
 
 
 **Owner request — 14 November2026, README and self-hosting:** NI-098 rewrites the reader-facing product overview and documents a complete reproducible local/own-domain deployment using existing packaging. Accurately describe authoring, curated public publication and search/AI discoverability intent; do not invent an AI thesis generator, guaranteed indexing, public data bundle or a new deployment capability. Documentation may proceed directly after its DONE dependencies; no remote rollout or new collection is authorized.
+
+**Owner follow-up — 15 November2026, public-release preparation:** NI-098 includes public-clone onboarding, original-code MIT licensing (explicitly approved), preserved third-party/data rights and bounded review of tracked content and published Git history. Official https://nearhackathon.com/HACKATHON.md Q-014 requires LICENSE and permits MIT. Prepare a reviewable release; do not change repository visibility, publish excluded data, rewrite history or submit an application without the applicable explicit instruction.
