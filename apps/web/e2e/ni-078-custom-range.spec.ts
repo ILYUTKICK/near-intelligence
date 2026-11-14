@@ -94,6 +94,12 @@ test("custom range: Apply resolves the requested window and survives reload, sig
   const addDialog = page.getByRole("dialog");
   await expect(addDialog.getByText(/Inspected dataset: /)).toBeVisible();
   await addDialog.getByRole("button", { name: "Confirm Add Chart" }).click();
+  await expect(addDialog).toBeHidden();
+  // The chart lands in an owned research document; the workspace lists it.
+  await page.goto(`${state.web_url}/workspace`);
+  const research = page.getByRole("link", { name: /Continue research/ }).first();
+  await expect(research).toBeVisible();
+  await research.click();
   await expect(page).toHaveURL(/\/workspace\/research\//);
   await expect(page.getByText(state.day_values[CUSTOM_START]).first()).toBeVisible();
 
