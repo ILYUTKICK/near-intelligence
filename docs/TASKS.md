@@ -2817,6 +2817,27 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Testing requirements:** data-explorer category tests updated and green; full web suite serial green; lint/typecheck clean; live verification on the deploy stack.
 
+### NI-097 — Models catalog and published-result page: readable presentation per the approved mockups
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P0 (direct owner instruction 2026-11-14 with approved mockups; supersedes the earlier rejected NI-097 registration attempt — this card is the fresh registration)
+- **Dependencies:** NI-054, NI-051, NI-052, NI-053, NI-079
+- **Complexity:** L
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T20:00:00+03:00
+- **Execution role:** A
+
+**Description:** /models and /models/{runId} read like a technical report: raw ids, verbatim JSON and repeated warnings crowd out the result. Per the approved mockups, the catalog presents one wide readable card per published run (presentation-mapped title/question/limit for the known specification, identity-preserving fallback for unknown ones; input window, fitted nobs, method; one View results action) and the result page answers, in order: what the model compares, what it found, what the numbers mean, which conclusions are allowed, where the diagnostics/method/reproduction live — via four keyboard-accessible tabs (Result / Diagnostics / Specification / Reproduction) with a rounded slope+CI summary plot built from the recorded values, the exact coefficients and all recorded limitations in disclosures, and the existing manifest download + Add to research + anonymous behavior preserved.
+
+**Integrity:** all values come from the read-only model APIs (no hardcoded numbers); the curated presentation is gated on the recorded slope sign (a negative or different result renders the neutral/negative variant — the positive finding is never spread); provider gross fees ≠ protocol revenue; association ≠ causality; the recorded approval renders as recorded; no fit/collectors/refresh/RPC/cloud SQL; no new dependencies.
+
+**Implementation steps:** presentation.ts (known-spec map + fallback + formatting); ModelRunList/catalog-screen rewrite; detail-screen header + ModelRunTabs client component with the four panels; inline SVG estimate+CI plot; recorded technical blocks in disclosures; UI-specification note about the presentation change; test updates preserving integrity checks.
+
+**Acceptance criteria:** catalog and detail match the approved composition; all four tabs keyboard-accessible; numbers match the published API (spot-check estimate 0.8542493147420771, CI [0.5719403297667323, 1.136558299717422]); exact values and all recorded limitations reachable; manifest download and Add to research work; empty/error/not-found honest; web suites green; live on localhost:13002 with the production container rebuilt (no DB/volume reset).
+
+**Explicitly out of scope:** mobile QA, deployment, push, merge (no push without separate owner permission), any non-Models page.
+
 ### NI-096 — Remove the gated charts from the registry and catalog; unified detail-page redesign
 
 - **Epic:** 07 — Public Data Delivery
