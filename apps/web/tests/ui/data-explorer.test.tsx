@@ -807,7 +807,7 @@ describe("Data chart detail — the same gates as /charts", () => {
     expect(await screen.findByText(/Unavailable — this is not zero/)).toBeInTheDocument();
     expect(screen.getAllByText(/Revenue gate \(fixture\)/).length).toBeGreaterThan(0);
     expect(requestsTo(requests, "/api/charts/protocol-revenue/view")).toHaveLength(0);
-    expect(screen.getByText("Definition, dataset and quality")).toBeInTheDocument();
+    expect(screen.queryByText("Definition, dataset and quality")).not.toBeInTheDocument();
   });
 
   it("answers a chart outside the category mapping with the 404 boundary", async () => {

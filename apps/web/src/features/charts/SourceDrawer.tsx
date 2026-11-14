@@ -92,6 +92,7 @@ export function SourceDrawer({
   label,
   sources,
   formulaUrl,
+  datasetId,
   manifestUrl,
   definition,
   triggerClassName,
@@ -100,6 +101,7 @@ export function SourceDrawer({
   label: string;
   sources: DataSource[];
   formulaUrl?: string;
+  datasetId?: string;
   manifestUrl?: string;
   /** Human-readable metric definition/version line shown above sources. */
   definition?: string;
@@ -133,6 +135,12 @@ export function SourceDrawer({
               </p>
             ) : null}
           </div>
+        ) : null}
+        {datasetId ? (
+          <dl className="mt-4 text-ui">
+            <dt className="font-medium">Dataset ID</dt>
+            <dd className="break-all font-mono text-text-secondary">{datasetId}</dd>
+          </dl>
         ) : null}
         <ul className="mt-4">
           {sources.map((source) => (

@@ -5,12 +5,10 @@ import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { PageIntro } from "@/components/layout/PageIntro";
 import { ChartView } from "@/features/charts/renderer/ChartView";
 import { ChartDetailClient } from "@/features/charts/library/ChartDetailClient";
-import { DefinitionQualityPanel } from "@/features/charts/library/DefinitionQualityPanel";
 import {
   fetchChartDefinition,
   fetchChartView,
   fetchDataset,
-  fetchMetric,
 } from "@/features/charts/library/catalog-api";
 import type { ApiFailure } from "@/features/charts/library/catalog-api";
 import {
@@ -30,7 +28,7 @@ import { fetchLatestDefaultView } from "./default-view";
  *
  * One server component renders the whole validated chart-detail experience —
  * definition load, the single selection-URL gate (`parseSelectionUrl`),
- * range anchoring, metric/quality provenance and the resolved view — under
+ * range anchoring and the resolved view — under
  * any public detail route base. The same serialized selection produces the
  * same view request under /charts and /data.
  *
@@ -155,14 +153,6 @@ export async function ChartDetailScreen({
     }
   }
 
-  // Bounded metric definitions for the quality panel (each may fail alone).
-  const metrics = await Promise.all(
-    definition.metric_definition_ids.map(async (id) => {
-      const metricResult = await fetchMetric(id);
-      return { id, metric: metricResult.ok ? metricResult.data : null };
-    }),
-  );
-
   const selection: SerializedSelection | null = range === null ? null : {
     version: definition.version,
     start: range.start,
@@ -204,15 +194,8 @@ export async function ChartDetailScreen({
         ...(links.categoryHref ? [] : [category]),
         { label: definition.title },
       ]} />
-      {/* NI-076 D3: one title and short visible metadata — the description
-          and full provenance stay available through "Sources & definitions"
-          and the definitions panel below. */}
       <PageIntro className="mt-5" compact eyebrow={category.label} title={definition.title} />
-      <p className="mt-2 max-w-prose text-metadata text-text-secondary">
-        Definition version v{definition.version} (pinned in the URL); renderer{" "}
-        <span className="font-mono">{definition.renderer_version}</span>.
-        {rangeNote !== null ? ` ${rangeNote}` : ""}
-      </p>
+      {rangeNote ? <p className="mt-2 max-w-prose text-metadata text-text-secondary">{rangeNote}</p> : null}
       {aggregateHref ? (
         <Link href={aggregateHref} className="mt-2 inline-block text-ui underline underline-offset-4">
           View payout totals (v1)
@@ -273,8 +256,6 @@ export async function ChartDetailScreen({
            loading state, and URL notes stay visible. */
         <DroppedNotice dropped={dropped} />
       ) : null}
-
-      <DefinitionQualityPanel definition={definition} view={view} metrics={metrics} />
 
       <p className="mt-8 max-w-prose">
         <Link

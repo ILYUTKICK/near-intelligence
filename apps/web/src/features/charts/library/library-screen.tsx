@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-import { PageIntro } from "@/components/layout/PageIntro";
-import { ProductIcon } from "@/components/layout/ProductIcon";
 import { CatalogSearch } from "@/features/charts/library/CatalogSearch";
 import { ChartCatalogEntry } from "@/features/charts/library/ChartCatalogEntry";
 import { fetchChartCatalog } from "@/features/charts/library/catalog-api";
@@ -87,11 +85,7 @@ export async function ChartLibraryScreen({
 
   return (
     <div className="page-container">
-      <PageIntro
-        eyebrow="Chart library"
-        title="A library of evidence."
-        description="Explore registered charts, inspect their data and definitions, and bring a selection into your research."
-      />
+      <h1 className="text-left text-page leading-page">Chart library</h1>
 
       {dropped.length > 0 ? (
         <div role="status" className="mt-4 rounded-surface border border-border bg-surface-muted p-4 max-w-prose">
@@ -108,11 +102,11 @@ export async function ChartLibraryScreen({
         </div>
       ) : null}
 
-      <div className="mt-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+      <div className="mt-5 flex flex-col items-start gap-4">
         <CatalogSearch key={q ?? ""} initialQuery={q ?? ""} category={category} basePath={`${routePrefix}/charts`} />
 
         <nav aria-label="Chart categories">
-          <ul className="flex flex-wrap gap-2">
+          <ul className="flex flex-wrap gap-x-5">
             {[
               { label: "All charts", value: null as string | null },
               ...CATALOG_CATEGORIES.map((value) => ({ label: categoryWordings[value], value })),
@@ -126,8 +120,8 @@ export async function ChartLibraryScreen({
                     aria-current={active ? "true" : undefined}
                     className={
                       active
-                        ? "inline-flex min-h-11 items-center rounded-full border border-accent bg-accent px-3.5 text-ui text-on-accent"
-                        : "inline-flex min-h-11 items-center rounded-full border border-control-border bg-surface px-3.5 text-ui text-text hover:bg-surface-muted"
+                        ? "inline-flex min-h-11 items-center border-b-2 border-accent text-ui font-semibold text-accent"
+                        : "inline-flex min-h-11 items-center border-b-2 border-transparent text-ui text-text-secondary hover:text-accent"
                     }
                   >
                     {tab.label}
@@ -141,16 +135,13 @@ export async function ChartLibraryScreen({
 
       {result.ok ? (
         result.data.items.length === 0 ? (
-          <div role="status" className="paper-panel mt-6 flex flex-col items-center p-10 text-center">
-            <span className="mb-4 grid size-12 place-items-center rounded-full bg-sage text-accent">
-              <ProductIcon name="search" className="size-5" />
-            </span>
-            <h2 className="text-heading">Nothing to show</h2>
+          <div role="status" className="mt-4 border-t border-border py-6">
+            <h2 className="text-heading">No charts found</h2>
             <p className="mt-2 max-w-prose text-ui text-text-secondary">
               {q !== null
-                ? "No registered chart matches this search. Search covers titles, descriptions and chart ids."
+                ? "No registered chart matches this search."
                 : category !== null
-                  ? `No chart is registered in the ${categoryWordings[category].toLowerCase()} category yet; a category without charts is stated, never filled with placeholders.`
+                  ? `No chart is registered in ${categoryWordings[category]} yet.`
                   : "No chart is registered yet."}
             </p>
             <Link
@@ -162,7 +153,7 @@ export async function ChartLibraryScreen({
           </div>
         ) : (
           <>
-            <ul className="paper-panel mt-6 divide-y divide-border">
+            <ul className="mt-3 border-t border-border">
               {result.data.items.map((item) => (
                 <ChartCatalogEntry key={item.chart_id} chart={item} href={`${routePrefix}/charts/${item.chart_id}`} row />
               ))}
@@ -184,8 +175,8 @@ export async function ChartLibraryScreen({
           <h2>The catalog could not be loaded</h2>
           <p className="text-body leading-body text-text-secondary mt-2">
             {result.status === 503
-              ? "The chart API is unavailable right now. Nothing is shown rather than stale or fabricated entries."
-              : "The catalog request failed. Nothing is shown rather than partial or fabricated entries."}
+              ? "The chart API is unavailable right now."
+              : "The catalog request failed."}
           </p>
           <Link
             href={catalogHref(routePrefix, category, q, cursor)}

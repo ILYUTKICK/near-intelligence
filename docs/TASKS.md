@@ -2484,7 +2484,7 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 - **Epic:** 13 — Quality and Security
 - **Priority:** P0, mandatory before remote deployment
-- **Dependencies:** NI-078, NI-064, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063, NI-044, NI-045, NI-055, NI-059, NI-071, NI-072, NI-060, NI-065, NI-080, NI-081, NI-082, NI-083, NI-084, NI-085, NI-086
+- **Dependencies:** NI-078, NI-064, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063, NI-044, NI-045, NI-055, NI-059, NI-071, NI-072, NI-060, NI-065, NI-080, NI-081, NI-082, NI-083, NI-084, NI-085, NI-086, NI-087, NI-088
 - **Complexity:** L
 - **Status:** TODO
 - **Execution role:** A (coordinator); B owns data/model/API acceptance contributions
@@ -2710,3 +2710,39 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Reviewer:** Codex root coordinator; independent review skipped by user instruction 2026-11-09.
 - **Completed at:** 2026-11-14T01:51:23+03:00
 - **Local handoff:** `http://127.0.0.1:51528/`, final saved-archive/API preview remains running. Artwork and exact built-in generation prompt are recorded in verification/ni-086/ASSETS.md. No Git staging/commit/push, dependencies, collection or external publication. NI-079/model/attribution/refresh/deployment gates remain separate.
+
+### NI-087 — Present the complete investment thesis and simplify the chart library
+
+- **Epic:** 02 — Public Research / product presentation
+- **Priority:** P0, owner-requested hackathon presentation
+- **Dependencies:** NI-014, NI-034, NI-083, NI-085, NI-086
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** Codex chat 01a1d769-4351-7503-8207-f16f501c3467
+- **Execution role:** A
+- **Started at:** 2026-11-14T03:57:36+03:00
+- **Branch/worktree:** main at b10bb07, existing Windows checkout
+- **Dependency verification:** All direct dependencies are DONE on main. The owner approved the article concept and requested the full research and a quieter chart catalog.
+
+**Acceptance criteria:** Lead with the investment thesis and evidence, show the NEAR/USD window comparison, and keep the full H1–H4 assessments, limits, source records, history, and existing deep links. Simplify the chart library to search, categories, chart names and essential status while preserving detail routes, paging and failures. Verify focused tests and both routes in the local desktop preview.
+
+- **Result:** The canonical Blog article leads with the thesis and the recorded NEAR/USD comparison. It retains all fifteen sections and the four testable hypotheses, with direct links from the verdicts to the full assessments and from those assessments to recorded claims. Detailed tables and model notes use native disclosures. The shared chart library uses compact rows, with search, category and pagination behavior intact.
+- **Verification:** Six focused Vitest suites passed 136 checks. The final thesis and figure pass passed 31 checks. TypeScript, ESLint, 1002 documentation links and the 85 scheduled task dependencies passed. Desktop Chrome on the running preview verified Blog → article, keyboard NEAR/USD switching, recorded values and CL-004 disclosure, H1–H4 links, zero article overflow at 1440 px, and catalog search → category → chart detail.
+- **Data boundary:** The window comparison uses the recorded claims in source. The preview API uses the isolated development database. The real archive model fit remains pending.
+- **Completed at:** 2026-11-14T04:10:00+03:00
+
+### NI-088 — Explain the research workflow and simplify chart details
+
+- **Epic:** 02 — Public Research / product presentation
+- **Priority:** P0, owner-requested hackathon walkthrough
+- **Dependencies:** NI-034, NI-086, NI-087
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex chat 01a1d769-4351-7503-8207-f16f501c3467
+- **Execution role:** A
+- **Started at:** 2026-11-14T04:14:58+03:00
+- **Branch/worktree:** feat/ni-088-hackathon-walkthrough
+- **Dependency verification:** NI-034 and NI-086 are DONE on main. NI-087 is implemented and verified in this branch's parent commit.
+- **Acceptance criteria:** Remove the standalone definition/quality section from shared chart details, preserve the chart's source drawer and unavailable states, and link the Overview walkthrough to the thesis, chart library and workspace. Publish the local review batch in a PR and verify its checks.
+
+- **Result:** Overview explains the thesis-to-evidence workflow through three linked steps. Shared chart detail renders the existing Sources & definitions drawer and exact data table without standalone metadata output or per-metric server requests.
+- **Local verification:** Desktop Chrome passed keyboard navigation from Overview to the chart library, chart opening and the sources drawer. The data-explorer detail uses the same compact layout. ESLint, TypeScript, documentation links and contrast checks passed.

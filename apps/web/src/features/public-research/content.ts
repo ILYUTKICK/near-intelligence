@@ -198,10 +198,10 @@ export const hypothesisIds = ["h1", "h2", "h3", "h4"] as const;
 export const thesisReleaseSlug = "near-thesis-2026-11";
 
 export const thesis = {
-  title: "A conversion channel.",
-  emphasis: "A conditional thesis.",
+  title: "Can Intents create",
+  emphasis: "lasting value for NEAR?",
   standfirst:
-    "The complete original conditional thesis, with supporting and contrary evidence side by side. Every number carries its source, scope and definition version, bounds stay bounds, and the model section states its honest release status.",
+    "The accounts we tracked converted assets into NEAR every day for 90 days. How much value the protocol earns and retains remains open.",
   evidenceStatus:
     "Recorded evidence basis: the saved 90-day cohort 2026-08-06 through 2026-11-04 (UTC, end exclusive) verified on 4 November 2026, plus the provider register reviewed 5 November 2026. No live values are published on this page; archival collection stays stopped, and a missing or unavailable value is never shown as zero.",
   tocLabel: "Thesis sections",
@@ -210,10 +210,9 @@ export const thesis = {
     id: "executive-summary",
     title: "Executive summary",
     lead:
-      "NEAR's long-term investment case depends on its ability to convert growing cross-chain activity into sustainable protocol revenue and measurable token value capture.",
+      "If growing Intents activity generates lasting protocol revenue and some of that revenue reaches the token, it could support long-term value for NEAR.",
     paragraphs: [
-      "Existing saved evidence supports a regularly operating conversion/payout channel within a defined cohort (CL-001, CL-003). It challenges a simple accelerating-demand narrative: NEAR quantities acquired declined across successive 30-day windows (CL-002), and observed acquisitions are small relative to positive net supply growth (CL-007, CL-008). Full fee provenance and economically attributable daily protocol revenue remain unresolved (CL-005, CL-006).",
-      "The appropriate current assessment is mixed evidence with important identification gaps, not a proven investment case. A working research product should make both findings and gaps inspectable — which is what the claim registry below is for.",
+      "We observed a recurring conversion channel. Purchases fell in NEAR terms and were small beside supply growth. Fee records cover only part of the funding path, so the investment case remains conditional.",
     ],
   },
 
@@ -221,8 +220,7 @@ export const thesis = {
     id: "question",
     title: "Research question and canonical hypotheses",
     intro:
-      "The thesis is carried by four conditional hypotheses. Each states its current assessment and what evidence would weaken it. These H1–H4 differ from the old product-plan's H1–H6; no numeric remapping is valid without a semantic mapping.",
-    hypothesesIntro: "Current assessment and falsification condition per hypothesis:",
+      "The thesis rests on four questions: whether activity grows protocol revenue, how revenue reaches the token, whether burns offset issuance, and how much value the protocol retains.",
     hypotheses: [
       {
         id: "h1",
@@ -337,7 +335,7 @@ export const thesis = {
     id: "revenue-capture",
     title: "Revenue capture and actual observed findings",
     intro:
-      "The claim registry binds each observation to its scope, definition version and recorded source. Values marked as bounds or approximations are rendered that way everywhere; nothing on this page is a live query.",
+      "For 1–3 November, we matched fee records to on-chain transfers and internal credits. This supports the fee-to-conversion route for part of the activity in that period. How much of the full 90-day cohort’s purchases came from fees is still unknown.",
     claimIds: ["CL-001", "CL-002", "CL-003", "CL-004", "CL-005", "CL-006"],
     closing:
       "CL-001 and CL-003 are different flows and must not be added as independent token demand. Even the route attribution in CL-006 is a conservative accounting model, not an exact causal estimate of market impact.",

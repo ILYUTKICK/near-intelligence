@@ -23,9 +23,9 @@ const dataDirections: readonly { title: string; description: string; href: strin
 ];
 
 const workflow = [
-  { title: "Read the research", body: "Start with an argument and its limits." },
-  { title: "Inspect the evidence", body: "Explore the charts, definitions and sources." },
-  { title: "Build your thesis", body: "Save charts, add notes and connect your conclusions." },
+  { title: "Start with the thesis", body: "Read the investment case, the four hypotheses it rests on and what would weaken each one.", href: "/research#question", action: "Read the hypotheses" },
+  { title: "Check the evidence", body: "Open a chart, choose a period and check its source. Compare what you find with the claims in the article.", href: "/charts", action: "Browse charts" },
+  { title: "Write your assessment", body: "Save charts in your workspace, cite the evidence alongside your notes and export a saved revision.", href: "/workspace", action: "Start a research document" },
 ] as const;
 
 /**
@@ -50,6 +50,7 @@ export default function HomePage() {
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild><Link href="/blog">Read the research <ProductIcon name="arrow" /></Link></Button>
           <Button asChild variant="secondary"><Link href="/data">Explore data</Link></Button>
+          <Link href="#how-it-works" className={textLink}>How it works</Link>
         </div>
       </div>
       <OverviewArtwork />
@@ -77,16 +78,17 @@ export default function HomePage() {
       <p className="mt-4 text-metadata leading-metadata text-text-secondary">Historical datasets · coverage varies by source</p>
     </section>
 
-    <section id="mechanism" aria-labelledby="workflow-heading" className="mt-12 border-t border-border pt-9 lg:mt-14">
-      <h2 id="workflow-heading" className={sectionHeading}>From a question to your own thesis.</h2>
+    <section id="how-it-works" aria-labelledby="workflow-heading" className="mt-12 scroll-mt-8 border-t border-border pt-9 lg:mt-14">
+      <h2 id="workflow-heading" className={sectionHeading}>How it works</h2>
       <ol className="mt-8 grid gap-7 lg:grid-cols-3 lg:gap-0">
         {workflow.map((step, index) => <li key={step.title} className="lg:px-7 lg:first:pl-0 lg:last:pr-0 lg:not-first:border-l lg:not-first:border-border">
           <span className="inline-flex size-8 items-center justify-center rounded-control bg-sage font-serif text-ui font-semibold text-accent">0{index + 1}</span>
           <h3 className="mt-4 font-serif text-heading leading-heading">{step.title}</h3>
           <p className="mt-3 max-w-[34ch] text-ui leading-ui text-text-secondary">{step.body}</p>
+          <Link href={step.href} className={`${textLink} mt-2`}>{step.action} <ProductIcon name="arrow" /></Link>
         </li>)}
       </ol>
-      <p className="mt-5 text-metadata text-text-secondary">Trace the mechanism in the <Link href="/research#mechanism" className="text-accent underline underline-offset-4">full research</Link>.</p>
+      <p id="mechanism" className="mt-5 text-metadata text-text-secondary">Trace the mechanism in the <Link href="/research#mechanism" className="text-accent underline underline-offset-4">full research</Link>.</p>
     </section>
 
     <section id="release-status" aria-labelledby="methodology-heading" className="mt-12 flex flex-wrap items-center justify-between gap-5 border-y border-border py-8 lg:mt-14">

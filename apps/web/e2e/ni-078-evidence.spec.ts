@@ -41,7 +41,7 @@ function record(testInfo: TestInfo, values: object) {
 test("D1/D2: the research opening and figures expose hypotheses and claim provenance", async ({ page }, testInfo) => {
   await page.goto(`${state.web_url}/research`);
   const assessment = page.locator("#hypothesis-assessment");
-  await expect(assessment.getByRole("link", { name: /Read the full H[1-4] assessment/ })).toHaveCount(4);
+  await expect(assessment.getByRole("link", { name: /^H[1-4] / })).toHaveCount(4);
   const assessmentPosition = await position(assessment);
   await page.screenshot({ path: testInfo.outputPath("research-opening-after-1440.jpg"), type: "jpeg", quality: 70 });
   await assessment.screenshot({ path: testInfo.outputPath("research-assessment-after-1440.jpg"), type: "jpeg", quality: 70 });

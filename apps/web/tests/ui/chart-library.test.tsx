@@ -532,15 +532,15 @@ describe("Chart library page — the catalog request reflects the URL", () => {
     expect(screen.getByRole("status")).toHaveTextContent("pagination cursor was not recognized");
   });
 
-  it("renders every catalog card with its honest data status, unavailable included", async () => {
+  it("renders compact rows and keeps unavailable charts reachable", async () => {
     installApiMock([(url) => (url.pathname === "/api/charts" ? catalogResponse("MTA") : undefined)]);
     await renderLibrary({});
 
     expect(await screen.findByRole("heading", { name: "Synthetic intents volume (fixture)" })).toBeInTheDocument();
-    expect(screen.getByText("Available")).toBeInTheDocument();
-    expect(screen.getByText("Unavailable — this is not zero")).toBeInTheDocument();
-    expect(screen.getByText(/Reason: Model gate \(fixture\)/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Units: USD/).length).toBe(2);
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open chart: Synthetic model diagnostics/ })).toHaveAccessibleDescription("Unavailable");
+    expect(screen.queryByText(/Reason: Model gate \(fixture\)/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Units: USD/)).not.toBeInTheDocument();
     const next = screen.getByRole("link", { name: "Next page" });
     expect(new URL(next.getAttribute("href") ?? "", "http://localhost").searchParams.get("cursor")).toBe("MTA");
   });
@@ -553,7 +553,7 @@ describe("Chart library page — the catalog request reflects the URL", () => {
           : undefined,
     ]);
     await renderLibrary({ q: "nothing matches" });
-    expect(await screen.findByText("Nothing to show")).toBeInTheDocument();
+    expect(await screen.findByText("No charts found")).toBeInTheDocument();
     expect(screen.getByText(/No registered chart matches this search/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Clear search and filters" })).toHaveAttribute("href", "/charts");
   });
@@ -659,7 +659,6 @@ describe("Chart detail page — validated selection URLs", () => {
 
     // The renderer resolved the pinned view: accessible table and frame.
     expect(await screen.findByRole("region", { name: /exact data table/ })).toBeInTheDocument();
-    expect(screen.getByText(/Definition version v1 \(pinned in the URL\)/)).toBeInTheDocument();
     expect(screen.getByText("Live — latest approved data")).toBeInTheDocument();
     // Session checked for the continuation actions; anonymous buttons render.
     expect(await screen.findByRole("button", { name: "Sign in to save this chart" })).toBeInTheDocument();
@@ -807,14 +806,9 @@ describe("Chart detail page — validated selection URLs", () => {
     await renderDetail({}, "model-diagnostics");
 
     expect(await screen.findByText(/Unavailable — this is not zero/)).toBeInTheDocument();
-    // The gate reason is rendered by both the renderer's unavailable state
-    // and the definitions panel.
     expect(screen.getAllByText(/Model gate \(fixture\)/).length).toBeGreaterThan(0);
     expect(requestsTo(requests, "/api/charts/model-diagnostics/view")).toHaveLength(0);
-    // Definitions stay fully visible for an unavailable chart.
-    expect(screen.getByText("Definition, dataset and quality")).toBeInTheDocument();
-    expect(screen.getByText(/Unavailable — Model gate \(fixture\)/)).toBeInTheDocument();
-    expect(screen.getByText(/No dataset is pinned for this chart right now/)).toBeInTheDocument();
+    expect(screen.queryByText("Definition, dataset and quality")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sign in to save this chart" })).not.toBeInTheDocument();
   });
 
@@ -876,56 +870,16 @@ describe("Chart detail page — validated selection URLs", () => {
     ).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
   });
 
-  it("shows the definitions/quality panel with metric availability in words", async () => {
-    installApiMock(detailRoutes());
+  it("keeps sources reachable without a standalone panel or metric requests", async () => {
+    const requests = installApiMock(detailRoutes());
     await renderDetail({ version: "1", start: VIEW_WINDOW.start, end: VIEW_WINDOW.end });
 
     await screen.findByRole("region", { name: /exact data table/ });
-    const panel = screen.getByRole("region", { name: /Definition, dataset and quality/ });
-    expect(within(panel).getByText("Chart definition")).toBeInTheDocument();
-    expect(within(panel).getAllByText("v1 (immutable)").length).toBeGreaterThan(0);
-    expect(within(panel).getByText(DEFINITION_ID)).toBeInTheDocument();
-    expect(within(panel).getByText(/presets 7, 30, 90 days; at most 366 days per view/)).toBeInTheDocument();
-    // Availability code P rendered in words, never as a bare letter.
-    expect(within(panel).getByText("Provider-reported")).toBeInTheDocument();
-    expect(
-      within(panel).getByText(/Saved provider-reported data; source-qualified and revisable/),
-    ).toBeInTheDocument();
-    expect(within(panel).getByText(/provider_gross_fees_usd_daily_sum \(fixture\)/)).toBeInTheDocument();
-    expect(within(panel).getByText("Synthetic fixture limitation — never published data.")).toBeInTheDocument();
-    // Resolved dataset provenance (the dd mixes span and text children, so
-    // the match runs on the whole textContent — the renderer-test pattern).
-    expect(
-      within(panel).getByText((_, element) => element?.textContent === "synthetic-fixture-dataset v1 (approved)"),
-    ).toBeInTheDocument();
-    expect(within(panel).getByText("5 of 5 expected periods")).toBeInTheDocument();
-    expect(within(panel).getAllByText("2026-11-06T00:00:00Z").length).toBeGreaterThan(0);
-    expect(within(panel).getByText("a".repeat(64))).toBeInTheDocument();
-    // Methodology anchors.
-    expect(within(panel).getByRole("link", { name: "metric definitions" })).toHaveAttribute(
-      "href",
-      "/methodology#definitions",
-    );
-    expect(within(panel).getByRole("link", { name: "collection and cleaning" })).toHaveAttribute(
-      "href",
-      "/methodology#collection",
-    );
-  });
-
-  it("renders a metric that failed to resolve as unavailable, not guessed", async () => {
-    installApiMock([
-      chartRoute("gross-fees", definition),
-      (url) =>
-        url.pathname === `/api/metrics/${METRIC_FEES_ID}`
-          ? apiError("NOT_FOUND", "Resource was not found", false, 404)
-          : undefined,
-      viewRoute("gross-fees", () => jsonResponse(viewFixture(definition, VIEW_WINDOW))),
-      ANONYMOUS_SESSION,
-    ]);
-    await renderDetail({ version: "1", start: VIEW_WINDOW.start, end: VIEW_WINDOW.end });
-    const panel = await screen.findByRole("region", { name: /Definition, dataset and quality/ });
-    expect(within(panel).getByText(/availability is not guessed/)).toBeInTheDocument();
-    expect(within(panel).getByText(METRIC_FEES_ID)).toBeInTheDocument();
+    expect(screen.queryByText("Definition, dataset and quality")).not.toBeInTheDocument();
+    expect(requestsTo(requests, `/api/metrics/${METRIC_FEES_ID}`)).toHaveLength(0);
+    await userEvent.click(screen.getByRole("button", { name: "Sources & definitions" }));
+    const sources = await screen.findByRole("dialog", { name: "Sources and definitions" });
+    expect(within(sources).getByText(DATASET_ID)).toBeVisible();
   });
 
   it("passes axe on the resolved chart page", async () => {
@@ -1297,7 +1251,7 @@ describe("Chart detail compact presentation (NI-076 D3)", () => {
   it("keeps visible metadata short and moves the description into Sources", async () => {
     renderCompactDetail();
     await screen.findByRole("region", { name: /exact data table/ });
-    expect(screen.getByText(/Definition version v1 \(pinned in the URL\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/Definition version v1 \(pinned in the URL\)/)).not.toBeInTheDocument();
     // The long description is not rendered as page prose; it stays available
     // through the Sources & definitions drawer.
     expect(screen.queryByText(definition.description)).not.toBeInTheDocument();

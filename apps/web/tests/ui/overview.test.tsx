@@ -13,10 +13,15 @@ describe("Approved editorial Overview", () => {
     const { container } = render(<HomePage />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Understand NEAR.Build your own thesis.");
     expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
-      "The research, in focus.", "Explore the evidence.", "From a question to your own thesis.",
+      "The research, in focus.", "Explore the evidence.", "How it works",
       "Sources first. Assumptions visible.", "Make the research your own.",
     ]);
     for (const id of ["findings", "evidence", "mechanism", "release-status"]) expect(container.querySelector(`#${id}`)).not.toBeNull();
+    expect(screen.getByRole("link", { name: "How it works" })).toHaveAttribute("href", "#how-it-works");
+    const workflow = screen.getByRole("region", { name: "How it works" });
+    expect(within(workflow).getByRole("link", { name: "Read the hypotheses" })).toHaveAttribute("href", "/research#question");
+    expect(within(workflow).getByRole("link", { name: "Browse charts" })).toHaveAttribute("href", "/charts");
+    expect(within(workflow).getByRole("link", { name: "Start a research document" })).toHaveAttribute("href", "/workspace");
     expect(screen.getByRole("link", { name: "full research" })).toHaveAttribute("href", "/research#mechanism");
     expect(screen.getByRole("link", { name: "Research status" })).toHaveAttribute("href", "/research#econometrics");
   });
