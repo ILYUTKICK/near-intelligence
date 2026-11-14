@@ -2208,7 +2208,15 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0
 - **Dependencies:** NI-066, NI-062, NI-063, NI-079
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex /root, chat 01a1db7f-9b8c-70e3-a57e-004e7f89f5e6
+- **Execution role:** A (deployment coordinator)
+- **Started at:** 2026-11-14T22:32:42+03:00
+- **Branch/worktree:** /Users/ilyutkinn/Desktop/near-deploy, fast-forwarded to origin/main 1d5e550; local developer Compose override preserved and excluded from release.
+- **Authorization:** Owner requested deployment to newly created DigitalOcean VPS 104.248.240.9 and confirmed near-intelligence.me in this chat; update to latest main explicitly authorized. No paid data collection or collector restart.
+- **Dependency verification:** NI-066/062/063/079 are DONE in fresh main. Accepted runtime dd7c3a1 is an ancestor of 1d5e550; merge adds no runtime diff beyond the accepted branch.
+- **Handoff:** /root/ni067_review reviewed VPS/data boundaries and now owns bounded role-B correction to API auth_settings.py plus JWT-only configuration regression tests: production API must verify JWTs without web-only cookie/CSRF secrets. /root owns deployment, source packaging, production smoke and this card.
+- **Progress:** SSH host verified through existing known_hosts; Ubuntu 24.04 x86_64, 3915 MiB RAM, 75 GiB free, Docker absent. Final TLS/auth/data and rollback smoke remain to execute.
 
 **Description:** Publish the authorized product at a real TLS origin with verified identity/data behavior.
 
@@ -2219,6 +2227,8 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 **Acceptance criteria:** Final-origin auth/cookies work; data/source refresh real; private APIs not public-cached; health/logs safe; no synthetic primary metrics; rollback documented.
 
 **Testing requirements:** Staging full workflow/security smoke then production bounded smoke; callback/expiry tests; provider failure leaves editing usable.
+
+- **Production preparation evidence:** main 1d5e550 fast-forwarded; source manifest 8212e33318331eed verified (818 files), 26 VPS tests pass locally and on Ubuntu x86_64. Docker installed; initial research-only restore rehearsed locally and imported to VPS with all 14 table counts and 11 artifact hashes matching; private tables empty. All public pages and real TLS/HTTP308 pass. Owner separately approved exact source/env/data payload transfer, existing Supabase, Site URL/callback and single-A DNS replacement. Bounded first demo test exposed backend requiring gateway-only secrets; fixing inside NI-067 before final acceptance.
 
 ### NI-068 — Verify backups, restore and operational monitoring
 

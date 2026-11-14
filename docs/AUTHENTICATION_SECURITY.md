@@ -90,3 +90,14 @@ Supabase provider with anonymous sign-ins enabled. This local verification does
 not establish a working remote provider. Same-label visitors cannot read each
 other's documents; logout revokes the refresh family while access JWT lifetime
 retains the existing documented semantics.
+
+## Production process boundaries (NI-067)
+
+The Next.js gateway alone receives `AUTH_ALLOWED_REDIRECT_ORIGINS`,
+`AUTH_COOKIE_SIGNING_SECRET` and `CSRF_SIGNING_SECRET`. FastAPI bearer verification
+requires only `SUPABASE_JWT_ISSUER`, `SUPABASE_JWKS_URL`,
+`SUPABASE_JWT_AUDIENCE` and `SUPABASE_JWT_ALGORITHM`; it must start authenticated
+routes without receiving gateway signing secrets. Both provider URLs require HTTPS;
+issuer and audience matching remain exact and only ES256/RS256/EdDSA are accepted.
+The isolated API configuration regression runs without a root `.env` or inherited
+web settings, matching the production Compose credential allowlist.
