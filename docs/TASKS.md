@@ -2486,12 +2486,15 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0, mandatory before remote deployment
 - **Dependencies:** NI-078, NI-064, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063, NI-044, NI-045, NI-055, NI-059, NI-071, NI-072, NI-060, NI-065, NI-080, NI-081, NI-082, NI-083, NI-084, NI-085, NI-086, NI-087, NI-088
 - **Complexity:** L
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
 - **Execution role:** A (coordinator); B owns data/model/API acceptance contributions
 - **Started at:** 2026-11-14T15:32:44+03:00
 - **Release candidate:** feat/ni-079-release-acceptance @ 596c36e (owner landing copy revisions) + 4c493b0 (NI-090 VPS preparation record) on top of main 13e9d0c
 
+- **Owner review (2026-11-14):** the full report (docs/verification/ni-079/README.md, six owner passes) was presented with every applicable gate recorded green, and the owner directed the transition to deployment ("все комитим, проходим все проверки и переходим к деплою") — recorded as the owner acceptance of the local release candidate at `dd7c3a1`.
+- **Final battery on `dd7c3a1` (2026-11-14):** statics all green (lint, typecheck, contracts, 1029 doc links, contrast, client-secrets, uv lock); web suite serial 680/680 (two evidence-chain tests flaked under parallel load and passed in isolation); production build green; **full disposable-cluster suite exit 0 (571 tests ok, 31 modules)** after two NI-096 follow-up test updates (the 8-chart honest catalog and the removed gated-chart probes); **e2e 25 passed + 1 honest skip**; PR #102 CI run 43630065068 recorded on the pushed head.
+- **Completed at:** 2026-11-14T22:10:00+03:00
 **Description:** Verify the integrated P0/P1/P2 release candidate locally after all eight formerly deferred features work; preserve the current design and prioritize actual charts. Earlier DONE cards or a design preview do not establish readiness.
 
 **Implementation steps:** Audit current main/PR integration and every non-deployment P0/P1/P2 criterion; resolve defects via their NI-card or a newly identified bounded task. Run the applicable full local checks from TESTING_STRATEGY and the handoff on one recorded source version. Rehearse production-mode container startup/migrations/export, local backup/restore and rollout rollback. Audit permitted real research inputs, actual refresh evidence and published model reproduction; missing permission/input/result remains an explicit blocker. Record a single final report and present the local product for owner review. Make no remote rollout here.
