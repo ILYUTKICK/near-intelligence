@@ -2779,6 +2779,26 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Completed at:** 2026-11-14T14:57:28+03:00
 
 
+### NI-091 — Unify model artifact limitation wording and fix archive module repo-root derivation
+
+- **Epic:** 13 — Quality and Security
+- **Priority:** P1 (release-affecting for real model publication; NI-079 recorded a workaround)
+- **Dependencies:** NI-052, NI-053, NI-054
+- **Complexity:** S
+- **Status:** TODO
+- **Execution role:** A
+
+**Description:** Discovered by the NI-079 publication gate on real bundles: `research/models/fit.py` attaches `limitations.attachment_policy` wording "…to this manifest…" while `research/models/diagnostics.py` attaches "…to this report…", so the NI-054 `limitations_attached` check can never pass on real artifact pairs; both modules also derive `REPO_ROOT = Path(__file__).parents[2]`, which yields no `apps/api/uv.lock` dependency-lock hash when run from any non-archive checkout.
+
+**Implementation steps:** Attach one identical canonical limitation block in both generators; derive the repo root from an explicit argument or the working checkout with a fail-closed error; update the recorded fixture expectations; re-run fit+diagnostics+publish on the real archive and confirm the gate passes without operator overrides.
+
+**Acceptance criteria:** The publication gate passes a real fit+diagnostics pair produced by the shipped generators with no module overrides; archive code changes are limited to the two generator modules and recorded.
+
+**Testing requirements:** NI-054 gate suite with regenerated real artifacts; NI-079 report updated with the re-run evidence.
+
+**Identified by:** NI-079 acceptance (2026-11-14); evidence in docs/verification/ni-079/README.md Gate D1.
+
+
 ### NI-090 — Prepare the current release for VPS deployment
 
 - **Epic:** 14 — Deployment preparation
