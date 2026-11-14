@@ -10,7 +10,7 @@
 
 | # | Gate | Status | Evidence |
 |---|------|--------|----------|
-| A1 | Offline API suite | running | — |
+| A1 | Offline API suite | **PASS** | `python -m unittest discover -s apps/api/tests` with node@24-first PATH: **exit 0, 849 tests, OK (skipped=312, DB-gated)**. First runs exposed two environment/test issues, both resolved before the recorded run: (1) the Node chart-renderer subprocess tests fail when a non-node@24 binary shadows the PATH prefix (both system node and keg-only node@24 are v24.22.2 here; PATH order is decisive) — toolchain rule recorded; (2) `test_insights.test_07` still expected a 367-day selection to exceed the Selection bound — fixed in `194eb79` to the 730-day NI-083 contract (test-only change; A2–A4 ran on the pre-fix tree whose runtime files are identical). |
 | A2 | Full disposable-cluster DB suite (26 patterns) | **PASS** | `scripts/run-db-tests.py --pg-bin /opt/homebrew/opt/postgresql@18/bin` (thread caps 1): **exit 0, 571 tests ok, 31 module summaries OK, zero failures/skips** |
 | A3 | Web unit suite (serial) | **PASS** | `pnpm --filter web test --maxWorkers=1`: **66 files / 681 tests pass, exit 0** |
 | A4 | Production build | **PASS** | `pnpm --filter web build`: exit 0 (static prerender + dynamic server routes) |
