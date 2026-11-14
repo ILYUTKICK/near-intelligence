@@ -113,15 +113,16 @@ class RegistryIntegrityTests(unittest.TestCase):
         available = {chart.chart_id for chart in CHARTS if chart.data_status == "available"}
         unavailable = {chart.chart_id for chart in CHARTS
                        if chart.data_status == "unavailable"}
-        # The CHART_SYSTEM initial catalog, resolved against real NI-029 inputs:
-        # the seven metric-driven charts are available; the gated revenue
-        # charts and the model-artifact chart are registered honestly
-        # unavailable.
+        # The CHART_SYSTEM catalog, resolved against real NI-029 inputs: the
+        # seven metric-driven charts are available. NI-096 (owner release
+        # decision for the demo): the gated revenue/treasury charts are
+        # REMOVED from the registry entirely — their OQ gates are recorded in
+        # the metric definitions, not advertised as unavailable charts. The
+        # model-artifact chart stays registered honestly unavailable.
         self.assertEqual(available, {"intents-volume", "gross-fees", "observed-conversions",
                                      "treasury-payouts", "quantity-usd-sensitivity",
                                      "supply-context", "fee-volume-association"})
-        self.assertEqual(unavailable, {"model-diagnostics", "protocol-revenue",
-                                       "capture-rate", "fee-funded-buybacks"})
+        self.assertEqual(unavailable, {"model-diagnostics"})
 
     def test_unavailable_metrics_are_never_advertised_as_live(self):
         for chart in CHARTS:
@@ -140,12 +141,13 @@ class RegistryIntegrityTests(unittest.TestCase):
                     self.assertEqual(chart.data_status, "available")
                     self.assertIsNone(chart.unavailable_reason)
                     self.assertEqual(contract["data_status"], "available")
-        # the gated bindings are exactly the three OQ-gated metric definitions;
-        # the model-artifact chart binds nothing and stays unavailable
+        # NI-096: the OQ-gated metrics are no longer bound by ANY chart — the
+        # gated charts were removed from the registry (owner release decision),
+        # so nothing advertises them, not even as unavailable.
         self.assertEqual({binding.metric_id for chart in CHARTS for binding in chart.series
                           if chart_registry.resolve_binding(METRICS, binding)
                           .definition["availability"] == "G"},
-                         GATED_METRIC_IDS)
+                         set())
         self.assertIn("model run", chart_by_chart_id("model-diagnostics").unavailable_reason)
 
     def test_filters_are_closed_string_enums_from_approved_mappings(self):
@@ -224,7 +226,7 @@ class RegistryRejectionTests(unittest.TestCase):
 
     def test_unavailable_chart_without_reason_is_rejected(self):
         with self.assertRaisesRegex(ChartRegistryError, "carries a reason"):
-            validate_single(doctored("protocol-revenue", unavailable_reason=None))
+            validate_single(doctored("model-diagnostics", unavailable_reason=None))
 
     def test_available_chart_marked_unavailable_is_rejected(self):
         with self.assertRaisesRegex(ChartRegistryError, "all of its bound metrics"):
@@ -547,18 +549,19 @@ class ChartRegistryDatabaseTests(unittest.TestCase):
     def test_04_registries_are_readable_but_append_only(self):
         with self.operator.begin() as connection:
             register_charts(connection)
-        # two runtime users read the public scientific definitions, including
-        # the honestly unavailable ones
+        # two runtime users read the public scientific definitions; NI-096
+        # removed the gated charts, so the model-artifact chart carries the
+        # recorded unavailable state instead
         for subject in (uuid4(), uuid4()):
             with user_transaction(self.runtime, subject) as connection:
                 count = connection.scalar(text("SELECT count(*) FROM app.chart_definitions"))
                 gated = connection.execute(text("""
                     SELECT data_status, unavailable_reason FROM app.chart_definitions
-                    WHERE chart_id = 'protocol-revenue'
+                    WHERE chart_id = 'model-diagnostics'
                 """)).one()
             self.assertEqual(count, len(CHARTS))
             self.assertEqual(gated.data_status, "unavailable")
-            self.assertIn("OQ-01", gated.unavailable_reason)
+            self.assertIn("model run", gated.unavailable_reason)
         runtime_forbidden = (
             "INSERT INTO app.chart_definitions(id, chart_id, version, title, description,"
             " category, visualization_type, data_status, update_frequency,"

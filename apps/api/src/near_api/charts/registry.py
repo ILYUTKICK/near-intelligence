@@ -191,18 +191,25 @@ class ChartDefinition:
                 for s in self.series]
 
 
-def _filter_enum(name: str, options: tuple[str, ...]) -> dict:
+def _filter_enum(name: str, options: tuple[str, ...],
+                 applies_to: tuple[str, ...] | None = None) -> dict:
     """The closed NI-031 single-value filter schema for one dimension.
 
     Built from the NI-071 filter registry declaration so the mapping cannot
-    drift; the produced property shape stays exactly ``{"type", "enum"}``.
+    drift. ``applies_to`` (NI-094) optionally scopes the dimension to specific
+    series roles: a series whose role is not listed is never filtered by it —
+    the filter exists to disambiguate that dimension's variants, not to blank
+    sibling series that do not carry it.
     """
     dimension = FILTER_DIMENSIONS[name]
     if tuple(dimension.options) != tuple(options):
         raise ChartRegistryError(
             f"filter dimension {name!r} options disagree with the filter registry")
+    bound: dict = {"type": "string", "enum": list(options)}
+    if applies_to is not None:
+        bound["applies_to"] = list(applies_to)
     return {"type": "object",
-            "properties": {name: {"type": "string", "enum": list(options)}},
+            "properties": {name: bound},
             "additionalProperties": False}
 
 
@@ -237,10 +244,6 @@ def _series(*bindings: "tuple[str, str] | tuple[str, str, int]") -> tuple[ChartS
                              metric_version=binding[2] if len(binding) > 2 else 1)
                  for binding in bindings)
 
-
-GatedRevenueReason = ("protocol_revenue_usd is gated (OQ-01): no verified economically "
-                      "attributable revenue/allocation ledger exists; gross fees and "
-                      "treasury payouts are not substitutes.")
 
 CHARTS: tuple[ChartDefinition, ...] = (
     _chart(
@@ -388,61 +391,20 @@ CHARTS: tuple[ChartDefinition, ...] = (
                                 "chart binds no metric series, so it stays unavailable "
                                 "until a reviewed artifact is published."},
     ),
-    _chart(
-        "protocol-revenue", version=1,
-        title="Economically attributable protocol revenue (gated)",
-        description="Explicitly unavailable chart: attributable protocol revenue stays "
-                    "gated until a reconciled fee/allocation ledger exists. Gross fees, "
-                    "volume and treasury payouts are not substitutes.",
-        category="fees", visualization_type="bar", update_frequency="daily",
-        series=_series(("protocol_revenue_usd", "required_primary")),
-        data_status="unavailable", unavailable_reason=GatedRevenueReason,
-        unit_schema={"required_primary": "USD"},
-        source_lineage={"sources": [],
-                        "note": "Bound to the gated protocol_revenue_usd definition "
-                                "(OQ-01); every observation is null with that reason "
-                                "until the gate passes."},
-    ),
-    _chart(
-        "capture-rate", version=1,
-        title="Protocol capture rate (gated)",
-        description="Explicitly unavailable chart: the capture rate needs an "
-                    "attributable revenue numerator and a compatible gross-fee "
-                    "denominator; both reconciliations are open questions.",
-        category="fees", visualization_type="line", update_frequency="daily",
-        series=_series(("protocol_capture_rate", "required_primary")),
-        data_status="unavailable",
-        unavailable_reason="protocol_capture_rate is gated (OQ-01/OQ-11): the revenue "
-                           "numerator and the compatible fee denominator are "
-                           "unresolved, so every observation is null with a reason.",
-        unit_schema={"required_primary": "percent"},
-        source_lineage={"sources": [],
-                        "note": "Bound to the gated protocol_capture_rate definition; no "
-                                "hard daily 0-100 clip hides the mismatch."},
-    ),
-    _chart(
-        "fee-funded-buybacks", version=1,
-        title="Fee-funded buybacks (gated)",
-        description="Explicitly unavailable chart: executed conversions attributable to "
-                    "earned fees cannot be identified because pooled funds are not "
-                    "physically tagged.",
-        category="treasury", visualization_type="bar", update_frequency="snapshot",
-        series=_series(("fee_funded_buybacks_near", "required_primary")),
-        data_status="unavailable",
-        unavailable_reason="fee_funded_buybacks_near is gated (OQ-08): no documented "
-                           "mixed-pool accounting attribution exists for the full "
-                           "window, so every observation is null with a reason.",
-        unit_schema={"required_primary": "NEAR"},
-        source_lineage={"sources": [],
-                        "note": "The narrow 27 Oct-2 Nov strict inventory equivalent is "
-                                "a NI-051 research artifact, not this metric."},
-    ),
 )
 
 # NI-083: append immutable long-history versions; v1 remains byte-for-byte.
 CHARTS += tuple(replace(chart, version=2,
     allowed_ranges={"presets_days": [30, 90, 365, 730], "max_days": MAX_HISTORY_RANGE_DAYS})
     for chart in CHARTS if chart.chart_id in {"intents-volume", "gross-fees"})
+
+# NI-094: the price_basis filter applies to the USD series only (the purchases
+# series carries no price dimension and must not be blanked by it); v1 remains
+# byte-for-byte.
+CHARTS += tuple(replace(chart, version=2,
+    filter_schema=_filter_enum("price_basis", FILTER_PRICE_BASES,
+                               applies_to=("required_secondary",)))
+    for chart in CHARTS if chart.chart_id == "quantity-usd-sensitivity")
 
 _CHARTS_BY_CHART_ID: dict[str, ChartDefinition] = {}
 for _chart_item in CHARTS:
@@ -506,14 +468,21 @@ def _validate_filter_schema(chart: ChartDefinition) -> None:
             or len(properties) > MAX_FILTER_PROPERTIES,
             f"{chart.chart_id}: at most {MAX_FILTER_PROPERTIES} filter properties")
     for name, bound in properties.items():
+        extra_keys = set(bound) - {"type", "enum"} if isinstance(bound, dict) else set()
         _reject(not isinstance(name, str) or not name or not isinstance(bound, dict)
-                or set(bound) not in ({"type", "enum"},
-                                      {"type", "enum", "multi_value"},
-                                      {"type", "enum", "multi_value",
-                                       "reconciliation"})
+                or not {"type", "enum"} <= set(bound)
+                or extra_keys - {"multi_value", "reconciliation", "applies_to"}
+                or ("reconciliation" in extra_keys) > ("multi_value" in extra_keys)
                 or bound["type"] != "string",
                 f"{chart.chart_id}: filter {name!r} must be a string enum (with the "
-                "optional NI-071 multi_value/reconciliation markers)")
+                "optional NI-071 multi_value/reconciliation and NI-094 applies_to "
+                "markers)")
+        applies_to = bound.get("applies_to")
+        _reject(applies_to is not None
+                and (not isinstance(applies_to, list) or not applies_to
+                     or any(role not in SERIES_ROLES for role in applies_to)),
+                f"{chart.chart_id}: filter {name!r} applies_to must list known "
+                "series roles")
         options = bound["enum"]
         _reject(not isinstance(options, list) or not options
                 or len(options) > MAX_FILTER_OPTIONS

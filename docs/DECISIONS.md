@@ -158,3 +158,33 @@ Financial metrics remain source-qualified in the article/data views; research
 and model gates are unchanged. Overview is independent of data API availability.
 Legacy homepage anchors retain meaningful section/link destinations. No fake
 KPIs, live claims, new collectors, dependencies or Git publication are introduced.
+
+
+## ADR-025 — Existing VPS uses an isolated single-host deployment (2026-11-14)
+
+**Context:** the owner requested preparing the current site for an existing VPS
+and supplied near-intelligence.me. The local/judge Compose intentionally lacks
+production lifecycle controls and passes an entire local env file to services.
+The host and production auth account are not yet configured or accessed.
+
+**Decision:** NI-090 adds a separate explicitly selected Compose with Caddy
+HTTPS → Next.js gateway → private API/PostgreSQL18, reusing the frozen app
+Dockerfiles and PostgreSQL digest. Use explicit per-service env allowlists,
+manual migrations, durable volumes, bounded logs/restart and host-timed bounded
+export batches. No ingestion/model/refresh scheduler is enabled. Caddy is the
+Apache-2.0 official image pinned by verified tag/digest; it replaces a separate
+proxy/certificate daemon. No new application dependency is needed.
+
+A dedicated Postgres container is the self-contained existing-VPS default;
+managed Postgres remains an alternative requiring a separately reviewed TLS/role
+connection configuration. This trades managed operations for operator-owned
+backup, disk monitoring and restore. Local backup quiesces API/web and serializes
+operator workers; export ZIP bytes are included in the DB. Offsite encryption,
+retention/alerts and final-origin checks remain NI-068/067 requirements.
+
+**Consequences:** package the actual source tree including audited local edits
+with a per-file digest manifest; exclude credentials/raw research/private state.
+Use a unique timestamp-source digest image tag. Recovery is rehearsed into fresh
+isolated volumes, never an automatic in-place restore or migration downgrade.
+This is preparation, not permission to bypass NI-079 or publish unavailable
+data/models. No server/DNS/auth account/collector is mutated by this decision.

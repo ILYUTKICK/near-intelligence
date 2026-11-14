@@ -484,10 +484,10 @@ const datasetVersionReference =
 export const claimRegistry: readonly ThesisClaim[] = [
   {
     id: "CL-001",
-    title: "Observed conversion cohort",
+    title: "Purchases throughout the study",
     assessment: "Observed — cohort-scoped",
     observation:
-      "Successful conversions of other assets into wrap.near occurred in every day of the 90-day cohort, and the acquired quantities are exact sums over deduplicated on-chain events within the observed cohort.",
+      "The selected accounts converted other assets into wrap.near every day of the study. The totals sum successful on-chain events after removing duplicates.",
     definitionVersions: [
       "conversion_count v1 (availability A)",
       "observed_near_purchases v1 (availability A)",
@@ -523,14 +523,14 @@ export const claimRegistry: readonly ThesisClaim[] = [
       { label: "Provider register: SRC-BQ saved exports", href: "/methodology#sources" },
     ],
     caution:
-      "The cohort covers treasury-linked collector accounts only — it is not whole-market demand and cannot estimate protocol revenue.",
+      "Only accounts linked to the selected treasury wallets are included. This sample cannot measure market-wide demand or protocol revenue.",
   },
   {
     id: "CL-002",
-    title: "Declining NEAR quantities across windows",
+    title: "Fewer NEAR in each window",
     assessment: "Observed — contrary to an accelerating-demand narrative",
     observation:
-      "Acquired quantities in successive 30-day windows declined, so the observed channel is recurrent but not accelerating in token units. Values are rounded for display; exact values live in the recorded summaries.",
+      "The accounts bought fewer NEAR in each successive window. The conversion route continued operating, but its token volume declined.",
     definitionVersions: ["observed_near_purchases v1 (availability A)"],
     datasetVersionReference,
     quantities: [
@@ -570,14 +570,14 @@ export const claimRegistry: readonly ThesisClaim[] = [
       { label: "Provider register: SRC-BQ saved exports", href: "/methodology#sources" },
     ],
     caution:
-      "Rounded for display; the decline is in NEAR units and must not be read as an equally sized fall in economic demand — see CL-004.",
+      "Window totals are rounded. In the last two windows, dollar estimates changed much less than token quantities.",
   },
   {
     id: "CL-003",
-    title: "Matched treasury payouts",
+    title: "Daily treasury payouts",
     assessment: "Observed — matched flows, not provenance",
     observation:
-      "Matched native payouts from the Intents contract to the three selected wallets arrived every day of the cohort; internal treasury transfers are excluded from this flow.",
+      "Native NEAR payouts from the Intents contract reached the three selected wallets every day. Transfers between those wallets are excluded.",
     definitionVersions: [
       "treasury_payouts_near v1 (availability A)",
       "treasury_payout_count v1 (availability A)",
@@ -612,14 +612,14 @@ export const claimRegistry: readonly ThesisClaim[] = [
       { label: "Provider register: SRC-BQ saved exports", href: "/methodology#sources" },
     ],
     caution:
-      "Matching used amount and recipient with a unique candidate within a recorded 300-second tolerance — this is not a full parent-graph proof. CL-001 and CL-003 are different flows and must not be added as independent token demand.",
+      "Payouts were matched by amount, recipient and a unique candidate within 300 seconds, rather than a full receipt graph. Do not add them to purchases as separate demand.",
   },
   {
     id: "CL-004",
-    title: "USD valuation and the price effect",
+    title: "A steadier dollar value",
     assessment: "Estimate — valuation, not execution",
     observation:
-      "Approximate USD acquisitions stayed near one level across the last two windows while NEAR quantities fell sharply, because the quantity-weighted price rose. The decomposition is arithmetic, not causation.",
+      "The estimated dollar value changed little between the last two windows. Higher price marks explain the arithmetic difference from falling NEAR quantities.",
     definitionVersions: [
       "estimated_purchase_usd v1 (availability B — valuation estimate)",
       "near_price_usd v1 (availability P)",
@@ -767,14 +767,14 @@ export const claimRegistry: readonly ThesisClaim[] = [
       { label: "CoinGecko historical range documentation", href: "https://docs.coingecko.com/reference/coins-id-market-chart-range" },
     ],
     caution:
-      "USD values are approximations at daily price marks, never execution prices; missing prices make USD values missing, never zero. Purchases and payouts are not added together.",
+      "Daily price marks approximate value; they are not trade prices. Missing prices remain missing, and purchases are not added to payouts.",
   },
   {
     id: "CL-005",
-    title: "Fee provenance cohort",
+    title: "Which fees reached purchases",
     assessment: "Partial — narrow cohort",
     observation:
-      "A share of declared fees in the creation cohort is matched end to end — API record, on-chain transfer and unique internal credit — establishing observable fee funding of purchases on those dates. The remainder is not labeled unpaid or erroneous.",
+      "Some declared fees can be matched from the API record through an on-chain transfer to a unique internal credit. This establishes fee funding for part of the purchases on those dates; unmatched records remain unresolved.",
     definitionVersions: [],
     datasetVersionReference,
     quantities: [
@@ -805,14 +805,14 @@ export const claimRegistry: readonly ThesisClaim[] = [
       { label: "1Click API fee configuration (declared appFees)", href: "https://docs.near-intents.org/integration/distribution-channels/1click-api/fee-config" },
     ],
     caution:
-      "The cohort is defined by request-creation date, not execution date, and appFees do not cover every funding channel; matched shares of this cohort must not be extrapolated to all Intents fees, weekly purchases or the 90-day flow.",
+      "This sample follows request-creation dates, not execution dates. It covers only declared appFees and cannot be extended to all fees, weekly purchases or the full study.",
   },
   {
     id: "CL-006",
-    title: "Strict inventory attribution minimum",
+    title: "A minimum fee-funded amount",
     assessment: "Bound — model minimum",
     observation:
-      "Under the strict short-window inventory model, a minimum amount of confirmed fee assets must have been sold into NEAR conversions, and a modeled minimum NEAR-equivalent of those sales cannot have remained in the collector's closing stock. This is an accounting minimum within the stated model, not physical token tracing.",
+      "The inventory model finds a minimum amount of confirmed fees that must have been used in NEAR conversions. After subtracting closing stock, a minimum NEAR-equivalent must also have reached payouts under the model's rules.",
     definitionVersions: [
       "strict_fee_conversion_equivalent_near v1 (availability B — bound/model)",
     ],
@@ -857,14 +857,14 @@ export const claimRegistry: readonly ThesisClaim[] = [
       { label: "1Click API fee configuration (declared appFees)", href: "https://docs.near-intents.org/integration/distribution-channels/1click-api/fee-config" },
     ],
     caution:
-      "Not physical token tracing and not extrapolatable to 90 days; even this route attribution is a conservative accounting model, not an exact causal estimate of market impact.",
+      "These are accounting lower bounds for a short window. They do not trace individual tokens, extend to the full study or estimate market impact.",
   },
   {
     id: "CL-007",
-    title: "Supply growth scale comparison",
+    title: "Purchases and supply growth",
     assessment: "Observed — scale comparison",
     observation:
-      "Total supply grew over the same 90 days, and the observed purchases are a small fraction of that growth. This is a scale comparison: it is not deflation, not a capture rate, and purchases are never subtracted from total supply.",
+      "Total supply grew by much more than the observed purchases over the same period. The comparison shows their relative scale, rather than a capture rate or deflation.",
     definitionVersions: [
       "net_supply_change_near v1 (availability A)",
       "purchases_to_net_supply_pct v1 (availability A)",
@@ -901,14 +901,14 @@ export const claimRegistry: readonly ThesisClaim[] = [
       { label: "NEAR RPC block interface documentation", href: "https://docs.near.org/api/rpc/block-chunk" },
     ],
     caution:
-      "Purchases are not subtracted from total supply. Emission does not equal market selling pressure; recipients may hold or stake their rewards.",
+      "Purchases leave total supply unchanged. Newly issued tokens may be held or staked, so issuance alone does not measure selling pressure.",
   },
   {
     id: "CL-008",
-    title: "Issuance and burn lower bounds",
+    title: "What the incomplete audit establishes",
     assessment: "Bounds — incomplete audit",
     observation:
-      "Gross issuance and burns are known only as conservative lower bounds because the archival mint-header audit stopped incomplete; the unverified remainder is never assumed zero.",
+      "The unfinished mint-header audit establishes minimum totals for issuance and burns. Unchecked blocks may contain more of both.",
     definitionVersions: [
       "issuance_lower_bound_near v1 (availability B — lower bound)",
       "burns_lower_bound_near v1 (availability B — lower bound)",
@@ -956,14 +956,14 @@ export const claimRegistry: readonly ThesisClaim[] = [
       { label: "NEAR RPC block interface documentation", href: "https://docs.near.org/api/rpc/block-chunk" },
     ],
     caution:
-      "These are not exact gross totals. Purchases, fees, protocol revenue, treasury payouts, burns and issuance are different metrics and are never relabeled as one another.",
+      "These are not exact gross totals. The table labels each lower or upper bound explicitly.",
   },
   {
     id: "CL-009",
-    title: "Treasury retention is reversible",
+    title: "Treasury balances can be spent",
     assessment: "Scoped absence — retention, not removal",
     observation:
-      "A role-index audit of the selected treasury wallets found no outgoing receipt-actions in the available index for the audited 30 days, and the observed funds sat on native balances under multisig/DAO control. Governance-controlled retention does not establish permanent supply removal.",
+      "The available index shows no outgoing receipt-actions from the selected wallets during the audited month. The funds were held as native balances under multisig or DAO control, where governance could decide to use them later.",
     definitionVersions: ["treasury_balance_near v1 (availability A — saved point)"],
     datasetVersionReference,
     quantities: [
@@ -980,7 +980,7 @@ export const claimRegistry: readonly ThesisClaim[] = [
       { label: "Provider register: SRC-FASTNEAR indexed history", href: "/methodology#sources" },
     ],
     caution:
-      "An index-scoped absence is not universal proof of no selling or locking, and account-level locked values do not exclude external delegation. The audit window is 2026-10-05 through 2026-11-03 (UTC).",
+      "The index cannot rule out every sale, lock or external delegation. Holding these balances does not establish permanent supply removal. The audit covers 2026-10-05 through 2026-11-03 (UTC).",
   },
 ];
 

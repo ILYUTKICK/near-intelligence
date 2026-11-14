@@ -462,7 +462,7 @@ class ComputeQualityTests(unittest.TestCase):
 
         records = formula_estimated_purchase_usd_v1(self.inputs, shape="daily")
         start_basis = [record for record in records
-                       if record["dimensions"]["price_basis"] == "start"]
+                       if record["dimensions"]["price_basis"] == "start_of_day"]
         by_day = {record["period_start"][:10]: record for record in start_basis}
         gap = by_day[(WINDOW_START + dt.timedelta(days=1)).isoformat()]
         self.assertIsNone(gap["value"])
@@ -731,7 +731,7 @@ class SyntheticEmissionTests(unittest.TestCase):
         # here the window estimate is unavailable; the two covered daily values are exact
         usd = self.values(flows, "estimated_purchase_usd")
         exacts = sorted(Decimal(r["quality"].get("exact_value", r["value"])) for r in usd
-                        if r["dimensions"]["price_basis"] == "start" and r["value"] is not None)
+                        if r["dimensions"]["price_basis"] == "start_of_day" and r["value"] is not None)
         self.assertEqual(len(exacts), 2)
         # day 3 purchases are a proven zero, so its USD estimate is exactly zero
         self.assertEqual(exacts[0], 0)

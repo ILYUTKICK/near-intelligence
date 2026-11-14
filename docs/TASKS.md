@@ -2486,9 +2486,15 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0, mandatory before remote deployment
 - **Dependencies:** NI-078, NI-064, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063, NI-044, NI-045, NI-055, NI-059, NI-071, NI-072, NI-060, NI-065, NI-080, NI-081, NI-082, NI-083, NI-084, NI-085, NI-086, NI-087, NI-088
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** DONE
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
 - **Execution role:** A (coordinator); B owns data/model/API acceptance contributions
+- **Started at:** 2026-11-14T15:32:44+03:00
+- **Release candidate:** feat/ni-079-release-acceptance @ 596c36e (owner landing copy revisions) + 4c493b0 (NI-090 VPS preparation record) on top of main 13e9d0c
 
+- **Owner review (2026-11-14):** the full report (docs/verification/ni-079/README.md, six owner passes) was presented with every applicable gate recorded green, and the owner directed the transition to deployment ("все комитим, проходим все проверки и переходим к деплою") — recorded as the owner acceptance of the local release candidate at `dd7c3a1`.
+- **Final battery on `dd7c3a1` (2026-11-14):** statics all green (lint, typecheck, contracts, 1029 doc links, contrast, client-secrets, uv lock); web suite serial 680/680 (two evidence-chain tests flaked under parallel load and passed in isolation); production build green; **full disposable-cluster suite exit 0 (571 tests ok, 31 modules)** after two NI-096 follow-up test updates (the 8-chart honest catalog and the removed gated-chart probes); **e2e 25 passed + 1 honest skip**; PR #102 CI run 43630065068 recorded on the pushed head.
+- **Completed at:** 2026-11-14T22:10:00+03:00
 **Description:** Verify the integrated P0/P1/P2 release candidate locally after all eight formerly deferred features work; preserve the current design and prioritize actual charts. Earlier DONE cards or a design preview do not establish readiness.
 
 **Implementation steps:** Audit current main/PR integration and every non-deployment P0/P1/P2 criterion; resolve defects via their NI-card or a newly identified bounded task. Run the applicable full local checks from TESTING_STRATEGY and the handoff on one recorded source version. Rehearse production-mode container startup/migrations/export, local backup/restore and rollout rollback. Audit permitted real research inputs, actual refresh evidence and published model reproduction; missing permission/input/result remains an explicit blocker. Record a single final report and present the local product for owner review. Make no remote rollout here.
@@ -2746,3 +2752,210 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 - **Result:** Overview explains the thesis-to-evidence workflow through three linked steps. Shared chart detail renders the existing Sources & definitions drawer and exact data table without standalone metadata output or per-metric server requests.
 - **Local verification:** Desktop Chrome passed keyboard navigation from Overview to the chart library, chart opening and the sources drawer. The data-explorer detail uses the same compact layout. ESLint, TypeScript, documentation links and contrast checks passed.
+
+
+### NI-089 — Recover the current local design and retain the article edits
+
+- **Epic:** 02 — Product presentation / local runtime
+- **Priority:** P0, explicit owner correction
+- **Dependencies:** NI-085, NI-086, NI-087
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat 01a1d9c5-0e1c-7f01-b320-d9557ecfc5f3
+- **Execution role:** A
+- **Started at:** 2026-11-14T14:46:05+03:00
+- **Branch/worktree:** existing detached checkout near-deploy @ 13e9d0c; preserve local docker-compose.override.yml. Earlier chat edits in Desktop/Near and near-intelligence-review are an obsolete source, not the current design.
+- **Authorization:** Owner reports that Blog and the approved Overview disappeared after this chat's changes; restore the intended current site and retain only appropriate article edits from the prior request. Local preview recovery only.
+- **Dependency verification:** NI-085/086/087 are DONE in this registry and their current Blog, approved Overview and article structures exist. NI-088 is still claimed elsewhere and is not taken over; its existing code is preserved.
+- **Handoff:** /root/current_design_review performs independent read-only design/copy review; /root handles the bounded patch, local web-only runtime update and final QA.
+
+**Acceptance criteria:** The user can open the actual current site with Blog navigation and the approved Overview, preserved article sidebar/hypothesis links/interactive charts/history/duplication. Do not replace current page/layout/navigation with obsolete versions. Transfer only equivalent source-qualified article wording and remove repeated visible system metadata without changing quantities or research limitations. Confirm and repair any missing public illustration in the local web image. Preserve API/database/auth configuration and existing data; no external deployment or data collection.
+
+**Expected files:** Article narrative/ClaimCard only as needed, Dockerfile.web for public assets, local recovery note and execution registry. No Overview source, navigation or backend edits.
+
+**Checks:** Independent design/quantity diff; focused existing public/blog/article tests and build where available; image asset delivery; actual current desktop Overview→Blog→article and preserved source/interactive evidence. No unsupported release/model claims.
+
+- **Result:** Located the intended Blog/Overview implementation in near-deploy @13e9d0c on localhost:13002; this chat had mistakenly used the obsolete owner-review stack on13000. Preserved the current Overview/page/navigation/global-style sources and entire thesis object. Transferred only title/observation/caution for the nine same-ID claims, retaining current dataset references and every quantitative record. Moved ClaimCard IDs/status inside its existing native disclosure and styled the compact source control with existing tokens, a decorative chevron, distinct accessible names and focusable exact-data region. Fixed the missing Overview illustration by copying apps/web/public into the runtime image. Added docs/LOCAL_PREVIEW_RECOVERY.md and a warning in the obsolete checkout's PLAN so later work uses the right source. No commit/push/external deployment or API/DB/data changes.
+- **Verification:** Exact staged current-source QA copy with the current lock (byte-identical to existing local dependency checkout) passed five focused UI suites, 50/50 tests: thesis, recorded figures, Blog, Overview and public routes; no package installation or environment files were needed. Direct ESLint on the three affected TS/TSX/test files passes. Independent before/after transpilation/deep comparison confirms entire thesis/methodology/release objects and every claim field except the 27 narrative fields unchanged, including all41 exact quantity records, current dataset-version references, definitions, assessments, scopes, sources and bounds. Docker Compose web-only production build passes compilation/TypeScript/static generation; runtime image includes public assets. Recreated only near-deploy-web-1 with --no-deps --no-build; API and database containers were not recreated. Current checkout doc-link check before completion:1003 links resolve; whitespace check passes. The initial pnpm wrapper refused a symlinked dependency directory without modifying it; the same installed Vitest binary was then used directly from the exact staged QA copy. Existing jsdom canvas-not-implemented notices appear in the suite; all assertions pass.
+- **Desktop/browser verification:** Actual localhost:13002 Overview shows the approved Blog navigation, typography/layout, desk/leaf/pen artwork (image complete:true, naturalWidth560) and correct actions. Overview→Blog catalog→full research works. The article retains its sticky contents/sidebar, title/emphasis, hypotheses, recorded comparison and all original anchors. Switched NEAR→USD and observed recorded $437,374/$557,914/$547,026 with the recorded1.95% decrease; CL-004 source control opens the full exact-value/valuation/source table and current dataset-reference text. Overview and article have scrollWidth1280 = viewport1280. Saved screenshots in the obsolete authoring checkout only as local evidence: output/ni-089/overview-restored.jpg and article-sources.jpg; final tab left open on the correct Overview.
+- **Known existing limitation:** The article's longer API-backed history reports unavailable for the selection; this recovery preserves its code and honest failure state and does not claim restored data delivery. No provider request, collector restart, archive import, auth test or model fit was performed. This does not close NI-079 or other data/model/release gates.
+- **Reviewer:** Codex /root/current_design_review, independent read-only review of the concrete staged patch: approved. Confirmed no obsolete page/layout/navigation transplant, entire newer thesis/methodology intact, all41 quantities/current provenance intact, stable heading IDs and accessible source suffix preserved, and the public COPY fixes the confirmed missing-asset boundary. Requested and received the CL-002 "last two windows" qualification. Root then verified the local production container/browser. NI-088 claim remains untouched.
+- **Completed at:** 2026-11-14T14:57:28+03:00
+
+
+### NI-091 — Unify model artifact limitation wording and fix archive module repo-root derivation
+
+- **Epic:** 13 — Quality and Security
+- **Priority:** P1 (release-affecting for real model publication; NI-079 recorded a workaround)
+- **Dependencies:** NI-052, NI-053, NI-054
+- **Complexity:** S
+- **Status:** TODO
+- **Execution role:** A
+
+**Description:** Discovered by the NI-079 publication gate on real bundles: `research/models/fit.py` attaches `limitations.attachment_policy` wording "…to this manifest…" while `research/models/diagnostics.py` attaches "…to this report…", so the NI-054 `limitations_attached` check can never pass on real artifact pairs; both modules also derive `REPO_ROOT = Path(__file__).parents[2]`, which yields no `apps/api/uv.lock` dependency-lock hash when run from any non-archive checkout.
+
+**Implementation steps:** Attach one identical canonical limitation block in both generators; derive the repo root from an explicit argument or the working checkout with a fail-closed error; update the recorded fixture expectations; re-run fit+diagnostics+publish on the real archive and confirm the gate passes without operator overrides.
+
+**Acceptance criteria:** The publication gate passes a real fit+diagnostics pair produced by the shipped generators with no module overrides; archive code changes are limited to the two generator modules and recorded.
+
+**Testing requirements:** NI-054 gate suite with regenerated real artifacts; NI-079 report updated with the re-run evidence.
+
+**Identified by:** NI-079 acceptance (2026-11-14); evidence in docs/verification/ni-079/README.md Gate D1.
+
+### NI-093 — Category pages render every available chart inline with its own save continuation
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P1 (owner product decision 2026-11-14: "в каждой вкладке графики должны отображаться сразу на экране… рядом с каждым графиком кнопка Save chart")
+- **Dependencies:** NI-015, NI-033, NI-034, NI-092
+- **Complexity:** S
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T17:00:00+03:00
+- **Execution role:** A
+
+**Description:** Category pages rendered inline figures only for hand-picked featured charts and left the rest as headings. The owner decided every AVAILABLE chart in a category renders its implicit default view immediately, each with its own Save chart continuation, and the full detail page stays one click away. Unavailable (gated) charts keep their honest reason cards.
+
+**Implementation steps:** category-screen renders `fetchLatestDefaultView` for every available item (NI-092 defaults), each figure carries Inspect-range plus ChartAuthActions (signed-in Save chart / anonymous sign-in continuation) built from the resolved default view's pinned dataset and selection; failed default fetches fall back to an honest card with an "Open chart" link; gated charts stay listed with their recorded reason.
+
+**Acceptance criteria:** All three analytical categories render their available charts inline with save actions; gated charts stay honestly listed; the workspace variant behaves identically under /workspace/data.
+
+**Testing requirements:** data-explorer category tests updated and green; full web suite serial green; lint/typecheck clean; live verification on the deploy stack.
+
+### NI-097 — Models catalog and published-result page: readable presentation per the approved mockups
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P0 (direct owner instruction 2026-11-14 with approved mockups; supersedes the earlier rejected NI-097 registration attempt — this card is the fresh registration)
+- **Dependencies:** NI-054, NI-051, NI-052, NI-053, NI-079
+- **Complexity:** L
+- **Status:** DONE
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T20:00:00+03:00
+- **Execution role:** A
+
+**Description:** /models and /models/{runId} read like a technical report: raw ids, verbatim JSON and repeated warnings crowd out the result. Per the approved mockups, the catalog presents one wide readable card per published run (presentation-mapped title/question/limit for the known specification, identity-preserving fallback for unknown ones; input window, fitted nobs, method; one View results action) and the result page answers, in order: what the model compares, what it found, what the numbers mean, which conclusions are allowed, where the diagnostics/method/reproduction live — via four keyboard-accessible tabs (Result / Diagnostics / Specification / Reproduction) with a rounded slope+CI summary plot built from the recorded values, the exact coefficients and all recorded limitations in disclosures, and the existing manifest download + Add to research + anonymous behavior preserved.
+
+**Integrity:** all values come from the read-only model APIs (no hardcoded numbers); the curated presentation is gated on the recorded slope sign (a negative or different result renders the neutral/negative variant — the positive finding is never spread); provider gross fees ≠ protocol revenue; association ≠ causality; the recorded approval renders as recorded; no fit/collectors/refresh/RPC/cloud SQL; no new dependencies.
+
+**Implementation steps:** presentation.ts (known-spec map + fallback + formatting); ModelRunList/catalog-screen rewrite; detail-screen header + ModelRunTabs client component with the four panels; inline SVG estimate+CI plot; recorded technical blocks in disclosures; UI-specification note about the presentation change; test updates preserving integrity checks.
+
+**Acceptance criteria:** catalog and detail match the approved composition; all four tabs keyboard-accessible; numbers match the published API (spot-check estimate 0.8542493147420771, CI [0.5719403297667323, 1.136558299717422]); exact values and all recorded limitations reachable; manifest download and Add to research work; empty/error/not-found honest; web suites green; live on localhost:13002 with the production container rebuilt (no DB/volume reset).
+- **Implementation (2026-11-14):** presentation.ts (the approved gross_fee_activity_v1 mapping — category/title/question/headline/scope-limit/sign-aware finding/variables/supports-unanswered — plus the identity-preserving fallback and the display formatters); ModelRunList rewritten to the wide readable card (input window, fitted nobs, method from the presentation map — no uuid/commit/tolerances/operator-session in the card); catalog-screen header + "Inside each model"; detail-screen editorial header (← All models, category+status, the question as the headline, tech line, fitted-stat strip, the two compared-variable cards, "The important limit"); ModelRunTabs (client, WAI-ARIA tabs with roving Arrow/Home/End focus) hosting Result (sign-aware finding + rounded slope 0.8542 with the SVG dot-and-line 95% CI plot from the recorded values + supports/unanswered + Exact coefficients disclosure + All recorded limitations · 7 with admission reasons), Diagnostics (Check/Recorded outcome/Implication table derived from the recorded battery — stationarity ADF/KPSS, Ljung–Box lags 3/7, Breusch–Pagan, Cook's distance 4 flagged dates kept, HAC lag sensitivity 3/14, alternate source, alternate price basis not-applicable — plus the exact-p-values and verbatim disclosures), Specification (presented variables + metric ids/sources + estimator/covariance/window/R²/rank + raw verbatim), Reproduction (run id/published/approval as recorded/gate/readiness/commit/tolerances/environment + manifest download + Add to research + the offline verify command). Recorded floats render verbatim in the disclosures; the summary rounding is explicitly marked.
+- **Verification (2026-11-14):** models suites 27/27; full web suite 680/680 serial (one renderer determinism test flaked under parallel load and passed 10/10 in isolation); lint/typecheck/production build green; **e2e 25 passed + 1 honest skip**; live on the rebuilt production container (localhost:13002, no DB/volume/artifact reset): catalog facts verified via the accessibility tree (card title/question/status/window/nobs/method/View results, no uuid/commit/tolerances/operator-session visible), detail verified incl. all four tabs, keyboard Arrow/Home navigation, the recorded numbers (0.8542; 0.5719–1.1366 rounded summary; 0.8542493147420771 verbatim in the disclosure), manifest download and the anonymous Add continuation. No push: the owner instruction for this task forbids push/merge/deployment — the branch carries the commits locally (two docs-only registration commits were pushed before that instruction was applied to the flow; no further pushes).
+- **Completed at:** 2026-11-14T21:20:00+03:00
+
+**Explicitly out of scope:** mobile QA, deployment, push, merge (no push without separate owner permission), any non-Models page.
+
+### NI-096 — Remove the gated charts from the registry and catalog; unified detail-page redesign
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P0 (owner release decision 2026-11-14: the gated charts must not appear before the recorded demo; the detail pages follow the supplied redesign brief)
+- **Dependencies:** NI-095, NI-071, NI-032
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T19:10:00+03:00
+- **Execution role:** A
+- **Implementation (2026-11-14):** the three gated charts removed from the registry (`1449da6`) and from the deployment DB (operator DELETE as the cluster admin — near_operator is write-once by design); the category scope note no longer mentions them. Detail redesign: the full ChartFrame chrome now matches the cards (units left, compact Live badge right with honest fallbacks, divider, one toolbar with range presets / source selector / single primary "+ Add to research", plot, axis footer, sr-only provenance+summary+tables; SourceDrawer retained only on working surfaces via `sourceDrawer`); ChartDetailClient passes the single action; the NI-071 strict variant-matching and the NI-092 anchoring note are unchanged. Commits `8f8e734`, `ac2f677`, `36d084b`, `dcabc4b`, `03f1022`.
+- **Verification (2026-11-14):** offline suites green (metrics/real-archive/registry/delivery/chart-blocks); full disposable-cluster suite **exit 0, 571 tests ok**; web suite **680/680**; lint/typecheck/build green; **e2e 25 passed + 1 honest skip** (D4 — the removed Save-chart creation path; the saved-preview surface stays covered by the unit suite); live: the gated charts appear nowhere, `/api/charts` lists 8 definitions, the detail pages render the unified chrome with real data.
+- **Completed at:** 2026-11-14T19:40:00+03:00
+- **Addendum (2026-11-14, owner request):** the bottom scope-note and registry-mapping paragraphs were removed from all five category pages (category-screen renders neither; the empty-state cards, titles, subtitles, chart cards and axis footers stay). Metadata (scopeNote/registryCategories) preserved in explorer-categories.ts; web 680/680, live verification of all five categories. Commit `e565228`.
+
+**Description (two owner decisions):** (1) the three OQ-gated charts (protocol-revenue, capture-rate, fee-funded-buybacks) are removed from the registry and catalog entirely — the owner release decision supersedes the "listed unavailable" presentation; the OQ gates stay recorded on the metric definitions. (2) The seven chart DETAIL pages get the unified editorial redesign: page header (breadcrumbs, uppercase category label, large serif title), one main analytics card (units left, compact Live badge right, divider, toolbar with time-range presets / source selector / one primary "+ Add to research" action), the plot as the focal point, compact axis footer, and removal of Save chart / Freeze snapshot / Add Insight / Sources & definitions / Inspect / zoom buttons / visible data tables / accessible-summary accordions (a11y semantics stay nonvisually).
+
+**Integrity:** no API/data/model changes; presets, custom range, source switching, tooltips, loading/error/empty states preserved; the detail page keeps the NI-092 anchoring note.
+
+**Acceptance criteria:** the three chart ids answer 404 in delivery and appear nowhere; all seven detail pages render the unified layout with real data; Add to research works; suites green; live verification.
+
+### NI-095 — Unified minimalist redesign of the seven analytics chart cards
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P1 (owner design decision 2026-11-14, full redesign brief supplied)
+- **Dependencies:** NI-033, NI-015, NI-092, NI-093
+- **Complexity:** M
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T18:20:00+03:00
+- **Execution role:** A
+
+**Description:** One consistent, minimalist institutional design system across all seven analytics chart cards: clean card container (project tokens: surface/border/radius-surface 22px), serif title + units subtitle + one compact Live badge, exactly ONE action per card ("+ Add to research" with the anonymous sign-in continuation), the plot as the focal point, and a compact axis-explanation footer. Removed from cards: the long mode pill, "Complete" badge, period/last-observed metadata line, Sources drawer, zoom buttons, visible exact-value tables and accessible-summary accordions.
+
+**Integrity rules honored:** no API/data/model changes; unavailable/no-data states keep their honest compact rendering; the stale notice stays; the accessible summary and exact-value tables remain in the DOM as visually-hidden nonvisual semantics; tooltips and pointer/scroll zoom interactions stay; the detail pages keep their full chrome (they are the "full info" destination) — the redesign applies to the dashboard cards via the new ChartFrame `variant="card"`.
+
+**Implementation steps:** ChartFrame card variant (title link, units, Live badge, divider + right-aligned action slot, plot, axis footer, sr-only a11y block); ChartView suppresses zoom controls and renders the axis explanation in card mode; category pages pass one Add action built from the resolved default view; tests updated.
+
+**Acceptance criteria:** all seven charts render in the unified card system on the category pages with real data; detail pages unchanged; full web suite + lint/typecheck/build green; live browser verification.
+
+- **Implementation (2026-11-14):** ChartFrame gained the `variant="card"` chrome (serif title link, units subtitle, compact Live badge with honest unavailable/stale fallbacks, right-aligned single action slot under a divider, plot, compact axis-explanation footer, visually-hidden nonvisual summary + exact-value table). ChartView suppresses the zoom button group in card mode (direct drag/scroll dataZoom stays) and renders the axis footer from the actual bound series names/units (scatter: first binding on X; time-series: Date axis). Category pages pass one `CategoryChartActions` action (signed-in AddChartToResearch / anonymous "+ Add to research" continuation) and a clean detail URL for the title link — the detail page recomputes the same deterministic implicit default and its honest anchoring note. Commits `a5ac01d`, `ea94844`, `32000d8`.
+- **Verification (2026-11-14):** web suite serial **681/681** (category tests updated to the card design), lint/typecheck clean, production build green, **e2e 26/26** (journey + workspace demo updated for the title-link navigation), live browser verification of /data/revenue: 0 long mode pills, 0 "Complete" badges, 0 period/last-observed lines, 0 Inspect buttons, 0 zoom buttons, 3 compact Live badges, 3 "+ Add to research", 3 sr-only exact tables in the DOM, axis footers on all three cards; detail pages keep the full chrome.
+- **Completed at:** 2026-11-14T19:00:00+03:00
+
+### NI-094 — Resolve charts whose required metrics span multiple approved datasets
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P2 (honest fallback renders today; discovered by NI-093 live verification)
+- **Dependencies:** NI-028, NI-029, NI-032
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14)
+- **Started at:** 2026-11-14T17:20:00+03:00
+- **Execution role:** A (data-model decision may route parts to B)
+- **Decision:** option (b) — the owner instructed the chart must render now; a dedicated combined dataset avoids touching the delivery resolution contract.
+- **Implementation (2026-11-14):** the NI-029 emitter gained the `metrics.supply-context.windows` dataset (members: observed_near_purchases window totals via a shape-specific formula override + net_supply_change_near), the price_basis observation vocabulary was aligned with the chart filter contract ("start_of_day"/"end_of_day"), and the chart registry gained the NI-094 `applies_to` series-role scoping with quantity-usd-sensitivity **v2** (v1 byte-for-byte immutable; the strict variant-matching semantics of NI-071 stay unchanged). Commits `78e56a6`, `cb219a0`, `5517508`, `a2808f3`, `ac2f677`.
+- **Verification (2026-11-14):** metrics 40 OK; real-archive reconciliation OK; chart registry OK; delivery OK; **full disposable-cluster suite exit 0 (571 tests ok, 31 modules)**; live: `/api/charts/quantity-usd-sensitivity` v2 latest with `applies_to` served, default-filter view returns 34/34 + 34/34 points, v1 recipient-filter strict behavior unchanged (all missing), supply-context **Complete** (2 series × 3 window points), all three explorer categories verified in the browser (intents 3× Complete, revenue figures + honest gated cards in one grid, token-economics Complete).
+- **Completed at:** 2026-11-14T18:05:00+03:00
+
+**Description:** `supply-context` binds `observed_near_purchases` (in the published `metrics.flows.daily`) and `net_supply_change_near` (in `metrics.windows.snapshot`). The NI-032 latest resolution requires ONE approved dataset containing every required metric, so the chart answers the honest "no approved dataset exists for this selection" fallback although both datasets are published. The NI-029 emitter intentionally emits two manifest families by structure (daily flows vs window snapshots).
+
+**Implementation steps (owner decision needed on the approach):** either (a) extend the delivery latest-resolution to compose views across approved datasets per bound metric, with the context hash recording every contributing dataset version, or (b) emit a dedicated supply-context dataset in the NI-029 pipeline staging both member metrics at their shared boundary semantics. No substitution across window semantics is acceptable.
+
+**Acceptance criteria:** supply-context renders real values by default on the deployment stack; the pinned context records every contributing dataset version; reconciliation tests cover the composed or combined dataset.
+
+**Testing requirements:** delivery suite cases for the chosen approach; NI-073/NI-079 evidence updated where affected.
+
+**Identified by:** NI-093 live verification (2026-11-14).
+
+### NI-092 — Implicit chart defaults: coverage-clamped window and first-approved filter preselection
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P1 (owner product decision 2026-11-14: "по дефолту все графики готовы, ничего не нужно выбирать")
+- **Dependencies:** NI-033, NI-071, NI-080
+- **Complexity:** S
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T16:20:00+03:00
+- **Execution role:** A
+
+**Description:** Category cards and explorer defaults rendered the honest multi-variant "Unavailable" state until the visitor picked a filter and narrowed the range. The owner decided the implicit default must render data with zero interaction: the window clamps to the approved dataset coverage and the first approved option of each registered filter dimension is preselected. Providers are still never summed (the preselection is one provider, disclosed by the chips); explicit `filters`/range URL parameters stay authoritative.
+
+**Implementation steps:** `selection-url.ts` gains `defaultFiltersFor`/`hasNoExplicitFilters`; `default-view.ts` clamps the re-anchored window to the latest approved dataset's coverage start and applies the preselection; the detail screen carries the preselection into the serialized selection (chips disclose it) with an updated honest note. Explicit-URL behavior unchanged.
+
+**Acceptance criteria:** Category cards and explorer defaults render real values with no interaction; explicit URL selections behave exactly as before; the preselection is visible and switchable.
+
+**Testing requirements:** chart-library + data-explorer unit expectations updated and green; full web suite serial green; e2e journey note updated; NI-079 report records the release-affecting recheck.
+
+
+
+### NI-090 — Prepare the current release for VPS deployment
+
+- **Epic:** 14 — Deployment preparation
+- **Priority:** P0, explicit owner preparation request
+- **Dependencies:** NI-066, NI-089
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat 01a1d9c5-0e1c-7f01-b320-d9557ecfc5f3
+- **Execution role:** A
+- **Started at:** 2026-11-14T15:01:03+03:00
+- **Branch/worktree:** existing near-deploy checkout @13e9d0c plus preserved NI-089 local edits; this is the correct current product source.
+- **Authorization:** User requested preparing everything for an existing VPS and supplied near-intelligence.me. Server OS/resources/SSH alias not yet provided. No remote deployment, DNS/account changes or collector requests authorized by this preparation task.
+- **Dependency verification:** NI-066/089 are DONE with current packaged images/public assets and actual local preview. DEPLOYMENT.md explicitly permits configuration/runbook preparation before NI-079. NI-067/068/079 remain separate and are not marked complete.
+- **Handoff:** /root/vps_config stages the isolated VPS Compose, proxy, environment sample/validation and meaningful checks; /root owns operator tooling, backup/recovery/source handoff and actual local rehearsal/review.
+
+**Acceptance criteria:** A concrete source bundle from the current dirty-but-audited checkout (not an obsolete branch) and a documented path for near-intelligence.me exist. Production-only Compose has HTTPS proxy, no host-exposed API/DB, explicit scoped env per service, durable storage, restart/log policies, explicit migrations and export processing, disabled collection by default. No secrets/raw research/private state in source bundle or logs. Environment initialization/validation refuses placeholders and mismatched origins. Backup/recovery and rollback commands preserve DB/artifact evidence and do not claim untested remote restore. Validate configs and meaningful failure cases; rehearse safe local Docker setup with disposable secrets/volumes, no provider calls or current-preview mutation. Document remaining server/Supabase/data/model/release gates and exact owner steps. Preserve current application design and all earlier changes.
+
+**Expected files:** deployment/vps/*, scripts/operator tooling as needed, docs/VPS_DEPLOYMENT.md, affected deployment/README/ADR, PLAN/TASKS/TEAM records; no unrelated product UI or data changes.
+
+**Testing requirements:** Scoped environment/secret isolation and package-boundary tests; resolved Compose topology; Caddy config validation; disposable DB/bootstrap/migrations/health/backup/restore/worker checks where supported without external accounts; verify bundle contents/hashes and docs links. Record facts and blockers. No TLS issuance or remote deployment claimed from local syntax tests.
+
+- **Result:** Prepared the current Blog/Overview source for near-intelligence.me under deployment/vps: standalone production Compose/Caddy with pinned official images, private DB/API, exact per-service credential allowlists, durable volumes, restart/log limits and no collector/refresh startup. Added exclusive0600 secret initialization and safe env/topology validation; explicit operator build/db/migrate/up/check/worker/sweep, stable per-user/project locking, coherent private backup, fresh-isolated-only hash-checked restore and schema-compatible image rollback. Added opt-in systemd export/sweep/local-backup timers, current-source packaging with exact extra-file whitelist, per-file manifest and clean build-input verification. Runbook, ADR-025 and actual check report explain server/auth/data/model/remote gates. No Git commit/push or remote mutation.
+- **Verification:** 26 stdlib adversarial tests pass; actual resolved Compose contract passes; pinned Caddy config validates with network disabled. Disposable Linux/aarch64 Docker project passed fresh role/bootstrap/migrations, API/web health, runtime DB/table grant and migrator revision checks, artifact read/write and current Overview/Blog/Research/illustration routes. Empty-queue bounded worker/sweep pass. Local HTTP Caddy forwarded public routes; anonymous private gateway returned401 and CSRF Secure/SameSite/no-store passed. Coherent DB/artifact backup restored into a second new project; synthetic nonfinancial row and artifact bytes matched, restored application readiness passed. Existing-volume restore and unfinished NI-079 rollout refuse. Image-selection rollback to an alternate synthetic tag and back passes (same image bytes, no historical schema-compatibility claim). Both production images built from a clean extracted, manifest-verified source archive using frozen locks; packaging excludes env/secrets/raw/private state. 1029 doc links and whitespace check pass. Full evidence/limits: docs/verification/ni-090.md. Current preview image IDs/StartedAt unchanged; disposable resources cleaned up.
+- **Reviewer:** /root/vps_config independent read-only review requested exact bundle extra-file whitelist, rejection of added unhashed build inputs and stable cross-candidate locks. Fixed all three with negative tests; re-review approved within preparation scope. Root additionally guards orphan one-shot writers before backup. No missing release criterion was reclassified as completed.
+- **Remaining:** NI-079 TODO, NI-067/068 not closed. VPS OS/resources/IP/SSH, DNS/TLS/Supabase final-origin checks, actual full-user frozen export, real research/model gates and offsite encrypted backup/alerts remain separate. Current long API-backed article history remains unavailable. No provider/RPC/cloud SQL, collector or raw evidence transfer.
+- **Completed at:** 2026-11-14T15:26:10+03:00

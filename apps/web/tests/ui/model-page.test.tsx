@@ -22,6 +22,7 @@ import path from "node:path";
 
 import { axe } from "jest-axe";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ModelsPage from "@/app/(public)/models/page";
@@ -157,7 +158,13 @@ function detailFixture(overrides: Partial<ModelRunDetail> = {}): ModelRunDetail 
     },
     admission_reasons: ADMISSION_REASONS,
     design: { declared_columns: ["const", "dlog_provider_intents_volume_usd"], rows: 90 },
-    estimation: { method: "OLS with Newey-West HAC (fixture)", maxlags: 7 },
+    estimation: {
+      method: "OLS with Newey-West HAC (fixture)",
+      maxlags: 7,
+      r_squared: 0.42,
+      adj_r_squared: 0.41,
+      covariance: { type: "HAC", kernel: "bartlett", maxlags: 7, use_t: true, use_correction: true },
+    },
     coefficients: COEFFICIENTS,
     diagnostics: {
       stationarity: [{ test: "adf (fixture)", status: "computed" }],
@@ -375,24 +382,25 @@ describe("Model catalog page — the honest published-runs catalog", () => {
     expect([...catalogRequests[0].searchParams.keys()]).toEqual(["cursor"]);
     expect(catalogRequests[0].searchParams.get("cursor")).toBe("MTA=");
 
-    // Cards carry the recorded identity exactly.
-    expect(screen.getByText(RUN_ID)).toBeInTheDocument();
-    expect(screen.getByText(`Model run ${MODEL_ID} v1`)).toBeInTheDocument();
-    expect(screen.getByText("Model run purchases_activity_v1 v2")).toBeInTheDocument();
-    expect(screen.getAllByText(/90 observations/).length).toBe(2);
-    expect(screen.getAllByText(/2026-08-06 to 2026-11-04 \(end exclusive\)/).length).toBe(2);
-    expect(
-      screen.getAllByText(/rtol 0\.00000001 \/ atol 0\.0000000001 \(recorded\)/).length,
-    ).toBe(2);
-    expect(screen.getAllByText("2026-11-08T00:00:00Z by fixture-operator").length).toBe(2);
-    expect(screen.getAllByText(CODE_COMMIT).length).toBe(2);
-    // Verdicts are spelled out, never a bare token.
-    expect(screen.getAllByText(/Gate verdict: READY WITH LIMITS/).length).toBe(1);
-    expect(screen.getByText("Gate verdict: READY (admitted without recorded limits)")).toBeInTheDocument();
+    // NI-097: the cards present the approved readable mapping for the known
+    // spec and the identity-preserving fallback for the unknown one. The
+    // recorded run id, tolerances and commit live on the detail page now.
+    expect(screen.getByText("Gross fees and Intents volume")).toBeInTheDocument();
+    expect(screen.getByText("Purchases activity")).toBeInTheDocument();
+    expect(screen.getByText("Intents · Fee activity")).toBeInTheDocument();
+    expect(screen.getAllByText("Published with limits").length).toBe(1);
+    expect(screen.getByText("Published")).toBeInTheDocument();
+    expect(screen.getAllByText("90 observations").length).toBe(2);
+    expect(screen.getAllByText("6 Aug – 3 Nov 2026").length).toBe(2);
+    expect(screen.getAllByText("OLS · daily log changes").length).toBe(1);
+    expect(screen.getByText("gross_fee_activity_v1 · version 1")).toBeInTheDocument();
+    expect(screen.getByText("purchases_activity_v1 · version 2")).toBeInTheDocument();
 
-    // Links into the detail page.
-    const openLinks = screen.getAllByRole("link", { name: new RegExp(`^Open model run: ${MODEL_ID}`) });
-    expect(openLinks[0]).toHaveAttribute("href", `/models/${RUN_ID}`);
+    // Links into the detail page (title and View results).
+    const titleLink = screen.getByRole("link", { name: "Gross fees and Intents volume" });
+    expect(titleLink).toHaveAttribute("href", `/models/${RUN_ID}`);
+    const viewLinks = screen.getAllByRole("link", { name: /View results/ });
+    expect(viewLinks[0]).toHaveAttribute("href", `/models/${RUN_ID}`);
 
     // Pagination through the opaque next cursor.
     const next = screen.getByRole("link", { name: "Next page" });
@@ -477,7 +485,7 @@ describe("Model catalog page — the honest published-runs catalog", () => {
           : undefined,
     ]);
     const { container } = await renderCatalog({});
-    await screen.findByText(RUN_ID);
+    await screen.findByText("Gross fees and Intents volume");
     expect(await axe(container, axeConfig)).toHaveNoViolations();
   });
 
@@ -500,45 +508,42 @@ describe("Model run detail page — limits before coefficients, recorded values 
   it("returns an anonymous reader to the exact published run after sign-in", async () => {
     const requests = installApiMock(detailRoutes());
     await renderDetail();
+    // NI-097: the Add-to-research action lives in the Reproduction tab.
+    await userEvent.click(screen.getByRole("tab", { name: "Reproduction" }));
     const link = await screen.findByRole("link", { name: "Sign in to add this model result" });
     expect(link).toHaveAttribute("href", `/login?next=${encodeURIComponent(`/models/${RUN_ID}`)}`);
     expect(requestsTo(requests, "/api/documents")).toHaveLength(0);
   });
-  it("renders the limits section BEFORE any coefficient, with every gate limit code visible", async () => {
+  it("renders the scope limit before any number, with every gate limit code recorded", async () => {
     installApiMock(detailRoutes());
     const { container } = await renderDetail();
 
-    const limits = screen.getByRole("region", { name: /Limits and prohibitions/ });
-    const coefficients = screen.getByRole("region", { name: /Coefficients \(recorded values\)/ });
-
-    // Structural DOM-order assertion: the limits section precedes the
-    // coefficient section (handoff contract point 2).
+    // NI-097: the compact scope limit renders before any coefficient, and the
+    // full recorded limitation set (prohibited labels, notes, every gate code,
+    // admission reasons) stays complete inside the disclosure.
+    const scopeLimit = screen.getByText(/Gross fees are calculated from volume through a fee rate/);
+    const coefficients = container.querySelector('details[aria-label^="Exact data table"]');
+    expect(coefficients).not.toBeNull();
+    const coefficientsNode = coefficients as HTMLElement;
     expect(
-      limits.compareDocumentPosition(coefficients) & Node.DOCUMENT_POSITION_FOLLOWING,
+      scopeLimit.compareDocumentPosition(coefficientsNode) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
-    // Prohibited labels render inside the limits region, before coefficients.
-    const limitsText = limits.textContent ?? "";
+    const limitsText = container.textContent ?? "";
     for (const label of LIMITATIONS.prohibited_labels) {
       expect(limitsText).toContain(label);
     }
-    // The mechanical fee-volume warning renders before any coefficient.
-    const mechanical = screen.getByText(/Mechanical construction warning \(fixture\)/);
+    const mechanical = screen.getAllByText(/Mechanical construction warning \(fixture\)/)[0];
     expect(
-      mechanical.compareDocumentPosition(coefficients) & Node.DOCUMENT_POSITION_FOLLOWING,
+      mechanical.compareDocumentPosition(coefficientsNode) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // Every gate limit code is visible verbatim.
     for (const code of LIMITATIONS.gate_limit_codes) {
       expect(limitsText).toContain(code);
     }
-    // Admission reasons with severities spelled out.
     expect(limitsText).toContain("SPEC_PROXY_ADMITTED");
-    expect(limitsText).toContain("Informational");
-    expect(limitsText).toContain("Limit");
-
-    // The prohibition framing is visible.
-    expect(within(limits).getByText(/must never be presented as/)).toBeInTheDocument();
-    // And the whole article keeps the recorded run identity.
+    expect(limitsText).toContain("informational");
+    expect(limitsText).toContain("limit");
+    expect(within(container).getByText(/must never be presented as/)).toBeInTheDocument();
     expect(container.textContent).toContain(RUN_ID);
   });
 
@@ -552,57 +557,65 @@ describe("Model run detail page — limits before coefficients, recorded values 
     expect(screen.getByText("0.012345678901234")).toBeInTheDocument();
     expect(screen.getByText("0.987654321098765")).toBeInTheDocument();
     expect(screen.getByText("0.000123456789012345")).toBeInTheDocument();
-    expect(screen.getByText("12.3456789012345")).toBeInTheDocument();
-    expect(screen.getByText("1.25e-12")).toBeInTheDocument();
-    expect(screen.getByText(String(COEFFICIENTS[0].ci95_low))).toBeInTheDocument();
-    expect(screen.getByText(String(COEFFICIENTS[0].ci95_high))).toBeInTheDocument();
-    // A rounded rendering is absent (toFixed(4) of the estimate is "0.0123").
-    expect(screen.queryByText("0.0123")).not.toBeInTheDocument();
-    expect(screen.queryByText("0.9877")).not.toBeInTheDocument();
-  });
-
-  it("renders the interpretation as a mechanical template, never authored text", async () => {
-    installApiMock(detailRoutes());
-    await renderDetail();
-
-    const interpretation = screen.getByRole("region", {
-      name: /Interpretation — mechanical template, not authored text/,
-    });
-    expect(within(interpretation).getByText("bounded_association_v1")).toBeInTheDocument();
-    expect(within(interpretation).getByText(/fixed template sentences over recorded numbers only/)).toBeInTheDocument();
-    for (const sentence of INTERPRETATION.sentences) {
-      expect(within(interpretation).getByText(sentence)).toBeInTheDocument();
-    }
-    expect(within(interpretation).getByText(/Authoring note \(recorded\)/)).toBeInTheDocument();
-  });
-
-  it("renders the mechanical question template and the recorded readiness verdict", async () => {
-    installApiMock(detailRoutes());
-    await renderDetail();
-
-    const spec = screen.getByRole("region", { name: /Specification and readiness/ });
-    // The question is framed as the mechanical template it is.
+    // NI-097: the inference renders as recorded combined rows.
+    expect(screen.getByText("12.3456789012345 / 1.25e-12")).toBeInTheDocument();
     expect(
-      within(spec).getByText(/Mechanically composed question — a fixed template/),
+      screen.getByText(
+        `${String(COEFFICIENTS[0].ci95_low)} to ${String(COEFFICIENTS[0].ci95_high)}`,
+      ),
     ).toBeInTheDocument();
-    expect(within(spec).getByText(DEFINITION.question)).toBeInTheDocument();
-    expect(within(spec).getByText(DEFINITION.required_metric_ids.join(", "))).toBeInTheDocument();
-    // Honest ready state with the recorded verdict.
-    expect(within(spec).getByText(/Ready: yes — the gate admitted this specification/)).toBeInTheDocument();
-    expect(within(spec).getByText("READY_WITH_LIMITS")).toBeInTheDocument();
-    expect(within(spec).getByText("READY_WITH_LIMITS (fixture)")).toBeInTheDocument();
-    // Reason codes appear both on the definition's recorded limitation codes
-    // and the readiness reasons.
-    expect(within(spec).getAllByText(/LIMIT_SHORT_SAMPLE/).length).toBeGreaterThan(0);
-    // Latest published run and recorded_in_run_id both name this run.
-    expect(within(spec).getAllByText(RUN_ID).length).toBe(2);
+    // NI-097: the summary surface shows the slope rounded for display, marked
+    // as rounded; the intercept is not summarized. "0.9877" (toFixed(4) of the
+    // slope) renders in the finding block; "0.0123" (the intercept) stays out.
+    expect(screen.getByText("0.9877")).toBeInTheDocument();
+    expect(screen.getByText(/The summary above is rounded for display/)).toBeInTheDocument();
+    expect(screen.queryByText("0.0123")).not.toBeInTheDocument();
+  });
+
+  it("keeps the recorded interpretation reachable verbatim (never paraphrased)", async () => {
+    installApiMock(detailRoutes());
+    await renderDetail();
+
+    // NI-097: the curated finding sits above; the recorded interpretation
+    // block stays complete inside its own disclosure.
+    const interpretation = document.querySelector('details[aria-label="Recorded interpretation"]')
+      ?? screen.getByText(/The recorded interpretation \(verbatim\)/).closest("details");
+    expect(interpretation).not.toBeNull();
+    expect((interpretation as HTMLElement).textContent).toContain("bounded_association_v1");
+    expect((interpretation as HTMLElement).textContent).toContain("fixed template sentences over recorded numbers only");
+    expect((interpretation as HTMLElement).textContent).toContain(INTERPRETATION.sentences[0]);
+    expect((interpretation as HTMLElement).textContent).toContain(INTERPRETATION.sentences[1]);
+    expect((interpretation as HTMLElement).textContent).toContain("Fixture authoring note");
+  });
+
+  it("renders the presented variables and the recorded readiness verdict (NI-097)", async () => {
+    installApiMock(detailRoutes());
+    await renderDetail();
+
+    // The Specification tab shows the presented variables with their recorded
+    // metric ids and sources.
+    await userEvent.click(screen.getByRole("tab", { name: "Specification" }));
+    const spec = screen.getByRole("region", { name: /What was estimated/ });
+    expect(within(spec).getByText(/Provider gross fees · USD · daily log difference/)).toBeInTheDocument();
+    expect(within(spec).getByText(/Intents volume · USD · daily log difference/)).toBeInTheDocument();
+    expect(within(spec).getByText(/provider_gross_fees_usd \| SRC-LLAMA/)).toBeInTheDocument();
+    expect(within(spec).getByText(/R² \/ adjusted R²/)).toBeInTheDocument();
+
+    // The recorded readiness verdict renders as recorded (never invented).
+    await userEvent.click(screen.getByRole("tab", { name: "Reproduction" }));
+    expect(screen.getByText("READY_WITH_LIMITS (fixture)")).toBeInTheDocument();
+    // Reason codes appear in the recorded limitations disclosure.
+    await userEvent.click(screen.getByRole("tab", { name: "Result" }));
+    expect(screen.getAllByText(/LIMIT_SHORT_SAMPLE/).length).toBeGreaterThan(0);
   });
 
   it("renders the manifest download link with the offline verify pointer", async () => {
     installApiMock(detailRoutes());
     await renderDetail();
+    // NI-097: the reproduction record lives in the Reproduction tab.
+    await userEvent.click(screen.getByRole("tab", { name: "Reproduction" }));
 
-    const manifest = screen.getByRole("region", { name: /Reproduction artifact/ });
+    const manifest = screen.getByRole("region", { name: /The reproduction bundle/ });
     const link = within(manifest).getByRole("link", { name: "Download the manifest bundle" });
     expect(link).toHaveAttribute("href", `/api/model-runs/${RUN_ID}/manifest`);
     expect(link).toHaveAttribute("download");
@@ -618,14 +631,14 @@ describe("Model run detail page — limits before coefficients, recorded values 
   it("renders recorded verbatim blocks as JSON without rewriting them", async () => {
     installApiMock(detailRoutes());
     await renderDetail();
-
+    await userEvent.click(screen.getByRole("tab", { name: "Specification" }));
     expect(screen.getByText(/"spec_id": "gross_fee_activity_v1"/)).toBeInTheDocument();
     expect(screen.getByText(/"method": "OLS with Newey-West HAC \(fixture\)"/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Reproduction" }));
     expect(screen.getByText(/"python": "3.13 \(fixture\)"/)).toBeInTheDocument();
-    // The approval block shows reviewer and decision.
-    expect(screen.getByText("Fixture reviewer (test)")).toBeInTheDocument();
+    // The approval record renders reviewer and decision as recorded.
+    expect(screen.getByText("Fixture reviewer (test) · approve")).toBeInTheDocument();
     expect(screen.getByText("fixture-review-reference-1")).toBeInTheDocument();
-    expect(screen.getByText("approve")).toBeInTheDocument();
   });
 
   it("lands an unknown, unpublished or malformed identity on the generic 404 boundary", async () => {
@@ -684,11 +697,13 @@ describe("Model run detail page — limits before coefficients, recorded values 
     ]);
     await renderDetail();
 
-    // The run's recorded content still renders.
+    // The run's recorded content still renders (NI-097 presentation).
     expect(screen.getByText("0.012345678901234")).toBeInTheDocument();
-    const spec = screen.getByRole("region", { name: /Specification and readiness/ });
-    expect(within(spec).getAllByText(/could not be resolved/).length).toBe(2);
-    expect(within(spec).getByText(/A verdict is never guessed here/)).toBeInTheDocument();
+    // A missing readiness never falls back to an invented verdict: the
+    // recorded gate verdict stands in for the overall readiness line.
+    await userEvent.click(screen.getByRole("tab", { name: "Reproduction" }));
+    expect(screen.getAllByText("READY_WITH_LIMITS").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/could not be resolved for this run/)).not.toBeInTheDocument();
   });
 
   it("passes axe on the rendered run detail", async () => {

@@ -196,3 +196,10 @@ Create action saves an empty document immediately; Continue opens the newest
 owned document. The checklist counts work in that document, without assessing
 the truth of its claims. Indicators reuse one day from each latest approved
 dataset and preserve dates, exact decimals, quality and provenance.
+
+## Existing VPS handoff (NI-090)
+
+For the current Overview/Blog release and `near-intelligence.me`, use the
+[dedicated VPS runbook](docs/VPS_DEPLOYMENT.md). Its isolated production Compose,
+secret initializer, source bundle, operator commands and backup/restore checks
+are separate from the local/judge Compose. Remote rollout still requires NI-079.

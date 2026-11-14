@@ -95,11 +95,10 @@ async function setOutage(enabled: boolean, page: Page): Promise<void> {
 }
 
 async function expectRecordedDataset(page: Page) {
-  await page.getByRole("button", { name: "Sources & definitions" }).click();
-  const sources = page.getByRole("dialog", { name: "Sources and definitions" });
-  await expect(sources.getByText(state.dataset_version_id, { exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(sources).toBeHidden();
+  // NI-096: provenance is announced nonvisually (sr-only), never a drawer.
+  const provenance = page.getByText(`Dataset version: ${state.dataset_version_id}`);
+  await expect(provenance).toBeAttached();
+  await expect(provenance.locator("xpath=ancestor::*[contains(@class, 'sr-only')]").first()).toBeAttached();
 }
 
 async function inspectDocumentVersion(page: Page, documentId: string) {
@@ -165,14 +164,16 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await expect(page).toHaveURL(/\/data\/intents\/intents-volume/);
   await expect(page.getByRole("heading", { level: 1, name: "Provider-reported Intents gross volume" }))
     .toBeVisible();
-  // The anonymous surface exposes the private actions only as auth continuations.
-  await expect(page.getByRole("button", { name: "Sign in to save this chart" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in to add it to research" })).toBeVisible();
+  // NI-096: the anonymous surface exposes exactly ONE private-action
+  // continuation — the context-preserving Add to research.
+  await expect(page.getByRole("button", { name: "+ Add to research" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in to save this chart" })).toHaveCount(0);
 
-  // NI-080: an implicit default follows the approved historical coverage.
-  // Explicit dates remain authoritative even when they have no observations.
+  // NI-080/NI-092: an implicit default is clamped to the approved coverage and
+  // preselects the first approved filter value. Explicit dates remain
+  // authoritative even when they have no observations.
   await expect(page.getByRole("group", { name: "Time range" })).toBeVisible();
-  await expect(page.getByText(/default preset is anchored to the latest approved dataset's coverage end/)).toBeVisible();
+  await expect(page.getByText(/implicit default is clamped to the latest approved dataset's coverage/)).toBeVisible();
   await expect(page.getByText(state.pin_value)).toBeVisible();
   await page.goto(`${state.web_url}/data/intents/intents-volume?version=1&start=2026-11-01&end=2026-11-04`);
   await expect(page).toHaveURL(/start=2026-11-01&end=2026-11-04/);
@@ -198,7 +199,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
     .toContain(`start=${anchoredStart}&end=${state.window.end}`);
 
   // -- 3. Sign-in continuation preserves the inspected selection --------- //
-  const continueButton = page.getByRole("button", { name: "Sign in to add it to research" });
+  const continueButton = page.getByRole("button", { name: "+ Add to research" });
   await continueButton.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/login\?next=/);
@@ -213,20 +214,27 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await expect.poll(() => page.url()).toContain("/data/intents/intents-volume");
   await expect.poll(() => page.url()).toContain(`start=${anchoredStart}`);
   await expect.poll(() => page.url()).toContain(`dataset_version=${state.dataset_version_id}`);
-  await expect(page.getByRole("button", { name: "Save chart", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add to research", exact: true })).toBeVisible();
 
-  // -- 4. Save the chart and reopen it from the workspace ---------------- //
-  await page.getByRole("button", { name: "Save chart", exact: true }).click();
-  await expect(page.getByText("Chart saved. Your range and filters are preserved.")).toBeVisible();
-  await page.getByRole("link", { name: "Open saved chart" }).click();
-  await expect(page).toHaveURL(/\/workspace\/saved-charts\//);
-  // The saved instance is a live view over the inspected 7-day selection
+  // -- 4. Add the chart to an owned research document --------------------- //
+  // NI-096: the Save chart action was removed from the detail UI; the owned
+  // persistence flow is Add to research with the pinned context.
+  await page.getByRole("button", { name: "Add to research", exact: true }).click();
+  const saveDialog = page.getByRole("dialog");
+  await expect(saveDialog.getByText(/Inspected dataset: /)).toBeVisible();
+  await saveDialog.getByRole("button", { name: "Confirm Add Chart" }).click();
+  await expect(saveDialog).toBeHidden();
+  await page.goto(`${state.web_url}/workspace`);
+  const savedResearch = page.getByRole("link", { name: /Continue research/ }).first();
+  await expect(savedResearch).toBeVisible();
+  await savedResearch.click();
+  await expect(page).toHaveURL(/\/workspace\/research\//);
+  // The added chart is a live view over the inspected 7-day selection
   // (UTC [start, end)); the first day carries the persisted exact value.
   await expect(page.getByText(state.day_values[anchoredStart]).first()).toBeVisible();
 
   // -- 5. Add to research: destination picker -> new document ------------- //
   await page.goto(chartSelectionUrl());
-  await expect(page.getByRole("button", { name: "Save chart", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Add to research" }).click();
   const destinationDialog = page.getByRole("dialog");
   await expect(destinationDialog).toContainText("Add chart to your research");

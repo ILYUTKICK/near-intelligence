@@ -43,7 +43,8 @@ test("email demo opens starter research, retains the cabinet, rotates and isolat
   await expect(page).toHaveURL(`${state.web_url}/workspace/data/intents`);
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await expectNoSeriousViolations(page, "NI-080 workspace explorer");
-  await page.getByRole("link", { name: "Open chart: Provider-reported Intents gross volume", exact: true }).click();
+  // NI-095: the card title itself links into the full chart detail page.
+  await page.getByRole("link", { name: "Provider-reported Intents gross volume", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace\/data\/intents\/intents-volume/);
   await expect(page.locator("figure [role=img] svg")).toBeVisible();
   await page.getByRole("button", { name: "Custom range" }).click();
@@ -53,9 +54,16 @@ test("email demo opens starter research, retains the cabinet, rotates and isolat
   await range.getByRole("button", { name: "Apply range" }).click();
   await expect(page).toHaveURL(/\/workspace\/data\/intents\/intents-volume\?.*start=2026-01-03/);
   await expect(page.getByRole("region", { name: /exact data table/ })).toContainText("200.25");
-  await page.getByRole("button", { name: "Save chart", exact: true }).click();
-  await page.getByRole("link", { name: "Open saved chart" }).click();
-  await expect(page).toHaveURL(/\/workspace\/saved-charts\//);
+  await page.getByRole("button", { name: "Add to research", exact: true }).click();
+  const addDialog = page.getByRole("dialog");
+  await expect(addDialog.getByText(/Inspected dataset: /)).toBeVisible();
+  await addDialog.getByRole("button", { name: "Confirm Add Chart" }).click();
+  await expect(addDialog).toBeHidden();
+  await page.goto(`${state.web_url}/workspace`);
+  const research = page.getByRole("link", { name: /Continue research/ }).first();
+  await expect(research).toBeVisible();
+  await research.click();
+  await expect(page).toHaveURL(/\/workspace\/research\//);
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await expect(page.getByRole("region", { name: /exact data table/ })).toContainText("200.25");
 

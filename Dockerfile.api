@@ -30,13 +30,20 @@ COPY apps/web/src/features/charts/renderer/option-builder.ts \
      apps/web/src/features/charts/renderer/format.ts \
      apps/web/src/features/charts/renderer/view-types.ts \
      apps/web/src/features/charts/renderer/
+# NI-079: the renderer's chart builder resolves the approved filter option
+# catalog (../filters/filter-values); package it next to the renderer tree.
+COPY apps/web/src/features/charts/filters/filter-values.ts \
+     apps/web/src/features/charts/filters/
 
 RUN mkdir -p /renderer/apps/web/scripts /renderer/apps/web/src/features/charts/renderer \
+ && mkdir -p /renderer/apps/web/src/features/charts/filters \
  && cp apps/web/scripts/render-charts.mjs /renderer/apps/web/scripts/ \
  && cp apps/web/src/features/charts/renderer/option-builder.ts \
        apps/web/src/features/charts/renderer/format.ts \
        apps/web/src/features/charts/renderer/view-types.ts \
        /renderer/apps/web/src/features/charts/renderer/ \
+ && cp apps/web/src/features/charts/filters/filter-values.ts \
+       /renderer/apps/web/src/features/charts/filters/ \
  && node -e "const path=require('node:path');const fs=require('node:fs');const req=require('module').createRequire('/app/apps/web/package.json');function rootOf(name){try{return path.dirname(req.resolve(name+'/package.json'))}catch(e){const echartsRoot=path.dirname(req.resolve('echarts/package.json'));const sibling=path.join(path.dirname(echartsRoot),name);if(fs.existsSync(sibling))return fs.realpathSync(sibling);const link=path.join('/app/apps/web/node_modules',name);if(fs.existsSync(link))return fs.realpathSync(link);throw e}}for(const name of ['echarts','zrender','tslib','zod']){fs.cpSync(rootOf(name),'/renderer/node_modules/'+name,{recursive:true,dereference:true})}"
 
 # --- Stage 2: Python environment from the frozen lock ----------------------

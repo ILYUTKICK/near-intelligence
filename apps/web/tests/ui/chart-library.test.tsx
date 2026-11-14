@@ -652,16 +652,21 @@ describe("Chart detail page — validated selection URLs", () => {
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
     expect(viewRequests).toHaveLength(1);
-    expect([...viewRequests[0].searchParams.keys()]).toEqual(["definition_version", "start", "end"]);
+    // NI-092: an explicit range with no filters param still preselects the
+    // first approved filter value (the filters param is appended to the
+    // explicit definition_version/start/end identity).
+    expect([...viewRequests[0].searchParams.keys()].sort()).toEqual(
+      ["definition_version", "end", "filters", "start"]);
     expect(viewRequests[0].searchParams.get("definition_version")).toBe("1");
     expect(viewRequests[0].searchParams.get("start")).toBe(VIEW_WINDOW.start);
     expect(viewRequests[0].searchParams.get("end")).toBe(VIEW_WINDOW.end);
+    expect(viewRequests[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
 
     // The renderer resolved the pinned view: accessible table and frame.
     expect(await screen.findByRole("region", { name: /exact data table/ })).toBeInTheDocument();
-    expect(screen.getByText("Live — latest approved data")).toBeInTheDocument();
-    // Session checked for the continuation actions; anonymous buttons render.
-    expect(await screen.findByRole("button", { name: "Sign in to save this chart" })).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
+    // Session checked for the continuation action; the single Add button renders.
+    expect(await screen.findByRole("button", { name: "+ Add to research" })).toBeInTheDocument();
   });
 
   it("never forwards an arbitrary URL field to the view request and reports the drops", async () => {
@@ -675,7 +680,11 @@ describe("Chart detail page — validated selection URLs", () => {
     });
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
-    expect([...viewRequests[0].searchParams.keys()]).toEqual(["definition_version", "start", "end"]);
+    // NI-092: the implicit filter preselection is forwarded; arbitrary URL
+    // fields are still dropped and reported.
+    expect([...viewRequests[0].searchParams.keys()].sort()).toEqual(
+      ["definition_version", "end", "filters", "start"]);
+    expect(viewRequests[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
     const status = await chartParameterNotice();
     expect(within(status).getByText("foo")).toBeInTheDocument();
     expect(within(status).getByText("admin")).toBeInTheDocument();
@@ -761,7 +770,7 @@ describe("Chart detail page — validated selection URLs", () => {
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
     expect(viewRequests[0].searchParams.get("dataset_version")).toBe(PINNED_DATASET_ID);
-    await screen.findByText("Historical — pinned version");
+    await screen.findByText("Pinned version");
   });
 
   it("anchors a missing range to the pinned dataset's coverage end, never wall-clock", async () => {
@@ -787,7 +796,7 @@ describe("Chart detail page — validated selection URLs", () => {
     expect(viewRequests[0].searchParams.get("end")).toBe("2026-11-05");
     expect(viewRequests[0].searchParams.get("dataset_version")).toBe(PINNED_DATASET_ID);
     expect(await screen.findByText(/coverage end \(2026-11-05 UTC\)/)).toBeInTheDocument();
-    expect(screen.getByText("Historical — pinned version")).toBeInTheDocument();
+    expect(screen.getByText("Pinned version")).toBeInTheDocument();
   });
 
   it("renders an unavailable chart with its reason and never requests a view", async () => {
@@ -809,7 +818,7 @@ describe("Chart detail page — validated selection URLs", () => {
     expect(screen.getAllByText(/Model gate \(fixture\)/).length).toBeGreaterThan(0);
     expect(requestsTo(requests, "/api/charts/model-diagnostics/view")).toHaveLength(0);
     expect(screen.queryByText("Definition, dataset and quality")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sign in to save this chart" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Add to research" })).not.toBeInTheDocument();
   });
 
   it("renders a data-not-ready resolution honestly with retry and methodology actions", async () => {
@@ -877,9 +886,11 @@ describe("Chart detail page — validated selection URLs", () => {
     await screen.findByRole("region", { name: /exact data table/ });
     expect(screen.queryByText("Definition, dataset and quality")).not.toBeInTheDocument();
     expect(requestsTo(requests, `/api/metrics/${METRIC_FEES_ID}`)).toHaveLength(0);
-    await userEvent.click(screen.getByRole("button", { name: "Sources & definitions" }));
-    const sources = await screen.findByRole("dialog", { name: "Sources and definitions" });
-    expect(within(sources).getByText(DATASET_ID)).toBeVisible();
+    // NI-096: provenance is announced nonvisually; no visible drawer remains.
+    expect(screen.queryByRole("button", { name: "Sources & definitions" })).not.toBeInTheDocument();
+    // NI-096: the dataset identity stays announced in the sr-only provenance.
+    const provenance = screen.getByText(DATASET_ID, { exact: false });
+    expect(provenance.closest(".sr-only")).not.toBeNull();
   });
 
   it("passes axe on the resolved chart page", async () => {
@@ -1180,8 +1191,8 @@ describe("ChartAuthActions — anonymous private-action continuation", () => {
     installApiMock([ANONYMOUS_SESSION]);
     renderActions();
 
-    const saveButton = await screen.findByRole("button", { name: "Sign in to save this chart" });
-    expect(screen.getByRole("button", { name: "Sign in to add it to research" })).toBeInTheDocument();
+    const saveButton = await screen.findByRole("button", { name: "+ Add to research" });
+    expect(routerPush).not.toHaveBeenCalled();
 
     await user.click(saveButton);
     expect(routerPush).toHaveBeenCalledTimes(1);
@@ -1201,8 +1212,8 @@ describe("ChartAuthActions — anonymous private-action continuation", () => {
   it("offers saved-chart persistence to a signed-in visitor", async () => {
     installApiMock([AUTHENTICATED_SESSION]);
     renderActions();
-    await screen.findByRole("button", { name: "Save chart" });
-    expect(screen.queryByRole("button", { name: "Sign in to save this chart" })).not.toBeInTheDocument();
+    await screen.findByRole("button", { name: "Add to research" });
+    expect(screen.queryByRole("button", { name: "+ Add to research" })).not.toBeInTheDocument();
     expect(routerPush).not.toHaveBeenCalled();
   });
 
@@ -1212,7 +1223,7 @@ describe("ChartAuthActions — anonymous private-action continuation", () => {
     ]);
     renderActions();
     await screen.findByText(/sign-in state could not be checked/);
-    expect(screen.queryByRole("button", { name: "Sign in to save this chart" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Add to research" })).not.toBeInTheDocument();
   });
 });
 
@@ -1255,7 +1266,7 @@ describe("Chart detail compact presentation (NI-076 D3)", () => {
     // The long description is not rendered as page prose; it stays available
     // through the Sources & definitions drawer.
     expect(screen.queryByText(definition.description)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sources & definitions" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sources & definitions" })).not.toBeInTheDocument();
   });
 
   it("places the selection and action controls inside the frame toolbar above the plot", async () => {
@@ -1267,7 +1278,7 @@ describe("Chart detail compact presentation (NI-076 D3)", () => {
     expect(within(figure).getByRole("group", { name: "Chart filters" })).toBeInTheDocument();
     expect(within(figure).getByRole("button", { name: "Custom range" })).toBeInTheDocument();
     expect(within(figure).getByRole("button", { name: "Refresh to latest" })).toBeInTheDocument();
-    expect(within(figure).getByRole("button", { name: "Sign in to save this chart" })).toBeInTheDocument();
+    expect(within(figure).getByRole("button", { name: "+ Add to research" })).toBeInTheDocument();
     expect(within(figure).getByRole("group", { name: "Time range" })).toBeInTheDocument();
     // The plot region renders inside the same frame, below the toolbar.
     expect(within(figure).getByRole("img")).toBeInTheDocument();
@@ -1305,7 +1316,7 @@ describe("NI-080 implicit latest coverage", () => {
       viewRoute("gross-fees", archivedView), ANONYMOUS_SESSION];
   }
 
-  it("reanchors the implicit preset to old approved coverage and pins the second request", async () => {
+  it("reanchors the implicit preset to the approved coverage window and pins the second request", async () => {
     const requests = installApiMock(routes());
     render(await ChartDetailPage({ params: Promise.resolve({ chartId: "gross-fees" }), searchParams: Promise.resolve({}) }));
     const views = requestsTo(requests, "/api/charts/gross-fees/view");
@@ -1313,8 +1324,13 @@ describe("NI-080 implicit latest coverage", () => {
     expect(views[0].searchParams.has("dataset_version")).toBe(false);
     expect(views[1].searchParams.get("dataset_version")).toBe(DATASET_ID);
     expect(views[1].searchParams.get("end")).toBe("2026-01-15");
-    expect(views[1].searchParams.get("start")).toBe(shiftIsoDate("2026-01-15", -90));
-    expect(screen.getByText(/latest approved dataset's coverage end/)).toBeVisible();
+    // NI-092: the implicit window is clamped to the approved coverage start…
+    expect(views[1].searchParams.get("start")).toBe("2026-01-01");
+    // …and preselects the first approved filter value (disclosed by the chips).
+    expect(views[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
+    expect(views[1].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
+    expect(screen.getByText(/implicit default is clamped to the latest approved dataset's coverage/)).toBeVisible();
+    expect(screen.getByText(/preselects the first approved filter value/)).toBeVisible();
     expect(await screen.findByRole("region", { name: /exact data table/ })).toHaveTextContent(/1\s000/);
   });
 

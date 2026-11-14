@@ -883,6 +883,10 @@ def build_series_points(version: Mapping, content: Mapping, metric_id: UUID,
     for row in content["observations"].get(metric_id, ()):
         if not (start_dt <= row["period_start"] < end_dt):
             continue
+        # Strict variant matching (NI-071): a filtered dimension must be
+        # carried and equal. A chart whose filter must NOT blank a sibling
+        # series declares `applies_to` on the filter dimension (NI-094) —
+        # the scoping happens in build_chart_view before this point.
         if all(row["dimensions"].get(key) == value for key, value in filters.items()):
             matched.append(row)
     by_period: dict[dt.datetime, list[dict]] = {}
@@ -1080,8 +1084,26 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
     selection = ResolvedSelection(start=start, end=end, frequency="day",
                                   filters=resolved_filters)
     dataset = dataset_response(version_row, content)
-    combinations = _filter_combinations(resolved_filters)
-    if len(bindings) * len(combinations) > MAX_FILTER_SERIES:
+    # NI-094: a filter dimension may declare the series roles it applies to
+    # (chart registry `applies_to`). A series whose role is not listed keeps
+    # its observations unfiltered — the dimension's variants live in the other
+    # series. Roles without any scoping keep the full resolved filters.
+    scoped_properties = chart_row["filter_schema"].get("properties") or {}
+
+    def _role_filters(role: str) -> dict[str, str]:
+        scoped: dict[str, str] = {}
+        for key, value in resolved_filters.items():
+            bound = scoped_properties.get(key) or {}
+            applies_to = bound.get("applies_to")
+            if applies_to is not None and role not in applies_to:
+                continue
+            scoped[key] = value
+        return scoped
+
+    role_combinations = {role: _filter_combinations(_role_filters(role))
+                         for _, role in bindings}
+    if sum(len(combinations) for combinations in role_combinations.values()) \
+            > MAX_FILTER_SERIES:
         raise DeliveryInvalidFilter(
             f"this selection resolves more than {MAX_FILTER_SERIES} compared series; "
             "narrow the filter selection")
@@ -1092,7 +1114,7 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
         if metric_row is None:
             raise DeliveryReferenceInvalid(
                 "a bound metric definition does not resolve to a registered version")
-        for combination in combinations:
+        for combination in role_combinations[role]:
             points = build_series_points(version_row, content, metric_id, start, end,
                                          combination)
             resolved_series.append((combination, points))
@@ -1104,7 +1126,9 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
     series_index = 0
     for metric_id, role in bindings:
         metric_row = metric_rows.get(metric_id)
-        for combination, points in resolved_series[series_index:series_index + len(combinations)]:
+        role_combination_count = len(role_combinations[role])
+        for combination, points in resolved_series[
+                series_index:series_index + role_combination_count]:
             all_points.extend(points)
             series.append(SeriesResponse(
                 metric=metric_response(metric_row), dataset=dataset,
@@ -1114,7 +1138,7 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
                 sources=_series_sources(connection, metric_row["source_id"],
                                         content["input_source_ids"],
                                         include_checkpoint=not verify_content)))
-        series_index += len(combinations)
+        series_index += role_combination_count
     return ChartViewResponse(
         definition=chart_response(chart_row), selection=selection, dataset=dataset,
         series=tuple(series), resolved_at=dt.datetime.now(UTC),

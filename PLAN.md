@@ -192,10 +192,12 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 | 80 | [NI-086](docs/TASKS.md) | Implement the approved editorial Overview design | P1 | A |
 | 81 | [NI-087](docs/TASKS.md) | Present the complete investment thesis and simplify the chart library | P0 | A |
 | 82 | [NI-088](docs/TASKS.md) | Explain the research workflow and simplify chart details | P0 | A |
-| 83 | [NI-079](docs/TASKS.md) | Pass final integrated local release acceptance | P0 | A |
-| 84 | [NI-067](docs/TASKS.md) | Deploy staging and production with safe configuration | P0 | A |
-| 85 | [NI-068](docs/TASKS.md) | Verify backups, restore and operational monitoring | P0 | A |
-| 86 | [NI-069](docs/TASKS.md) | Run hackathon demo and reviewer reproduction | P0 | A |
+| 83 | [NI-089](docs/TASKS.md) | Recover the current local preview and retain article edits | P0 | A |
+| 84 | [NI-090](docs/TASKS.md) | Prepare the current release for an owner-supplied VPS and domain | P0 | A |
+| 85 | [NI-079](docs/TASKS.md) | Pass final integrated local release acceptance | P0 | A |
+| 86 | [NI-067](docs/TASKS.md) | Deploy staging and production with safe configuration | P0 | A |
+| 87 | [NI-068](docs/TASKS.md) | Verify backups, restore and operational monitoring | P0 | A |
+| 88 | [NI-069](docs/TASKS.md) | Run hackathon demo and reviewer reproduction | P0 | A |
 
 ## 9. Изменение самого плана
 
@@ -248,3 +250,11 @@ NI-077 оформляет передачу и её уточнение 12 ноя�
 **Blog implementation — 14 November 2026:** the owner explicitly says to implement the recorded direction. NI-085 adds the public catalog/navigation and reusable publication routing/content organization, with the existing full research as its first real article. Preserve `/research` and all evidence anchors, source/metric/chart identities and private boundaries. No invented extra articles/metadata, CMS dependency, external publication, new data collection or Git mutation. This local batch is included in NI-079 before deployment.
 
 **Approved Overview — 14 November 2026:** owner approved the generated editorial Overview mockup and explicitly requests implementation through NI-086. Replace the old thesis-heavy landing presentation with the approved hero, one real featured research card, three data-exploration links, reader workflow, methodology band and workspace CTA. This supersedes NI-012's on-Overview metric/claim-table presentation only; preserve the real data services, full research/evidence/model status and existing documented deep links through compatible destinations. No fake KPIs, live claims, automatic data refresh or Git publication. Include NI-086 in NI-079 local acceptance.
+
+
+## Explicit local-preview recovery — 14 November 2026
+
+NI-089 (role A), requested by the owner: restore the current Blog/Overview experience after this chat used the obsolete localhost:13000 review stack. The current source is near-deploy at 13e9d0c and the current local preview is localhost:13002. Preserve the NI-085–088 design and behavior; carry over only source-qualified article copy/quiet metadata, fix missing local static assets if confirmed, and verify desktop Overview→Blog→article. No external deployment, database migration, provider collection or takeover of NI-088. Status/acceptance live in TASKS.md.
+
+
+**Owner instruction — 14 November 2026, VPS preparation:** prepare the current Blog/Overview release for the existing VPS and near-intelligence.me. NI-090 covers repository configuration, explicit environment validation, HTTPS proxy, backup/recovery/export-worker tooling, a reproducible source handoff and local disposable verification. No remote login, provisioning, DNS mutation, public rollout or source collection is requested yet. Preparation may proceed under DEPLOYMENT.md without closing NI-079; NI-067/068 retain real remote acceptance and missing data/model gates remain explicit.

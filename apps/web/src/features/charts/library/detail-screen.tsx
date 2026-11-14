@@ -12,8 +12,10 @@ import {
 } from "@/features/charts/library/catalog-api";
 import type { ApiFailure } from "@/features/charts/library/catalog-api";
 import {
+  defaultFiltersFor,
   defaultRangeFor,
   detailHrefFor,
+  hasNoExplicitFilters,
   parseSelectionUrl,
   todayUtc,
 } from "@/features/charts/library/selection-url";
@@ -122,6 +124,12 @@ export async function ChartDetailScreen({
   let rangeNote: string | null = null;
   let datasetFailure: DroppedParam | null = null;
   let defaultViewResult: Awaited<ReturnType<typeof fetchChartView>> | null = null;
+  // NI-092 implicit default: with no `filters` URL parameter the first approved
+  // option of each registered dimension is preselected and disclosed by the
+  // chips. An explicit filters parameter is authoritative and stays untouched.
+  const effectiveFilters = hasNoExplicitFilters(parsed.filters)
+    ? defaultFiltersFor(definition)
+    : parsed.filters;
   if (range === null) {
     const pinnedDataset = parsed.datasetVersion !== null && parsed.datasetVersion !== "latest"
       ? parsed.datasetVersion
@@ -141,12 +149,13 @@ export async function ChartDetailScreen({
         };
       }
     } else if (definition.data_status === "available") {
-      const latest = await fetchLatestDefaultView(definition, parsed.filters);
+      const latest = await fetchLatestDefaultView(definition, effectiveFilters);
       range = latest.range;
       defaultViewResult = latest.result;
       if (latest.result.ok) {
-        rangeNote = `No range was given in the URL; the chart version's default preset is anchored `
-          + `to the latest approved dataset's coverage end (${latest.result.data.dataset.end} UTC).`;
+        rangeNote = `No range was given in the URL; the implicit default is clamped to the `
+          + `latest approved dataset's coverage (${latest.range.start} … ${latest.result.data.dataset.end} UTC) `
+          + `and preselects the first approved filter value. Switch the filter chips to compare providers.`;
       }
     } else {
       range = defaultRangeFor(definition, todayUtc());
@@ -158,7 +167,7 @@ export async function ChartDetailScreen({
     start: range.start,
     end: range.end,
     datasetVersion: parsed.datasetVersion ?? "latest",
-    filters: parsed.filters,
+    filters: effectiveFilters,
   };
 
   // Resolved view — only for available charts and a resolvable selection.
@@ -236,6 +245,8 @@ export async function ChartDetailScreen({
               : { start: "", end: "" }}
             mode="live"
             presentation="compact"
+            sourceDrawer={false}
+            exactValues="sr-only"
           />
           {dropped.length > 0 ? <DroppedNotice dropped={dropped} /> : null}
         </div>

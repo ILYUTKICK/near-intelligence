@@ -366,7 +366,7 @@ class RealArchiveReconciliationTests(unittest.TestCase):
         self.assertEqual(decimal_string(sum(
             Decimal(r["quality"].get("exact_value", r["value"]))
             for r in records(flows, "estimated_purchase_usd")
-            if r["dimensions"]["price_basis"] == "start")),
+            if r["dimensions"]["price_basis"] == "start_of_day")),
             self.dollar["total"]["buy_usd_start"])
         for record, period in zip(records(windows, "net_supply_change_near"),
                                   self.supply["periods"]):

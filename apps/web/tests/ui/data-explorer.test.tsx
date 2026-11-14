@@ -520,6 +520,9 @@ describe("Data category page — real charts through the catalog category filter
   it("serves the mapped registry category and links into the explorer", async () => {
     const requests = installApiMock([
       catalogRouteFor("activity", [activityChart]),
+      // NI-093: the available chart renders its implicit default view inline.
+      viewRoute("intents-volume", activityChart),
+      ANONYMOUS_SESSION,
     ]);
     const ui = await DataCategoryPage({
       params: Promise.resolve({ category: "intents" }),
@@ -532,11 +535,15 @@ describe("Data category page — real charts through the catalog category filter
     expect(catalogRequests[0].searchParams.get("category")).toBe("activity");
     expect([...catalogRequests[0].searchParams.keys()]).toEqual(["category"]);
 
-    // The visible mapping line names the registry category.
-    expect(screen.getByText(/Registry categories mapped here: Activity/)).toBeInTheDocument();
+    // NI-096 addendum: the bottom scope/registry-mapping paragraphs are gone.
+    expect(screen.queryByText(/Registry categories mapped here/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Charts from the registry activity category/)).not.toBeInTheDocument();
+    // The chart renders inline; the card title links into the detail page and
+    // the single card action is the Add-to-research continuation (NI-095).
     expect(
-      await screen.findByRole("link", { name: "Open chart: Synthetic intents volume (fixture)" }),
-    ).toHaveAttribute("href", "/data/intents/intents-volume");
+      await screen.findByRole("link", { name: "Synthetic intents volume (fixture)" }),
+    ).toHaveAttribute("href", expect.stringMatching(/^\/data\/intents\/intents-volume\?/));
+    expect(await screen.findByRole("button", { name: "+ Add to research" })).toBeInTheDocument();
   });
 
   it("lists unavailable charts with their reason and never hides them", async () => {
@@ -599,8 +606,9 @@ describe("Data category page — real charts through the catalog category filter
       await screen.findByText("No network-level chart is registered yet"),
     ).toBeInTheDocument();
     expect(screen.getByText(/This is not zero/)).toBeInTheDocument();
-    expect(screen.getByText(/No registry category is mapped to this explorer category yet/))
-      .toBeInTheDocument();
+    // NI-096 addendum: the registry-mapping paragraph below the empty-state
+    // card was removed by owner decision.
+    expect(screen.queryByText(/No registry category is mapped/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Browse the chart library" })).toHaveAttribute(
       "href",
       "/charts",
@@ -680,13 +688,17 @@ describe("Data category page — real charts through the catalog category filter
   });
 
   it("passes axe on a loaded category", async () => {
-    installApiMock([catalogRouteFor("activity", [activityChart])]);
+    installApiMock([
+      catalogRouteFor("activity", [activityChart]),
+      // NI-093: the available chart renders its implicit default view inline.
+      viewRoute("intents-volume", activityChart),
+    ]);
     const ui = await DataCategoryPage({
       params: Promise.resolve({ category: "intents" }),
       searchParams: Promise.resolve({}),
     });
     const { container } = render(ui);
-    await screen.findByRole("link", { name: "Open chart: Synthetic intents volume (fixture)" });
+    await screen.findByRole("region", { name: /exact data table/ });
     expect(await axe(container, axeConfig)).toHaveNoViolations();
   });
 });
@@ -760,7 +772,11 @@ describe("Data chart detail — the same gates as /charts", () => {
     render(ui);
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
-    expect([...viewRequests[0].searchParams.keys()]).toEqual(["definition_version", "start", "end"]);
+    // NI-092: the implicit filter preselection is forwarded; arbitrary URL
+    // fields are still dropped and reported.
+    expect([...viewRequests[0].searchParams.keys()].sort()).toEqual(
+      ["definition_version", "end", "filters", "start"]);
+    expect(viewRequests[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
     const status = await chartParameterNotice();
     expect(within(status).getByText("foo")).toBeInTheDocument();
     expect(within(status).getByText("admin")).toBeInTheDocument();
@@ -1024,7 +1040,7 @@ describe("Data chart detail island — selection URLs and continuation stay /dat
       />,
     );
 
-    const saveButton = await screen.findByRole("button", { name: "Sign in to save this chart" });
+    const saveButton = await screen.findByRole("button", { name: "+ Add to research" });
     await user.click(saveButton);
     expect(routerPush).toHaveBeenCalledTimes(1);
     const [href] = routerPush.mock.calls[0];
@@ -1061,9 +1077,15 @@ describe("NI-080 workspace explorer context", () => {
 
   it("links Intents charts into the workspace detail rather than the public layout", async () => {
     const chart = definitionFixture({ chart_id: "intents-volume", category: "activity" });
-    installApiMock([catalogRouteFor("activity", [chart])]);
+    installApiMock([
+      catalogRouteFor("activity", [chart]),
+      viewRoute("intents-volume", chart),
+    ]);
     render(await WorkspaceDataCategoryPage({ params: Promise.resolve({ category: "intents" }), searchParams: Promise.resolve({}) }));
-    expect(screen.getByRole("link", { name: `Open chart: ${chart.title}` })).toHaveAttribute("href", "/workspace/data/intents/intents-volume");
+    expect(screen.getByRole("link", { name: chart.title })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/workspace\/data\/intents\/intents-volume\?/),
+    );
   });
 
   it("keeps catalog search, category tabs and chart links inside workspace", async () => {
@@ -1110,8 +1132,10 @@ it("NI-080 featured chart resolves its default range against the same old approv
   expect(views).toHaveLength(2);
   expect(views[1].searchParams.get("end")).toBe("2026-01-15");
   expect(views[1].searchParams.get("dataset_version")).toBe(DATASET_ID);
-  const link = screen.getByRole("link", { name: /Inspect range and data/ });
+  // NI-095: the card title links to the clean detail URL — the detail page
+  // recomputes the same deterministic implicit default itself.
+  const link = screen.getByRole("link", { name: "Synthetic gross fees (fixture)" });
   expect(link.getAttribute("href")).toContain("/workspace/data/intents/observed-conversions?");
-  expect(link.getAttribute("href")).toContain("end=2026-01-15");
-  expect(link.getAttribute("href")).toContain(`dataset_version=${DATASET_ID}`);
+  expect(link.getAttribute("href")).toContain("version=1");
+  expect(link.getAttribute("href")).not.toContain("dataset_version=");
 });

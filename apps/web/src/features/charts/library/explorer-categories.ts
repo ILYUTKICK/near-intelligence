@@ -100,10 +100,8 @@ export const EXPLORER_CATEGORIES: readonly ExplorerCategory[] = [
       "What gross fees are reported, and what cash payouts reached the selected wallets?",
     scopeNote:
       "Charts from the registry fees and treasury categories: provider-reported gross "
-      + "fees, the fee/volume association, and treasury payouts. Economically "
-      + "attributable protocol revenue, capture rate and fee-funded buybacks stay "
-      + "gated (OQ-01/OQ-08) and are listed with their recorded reasons — gross fees "
-      + "and treasury payouts are not substitutes for revenue.",
+      + "fees, the fee/volume association, and treasury payouts — never summed across "
+      + "qualified sources, and never presented as attributable protocol revenue.",
     emptyExplanation: {
       heading: "No chart is registered for this category yet",
       body:

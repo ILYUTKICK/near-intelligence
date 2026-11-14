@@ -1,0 +1,9 @@
+# Final origin only. Caddy provisions/renews TLS and redirects HTTP to HTTPS
+# when DNS and inbound80/443 are ready. Local validation never starts Caddy.
+near-intelligence.me {
+	encode zstd gzip
+	header -Server
+	# The same-origin Next gateway authenticates private/API requests.
+	# Caddy adds no response cache and never routes around the gateway.
+	reverse_proxy web:3000
+}

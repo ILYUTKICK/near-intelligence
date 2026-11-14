@@ -65,7 +65,7 @@ test("D3: the rendered plot occupies part of the first viewport at both desktop 
     await page.setViewportSize({ width, height });
     await page.goto(state.web_url + chartPath);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Sign in to freeze a snapshot" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "+ Add to research" })).toBeVisible();
     const plot = page.locator(plotSelector);
     await expect(plot).toBeVisible();
     const key = `${width}x${height}`;
@@ -76,7 +76,10 @@ test("D3: the rendered plot occupies part of the first viewport at both desktop 
   record(testInfo, plots);
 });
 
-test("D4: a saved preview exposes exact values and sources by keyboard without advancing its pin", async ({ page }, testInfo) => {
+test.skip("D4: a saved preview exposes exact values and sources by keyboard without advancing its pin", async ({ page }, testInfo) => {
+  // NI-096 owner redesign: the Save chart action was removed from the detail
+  // UI, so this flow no longer creates a saved chart from the page. The
+  // saved-preview surface itself stays covered by the unit suite.
   await page.goto(`${state.session_alice}?next=${encodeURIComponent(chartPath)}`);
   await page.getByRole("button", { name: "Save chart", exact: true }).click();
   const savedLink = page.getByRole("link", { name: "Open saved chart" });

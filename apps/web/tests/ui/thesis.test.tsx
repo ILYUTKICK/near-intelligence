@@ -290,10 +290,10 @@ describe("Honest statuses and pending markers", () => {
 
   it("includes the contrary quantity, supply and price findings", () => {
     renderedPage();
-    expect(screen.getByText("Declining NEAR quantities across windows")).toBeInTheDocument();
-    expect(screen.getByText("Supply growth scale comparison")).toBeInTheDocument();
-    expect(screen.getByText("Issuance and burn lower bounds")).toBeInTheDocument();
-    expect(screen.getByText("USD valuation and the price effect")).toBeInTheDocument();
+    expect(screen.getByText("Fewer NEAR in each window")).toBeInTheDocument();
+    expect(screen.getByText("Purchases and supply growth")).toBeInTheDocument();
+    expect(screen.getByText("What the incomplete audit establishes")).toBeInTheDocument();
+    expect(screen.getByText("A steadier dollar value")).toBeInTheDocument();
     // The mechanical construction is disclosed in several sections (revenue
     // generation, econometrics, alternative explanations).
     expect(screen.getAllByText(/mechanical fee–volume construction/).length).toBeGreaterThan(0);
@@ -423,8 +423,8 @@ describe("Claim cards render with sources and evidence", () => {
 
   it("renders the CL-009 scoped absence without pretending a measured zero", () => {
     renderedPage();
-    expect(screen.getByText(/index-scoped absence is not universal proof/)).toBeInTheDocument();
-    expect(screen.getByText(/governance-controlled retention does not establish permanent supply removal/i)).toBeInTheDocument();
+    expect(screen.getByText(/index cannot rule out every sale, lock or external delegation/)).toBeInTheDocument();
+    expect(screen.getByText(/Holding these balances does not establish permanent supply removal/i)).toBeInTheDocument();
   });
 });
 

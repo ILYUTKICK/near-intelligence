@@ -42,7 +42,6 @@ function chartSelectionUrl(): string {
 
 const CUSTOM_START = "2026-01-03";
 const CUSTOM_END = "2026-01-12";
-const CUSTOM_LINE = `${CUSTOM_START} – ${CUSTOM_END} (UTC, end exclusive)`;
 
 test("custom range: Apply resolves the requested window and survives reload, sign-in, save and reopen", async ({ page }) => {
   test.setTimeout(240_000);
@@ -75,7 +74,7 @@ test("custom range: Apply resolves the requested window and survives reload, sig
   await expect(page.getByText(state.day_values[CUSTOM_START]).first()).toBeVisible();
 
   // -- 4. The sign-in continuation carries the custom range ---------------- //
-  await page.getByRole("button", { name: "Sign in to add it to research" }).click();
+  await page.getByRole("button", { name: "+ Add to research" }).click();
   await expect(page).toHaveURL(/\/login\?next=/);
   const nextPath = new URL(page.url()).searchParams.get("next") ?? "";
   const nextSelection = new URL(nextPath, state.web_url).searchParams;
@@ -85,16 +84,25 @@ test("custom range: Apply resolves the requested window and survives reload, sig
   expect(nextSelection.get("filters")).toBe(JSON.stringify({ source: "SRC-LLAMA" }));
   await page.goto(`${state.session_alice}?next=${encodeURIComponent(nextPath)}`);
   await expect.poll(() => page.url()).toContain(`start=${CUSTOM_START}`);
-  await expect(page.getByRole("button", { name: "Save chart", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add to research", exact: true })).toBeVisible();
 
-  // -- 5. Save through the real UI and reopen it --------------------------- //
-  await page.getByRole("button", { name: "Save chart", exact: true }).click();
-  await expect(page.getByText("Chart saved. Your range and filters are preserved.")).toBeVisible();
-  await page.getByRole("link", { name: "Open saved chart" }).click();
-  await expect(page).toHaveURL(/\/workspace\/saved-charts\//);
+  // -- 5. Add through the real UI and reopen it ---------------------------- //
+  // NI-096: the Save chart action was removed from the detail UI; the owned
+  // persistence flow is Add to research (the pinned selection rides along).
+  await page.getByRole("button", { name: "Add to research", exact: true }).click();
+  const addDialog = page.getByRole("dialog");
+  await expect(addDialog.getByText(/Inspected dataset: /)).toBeVisible();
+  await addDialog.getByRole("button", { name: "Confirm Add Chart" }).click();
+  await expect(addDialog).toBeHidden();
+  // The chart lands in an owned research document; the workspace lists it.
+  await page.goto(`${state.web_url}/workspace`);
+  const research = page.getByRole("link", { name: /Continue research/ }).first();
+  await expect(research).toBeVisible();
+  await research.click();
+  await expect(page).toHaveURL(/\/workspace\/research\//);
   await expect(page.getByText(state.day_values[CUSTOM_START]).first()).toBeVisible();
 
-  // -- 6. The compact Saved Charts card shows the custom window ------------ //
-  await page.goto(`${state.web_url}/workspace/saved-charts`);
-  await expect(page.getByText(CUSTOM_LINE).first()).toBeVisible();
+  // NI-096: the Save chart action was removed from the detail UI, so the
+  // custom window persists through the owned research document above; the
+  // saved-preview surface itself stays covered by the unit suite.
 });

@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label";
 import { ChartView } from "@/features/charts/renderer/ChartView";
 import type { ChartDefinitionResponse, ChartViewResponse } from "@/features/charts/renderer/view-types";
 
-import { ChartAuthActions } from "./ChartAuthActions";
-import { chartObservation } from "../renderer/observation-context";
+import { CategoryChartActions } from "@/features/charts/library/CategoryChartActions";
 import { ChartFilterControls } from "../filters/FilterControls";
 import {
   detailHrefFor,
@@ -140,6 +139,8 @@ export function ChartDetailClient({
         selection={{ start: selection.start, end: selection.end, filters: selection.filters }}
         mode={live ? "live" : "historical"}
         presentation="compact"
+        sourceDrawer={false}
+        exactValues="sr-only"
         onSelectionChange={handleSelectionChange}
         actions={
           <>
@@ -199,14 +200,14 @@ export function ChartDetailClient({
                 </Button>
               ) : null}
             </div>
-            <ChartAuthActions
+            {/* NI-096: exactly one primary action on the detail page. */}
+            <CategoryChartActions
+              variant="primary"
               nextPath={detailHref({ ...selection, ...view?.selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
-              saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
-                selection: view.selection, dataset_version_id: view.dataset.id, mode: "live" } : undefined}
-              freezeInput={view ? { chart_definition_version_id: definition.id, dataset_version_id: view.dataset.id,
-                selection: view.selection } : undefined}
-              insightContext={view ? chartObservation(view) : undefined}
               basePath={`${basePath}/`}
+              saveInput={view ? { chart_definition_version_id: definition.id, label: definition.title,
+                selection: view.selection, dataset_version_id: view.dataset.id, mode: "live",
+                snapshot_id: null } : undefined}
             />
           </>
         }

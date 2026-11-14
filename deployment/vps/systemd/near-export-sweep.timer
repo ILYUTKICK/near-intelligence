@@ -1,0 +1,10 @@
+[Unit]
+Description=Sweep expired NEAR export bytes hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=1h
+Unit=near-export-sweep.service
+
+[Install]
+WantedBy=timers.target
