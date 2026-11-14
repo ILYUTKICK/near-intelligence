@@ -77,6 +77,10 @@ STORAGE_SCALE = Decimal("1e-30")
 SUPPLY_FLOAT_TOLERANCE_NEAR = Decimal("0.01")
 
 PRICE_BASES = ("start", "end")
+# NI-079 acceptance: the emitted observation dimensions must use the SAME
+# vocabulary as the chart filter contract (charts/filter_registry.py
+# FILTER_PRICE_BASES); the internal price lookup keys stay short.
+PRICE_BASIS_LABELS = {"start": "start_of_day", "end": "end_of_day"}
 PROVIDER_SOURCES = ("SRC-LLAMA", "SRC-DASHBOARD")
 
 TREASURY_ACCOUNTS = ("buybacks.multisignature.near", "fefundsadmin.sputnik-dao.near",
@@ -324,6 +328,47 @@ def formula_observed_near_purchases_v1(inputs: MetricInputs, *, shape: str) -> l
 
 
 @exact_arithmetic
+def formula_observed_near_purchases_window_totals_v1(inputs: MetricInputs, *,
+                                                     shape: str) -> list[dict]:
+    """Per-window purchase totals for the combined supply-context dataset (NI-094).
+
+    Sums the exact verified daily purchase records the daily dataset publishes
+    over each window period, so one approved dataset can carry both members the
+    supply-context chart binds. A window whose days the extract covers but that
+    holds no qualifying records is a proven zero — never a missing day silently
+    treated as zero: the daily coverage gate has already required every window
+    day to be covered.
+    """
+    require_daily_coverage(inputs)
+    flows = purchases_by_day(inputs)
+    definition = metric_registry.definition_by_metric_id("observed_near_purchases")
+    records: list[dict] = []
+    for start, end in _shape_periods(inputs, shape):
+        total = Decimal(0)
+        events = 0
+        days_with_records = 0
+        cursor = start.date()
+        while cursor < end.date():
+            amount = flows.by_day.get(cursor)
+            if amount is not None:
+                days_with_records += 1
+                total += amount
+                events += flows.events_by_day.get(cursor, 0)
+            cursor += dt.timedelta(days=1)
+        quality: dict = {}
+        if days_with_records == 0:
+            quality["verified_zero"] = (
+                f"the extract covers every day of {start.date().isoformat()} … "
+                f"{end.date().isoformat()} and holds no qualifying purchase "
+                "records; the window total is a proven zero")
+        records.append(observation_record(
+            definition, period_start=start, period_end=end, dimensions={},
+            value=near_amount(total), bound_kind="exact", quality_status="verified",
+            quality=quality))
+    return records
+
+
+@exact_arithmetic
 def formula_conversion_count_v1(inputs: MetricInputs, *, shape: str) -> list[dict]:
     require_daily_coverage(inputs)
     flows = purchases_by_day(inputs)
@@ -474,14 +519,14 @@ def formula_near_price_usd_v1(inputs: MetricInputs, *, shape: str) -> list[dict]
         day = _day_of((start, end))
         for basis in PRICE_BASES:
             value = prices.by_day.get((day, basis))
-            dimensions = {"price_basis": basis}
+            dimensions = {"price_basis": PRICE_BASIS_LABELS[basis]}
             if value is None:
                 records.append(observation_record(
                     definition, period_start=start, period_end=end, dimensions=dimensions,
                     value=None, bound_kind=None, quality_status="missing",
                     quality={"reason": f"no saved NEAR/USD point at "
                                        f"{canonical_timestamp(point_instant(day, basis))} "
-                                       f"(basis {basis}); no forward fill"}))
+                                       f"(basis {PRICE_BASIS_LABELS[basis]}); no forward fill"}))
                 continue
             records.append(observation_record(
                 definition, period_start=start, period_end=end, dimensions=dimensions,
@@ -505,7 +550,7 @@ def formula_estimated_purchase_usd_v1(inputs: MetricInputs, *, shape: str) -> li
     records: list[dict] = []
     for start, end in _shape_periods(inputs, shape):
         for basis in PRICE_BASES:
-            dimensions = {"price_basis": basis}
+            dimensions = {"price_basis": PRICE_BASIS_LABELS[basis]}
             missing_days: list[dt.date] = []
             total = Decimal(0)
             cursor = start.date()
@@ -524,7 +569,7 @@ def formula_estimated_purchase_usd_v1(inputs: MetricInputs, *, shape: str) -> li
                         value=None, bound_kind=None, quality_status="missing",
                         quality={"reason": f"no saved NEAR/USD price at "
                                            f"{canonical_timestamp(point_instant(start.date(), basis))} "
-                                           f"(basis {basis}); the USD value is missing, "
+                                           f"(basis {PRICE_BASIS_LABELS[basis]}); the USD value is missing, "
                                            "not zero"}))
                 else:
                     records.append(observation_record(
@@ -538,7 +583,7 @@ def formula_estimated_purchase_usd_v1(inputs: MetricInputs, *, shape: str) -> li
             records.append(observation_record(
                 definition, period_start=start, period_end=end, dimensions=dimensions,
                 value=total, bound_kind="estimate", quality_status="verified",
-                quality={"price_basis": basis, "exact_value": decimal_string(total),
+                quality={"price_basis": PRICE_BASIS_LABELS[basis], "exact_value": decimal_string(total),
                          "rounding": "stored at the NUMERIC(78,30) scale; the exact value "
                                      "is preserved here and in the manifest artifact"}))
     return records

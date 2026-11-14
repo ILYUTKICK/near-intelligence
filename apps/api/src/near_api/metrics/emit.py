@@ -48,6 +48,7 @@ from near_api.metrics.compute import (
     formula_near_price_usd_v1,
     formula_net_supply_change_near_v1,
     formula_observed_near_purchases_v1,
+    formula_observed_near_purchases_window_totals_v1,
     formula_protocol_capture_rate_v1,
     formula_protocol_revenue_usd_v1,
     formula_provider_gross_fees_usd_v1,
@@ -74,6 +75,10 @@ FLOWS_DATASET_MEMBERS: tuple[tuple[str, int], ...] = (
     ("effective_gross_fee_bps", 1),
     ("protocol_revenue_usd", 1), ("protocol_capture_rate", 1),
 )
+SUPPLY_CONTEXT_DATASET_MEMBERS: tuple[tuple[str, int], ...] = (
+    ("observed_near_purchases", 1), ("net_supply_change_near", 1),
+)
+
 WINDOWS_DATASET_MEMBERS: tuple[tuple[str, int], ...] = (
     ("total_supply_near", 1), ("net_supply_change_near", 1),
     ("issuance_lower_bound_near", 1),
@@ -112,9 +117,18 @@ FORMULAS: dict[tuple[str, int], Callable] = {
     ("fee_funded_buybacks_near", 1): formula_fee_funded_buybacks_near_v1,
 }
 
+# NI-094: shape-specific formula overrides. The combined supply-context
+# dataset publishes per-window purchase totals, not the daily flow records.
+SHAPE_FORMULAS: dict[str, dict[tuple[str, int], Callable]] = {
+    "windows": {
+        ("observed_near_purchases", 1): formula_observed_near_purchases_window_totals_v1,
+    },
+}
+
 DATASET_PERIOD_SHAPES = {
     "metrics.flows.daily": "daily",
     "metrics.windows.snapshot": "windows",
+    "metrics.supply-context.windows": "windows",
 }
 
 
@@ -201,15 +215,21 @@ def build_manifest(inputs: MetricInputs, *, dataset_key: str,
     shape = DATASET_PERIOD_SHAPES.get(dataset_key)
     if shape is None:
         raise MetricComputationError(f"unknown dataset key {dataset_key!r}")
+    members_by_key = {
+        "metrics.flows.daily": FLOWS_DATASET_MEMBERS,
+        "metrics.windows.snapshot": WINDOWS_DATASET_MEMBERS,
+        "metrics.supply-context.windows": SUPPLY_CONTEXT_DATASET_MEMBERS,
+    }
+    members = members_by_key[dataset_key]
     if dataset_key == "metrics.flows.daily":
-        members = FLOWS_DATASET_MEMBERS
         window_start, window_end = inputs.window_start, inputs.window_end_exclusive
     else:
-        members = WINDOWS_DATASET_MEMBERS
         window_start, window_end = windows_dataset_span(inputs)
     observations: list[dict] = []
+    shape_formulas = SHAPE_FORMULAS.get(shape, {})
     for member_id, member_version in members:
-        formula = FORMULAS.get((member_id, member_version))
+        formula = shape_formulas.get((member_id, member_version)) \
+            or FORMULAS.get((member_id, member_version))
         if formula is None:
             raise MetricComputationError(
                 f"metric {member_id} v{member_version} has no registered formula; "
