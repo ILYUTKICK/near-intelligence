@@ -23,7 +23,7 @@ const dataDirections: readonly { title: string; description: string; href: strin
 ];
 
 const workflow = [
-  { title: "Start with the thesis", body: "Can Intents create lasting value for NEAR? Read the four hypotheses and what would weaken each one.", href: "/research#question", action: "Read the hypotheses" },
+  { title: "Start with the thesis", body: "Read the investment case, the four hypotheses it rests on and what would weaken each one.", href: "/research#question", action: "Read the hypotheses" },
   { title: "Check the evidence", body: "Open a chart, choose a period and check its source. Compare what you find with the claims in the article.", href: "/charts", action: "Browse charts" },
   { title: "Write your assessment", body: "Save charts in your workspace, cite the evidence alongside your notes and export a saved revision.", href: "/workspace", action: "Start a research document" },
 ] as const;
