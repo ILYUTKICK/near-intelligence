@@ -363,8 +363,9 @@ Use their `--help`, [data pipeline](DATA_PIPELINE.md) and
 [reproduction contracts](REPRODUCIBILITY.md) for required bindings and permissions.
 These run with the appropriate operator role, not a browser request. There is
 no universal `seed-demo-data` command or bundled production-data download.
-Model fitting/reproduction also needs separately supplied inputs and research
-modules; the runtime image intentionally excludes the local `research/` tree.
+Model fitting/reproduction runs from a source checkout with the versioned
+`research/models` modules and separately supplied inputs; the runtime image
+intentionally excludes the `research/` tree.
 
 Versioned registries are registered through the existing
 `register_definitions` and `register_charts` Python functions in an operator
