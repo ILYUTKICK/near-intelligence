@@ -39,22 +39,24 @@ export function ClaimCard({ claim }: { readonly claim: ThesisClaim }) {
       aria-labelledby={`${claim.id}-heading`}
       className="min-w-0 py-5"
     >
-      <p className="font-ui text-ui leading-ui text-text-secondary">
-        <span className="font-medium text-text">{claim.id}</span> — {claim.assessment}
-      </p>
       <h3 id={`${claim.id}-heading`} className="mt-1 scroll-mt-8 text-heading leading-heading">
         {claim.title}
       </h3>
       <p className="text-body leading-body text-text-secondary mt-2">{claim.observation}</p>
       {claim.caution ? <p className="mt-2 text-ui leading-ui text-text-secondary">{claim.caution}</p> : null}
 
-      <details className="mt-2">
-        <summary className="w-fit cursor-pointer py-2 text-ui font-medium text-accent">
-          {claim.quantities.length > 0 ? "Recorded values and sources" : "Sources and definitions"}
+      <details className="group mt-2">
+        <summary className="inline-flex min-h-9 cursor-pointer list-none items-center gap-2 rounded-control border border-border bg-surface px-3 py-1.5 text-ui font-medium text-accent hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
+          <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="size-3.5 shrink-0 group-open:rotate-90"><path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Data and sources
           <span className="sr-only"> for {claim.id}</span>
         </summary>
+        <p className="font-ui text-ui leading-ui text-text-secondary">
+          <span className="font-medium text-text">{claim.id}</span> — {claim.assessment}
+        </p>
+
         {claim.quantities.length > 0 ? (
-          <div className={tableWrapClasses}>
+          <div className={tableWrapClasses} role="region" aria-label={`${claim.title}: data`} tabIndex={0}>
             <table className="w-full table-fixed border-collapse break-words text-left">
               <caption className="sr-only">{`${claim.id} recorded quantities, scopes and sources`}</caption>
               <thead>
