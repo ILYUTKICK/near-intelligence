@@ -15,6 +15,8 @@ import { resetRateLimitForTests } from "@/lib/auth/rate-limit";
 
 const ENV = {
   APP_ENV: "test",
+  APP_ORIGIN: "https://near-intelligence.me",
+  API_INTERNAL_URL: "http://api:8000",
   NEXT_PUBLIC_SUPABASE_URL: "https://dev.supabase.co",
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_synthetic_test_key_0123456789",
   SUPABASE_JWT_ISSUER: "https://dev.supabase.co/auth/v1",
@@ -263,7 +265,15 @@ describe("Email-link callback", () => {
         url.searchParams.set(key, value);
       }
     }
-    return new NextRequest(url);
+    // Standalone Next.js sees an internal origin. Neither that URL nor
+    // attacker-controlled proxy headers may determine a callback redirect.
+    return new NextRequest(url, {
+      headers: {
+        host: "evil.example",
+        "x-forwarded-host": "forwarded-evil.example",
+        "x-forwarded-proto": "http",
+      },
+    });
   }
 
   it("exchanges a valid signup link for HttpOnly cookies and redirects internally", async () => {
@@ -274,7 +284,7 @@ describe("Email-link callback", () => {
       callbackRequest({ token_hash: "hash-1", type: "signup", return_to: "/workspace" }),
     );
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("http://localhost:3000/workspace");
+    expect(response.headers.get("location")).toBe("https://near-intelligence.me/workspace");
     const session = findCookie(response.headers.getSetCookie(), SESSION_COOKIE);
     expect(session).toContain("HttpOnly");
     expect(String(providerFetchMock.mock.calls[0][0])).toContain("/auth/v1/verify");
@@ -282,12 +292,13 @@ describe("Email-link callback", () => {
 
   it("rejects missing or invalid link parameters before calling the provider", async () => {
     for (const params of [
-      { type: "signup" },
+      { type: "signup", return_to: "https://example.com" },
       { token_hash: "hash-1", type: "magiclink" },
     ]) {
       const response = await callbackGet(callbackRequest(params));
       expect(response.status).toBe(307);
       const location = new URL(response.headers.get("location") as string);
+      expect(location.origin).toBe(ENV.APP_ORIGIN);
       expect(location.pathname).toBe("/login");
       expect(location.search).toBe("?error=invalid_link");
       expect(providerFetchMock).not.toHaveBeenCalled();
@@ -303,13 +314,35 @@ describe("Email-link callback", () => {
       expect(response.status).toBe(307);
       const location = new URL(response.headers.get("location") as string);
       expect(location.pathname).toBe("/");
-      expect(location.host).toBe("localhost:3000");
+      expect(location.origin).toBe(ENV.APP_ORIGIN);
     }
   });
 
   it("maps expired or used links to a generic expired error", async () => {
     providerFetchMock.mockResolvedValueOnce(providerReply(400, { msg: "Email link is invalid or has expired" }));
     const response = await callbackGet(callbackRequest({ token_hash: "old", type: "recovery" }));
-    expect(response.headers.get("location")).toContain("error=expired_link");
+    expect(response.headers.get("location")).toBe(`${ENV.APP_ORIGIN}/login?error=expired_link`);
+  });
+
+  it("returns provider outages to the configured public origin", async () => {
+    providerFetchMock.mockRejectedValueOnce(new Error("provider unavailable"));
+    const response = await callbackGet(
+      callbackRequest({ token_hash: "hash-1", type: "signup", return_to: "https://example.com" }),
+    );
+    expect(response.headers.get("location")).toBe(`${ENV.APP_ORIGIN}/login?error=unavailable`);
+  });
+
+  it("fails closed without a valid canonical origin before provider exchange", async () => {
+    process.env.APP_ORIGIN = "not-a-url";
+    // Load a fresh environment module to exercise validation without its
+    // previous test's validated configuration cache.
+    vi.resetModules();
+    const { GET: invalidConfigCallback } = await import("@/app/auth/callback/route");
+    const response = await invalidConfigCallback(
+      callbackRequest({ token_hash: "hash-1", type: "signup" }),
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get("location")).toBeNull();
+    expect(providerFetchMock).not.toHaveBeenCalled();
   });
 });
