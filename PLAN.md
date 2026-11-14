@@ -190,10 +190,11 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 | 78 | [NI-084](docs/TASKS.md) | Record the Blog and research-publication product direction | P1 | A |
 | 79 | [NI-085](docs/TASKS.md) | Implement the public Blog and research-publication catalog | P1 | A |
 | 80 | [NI-086](docs/TASKS.md) | Implement the approved editorial Overview design | P1 | A |
-| 81 | [NI-079](docs/TASKS.md) | Pass final integrated local release acceptance | P0 | A |
-| 82 | [NI-067](docs/TASKS.md) | Deploy staging and production with safe configuration | P0 | A |
-| 83 | [NI-068](docs/TASKS.md) | Verify backups, restore and operational monitoring | P0 | A |
-| 84 | [NI-069](docs/TASKS.md) | Run hackathon demo and reviewer reproduction | P0 | A |
+| 81 | [NI-087](docs/TASKS.md) | Present the complete investment thesis and simplify the chart library | P0 | A |
+| 82 | [NI-079](docs/TASKS.md) | Pass final integrated local release acceptance | P0 | A |
+| 83 | [NI-067](docs/TASKS.md) | Deploy staging and production with safe configuration | P0 | A |
+| 84 | [NI-068](docs/TASKS.md) | Verify backups, restore and operational monitoring | P0 | A |
+| 85 | [NI-069](docs/TASKS.md) | Run hackathon demo and reviewer reproduction | P0 | A |
 
 ## 9. Изменение самого плана
 

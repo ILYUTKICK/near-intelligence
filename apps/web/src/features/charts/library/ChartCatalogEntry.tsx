@@ -11,13 +11,29 @@ export function ChartCatalogEntry({ chart, href, row = false }: {
   row?: boolean;
 }) {
   const available = chart.data_status === "available";
+  if (row) {
+    return (
+      <li className="border-b border-border">
+        <Link
+          href={href}
+          aria-label={`Open chart: ${chart.title}`}
+          aria-describedby={available ? undefined : `chart-status-${chart.chart_id}`}
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-1 px-2 py-3 hover:bg-surface-muted/55 sm:px-4"
+        >
+          <h2 className="text-left font-sans text-base font-medium leading-snug">{chart.title}</h2>
+          <ProductIcon name="arrow" className="col-start-2 row-start-1 size-4 text-accent" />
+          <p className="text-metadata text-text-secondary">
+            {categoryWordings[chart.category]}
+            {!available ? <> · <span id={`chart-status-${chart.chart_id}`}>Unavailable</span></> : null}
+          </p>
+        </Link>
+      </li>
+    );
+  }
   return (
-    <li className={cn(
-      "relative min-w-0 px-6 py-4 hover:bg-surface-muted/55",
-      row ? "flex flex-wrap items-center justify-between gap-x-5 gap-y-3" : "paper-panel",
-    )}>
-      <div className="min-w-0 flex-1 basis-72">
-        <h2 aria-label={chart.title} className={row ? "font-sans text-ui font-semibold" : "text-heading"}>
+    <li className="paper-panel relative min-w-0 px-6 py-4 hover:bg-surface-muted/55">
+      <div className="min-w-0">
+        <h2 aria-label={chart.title} className="text-heading">
           <Link
             href={href}
             aria-label={`Open chart: ${chart.title}`}
@@ -36,7 +52,7 @@ export function ChartCatalogEntry({ chart, href, row = false }: {
           <p className="mt-2 text-ui text-text-secondary">Reason: {chart.unavailable_reason}</p>
         ) : null}
       </div>
-      <div className={cn("flex items-center gap-4", !row && "mt-4")}>
+      <div className="mt-4 flex items-center gap-4">
         <span className={cn("rounded-full px-2.5 py-1 text-metadata font-medium", available ? "bg-sage text-accent" : "bg-surface-muted text-text-secondary")}>
           {available ? "Available" : "Unavailable — this is not zero"}
         </span>

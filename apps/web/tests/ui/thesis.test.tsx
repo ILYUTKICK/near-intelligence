@@ -98,8 +98,8 @@ describe("Thesis structure and anchors", () => {
 
   it("renders a complete table of contents matching the sections", () => {
     renderedPage();
-    const toc = screen.getByRole("navigation", { name: "Thesis sections" });
-    const links = within(toc).getAllByRole("link");
+    const toc = screen.getByRole("navigation", { name: "Thesis sections", hidden: true });
+    const links = within(toc).getAllByRole("link", { hidden: true });
     expect(links).toHaveLength(15);
     links.forEach((link, index) => {
       expect(link.getAttribute("href")).toBe(`#${thesisToc[index].id}`);
@@ -247,7 +247,7 @@ describe("Honest statuses and pending markers", () => {
       "Not supported on current evidence",
       "Unresolved",
     ]);
-    expect(screen.getAllByText(/Weakening condition:/)).toHaveLength(4);
+    expect(screen.getAllByText("What would weaken it.")).toHaveLength(4);
     for (const code of ["H1", "H2", "H3", "H4"]) {
       expect(screen.getAllByText(code).length).toBeGreaterThan(0);
     }
@@ -352,16 +352,17 @@ describe("Public projection allowlists", () => {
       ...verifiedExternalLinks,
       ...thesisToc.map((entry) => `#${entry.id}`),
       ...hypothesisIds.map((id) => `#${id}`),
-      // Provenance anchors for the opening, USD windows and supply figures.
-      "#CL-001-heading",
-      "#CL-002-heading",
-      "#CL-004-heading",
-      "#CL-007-heading",
+      "#purchase-windows",
+      "#hypothesis-assessment",
+      "#interactive-history",
+      "#thesis-usd-windows",
+      ...claimRegistry.map((claim) => `#${claim.id}-heading`),
     ]);
     const hrefs = Array.from(container.querySelectorAll("a")).map((anchor) => anchor.getAttribute("href"));
     expect(hrefs.length).toBeGreaterThan(0);
     for (const href of hrefs) {
       expect(allowed.has(href as string), `unexpected public link ${href}`).toBe(true);
+      if (href?.startsWith("#")) expect(document.getElementById(href.slice(1))).not.toBeNull();
     }
     // Unimplemented routes are never advertised. /models is the implemented
     // model catalog (NI-054) and is allowlisted; /data, /charts and /workspace
@@ -415,8 +416,8 @@ describe("Claim cards render with sources and evidence", () => {
         screen.getByRole("heading", { level: 3, name: claim.title }),
       ).toBeInTheDocument();
       expect(screen.getByText(`${claim.id} recorded quantities, scopes and sources`)).toBeInTheDocument();
-      const evidenceList = screen.getByRole("list", { name: `${claim.id} evidence links` });
-      expect(within(evidenceList).getAllByRole("link").length).toBe(claim.evidence.length);
+      const evidenceList = screen.getByRole("list", { name: `${claim.id} evidence links`, hidden: true });
+      expect(within(evidenceList).getAllByRole("link", { hidden: true }).length).toBe(claim.evidence.length);
     }
   });
 
@@ -443,7 +444,7 @@ describe("Compact hypothesis assessment (NI-076 D1)", () => {
       expect(card!.textContent).toContain(hypothesis.status);
       expect(card!.textContent).toContain(hypothesis.title);
       const link = within(card as HTMLElement).getByRole("link", {
-        name: `Read the full ${hypothesis.code} assessment`,
+        name: `Read the full ${hypothesis.code} assessment: ${hypothesis.title}`,
       });
       expect(link).toHaveAttribute("href", `#${hypothesis.id}`);
       // The anchor target is the unchanged full section below.
@@ -451,13 +452,10 @@ describe("Compact hypothesis assessment (NI-076 D1)", () => {
     }
   });
 
-  it("keeps the full thesis reachable: the overview links on to the executive summary", () => {
+  it("links the verdicts to the full research question and test criteria", () => {
     renderedPage();
-    const overview = document.getElementById("hypothesis-assessment");
-    expect(overview!.textContent).toMatch(/all fifteen sections, definitions and limitations/);
-    expect(screen.getByRole("link", { name: "continue to the executive summary" }))
-      .toHaveAttribute("href", "#executive-summary");
-    // All fifteen original sections remain rendered below the overview.
+    expect(screen.getByRole("link", { name: "Read the research question and test criteria" }))
+      .toHaveAttribute("href", "#question");
     for (const entry of thesisToc) {
       expect(document.getElementById(entry.id)).not.toBeNull();
     }

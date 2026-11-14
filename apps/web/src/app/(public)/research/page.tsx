@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { PageIntro } from "@/components/layout/PageIntro";
+import { AcquisitionComparison } from "@/features/public-research/AcquisitionComparison";
 import { ClaimCard } from "@/features/public-research/ClaimCard";
 import { DuplicateReleaseAction } from "@/features/public-research/DuplicateReleaseAction";
 import { MechanismFlow } from "@/features/public-research/MechanismFlow";
-import { RecordedPurchases } from "@/features/public-research/RecordedPurchases";
 import { InteractiveHistory } from "@/features/public-research/InteractiveHistory";
-import { SupplyScaleFigure, UsdWindowsFigure } from "@/features/public-research/ResearchFigures";
+import { scopePeriodLabel, SupplyScaleFigure } from "@/features/public-research/ResearchFigures";
 import {
   claimRegistry,
   thesis,
@@ -30,19 +29,14 @@ export const metadata: Metadata = { title: "Research — NEAR Intelligence" };
  * The content carries no private editor metadata and no live data fetching;
  * internal links stay on implemented routes and verified methodology anchors.
  *
- * NI-078 presentation (resolving NI-076 D1/D2 without changing the thesis):
- * a compact H1–H4 assessment sits beside the opening evidence with real
- * anchor links into the unchanged full sections, and the two missing
- * recorded-evidence figures (CL-004 USD windows, CL-007 supply-scale) render
- * in their owning sections through the shared claim-registry figure
- * components. All fifteen sections, definitions and limitations are intact.
+ * NI-087 puts the thesis, recorded window comparison and H1–H4 verdicts
+ * before the full assessment. The article retains the stable source anchors.
  */
 
-const sectionClasses = "mt-12 max-w-(--width-prose)";
-const h2Classes = "font-serif text-title leading-title";
-const bodyClasses = "text-body leading-body text-text-secondary mt-2";
-const listClasses =
-  "text-body leading-body text-text-secondary mt-3 max-w-(--width-prose) list-disc pl-5 flex flex-col gap-2";
+const sectionClasses = "mt-12 min-w-0 scroll-mt-8 border-t border-border pt-7";
+const h2Classes = "max-w-[28ch] font-serif text-title leading-title";
+const bodyClasses = "mt-3 max-w-[62ch] font-serif text-[1.25rem] leading-[1.5]";
+const listClasses = `${bodyClasses} list-disc space-y-2 pl-5`;
 const linkClasses =
   "text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 const noteClasses = "text-ui leading-ui text-text-secondary mt-3";
@@ -56,6 +50,29 @@ function getClaim(id: string): ThesisClaim {
   }
   return claim;
 }
+
+const purchaseClaim = getClaim("CL-002");
+const valuationClaim = getClaim("CL-004");
+const acquisitionWindows = purchaseClaim.quantities
+  .filter((quantity) => quantity.unit === "NEAR acquired")
+  .map((quantity) => {
+    const estimate = valuationClaim.quantities.find(
+      (entry) => entry.scope === quantity.scope && entry.unit === "USD (approximate acquisition value)",
+    );
+    if (!estimate) throw new Error(`Missing recorded USD valuation for ${quantity.scope}`);
+    return { label: scopePeriodLabel(quantity.scope), near: quantity.value, usd: estimate.value };
+  });
+
+const readingLinks = [
+  ["executive-summary", "Investment thesis"],
+  ["purchase-windows", "Purchases over time"],
+  ["hypothesis-assessment", "Hypotheses and verdicts"],
+  ["revenue-capture", "From fees to treasury"],
+  ["token-economics", "Purchases and supply"],
+  ["interactive-history", "Explore the data"],
+  ["assessment", "Final assessment"],
+  ["sources-reproducibility", "Sources and notes"],
+] as const;
 
 function EvidenceLinks({ links, label }: { readonly links: readonly ClaimEvidenceLink[]; readonly label: string }) {
   return (
@@ -71,12 +88,6 @@ function EvidenceLinks({ links, label }: { readonly links: readonly ClaimEvidenc
   );
 }
 
-/**
- * NI-076 D1 — compact H1–H4 assessment beside the opening evidence. Statuses
- * restate `hypothesis.status` from the thesis verbatim; each card links to
- * the unchanged full section (real anchors, keyboard reachable). No new
- * claims, no API dependency; the block is server-rendered.
- */
 function HypothesisAssessment() {
   const { question } = thesis;
   return (
@@ -88,30 +99,20 @@ function HypothesisAssessment() {
       <h2 id="hypothesis-assessment-heading" className={h2Classes}>
         Hypothesis assessment at a glance
       </h2>
-      <p className={bodyClasses}>
-        The four canonical hypotheses currently carry these recorded assessments. Each card links
-        to the full statement below — question, rationale, weakening condition and cited claims.
-      </p>
-      <ul className="mt-4 grid gap-3 sm:grid-cols-2" aria-label="H1–H4 current assessment">
+      <ul className="mt-4 divide-y divide-border border-y border-border" aria-label="H1–H4 current assessment">
         {question.hypotheses.map((hypothesis) => (
-          <li key={hypothesis.id} className="rounded-surface border border-border bg-surface p-4">
-            <p className="font-ui text-ui leading-ui text-text-secondary">
-              <span className="font-medium text-text">{hypothesis.code}</span> —{" "}
-              <span className="font-medium text-text">{hypothesis.status}</span>
-            </p>
-            <p className="text-heading leading-heading mt-1">{hypothesis.title}</p>
-            <a href={`#${hypothesis.id}`} className={`${linkClasses} mt-2 inline-block`}>
-              Read the full {hypothesis.code} assessment
+          <li key={hypothesis.id}>
+            <a href={`#${hypothesis.id}`} aria-label={`Read the full ${hypothesis.code} assessment: ${hypothesis.title}`} className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 py-3 hover:bg-surface-muted/60">
+              <span className="text-ui font-semibold text-accent">{hypothesis.code}</span>
+              <span className="font-serif text-xl font-medium">{hypothesis.title}</span>
+              <span aria-hidden="true" className="col-start-3 row-start-1 text-accent">→</span>
+              <span className="col-start-2 text-ui text-text-secondary">{hypothesis.status}</span>
             </a>
           </li>
         ))}
       </ul>
       <p className={noteClasses}>
-        The complete thesis follows with all fifteen sections, definitions and limitations:{" "}
-        <a href="#executive-summary" className={linkClasses}>
-          continue to the executive summary
-        </a>
-        .
+        <a href="#question" className={linkClasses}>Read the research question and test criteria</a>
       </p>
     </section>
   );
@@ -138,27 +139,12 @@ function ThesisBody() {
 
   return (
     <div className="min-w-0">
-      <RecordedPurchases />
-      <p className="mt-4 rounded-surface bg-sage px-5 py-4 text-ui text-text">
-        {thesis.evidenceStatus}
-      </p>
-
-      {/* NI-076 D1: compact overview of the four canonical hypotheses. */}
-      <HypothesisAssessment />
-
-      {/* NI-045 duplication CTA: rendered only when a published release
-          exists for the thesis slug; otherwise it renders nothing. */}
-      <DuplicateReleaseAction slug={thesisReleaseSlug} nextPath="/research" />
-
-      <MechanismFlow />
-      <InteractiveHistory />
-
       {/* 1. Executive summary */}
-      <section id={executiveSummary.id} aria-labelledby={`${executiveSummary.id}-heading`} className={sectionClasses}>
+      <section id={executiveSummary.id} aria-labelledby={`${executiveSummary.id}-heading`} className="min-w-0 scroll-mt-8">
         <h2 id={`${executiveSummary.id}-heading`} className={h2Classes}>
           {executiveSummary.title}
         </h2>
-        <p className="text-body leading-body text-text mt-3">{executiveSummary.lead}</p>
+        <p className={bodyClasses}><strong>The thesis.</strong> {executiveSummary.lead}</p>
         {executiveSummary.paragraphs.map((paragraph) => (
           <p key={paragraph.slice(0, 64)} className={bodyClasses}>
             {paragraph}
@@ -166,20 +152,35 @@ function ThesisBody() {
         ))}
       </section>
 
+      <section id="purchase-windows" aria-labelledby="purchase-windows-heading" className="mt-6 scroll-mt-8">
+        <h2 id="purchase-windows-heading" className={h2Classes}>Fewer tokens in each 30-day window</h2>
+        <p className={bodyClasses}>
+          The cohort acquired less NEAR in each window. Higher daily prices offset much of the drop
+          in token quantity when we valued the final window in dollars.
+        </p>
+        <AcquisitionComparison
+          windows={acquisitionWindows}
+          nearDecline={purchaseClaim.quantities[3].value}
+          usdDecline={valuationClaim.quantities[3].value}
+          closingDecline={valuationClaim.quantities[4].value}
+        />
+      </section>
+
+      <HypothesisAssessment />
+
       {/* 2. Research question and canonical hypotheses (anchors #h1–#h4) */}
       <section id={question.id} aria-labelledby={`${question.id}-heading`} className={sectionClasses}>
         <h2 id={`${question.id}-heading`} className={h2Classes}>
           {question.title}
         </h2>
         <p className={bodyClasses}>{question.intro}</p>
-        <p className={bodyClasses}>{question.hypothesesIntro}</p>
-        <div className="mt-4 flex flex-col gap-6">
+        <div className="mt-6 divide-y divide-border border-y border-border">
           {question.hypotheses.map((hypothesis) => (
             <article
               key={hypothesis.id}
               id={hypothesis.id}
               aria-labelledby={`${hypothesis.id}-heading`}
-              className="rounded-surface border border-border bg-surface p-4"
+              className="scroll-mt-8 py-5"
             >
               <p className="font-ui text-ui leading-ui text-text-secondary">
                 <span className="font-medium text-text">{hypothesis.code}</span> —{" "}
@@ -188,18 +189,19 @@ function ThesisBody() {
               <h3 id={`${hypothesis.id}-heading`} className="text-heading leading-heading mt-1">
                 {hypothesis.title}
               </h3>
-              <p className="text-body leading-body text-text mt-2">{hypothesis.question}</p>
+              <p className={bodyClasses}>{hypothesis.question}</p>
               <p className={bodyClasses}>
-                <span className="font-medium text-text">Rationale: </span>
                 {hypothesis.rationale}
               </p>
               <p className={bodyClasses}>
-                <span className="font-medium text-text">Weakening condition: </span>
+                <strong>What would weaken it.</strong>{" "}
                 {hypothesis.weakening}
               </p>
-              <p className={noteClasses}>
-                Recorded claims cited: {hypothesis.claimIds.map((id) => getClaim(id).id).join(", ")}
-              </p>
+              <ul aria-label={`${hypothesis.code} recorded claims`} className="mt-3 flex flex-wrap gap-3 text-ui">
+                {hypothesis.claimIds.map((id) => (
+                  <li key={id}><a href={`#${id}-heading`} className={linkClasses}>{id}</a></li>
+                ))}
+              </ul>
               <EvidenceLinks links={hypothesis.evidence} label={`${hypothesis.code} evidence links`} />
             </article>
           ))}
@@ -231,6 +233,7 @@ function ThesisBody() {
           </p>
         ))}
         <EvidenceLinks links={intentsMechanism.links} label="Intents mechanism references" />
+        <MechanismFlow />
       </section>
 
       {/* 5. Adoption and network activity */}
@@ -245,6 +248,8 @@ function ThesisBody() {
         ))}
         <EvidenceLinks links={adoption.links} label="Adoption definitions references" />
       </section>
+
+      <InteractiveHistory />
 
       {/* 6. Revenue generation */}
       <section id={revenueGeneration.id} aria-labelledby={`${revenueGeneration.id}-heading`} className={sectionClasses}>
@@ -265,18 +270,17 @@ function ThesisBody() {
           {revenueCapture.title}
         </h2>
         <p className={bodyClasses}>{revenueCapture.intro}</p>
-        {/* NI-076 D2: the approximate USD windows (CL-004) beside their claim. */}
-        <div className="mt-6 max-w-none">
-          <UsdWindowsFigure />
-        </div>
-        <ol aria-label="Claim registry: revenue capture" className="mt-6 flex flex-col gap-6 list-none pl-0">
+        <p className={bodyClasses}>{revenueCapture.closing}</p>
+        <p className={noteClasses}>
+          <a href="#thesis-usd-windows" className={linkClasses}>Compare NEAR and estimated USD across the three windows</a>
+        </p>
+        <ol aria-label="Claim registry: revenue capture" className="mt-6 list-none divide-y divide-border border-y border-border pl-0">
           {revenueCapture.claimIds.map((id) => (
             <li key={id}>
               <ClaimCard claim={getClaim(id)} />
             </li>
           ))}
         </ol>
-        <p className={bodyClasses}>{revenueCapture.closing}</p>
       </section>
 
       {/* 8. Token economics — claims CL-007–CL-009 */}
@@ -289,7 +293,7 @@ function ThesisBody() {
         <div className="mt-6 max-w-none">
           <SupplyScaleFigure />
         </div>
-        <ol aria-label="Claim registry: token economics" className="mt-6 flex flex-col gap-6 list-none pl-0">
+        <ol aria-label="Claim registry: token economics" className="mt-6 list-none divide-y divide-border border-y border-border pl-0">
           {tokenEconomics.claimIds.map((id) => (
             <li key={id}>
               <ClaimCard claim={getClaim(id)} />
@@ -303,14 +307,17 @@ function ThesisBody() {
         <h2 id={`${econometrics.id}-heading`} className={h2Classes}>
           {econometrics.title}
         </h2>
-        <p className="rounded-surface border border-border bg-sage p-4 text-body leading-body text-text mt-3">
-          {econometrics.releaseStatus}
+        <p className={bodyClasses}>
+          The available data support an exploratory comparison of volume and gross fees.
+          The dataset still lacks comparable daily protocol revenue, and the archive fit is pending.
         </p>
-        {econometrics.paragraphs.map((paragraph) => (
-          <p key={paragraph.slice(0, 64)} className={bodyClasses}>
-            {paragraph}
-          </p>
-        ))}
+        <details className="mt-3 border-y border-border py-2">
+          <summary className="w-fit cursor-pointer py-1 text-ui font-medium text-accent">Model design and release status</summary>
+          <p className={bodyClasses}>{econometrics.releaseStatus}</p>
+          {econometrics.paragraphs.map((paragraph) => (
+            <p key={paragraph.slice(0, 64)} className={bodyClasses}>{paragraph}</p>
+          ))}
+        </details>
         <EvidenceLinks links={econometrics.links} label="Econometrics references" />
       </section>
 
@@ -368,6 +375,7 @@ function ThesisBody() {
             {paragraph}
           </p>
         ))}
+        <DuplicateReleaseAction slug={thesisReleaseSlug} nextPath="/research" />
       </section>
 
       {/* 14. Limitations */}
@@ -398,6 +406,7 @@ function ThesisBody() {
           </p>
         ))}
         <p className={bodyClasses}>{sourcesReproducibility.datasetNote}</p>
+        <p className={bodyClasses}>{thesis.evidenceStatus}</p>
         <EvidenceLinks links={sourcesReproducibility.links} label="Sources and reproduction references" />
       </section>
     </div>
@@ -406,26 +415,45 @@ function ThesisBody() {
 
 export default function ResearchPage() {
   return (
-    <article className="page-container">
-      <Link href="/blog" className="mb-6 inline-flex min-h-11 items-center text-ui text-accent underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">← Back to Blog</Link>
-      <PageIntro
-        eyebrow="The original research · November 2026"
-        title={<>{thesis.title}<br /><em className="text-accent">{thesis.emphasis}</em></>}
-        action={<p className="max-w-[45ch] text-ui text-text-secondary lg:pb-1">{thesis.standfirst}</p>}
-      />
-      <div className="mt-9 grid items-start gap-8 lg:grid-cols-[12.75rem_minmax(0,1fr)]">
-        <nav aria-label={thesis.tocLabel} className="lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:px-1">
-          <p aria-hidden="true" className="eyebrow mb-3">In this research</p>
-          <ol className="list-decimal space-y-0.5 pl-5 text-metadata text-text-secondary marker:font-medium marker:tabular-nums">
-            {thesisToc.map((entry) => (
-              <li key={entry.id} className="pl-1">
-                <a href={`#${entry.id}`} className="inline-flex rounded-control px-1 py-1 text-text-secondary hover:text-accent hover:underline">
-                  {entry.title}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
+    <article className="page-container pt-8 lg:pt-9" aria-labelledby="research-title">
+      <header className="border-b border-border pb-6">
+        <div className="flex flex-wrap items-center gap-3 text-ui">
+          <Link href="/blog" className="inline-flex min-h-11 items-center font-medium text-accent hover:underline">← Back to Blog</Link>
+          <span className="border-l border-border pl-3 text-text-secondary">NEAR Intents · November 2026</span>
+        </div>
+        <h1 id="research-title" className="mt-3 text-left text-[clamp(2.75rem,6vw,4.85rem)] leading-[.98] tracking-[-.04em]">
+          {thesis.title}<br /><em className="text-accent">{thesis.emphasis}</em>
+        </h1>
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-5">
+          <p className="max-w-[47ch] font-serif text-[clamp(1.35rem,2.6vw,1.625rem)] leading-[1.25]">{thesis.standfirst}</p>
+          <p className="border-l border-border pl-4 text-ui text-text-secondary">
+            Observation window<br />
+            <strong className="text-text">6 Aug–3 Nov 2026 UTC</strong><br />
+            Accounts linked to three treasury wallets
+          </p>
+        </div>
+      </header>
+      <div className="mt-6 grid items-start gap-8 lg:grid-cols-[11.5rem_minmax(0,53rem)] lg:gap-12">
+        <aside className="lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:pr-2">
+          <nav aria-label="In this article">
+            <p className="eyebrow mb-2">In this article</p>
+            <ul className="border-l border-border text-ui">
+              {readingLinks.map(([id, label]) => (
+                <li key={id}><a href={`#${id}`} className="block py-2 pl-3 text-text-secondary hover:text-accent hover:underline">{label}</a></li>
+              ))}
+            </ul>
+          </nav>
+          <details className="mt-3 text-ui">
+            <summary className="w-fit cursor-pointer py-2 text-accent">All sections</summary>
+            <nav aria-label={thesis.tocLabel}>
+              <ol className="space-y-1 border-l border-border pl-3">
+                {thesisToc.map((entry) => (
+                  <li key={entry.id}><a href={`#${entry.id}`} className="block py-1 text-text-secondary hover:text-accent hover:underline">{entry.title}</a></li>
+                ))}
+              </ol>
+            </nav>
+          </details>
+        </aside>
         <ThesisBody />
       </div>
     </article>

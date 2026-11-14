@@ -178,6 +178,7 @@ A/B — лид приёмки всей задачи; второй участни
 | NI-084 | Record the Blog and research-publication product direction | P1 | A | Coordinator |
 | NI-085 | Implement the public Blog and research-publication catalog | P1 | A | Coordinator |
 | NI-086 | Implement the approved editorial Overview design | P1 | A | Coordinator |
+| NI-087 | Present the complete investment thesis and simplify the chart library | P0 | A | Owner |
 | NI-079 | Pass final integrated local release acceptance | P0 | A with B data/API/model contributions | Coordinator |
 | NI-071 | Add advanced supported analytical filters | P1 | A | B |
 | NI-072 | Add lightweight private research organization | P1 | B | A |

@@ -1,23 +1,10 @@
-/**
- * NI-078 recorded-evidence figures (NI-076 D2): the CL-004 approximate USD
- * windows and the CL-007 purchases-versus-net-supply-scale comparison.
- *
- * The figures consume ONLY the typed claim registry in content.ts, so the
- * assertions below compare the rendered values against the registry objects
- * EXACTLY — a retyped or rounded value fails here. Also asserted: the
- * estimate labeling (CL-004), the single measurement unit per figure (no
- * dual axis), the "purchases are never subtracted from supply" caution, and
- * the accessible names/summaries.
- *
- * All content comes from the saved NI-014 claim registry (historical
- * observations verified 4 November 2026); no fixtures, no live data.
- */
 import { axe } from "jest-axe";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import ResearchPage from "@/app/(public)/research/page";
-import { SupplyScaleFigure, UsdWindowsFigure } from "@/features/public-research/ResearchFigures";
+import { SupplyScaleFigure } from "@/features/public-research/ResearchFigures";
 import { claimRegistry } from "@/features/public-research/content";
 
 function claim(id: string) {
@@ -32,41 +19,31 @@ function figure(id: string) {
   return element as HTMLElement;
 }
 
-describe("CL-004 approximate USD windows figure", () => {
-  it("renders the three recorded USD window values exactly as registered", () => {
-    const claim004 = claim("CL-004");
-    const windows = claim004.quantities.slice(0, 3);
-    expect(windows.map((quantity) => quantity.value)).toEqual(["437,374", "557,914", "547,026"]);
-    render(<UsdWindowsFigure />);
-    const figureNode = figure("thesis-usd-windows");
-    for (const quantity of windows) {
-      // Exact string match: no rounding, no reformatting of recorded values.
-      expect(within(figureNode).getByText(quantity.value)).toBeInTheDocument();
-      expect(within(figureNode).getByText(quantity.scope)).toBeInTheDocument();
+describe("Recorded acquisition windows", () => {
+  it("switches units and exposes the registered values and valuation basis", async () => {
+    const user = userEvent.setup();
+    render(<ResearchPage />);
+    const comparison = within(figure("thesis-usd-windows"));
+    const near = comparison.getByRole("button", { name: "NEAR" });
+    const usd = comparison.getByRole("button", { name: "USD estimate" });
+    expect(near).toHaveAttribute("aria-pressed", "true");
+    expect(comparison.getByRole("img")).toHaveAccessibleName(/NEAR acquired.*244,845.70/);
+
+    await user.click(usd);
+    expect(usd).toHaveAttribute("aria-pressed", "true");
+    expect(near).toHaveAttribute("aria-pressed", "false");
+    expect(comparison.getByText(/Daily start-of-day prices/)).toBeVisible();
+    expect(comparison.getByRole("img")).toHaveAccessibleName(/Estimated USD.*\$547,026/);
+
+    await user.click(comparison.getByText("Values and valuation method"));
+    const table = within(comparison.getByRole("table"));
+    for (const value of claim("CL-004").quantities.slice(0, 3)) {
+      expect(table.getByText("$" + value.value)).toBeVisible();
     }
-  });
-
-  it("labels the estimate and its recorded price-mark basis", () => {
-    render(<UsdWindowsFigure />);
-    const figureNode = figure("thesis-usd-windows");
-    expect(within(figureNode).getByText("Estimate — valuation, not execution")).toBeInTheDocument();
-    expect(figureNode.textContent).toMatch(/daily start-of-day price marks/);
-    expect(figureNode.textContent).toMatch(/approximate acquisition value/i);
-    // The recorded window-over-window decomposition comes from the registry.
-    const startMarks = claim("CL-004").quantities[3];
-    const endMarks = claim("CL-004").quantities[4];
-    expect(figureNode.textContent).toContain(startMarks.value);
-    expect(figureNode.textContent).toContain(endMarks.value);
-    expect(figureNode.textContent).toMatch(new RegExp(startMarks.basis!.replace(/[()*]/g, "\\$&")));
-    expect(figureNode.textContent).toMatch(new RegExp(endMarks.basis!.replace(/[()*]/g, "\\$&")));
-  });
-
-  it("carries no USD quantity from another claim and no NEAR unit", () => {
-    render(<UsdWindowsFigure />);
-    const figureNode = figure("thesis-usd-windows");
-    // Single unit: NEAR quantities from other claims must not appear here.
-    expect(figureNode.textContent).not.toContain("524,480.127692882832410490617319");
-    expect(figureNode.textContent).not.toContain("7,936,181.547057263680300503519861");
+    for (const value of claim("CL-002").quantities.slice(0, 3)) {
+      expect(table.getByText(value.value)).toBeVisible();
+    }
+    expect(comparison.getByText(/5.45% decline/)).toBeVisible();
   });
 });
 
@@ -102,12 +79,11 @@ describe("CL-007 purchases versus net supply scale figure", () => {
 });
 
 describe("Figures on the thesis page", () => {
-  it("renders both figures in their owning sections beside the claim cards", () => {
+  it("links the opening comparison and the supply figure to the recorded claims", () => {
     render(<ResearchPage />);
-    // CL-004 figure inside the revenue capture section, before its claim card.
-    const revenueCapture = document.getElementById("revenue-capture");
-    expect(revenueCapture).not.toBeNull();
-    expect(revenueCapture!.querySelector("#thesis-usd-windows")).not.toBeNull();
+    expect(document.getElementById("purchase-windows")?.querySelector("#thesis-usd-windows")).not.toBeNull();
+    expect(screen.getByRole("link", { name: /Compare NEAR and estimated USD/ }))
+      .toHaveAttribute("href", "#thesis-usd-windows");
     // CL-007 figure inside the token economics section, before its claim card.
     const tokenEconomics = document.getElementById("token-economics");
     expect(tokenEconomics).not.toBeNull();

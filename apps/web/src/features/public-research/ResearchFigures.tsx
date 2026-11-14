@@ -4,33 +4,7 @@ import { ProductIcon } from "@/components/layout/ProductIcon";
 import { claimRegistry, type ClaimQuantity, type ThesisClaim } from "./content";
 import { RecordedQuantityPlot } from "./RecordedQuantityPlot";
 
-/**
- * Recorded-evidence figures (NI-078, resolving NI-076 finding D2).
- *
- * The opening figure charts CL-002 purchases; the two figures here chart the
- * remaining explanatory comparisons the atlas carried and the NI-076 review
- * found missing: the approximate USD value of the observed purchases (CL-004)
- * and the scale of those purchases against positive net supply growth
- * (CL-007 with the recorded CL-001 cohort total).
- *
- * Hard rules carried over from the claim registry contract (NI-014):
- * - Values are consumed ONLY as the typed `ClaimQuantity` objects from
- *   content.ts — never retyped, rounded or recomputed. Number conversion
- *   happens solely for zero-based bar geometry, exactly like the equivalent
- *   chart-frame table rule ("only plot geometry crosses the Number boundary").
- * - One measurement unit per figure: the USD estimate figure plots USD
- *   quantities only; the supply-scale figure plots NEAR quantities only.
- *   No dual-axis comparison exists anywhere.
- * - Estimates stay labeled: the CL-004 figure carries the estimate badge,
- *   the recorded price-mark basis, and the "approximately" reading in text
- *   and for assistive technology.
- * - Purchases are never subtracted from supply: the scale figure states the
- *   recorded caution verbatim and plots both quantities as independent bars.
- * - No daily interpolation, no trend line, no invented series: three window
- *   summaries and two recorded totals, nothing else. No ChartView/dataset
- *   identifiers are invented; provenance stays with the linked claim cards.
- */
-
+// Values come from the claim registry. Only plot geometry crosses the Number boundary.
 const dayMonth = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
 
 /** "First 30-day window, 2026-08-06 through 2026-09-04 …" → "06 Aug–04 Sep". */
@@ -145,44 +119,6 @@ function FigureShell({
         ))}
       </div>
     </figure>
-  );
-}
-
-/**
- * CL-004 — the three approximate USD acquisition windows. Estimated at daily
- * start-of-day price marks (a second end-of-day scenario exists in the claim
- * card); the plot stays a window-summary comparison, never a daily series.
- */
-export function UsdWindowsFigure({ idPrefix = "thesis" }: { readonly idPrefix?: string }) {
-  const claim = claimById("CL-004");
-  const windows = [0, 1, 2].map((index) =>
-    quantityAt(claim, index, "USD (approximate acquisition value)"),
-  );
-  const startMarks = quantityAt(claim, 3, "percent");
-  const endMarks = quantityAt(claim, 4, "percent");
-  const directionWord = (direction: ClaimQuantity["direction"]) =>
-    direction === "decrease" ? "decrease" : direction === "increase" ? "increase" : "change";
-  return (
-    <FigureShell
-      idPrefix={idPrefix}
-      kind="usd-windows"
-      claimIds={["CL-004"]}
-      badge="Estimate — valuation, not execution"
-      title="The approximate dollar value stayed near one level"
-      subtitle="Approximate acquisition value · USD per 30-day window · daily start-of-day price marks"
-      bars={windows.map((quantity) => ({
-        label: scopePeriodLabel(quantity.scope),
-        srLabel: quantity.scope,
-        value: quantity,
-      }))}
-      unit="USD (approximate)"
-      takeaway="Approximate USD acquisitions stayed near one level across the last two windows while NEAR quantities fell sharply, because the quantity-weighted price rose. The decomposition is arithmetic, not causation."
-      note={
-        `Recorded change, third window relative to the second: ${directionWord(startMarks.direction)} of `
-        + `${startMarks.value} ${startMarks.unit} on start-of-day marks and ${endMarks.value} ${endMarks.unit} `
-        + `on ${endMarks.basis}.`
-      }
-    />
   );
 }
 

@@ -7,7 +7,7 @@ import type { ClaimQuantity, ThesisClaim } from "./content";
  * bounds and directions render as words; nothing here computes or rounds.
  */
 
-const tableWrapClasses = "mt-4 overflow-x-auto rounded-surface border border-border bg-surface";
+const tableWrapClasses = "mt-3 overflow-x-auto border-y border-border";
 const headCellClasses = "p-3 font-ui text-ui leading-ui text-left align-bottom border-b border-border";
 const rowHeaderClasses = "p-3 align-top font-ui text-ui leading-ui text-text";
 const cellClasses = "p-3 align-top text-metadata leading-metadata text-text-secondary";
@@ -37,78 +37,80 @@ export function ClaimCard({ claim }: { readonly claim: ThesisClaim }) {
   return (
     <article
       aria-labelledby={`${claim.id}-heading`}
-      className="rounded-surface border border-border bg-surface p-4"
+      className="min-w-0 py-5"
     >
       <p className="font-ui text-ui leading-ui text-text-secondary">
         <span className="font-medium text-text">{claim.id}</span> — {claim.assessment}
       </p>
-      <h3 id={`${claim.id}-heading`} className="text-heading leading-heading mt-1">
+      <h3 id={`${claim.id}-heading`} className="mt-1 scroll-mt-8 text-heading leading-heading">
         {claim.title}
       </h3>
       <p className="text-body leading-body text-text-secondary mt-2">{claim.observation}</p>
+      {claim.caution ? <p className="mt-2 text-ui leading-ui text-text-secondary">{claim.caution}</p> : null}
 
-      {claim.quantities.length > 0 ? (
-        <div className={tableWrapClasses}>
-          <table className="w-full border-collapse text-left">
-            <caption className="sr-only">{`${claim.id} recorded quantities, scopes and sources`}</caption>
-            <thead>
-              <tr>
-                <th scope="col" className={headCellClasses}>
-                  Recorded quantity
-                </th>
-                <th scope="col" className={headCellClasses}>
-                  Scope
-                </th>
-                <th scope="col" className={headCellClasses}>
-                  Source
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {claim.quantities.map((quantity, index) => (
-                <tr key={`${claim.id}-quantity-${index}`} className="border-b border-border last:border-b-0">
-                  <th scope="row" className={rowHeaderClasses}>
-                    <QuantityHeadline quantity={quantity} />
+      <details className="mt-2">
+        <summary className="w-fit cursor-pointer py-2 text-ui font-medium text-accent">
+          {claim.quantities.length > 0 ? "Recorded values and sources" : "Sources and definitions"}
+          <span className="sr-only"> for {claim.id}</span>
+        </summary>
+        {claim.quantities.length > 0 ? (
+          <div className={tableWrapClasses}>
+            <table className="w-full table-fixed border-collapse break-words text-left">
+              <caption className="sr-only">{`${claim.id} recorded quantities, scopes and sources`}</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className={headCellClasses}>
+                    Recorded quantity
                   </th>
-                  <td className={cellClasses}>{quantity.scope}</td>
-                  <td className={cellClasses}>
-                    <a href={quantity.sourceHref} className={linkClasses}>
-                      Recorded source
-                    </a>
-                    <span className="block mt-1 break-words">{quantity.source}</span>
-                  </td>
+                  <th scope="col" className={headCellClasses}>
+                    Scope
+                  </th>
+                  <th scope="col" className={headCellClasses}>
+                    Source
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+              </thead>
+              <tbody>
+                {claim.quantities.map((quantity, index) => (
+                  <tr key={`${claim.id}-quantity-${index}`} className="border-b border-border last:border-b-0">
+                    <th scope="row" className={rowHeaderClasses}>
+                      <QuantityHeadline quantity={quantity} />
+                    </th>
+                    <td className={cellClasses}>{quantity.scope}</td>
+                    <td className={cellClasses}>
+                      <a href={quantity.sourceHref} className={linkClasses}>
+                        Recorded source
+                      </a>
+                      <span className="block mt-1 break-words">{quantity.source}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
 
-      <p className="text-ui leading-ui text-text-secondary mt-3">
-        Definition versions:{" "}
-        {claim.definitionVersions.length > 0
-          ? claim.definitionVersions.join("; ")
-          : "none — this claim's values come from recorded analysis artifacts, not a registered metric"}
-      </p>
-      <p className="text-ui leading-ui text-text-secondary mt-1">
-        Dataset versions: {claim.datasetVersionReference}
-      </p>
-
-      <ul aria-label={`${claim.id} evidence links`} className="text-ui leading-ui text-text-secondary mt-3 list-disc pl-5 flex flex-col gap-1">
-        {claim.evidence.map((link) => (
-          <li key={link.href}>
-            <a href={link.href} className={linkClasses}>
-              {link.label}
-            </a>
-          </li>
-        ))}
-      </ul>
-
-      {claim.caution ? (
-        <p className="text-ui leading-ui text-text mt-3 rounded-surface border border-border bg-surface-muted p-3">
-          {claim.caution}
+        <p className="text-ui leading-ui text-text-secondary mt-3">
+          Definition versions:{" "}
+          {claim.definitionVersions.length > 0
+            ? claim.definitionVersions.join("; ")
+            : "none — this claim's values come from recorded analysis artifacts, not a registered metric"}
         </p>
-      ) : null}
+        <p className="text-ui leading-ui text-text-secondary mt-1">
+          Dataset versions: {claim.datasetVersionReference}
+        </p>
+
+        <ul aria-label={`${claim.id} evidence links`} className="text-ui leading-ui text-text-secondary mt-3 list-disc pl-5 flex flex-col gap-1">
+          {claim.evidence.map((link) => (
+            <li key={link.href}>
+              <a href={link.href} className={linkClasses}>
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+
+      </details>
     </article>
   );
 }

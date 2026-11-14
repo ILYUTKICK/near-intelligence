@@ -33,8 +33,8 @@ export function CatalogSearch({ initialQuery, category, basePath = "/charts" }: 
   }
 
   return (
-    <form role="search" action={basePath} method="get" onSubmit={submit} className="flex flex-col gap-1.5">
-      <Label htmlFor="chart-catalog-search">Search charts</Label>
+    <form role="search" action={basePath} method="get" onSubmit={submit}>
+      <Label htmlFor="chart-catalog-search" className="sr-only">Search charts</Label>
       <div className="flex gap-2">
         <div className="relative min-w-0">
           <ProductIcon name="search" className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-text-secondary" />
@@ -45,8 +45,8 @@ export function CatalogSearch({ initialQuery, category, basePath = "/charts" }: 
             maxLength={200}
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            placeholder="Title, description or chart id"
-            className="rounded-full pl-10 text-ui"
+            placeholder="Search charts"
+            className="pl-10 text-ui"
           />
         </div>
         {category !== null ? <input type="hidden" name="category" value={category} /> : null}

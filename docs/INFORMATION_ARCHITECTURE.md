@@ -31,7 +31,7 @@ Canonical product name: NEAR Intelligence. Labels and routes below override the 
 | Data | `/data` | Data explorer overview: the five categories below with live availability or honest explanations; public (NI-015) |
 | Data category | `/data/[category]` | `network`, `intents`, `revenue`, `token-economics`, `ecosystem`; same analytical components as workspace; public (NI-015) |
 | Data chart | `/data/[category]/[chartId]` | Chart detail through the same shared implementation as `/charts/[chartId]`, mounted under the category; public (NI-015) |
-| Chart library | `/charts` | Search/category catalog of every registered chart with its honest data status; public (NI-034) |
+| Chart library | `/charts` | Search and category filters over compact chart rows. Unavailable entries are labeled. Descriptions, units and availability reasons are on the chart detail (NI-034, NI-087). |
 | Chart | `/charts/[chartId]` | Shareable public chart detail with validated selection URL; public |
 | Methodology | `/methodology` | Definitions, sources, diagnostics and reproduction; public |
 | Models | `/models` | Catalog of published model runs with the honest "no published model yet" empty state; public (NI-054) |

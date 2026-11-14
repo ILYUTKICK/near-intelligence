@@ -532,15 +532,15 @@ describe("Chart library page — the catalog request reflects the URL", () => {
     expect(screen.getByRole("status")).toHaveTextContent("pagination cursor was not recognized");
   });
 
-  it("renders every catalog card with its honest data status, unavailable included", async () => {
+  it("renders compact rows and keeps unavailable charts reachable", async () => {
     installApiMock([(url) => (url.pathname === "/api/charts" ? catalogResponse("MTA") : undefined)]);
     await renderLibrary({});
 
     expect(await screen.findByRole("heading", { name: "Synthetic intents volume (fixture)" })).toBeInTheDocument();
-    expect(screen.getByText("Available")).toBeInTheDocument();
-    expect(screen.getByText("Unavailable — this is not zero")).toBeInTheDocument();
-    expect(screen.getByText(/Reason: Model gate \(fixture\)/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Units: USD/).length).toBe(2);
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open chart: Synthetic model diagnostics/ })).toHaveAccessibleDescription("Unavailable");
+    expect(screen.queryByText(/Reason: Model gate \(fixture\)/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Units: USD/)).not.toBeInTheDocument();
     const next = screen.getByRole("link", { name: "Next page" });
     expect(new URL(next.getAttribute("href") ?? "", "http://localhost").searchParams.get("cursor")).toBe("MTA");
   });
@@ -553,7 +553,7 @@ describe("Chart library page — the catalog request reflects the URL", () => {
           : undefined,
     ]);
     await renderLibrary({ q: "nothing matches" });
-    expect(await screen.findByText("Nothing to show")).toBeInTheDocument();
+    expect(await screen.findByText("No charts found")).toBeInTheDocument();
     expect(screen.getByText(/No registered chart matches this search/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Clear search and filters" })).toHaveAttribute("href", "/charts");
   });
