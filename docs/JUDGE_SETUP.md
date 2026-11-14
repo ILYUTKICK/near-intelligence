@@ -1,5 +1,7 @@
 # Judge and contributor setup — tested clean-clone sequence (NI-066)
 
+For the current product overview and first local run, start with the [README](../README.md). For your own production domain use the [self-hosting guide](SELF_HOSTING.md); this page retains the detailed contributor/judge sequence and its dated verification evidence.
+
 Status 10 November 2026: **the P0 application runtime is implemented and this
 sequence was executed end to end** (fresh frozen installs, migrations, both
 services, and one real export processed by the worker — see "Verification
@@ -115,10 +117,11 @@ user's sharing instruction; the local archive is machine-only). Therefore:
 ## 6. Run — Compose mode
 
 ```sh
-docker compose build            # near-intelligence-web:local + near-intelligence-api:local
-docker compose up -d            # db + api + web ONLY — verified; nothing else starts
-docker compose run --rm migrate # explicit Alembic upgrade head as near_migrator
-docker compose ps               # db, api, web all (healthy)
+docker compose -f docker-compose.yml build api web
+docker compose -f docker-compose.yml up -d --wait db
+docker compose -f docker-compose.yml run --rm -T migrate
+docker compose -f docker-compose.yml up -d --wait api web
+docker compose -f docker-compose.yml ps
 ```
 
 `up` never runs migrations, ingestion or the worker. The one-shot operator
@@ -152,6 +155,7 @@ uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head   # exit 
 
 export DATABASE_URL="postgresql+psycopg://near_app:<DB_RUNTIME_PASSWORD>@localhost:5432/near_intelligence"
 export API_INTERNAL_URL=http://localhost:8000
+pnpm --filter web build                                             # required before production start
 uv run --project apps/api uvicorn near_api.main:app --port 8000          # verified /health 200
 
 API_INTERNAL_URL=http://localhost:8000 pnpm --filter web start           # verified /health 200

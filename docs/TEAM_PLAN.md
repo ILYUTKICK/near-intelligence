@@ -222,3 +222,14 @@ Role A: Codex /root applies bounded current-checkout recovery and verifies local
 ## NI-090 VPS preparation
 
 Role A: Codex /root coordinates the current checkout, source handoff and operator runbook. /root/vps_config implements isolated production Compose/Caddy/environment validation in a staging directory; /root reviews security/credentials/network boundaries and verifies in disposable local containers. Independent review follows before DONE. No remote mutation or takeover of NI-067/079.
+
+
+## NI-098 — README and self-hosting handoff
+
+Explicit owner request14 November2026: A owns product README, local/own-domain
+deployment guide and verification record; B supports read-only review of
+configuration, data/model handoff and credential boundaries. Root coordinates
+NI-098; /root/ni067_review audits commands. Status/acceptance remain in TASKS.
+No application/SEO feature, new data collection or remote rollout is included.
+
+NI-098 follow-up15 November2026: root handles published-history audit and release record; /root/ni067_review implements the approved original-code MIT/third-party notices and public-clone README adjustments. No visibility mutation or research-data publication.

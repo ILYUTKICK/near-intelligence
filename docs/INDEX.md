@@ -1,6 +1,6 @@
 # Documentation index
 
-Version 1.0, 5 November 2026. Normative implementation specification; application remains unbuilt. Read MVP scope and decisions before taking a task. If documents conflict, resolve the conflict explicitly; the financial integrity and ownership invariants cannot be overridden by convenience.
+Project specifications, setup and research references. The application is implemented and the owner instance is deployed; current execution status remains in TASKS.md. Read MVP scope and decisions before taking a task. If documents conflict, resolve the conflict explicitly; the financial integrity and ownership invariants cannot be overridden by convenience.
 
 ## Product and experience
 
@@ -22,8 +22,9 @@ Version 1.0, 5 November 2026. Normative implementation specification; applicatio
 - [API_SPECIFICATION.md](API_SPECIFICATION.md) — REST requests/responses.
 - [DATA_PIPELINE.md](DATA_PIPELINE.md) — ingestion and publishing.
 - [AUTHENTICATION_SECURITY.md](AUTHENTICATION_SECURITY.md) — sessions and protection.
-- [DEPLOYMENT.md](DEPLOYMENT.md) — planned local/production operations.
-- [DEPENDENCIES.md](DEPENDENCIES.md) — pinned Python environment, package rationale and lockfile transition.
+- [DEPLOYMENT.md](DEPLOYMENT.md) — local/production topology and release boundaries.
+- [Self-hosting and own-domain deployment](SELF_HOSTING.md) — fresh local setup, Supabase, verified source bundles, custom-domain profile, data boundaries and operations.
+- [DEPENDENCIES.md](DEPENDENCIES.md) — pinned environments, lockfile sources and dependency rationale.
 - [JUDGE_SETUP.md](JUDGE_SETUP.md) — contributor/judge setup and remaining release gates.
 - [TESTING_STRATEGY.md](TESTING_STRATEGY.md) — meaningful verification.
 
@@ -42,6 +43,7 @@ Version 1.0, 5 November 2026. Normative implementation specification; applicatio
 - [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) — dependency phases.
 - [TASKS.md](TASKS.md) — actionable work with acceptance tests.
 - [TEAM_PLAN.md](TEAM_PLAN.md) — two-person ownership, handoffs and integration sequence.
+- [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md) — hackathon licensing, public-clone scope, bounded history review and owner release procedure.
 - [COLLABORATION.md](COLLABORATION.md) — repository access, cloning, branches and contributor setup.
 - [DECISIONS.md](DECISIONS.md) — architecture decisions.
 - [RISKS.md](RISKS.md) — mitigations and release triggers.

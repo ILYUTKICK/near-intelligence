@@ -1,16 +1,16 @@
 # Development and deployment
 
-Portable deployment topology; current images/local Compose are implemented (NI-066), and the existing VPS handoff is prepared in NI-090. No remote deployment is claimed. Baseline is deliberately portable: reverse proxy + Next.js + FastAPI on one VM, managed PostgreSQL and Supabase Auth, persistent artifact volume, scheduled Python CLI/worker. No hosting purchase or account creation is part of this documentation work.
+Portable deployment topology. NI-067 deployed and verified the owner instance; see the [actual release report](verification/ni-067.md). For a new local or own-domain installation follow the [self-hosting guide](SELF_HOSTING.md); for the existing instance use the [VPS runbook](VPS_DEPLOYMENT.md). Baseline is deliberately portable: reverse proxy + Next.js + FastAPI on one VM, managed PostgreSQL and Supabase Auth, persistent artifact volume, scheduled Python CLI/worker. No hosting purchase or account creation is part of this documentation work.
 
 ## Dependency baseline and judge handoff
 
-[DEPENDENCIES.md](DEPENDENCIES.md) defines the tested CPython3.13 hash-pinned requirements baseline and migration to the future uv.lock. The frozen application images and local/judge setup are implemented; remote release acceptance remains separate. [JUDGE_SETUP.md](JUDGE_SETUP.md) is the mandatory clean-clone deployment/reproduction runbook for NI-066/NI-069, including frontend locks, database/auth configuration and explicitly authorized evidence input access. A dependency-only smoke test does not satisfy deployment acceptance.
+[DEPENDENCIES.md](DEPENDENCIES.md) defines the tested CPython 3.13 baseline: apps/api/pyproject.toml declares direct dependencies, apps/api/uv.lock is the frozen resolution and requirements.txt is its generated export. The frozen application images and local/judge setup are implemented; remote release acceptance remains separate. [JUDGE_SETUP.md](JUDGE_SETUP.md) is the mandatory clean-clone deployment/reproduction runbook for NI-066/NI-069, including frontend locks, database/auth configuration and explicitly authorized evidence input access. A dependency-only smoke test does not satisfy deployment acceptance.
 
 ## Local development contract
 
 NI-001–NI-003 creates exact runtime pins, pnpm/uv locks, `.gitignore`, Dockerfiles, Compose and root scripts. Compose services: `db` (PostgreSQL major chosen/tested at bootstrap), `api` (FastAPI), `web` (Next.js); optional explicit `worker` profile for exports. Startup must not run ingestion, models, fetch scripts or cloud SQL automatically. Supabase Auth is an explicitly configured dev project or optional local stack; do not silently use production auth.
 
-Copy [.env.example](../.env.example) and replace only local/dev placeholders. Host commands use localhost DB/API; container configuration uses service hostnames db/api. Compose reads env and injects values per service; root .env is not implicitly visible to every process. UI sees only public Supabase URL/key; backend sees JWT metadata/DB/storage/provider secrets.
+Copy [.env.example](../.env.example) and replace only local/dev placeholders. Host commands use localhost DB/API; container configuration uses service hostnames db/api. Local root Compose uses env_file and passes the complete local .env to API/web; it is a development profile. The hardened deployment/vps/compose.yaml uses explicit per-service variable allowlists: web has no DB credentials, while API receives JWT-provider settings without gateway cookie/CSRF secrets. Browser code sees only browser-safe public configuration.
 
 Create volumes, start db, migrate with the dedicated migration role, start API/web, run health checks and import an approved saved manifest. For native mode use the README commands after scripts exist. A working onboarding run from a clean machine is acceptance, not just Compose syntax validation.
 
@@ -40,7 +40,7 @@ Target backups: nightly DB and daily incremental artifact copy to offsite encryp
 
 ## Hosting alternatives and unresolved inputs
 
-Vercel may host web or combined services later; current platform capabilities and limits must be rechecked before choosing it. Do not infer that scientific jobs/persistent files will work on any request runtime. Moving storage to object storage requires an adapter, scoped downloads and the same content hashes. OQ-04 records budget/provider/region; OQ-07 records residency/retention. The owner supplied near-intelligence.me on14 November2026 and confirmed an existing VPS; host OS/resources/IP/SSH details and production Supabase configuration are still unknown.
+Vercel may host web or combined services later; current platform capabilities and limits must be rechecked before choosing it. Do not infer that scientific jobs/persistent files will work on any request runtime. Moving storage to object storage requires an adapter, scoped downloads and the same content hashes. OQ-04 records budget/provider/region; OQ-07 records residency/retention. The owner instance at near-intelligence.me was deployed to Ubuntu 24.04 x86_64 on DigitalOcean in NI-067 with final-origin Supabase configuration. This does not provision another installation or its data; each operator supplies and validates their own host, domain, identity provider and inputs.
 
 ## Deployment acceptance
 
