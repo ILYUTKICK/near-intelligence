@@ -2,12 +2,10 @@
  * NI-011 public routes: server-side shells render without login, mechanism
  * separates purchases from burns, stable anchors exist, no fake metrics.
  *
- * NI-012 made the landing an async server component that fetches the three
- * evidence metrics through the delivery APIs; this file pins the honest
- * fresh-environment default (delivery API reports no approved dataset), so
- * the landing renders typed unavailability — no fabricated digits. The
- * fetch-backed matrix (approved input, 503, empty, stale, unreachable,
- * malformed) lives in landing-metrics.test.tsx.
+ * NI-086 replaces the old metric-heavy landing with an API-independent
+ * editorial Overview. The retained source loader still has its independent
+ * exact-value/failure matrix in landing-metrics.test.tsx. Full evidence and
+ * mechanism assertions here remain on their owning research route.
  */
 import { axe } from "jest-axe";
 import { render, screen, within } from "@testing-library/react";
@@ -16,7 +14,6 @@ import { describe, expect, it, vi } from "vitest";
 import HomePage from "@/app/(public)/page";
 import MethodologyPage from "@/app/(public)/methodology/page";
 import ResearchPage from "@/app/(public)/research/page";
-import { publicNav } from "@/lib/navigation";
 
 // The NI-045 duplication CTA on the research page reads the router for the
 // sign-in continuation; these shell tests stub the router (the page renders
@@ -25,45 +22,16 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("@/features/public-research/landing-metrics", async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import("@/features/public-research/landing-metrics")
-  >();
-  return {
-    ...actual,
-    fetchLandingMetrics: vi.fn(async () =>
-      actual.landingMetricSources.map((source) => ({
-        kind: "unavailable" as const,
-        metricId: source.metricId,
-        metricTitle: source.metricId,
-        reason:
-          "The delivery API reports no approved dataset for this metric yet. This is not zero.",
-      })),
-    ),
-  };
-});
-
-describe("Landing", () => {
-  it("renders the standfirst, registry links and honest unavailability with no fabricated values", async () => {
-    const { container } = render(await HomePage());
-    expect(screen.getByRole("heading", { level: 1, name: /Follow the evidence/ })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Recorded claim" })).toHaveAttribute("href", "/research#CL-002-heading");
-    for (const link of ["Read the research", "Read the methodology"]) {
-      const anchor = screen.getByRole("link", { name: link });
-      expect(
-        publicNav.map((item) => item.href).concat(["/research", "/methodology", "/workspace"]),
-      ).toContain(anchor.getAttribute("href"));
-    }
-    const workspaceLinks = screen.getAllByRole("link", { name: "Open the workspace" });
-    expect(workspaceLinks.length).toBeGreaterThanOrEqual(1);
-    for (const workspaceLink of workspaceLinks) {
-      expect(workspaceLink.getAttribute("href")).toBe("/workspace");
-    }
-    // The fresh-environment default: every metric strip card is the typed
-    // unavailable state ("not zero"), never a fabricated value.
-    expect(screen.getAllByText(/Unavailable — this is not zero/)).toHaveLength(3);
-    // No fabricated quantitative claims: no percent signs in the content.
-    expect(container.textContent).not.toMatch(/%/);
+describe("Overview", () => {
+  it("introduces the platform with a real article, data destinations and workspace action", async () => {
+    const { container } = render(<HomePage />);
+    expect(screen.getByRole("heading", { level: 1, name: /Understand NEAR/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Read the research" }).map((link) => link.getAttribute("href"))).toEqual(["/blog", "/research"]);
+    expect(screen.getByRole("link", { name: "Our methodology" })).toHaveAttribute("href", "/methodology");
+    expect(screen.getByRole("link", { name: "Open workspace" })).toHaveAttribute("href", "/workspace");
+    expect(screen.getByRole("link", { name: "Explore data: Intents activity" })).toHaveAttribute("href", "/data/intents");
+    expect(screen.getByText(/Historical datasets/)).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/Selected approved metrics|Unavailable — this is not zero/);
     expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });
 });
@@ -115,7 +83,8 @@ describe("Methodology route", () => {
     for (const anchor of ["sources", "definitions", "collection", "reproduce"]) {
       expect(document.getElementById(anchor)).not.toBeNull();
     }
-    expect(screen.getByText(/intentionally does not contain them/i)).toBeInTheDocument();
+    expect(screen.getByText(/Missing observations remain gaps, never zeros/i)).toBeInTheDocument();
+    expect(container.querySelectorAll("details, summary")).toHaveLength(0);
     expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });
 });

@@ -153,7 +153,7 @@ class SecurityRlsProbeTests(unittest.TestCase):
                        '{"start": "2026-01-01", "end": "2026-01-02",
                          "frequency": "day", "filters": {}}'::jsonb
                 FROM app.chart_definitions cd
-                WHERE cd.chart_id = 'intents-volume'
+                WHERE cd.chart_id = 'intents-volume' AND cd.version = 1
             """), {"id": saved_chart_id, "owner": self.alice_id})
             connection.execute(text("""
                 INSERT INTO app.idempotency_records(owner_id, route_key, idempotency_key,

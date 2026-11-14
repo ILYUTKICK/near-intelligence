@@ -26,6 +26,9 @@ import DataChartDetailPage from "@/app/(public)/data/[category]/[chartId]/page";
 import DataCategoryPage from "@/app/(public)/data/[category]/page";
 import DataExplorerPage from "@/app/(public)/data/page";
 import ChartDetailPage from "@/app/(public)/charts/[chartId]/page";
+import WorkspaceDataCategoryPage from "@/app/(workspace)/workspace/data/[category]/page";
+import WorkspaceDataChartPage from "@/app/(workspace)/workspace/data/[category]/[chartId]/page";
+import WorkspaceChartLibraryPage from "@/app/(workspace)/workspace/charts/page";
 import {
   EXPLORER_CATEGORIES,
   explorerCategoryBySlug,
@@ -308,6 +311,15 @@ afterEach(() => {
 });
 
 const axeConfig = { rules: { region: { enabled: false } } };
+
+async function chartParameterNotice(): Promise<HTMLElement> {
+  const message = await screen.findByText(
+    "Some URL parameters were not used — the chart request carries only supported fields.",
+  );
+  const status = message.closest<HTMLElement>('[role="status"]');
+  expect(status).not.toBeNull();
+  return status!;
+}
 
 // -- explorer categories and the registry mapping ------------------------------ //
 
@@ -749,7 +761,7 @@ describe("Data chart detail — the same gates as /charts", () => {
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
     expect([...viewRequests[0].searchParams.keys()]).toEqual(["definition_version", "start", "end"]);
-    const status = await screen.findByRole("status");
+    const status = await chartParameterNotice();
     expect(within(status).getByText("foo")).toBeInTheDocument();
     expect(within(status).getByText("admin")).toBeInTheDocument();
   });
@@ -770,7 +782,7 @@ describe("Data chart detail — the same gates as /charts", () => {
     expect(viewRequests[0].searchParams.get("start")).toBe(expectedStart);
     expect(viewRequests[0].searchParams.get("end")).toBe(expectedEnd);
     expect(viewRequests[0].searchParams.get("definition_version")).toBe("1");
-    const status = await screen.findByRole("status");
+    const status = await chartParameterNotice();
     expect(within(status).getAllByText(/at most 366/).length).toBe(2);
   });
 
@@ -1021,7 +1033,9 @@ describe("Data chart detail island — selection URLs and continuation stay /dat
     expect(next).toBe(
       `/data/revenue/gross-fees?${serializeSelectionQuery({ ...baseSelection, datasetVersion: "a3333333-3333-4333-8333-333333333333" })}`,
     );
-    expect(screen.getByRole("status")).toHaveTextContent(/selection are preserved in the sign-in link/);
+    const continuation = screen.getByText(/^Signing in to continue — this chart/);
+    expect(continuation).toHaveAttribute("role", "status");
+    expect(continuation).toHaveTextContent(/selection are preserved in the sign-in link/);
   });
 
   it("accepts only internal /data paths as continuation targets", () => {
@@ -1033,4 +1047,71 @@ describe("Data chart detail island — selection URLs and continuation stay /dat
     expect(isInternalPath("/charts/gross-fees", base)).toBe(false);
     expect(isInternalPath("/data/intents/intents-volume", base)).toBe(false);
   });
+});
+
+
+describe("NI-080 workspace explorer context", () => {
+  it("keeps Network Activity's honest empty state and library action in the cabinet", async () => {
+    const requests = installApiMock([]);
+    render(await WorkspaceDataCategoryPage({ params: Promise.resolve({ category: "network" }), searchParams: Promise.resolve({}) }));
+    expect(screen.getByRole("heading", { name: "No network-level chart is registered yet" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Browse the chart library" })).toHaveAttribute("href", "/workspace/charts");
+    expect(requestsTo(requests, "/api/charts")).toHaveLength(0);
+  });
+
+  it("links Intents charts into the workspace detail rather than the public layout", async () => {
+    const chart = definitionFixture({ chart_id: "intents-volume", category: "activity" });
+    installApiMock([catalogRouteFor("activity", [chart])]);
+    render(await WorkspaceDataCategoryPage({ params: Promise.resolve({ category: "intents" }), searchParams: Promise.resolve({}) }));
+    expect(screen.getByRole("link", { name: `Open chart: ${chart.title}` })).toHaveAttribute("href", "/workspace/data/intents/intents-volume");
+  });
+
+  it("keeps catalog search, category tabs and chart links inside workspace", async () => {
+    const chart = definitionFixture();
+    installApiMock([(url) => url.pathname === "/api/charts" ? jsonResponse({ items: [chart], next_cursor: null }) : undefined]);
+    render(await WorkspaceChartLibraryPage({ searchParams: Promise.resolve({ q: "fees" }) }));
+    expect(screen.getByRole("search")).toHaveAttribute("action", "/workspace/charts");
+    expect(screen.getByRole("link", { name: `Open chart: ${chart.title}` })).toHaveAttribute("href", "/workspace/charts/gross-fees");
+    expect(screen.getByRole("link", { name: "All charts" }).getAttribute("href")).toBe("/workspace/charts?q=fees");
+  });
+
+  it("uses the same pinned query while detail backlinks stay inside workspace", async () => {
+    const chart = definitionFixture();
+    const requests = installApiMock([
+      chartRoute("gross-fees", chart), metricRoute(metricFixture(METRIC_FEES_ID, "provider_gross_fees_usd", "USD")),
+      viewRoute("gross-fees", chart), ANONYMOUS_SESSION,
+    ]);
+    render(await WorkspaceDataChartPage({ params: Promise.resolve({ category: "revenue", chartId: "gross-fees" }),
+      searchParams: Promise.resolve({ version: "1", start: VIEW_WINDOW.start, end: VIEW_WINDOW.end, filters: '{"source":"SRC-LLAMA"}' }) }));
+    await screen.findByRole("region", { name: /exact data table/ });
+    expect(screen.getByRole("link", { name: "More charts in Revenue & Fees" })).toHaveAttribute("href", "/workspace/data/revenue");
+    const query = requestsTo(requests, "/api/charts/gross-fees/view")[0];
+    expect(query.searchParams.get("start")).toBe(VIEW_WINDOW.start);
+    expect(query.searchParams.get("end")).toBe(VIEW_WINDOW.end);
+    expect(query.searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
+  });
+});
+
+
+it("NI-080 featured chart resolves its default range against the same old approved coverage", async () => {
+  const definition = definitionFixture({ chart_id: "observed-conversions", category: "activity" });
+  const requests = installApiMock([
+    catalogRouteFor("activity", [definition]),
+    (url) => {
+      if (url.pathname !== "/api/charts/observed-conversions/view") return undefined;
+      const view = viewFixture(definition, { start: url.searchParams.get("start")!, end: url.searchParams.get("end")! });
+      view.dataset = datasetFixture({ start: "2026-01-01", end: "2026-01-15" });
+      for (const series of view.series) series.dataset = view.dataset;
+      return jsonResponse(view);
+    },
+  ]);
+  render(await WorkspaceDataCategoryPage({ params: Promise.resolve({ category: "intents" }), searchParams: Promise.resolve({}) }));
+  const views = requestsTo(requests, "/api/charts/observed-conversions/view");
+  expect(views).toHaveLength(2);
+  expect(views[1].searchParams.get("end")).toBe("2026-01-15");
+  expect(views[1].searchParams.get("dataset_version")).toBe(DATASET_ID);
+  const link = screen.getByRole("link", { name: /Inspect range and data/ });
+  expect(link.getAttribute("href")).toContain("/workspace/data/intents/observed-conversions?");
+  expect(link.getAttribute("href")).toContain("end=2026-01-15");
+  expect(link.getAttribute("href")).toContain(`dataset_version=${DATASET_ID}`);
 });

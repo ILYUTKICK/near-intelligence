@@ -4,6 +4,14 @@ Editorial foundation, 5 November 2026. Historical evidence mainly spans **2026-0
 
 ## 1. Executive summary
 
+**Local descriptive extension — 14 November 2026 (NI-083):** the interactive
+research page now separates the original 90-day attributed cohort from the
+longer saved, source-qualified volume/gross-fee history. Server calculations use
+matched-date sums and expose partial calendar periods; they do not extend fee
+provenance, establish net revenue or change H1–H4 verdicts. Original CL-001–009
+remain pinned to their recorded windows; independent recomputation reconciled
+the historical amounts. See [actual calculations and verification](verification/ni-083/README.md).
+
 **NEAR's long-term investment case depends on its ability to convert growing cross-chain activity into sustainable protocol revenue and measurable token value capture.** Existing saved evidence supports a regularly operating conversion/payout channel within a defined cohort. It challenges a simple accelerating-demand narrative: NEAR quantities acquired declined across successive 30-day windows, and observed acquisitions are small relative to positive net supply growth. Full fee provenance and economically attributable daily protocol revenue remain unresolved.
 
 The appropriate current assessment is mixed evidence with important identification gaps, not a proven investment case. A working research product should make both findings and gaps inspectable.

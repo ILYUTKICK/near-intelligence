@@ -107,3 +107,54 @@ Minimum amendment record: context, decision, alternatives, scientific/security e
 **Date:** 2026-11-12.
 
 **ADR-022 integration amendment — 13 November 2026:** keep the already-published sharing ADR-021 identity and number integrity separately as ADR-022. Verify frozen chart/model contexts against canonical pins and shared hash helpers; support the integrated NI-055 model-result block in checks and selected commentary. Findings never label an older fallback dataset as newer. The report bound is derived from the canonical block cap and actual maximum findings per block. Client reports are scoped to the active session/document/revision/request; pending or failed checks never reuse an old result as the current one. Optional adapter errors remain typed, owner checks precede configuration errors, and numeric grounding preserves the complete numeric spelling. The numeric guard enforces lexical read-back only; it cannot verify the meaning of generated prose. Offline transports exercise provider behavior; no real provider connectivity is inferred.
+
+
+## ADR-023 — Public research grows into a Blog/article library (2026-11-14)
+
+**Context:** the owner wants to build on the existing complete research with more
+articles over time and explicitly asks to anchor this direction in the project.
+
+**Decision:** add a planned public Blog catalog (working name) with distinct
+research publications; the current full `/research` is the first article. The
+article experience combines authored arguments, interactive charts and cited,
+versioned evidence. Follow-ups link back to their earlier research. Preserve
+original findings and stable links; separate article revisions from data refresh.
+The private workspace remains the reader's research tool. The accepted brief is
+[BLOG_PUBLICATIONS.md](BLOG_PUBLICATIONS.md), recorded through NI-084.
+
+**Consequences:** this is a product/documentation decision, not completed Blog
+routing, a CMS selection or automatic publication. Future implementation needs an
+identified NI-task and a compatible URL/publication contract. No private document
+becomes public implicitly; no fake future articles or metadata populate a catalog.
+Existing data/model/release gates, stopped collectors and Git hold remain intact.
+
+
+**ADR-023 implementation amendment — 14 November 2026 (NI-085):** the owner
+subsequently requested implementation. The local web application now has the
+curated `/blog` catalog, shared article template and `/blog/[slug]` route. The
+original research remains canonical at `/research`; its existing slug is an
+explicit 308 alias, preserving old links. Primary navigation uses Blog and marks
+it active for the original article. Metadata records only the known November
+2026 research-release label; no exact publication date or author is invented.
+Future publications are deliberate curated source entries, never automatic
+exposure of private documents or synthetic demo release records. No CMS,
+external publication, data collection or Git transfer accompanies this change.
+
+
+## ADR-024 — Editorial Overview follows the approved visual concept (2026-11-14)
+
+**Context:** after introducing Blog, the owner reviewed the existing thesis-heavy
+Overview, approved a new rendered mockup and explicitly requested implementation.
+
+**Decision:** NI-086 makes `/` a concise editorial product entry: hero, one actual
+featured research publication from the shared registry, three data directions,
+reader workflow, short methodology and workspace CTA. The approved-style artwork
+is decorative and contains no measured financial values. UI copy and controls
+are native web elements; the mockup is not embedded as the page itself.
+
+**Consequences:** this supersedes NI-012's duplicate on-home metric/claim/status
+tables, preserving their underlying data services and complete original research.
+Financial metrics remain source-qualified in the article/data views; research
+and model gates are unchanged. Overview is independent of data API availability.
+Legacy homepage anchors retain meaningful section/link destinations. No fake
+KPIs, live claims, new collectors, dependencies or Git publication are introduced.

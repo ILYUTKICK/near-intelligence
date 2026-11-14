@@ -4,6 +4,22 @@ P0 defines the minimum hackathon product. **Owner scope update — 12 November 2
 
 ## P0 commitments
 
+**Publication direction and implementation — 14 November 2026:** NI-084 records
+and NI-085 locally implements a public Blog/research-article library. The complete
+`/research` is its first article, with stable existing anchors and evidence.
+See [the publication brief](BLOG_PUBLICATIONS.md). Shared curated metadata and an
+article template support subsequent real publications. No CMS, automatic public
+promotion of private drafts or daily collection is introduced. This owner-requested
+batch is included in NI-079; other data/model/workspace/release gates remain.
+
+**Approved Overview — 14 November 2026:** NI-086 implements the owner's approved
+editorial design, presenting the product and its research rather than repeating
+the full thesis tables on the homepage. The original NI-012 evidence-first
+requirement remains satisfied through the real featured article and working
+data/source/methodology links; the earlier on-home metric-strip acceptance is
+superseded by explicit owner instruction. No quantitative/model release gate
+is removed. NI-086 is included in NI-079 local acceptance before deployment.
+
 **User scope update — 8 November 2026:** remaining implementation and release verification target desktop. Mobile development/adaptation and mobile, touch, phone and tablet QA are excluded from the current authorized scope to limit execution cost. Existing responsive code and historical verification evidence are preserved; no new mobile viewport/device passes or screenshots are required. Desktop keyboard/accessibility, ownership, persistence and reproducibility requirements remain in force.
 
 Public landing, full original thesis, methodology and public data explorer; shared source/metric/chart registries; daily historical analytics from saved real data; scheduled refresh for at least one approved reliable source; visibly historical fallback for any failed source. Working Supabase login, private workspace/home, saved charts, document CRUD, Tiptap editor, text/heading/chart/table/insight/hypothesis/evidence/risk/divider blocks, Add Chart, Add Insight, typed context, server ownership, autosave/reopen and reproducible published quantitative analysis. Markdown bundle export is the single reliable MVP export.

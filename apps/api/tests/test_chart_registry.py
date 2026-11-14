@@ -23,7 +23,7 @@ from near_api.charts.registry import (
     ChartSeries,
     FILTER_PROVIDER_SOURCES,
     FILTER_TREASURY_RECIPIENTS,
-    MAX_RANGE_DAYS,
+    MAX_RANGE_DAYS, MAX_HISTORY_RANGE_DAYS,
     RENDERER_VERSION,
     SERIES_ROLES,
     chart_by_chart_id,
@@ -173,7 +173,7 @@ class RegistryIntegrityTests(unittest.TestCase):
         for chart in CHARTS:
             with self.subTest(chart=chart.chart_id):
                 ranges = chart.allowed_ranges
-                self.assertLessEqual(ranges["max_days"], MAX_RANGE_DAYS)
+                self.assertLessEqual(ranges["max_days"], MAX_HISTORY_RANGE_DAYS)
                 self.assertTrue(ranges["presets_days"])
                 for preset in ranges["presets_days"]:
                     self.assertLessEqual(preset, ranges["max_days"])
@@ -233,7 +233,7 @@ class RegistryRejectionTests(unittest.TestCase):
 
     def test_invalid_ranges_are_rejected(self):
         cases = (
-            ({"presets_days": [7, 30, 90], "max_days": MAX_RANGE_DAYS + 1}, "max_days"),
+            ({"presets_days": [7, 30, 90], "max_days": MAX_HISTORY_RANGE_DAYS + 1}, "max_days"),
             ({"presets_days": [7, 400], "max_days": 366}, "exceeds max_days"),
             ({"presets_days": [30, 7], "max_days": 366}, "unique and ascending"),
             ({"presets_days": [], "max_days": 366}, "positive integers"),
@@ -394,7 +394,7 @@ class RegistryRejectionTests(unittest.TestCase):
         self.assertFalse(FILTER_DIMENSIONS["price_basis"].multi_value)
 
     def test_version_increment_adds_a_new_definition_without_touching_v1(self):
-        first = chart_by_chart_id("intents-volume")
+        first = next(chart for chart in CHARTS if chart.chart_id == "intents-volume" and chart.version == 1)
         second = doctored("intents-volume", version=2, title="Intents volume (revised)")
         validate_single(second)
         self.assertNotEqual(first.id, second.id)
@@ -404,7 +404,7 @@ class RegistryRejectionTests(unittest.TestCase):
         with self.assertRaises(Exception):
             first.title = "rewritten"
         # the deterministic identity of v1 is unchanged by the v2 registration
-        self.assertEqual(first.id, chart_by_chart_id("intents-volume").id)
+        self.assertEqual(first.id, next(c.id for c in CHARTS if c.chart_id == "intents-volume" and c.version == 1))
 
 
 # --------------------------------------------------------------------------- #

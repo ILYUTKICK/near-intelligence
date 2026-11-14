@@ -135,10 +135,12 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
 
   await page.goto(`${state.web_url}/`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const thesisLink = page.getByRole("link", { name: "Read the full thesis" });
+  // NI-086 overview copy: the anonymous paths into the public thesis and
+  // methodology keep their relative hrefs under the new link names.
+  const thesisLink = page.getByRole("link", { name: "full research" });
   await expect(thesisLink).toBeVisible();
   expect(await thesisLink.getAttribute("href")).toMatch(/^\//);
-  const methodologyLink = page.getByRole("link", { name: "Check the methodology" });
+  const methodologyLink = page.getByRole("link", { name: "Our methodology" });
   await expect(methodologyLink).toBeVisible();
 
   await page.goto(`${state.web_url}/methodology`);
@@ -159,10 +161,15 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await expect(page.getByRole("button", { name: "Sign in to save this chart" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in to add it to research" })).toBeVisible();
 
-  // The default live view anchors to the current UTC day (after this dataset's
-  // coverage) and stays honest: no observed values are invented for it.
+  // NI-080: an implicit default follows the approved historical coverage.
+  // Explicit dates remain authoritative even when they have no observations.
   await expect(page.getByRole("group", { name: "Time range" })).toBeVisible();
+  await expect(page.getByText(/default preset is anchored to the latest approved dataset's coverage end/)).toBeVisible();
+  await expect(page.getByText(state.pin_value)).toBeVisible();
+  await page.goto(`${state.web_url}/data/intents/intents-volume?version=1&start=2026-11-01&end=2026-11-04`);
+  await expect(page).toHaveURL(/start=2026-11-01&end=2026-11-04/);
   await expect(page.getByText(state.pin_value)).toHaveCount(0);
+  await expect(page.getByText(/Nothing was observed for this selection/)).toBeVisible();
 
   // The pinned full-selection claim: exact persisted values, exact dataset.
   await page.goto(chartSelectionUrl());

@@ -72,7 +72,7 @@ class ContractTests(TestCase):
 
     def test_selection_half_open_limits_and_unknown_fields(self):
         Selection.model_validate(self.fixture["selection"])
-        for changes in ({"end": "2024-01-01"}, {"end": "2025-01-02"}, {"start": 0},
+        for changes in ({"end": "2024-01-01"}, {"end": "2026-01-02"}, {"start": 0},
                         {"start": "20240101"}, {"frequency": "week"},
                         {"filters": {"unapproved": True}}, {"owner_id": "synthetic"}):
             with self.subTest(changes=changes), self.assertRaises(ValidationError):
@@ -108,7 +108,7 @@ class ContractTests(TestCase):
             # NI-060 added the share capability routes.
             # NI-065 adds integrity and grounded-commentary routes.
             self.assertEqual(set(schema["paths"]), {
-                "/health", "/api/home", "/api/me",
+                "/health", "/api/home", "/api/me", "/api/research/history",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
                 "/api/snapshots", "/api/snapshots/{snapshot_id}",
                 "/api/snapshots/{snapshot_id}/compare-live",

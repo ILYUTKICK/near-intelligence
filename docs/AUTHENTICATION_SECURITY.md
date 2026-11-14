@@ -67,3 +67,26 @@ Back up DB and artifacts together; restore/reconcile manifests before traffic. P
 Alice/Bob matrix for every private endpoint family; IDOR by nested version/snapshot/export/reference; pooled RLS identity reset; forged/expired/wrong issuer/audience/algorithm tokens; revoked refresh and disabled users; CSRF/open redirects; private cache bleed; XSS in text/link/tooltip/export; path traversal and oversized document/query/export. A release with any unauthorized read/write is blocked. See NI-062 and [testing](TESTING_STRATEGY.md).
 
 NI-035 parallel-write correction: `GET /api/auth/csrf` reuses a valid signed double-submit cookie and returns `no-store`. If an authenticated session lacks that cookie, concurrent requests derive the same opaque signed nonce from a domain-separated HMAC of the bearer; no bearer or session payload is returned. Anonymous first minting stays random. Invalid cookies are replaced, mutation cookie/header matching and Origin checks remain mandatory, and logout clears both session and CSRF cookies.
+
+## NI-080 email-label demo entry — 13 November 2026
+
+The login screen leads with a required syntactically valid email label and
+Enter demo workspace. It sends no password or verification message. The label
+is metadata, never proof of ownership, a lookup key for an existing identity,
+or a way to recover previous research. Each successful anonymous sign-in
+creates a distinct provider subject and an owned `investment-v1` starter
+document through the ordinary authenticated API. The gateway issues the browser
+session only after that template creation succeeds. An existing permanent
+account remains available in a separate disclosure on the same page.
+
+In the loopback QA preview only, `e2e/harness/stack.py` now supplies the
+GoTrue-compatible anonymous signup, rotating refresh and logout transport.
+It signs ES256 tokens with the ephemeral local key already used by the
+harness and never contacts Supabase or sends the label externally. Signature,
+issuer/audience, principal bootstrap, signed cookies, Origin/CSRF and RLS checks
+still run normally. These transport routes exist only in the harness process,
+not in the application or deployment image. A deployed demo uses the configured
+Supabase provider with anonymous sign-ins enabled. This local verification does
+not establish a working remote provider. Same-label visitors cannot read each
+other's documents; logout revokes the refresh family while access JWT lifetime
+retains the existing documented semantics.

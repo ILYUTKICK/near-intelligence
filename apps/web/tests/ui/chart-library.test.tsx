@@ -677,7 +677,7 @@ describe("Chart detail page — validated selection URLs", () => {
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
     expect([...viewRequests[0].searchParams.keys()]).toEqual(["definition_version", "start", "end"]);
-    const status = await screen.findByRole("status");
+    const status = await chartParameterNotice();
     expect(within(status).getByText("foo")).toBeInTheDocument();
     expect(within(status).getByText("admin")).toBeInTheDocument();
     expect(within(status).getAllByText(/unsupported URL parameter/).length).toBe(2);
@@ -688,14 +688,15 @@ describe("Chart detail page — validated selection URLs", () => {
     await renderDetail({ version: "1", start: "2025-10-01", end: "2026-11-06" });
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
-    // The fallback is the version's default preset anchored to today (UTC).
+    // The bounded bootstrap uses today only to discover approved coverage;
+    // this mock dataset echoes that range, so no re-anchor request is needed.
     const expectedEnd = todayUtc();
     const expectedStart = shiftIsoDate(expectedEnd, -90);
     expect(viewRequests[0].searchParams.get("start")).toBe(expectedStart);
     expect(viewRequests[0].searchParams.get("end")).toBe(expectedEnd);
     expect(viewRequests[0].searchParams.get("definition_version")).toBe("1");
 
-    const status = await screen.findByRole("status");
+    const status = await chartParameterNotice();
     // start and end both carry the fallback note.
     expect(within(status).getAllByText(/at most 366/).length).toBe(2);
     expect(within(status).getAllByText(/90 days/).length).toBe(2);
@@ -712,7 +713,7 @@ describe("Chart detail page — validated selection URLs", () => {
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
     expect(viewRequests[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
-    const status = await screen.findByRole("status");
+    const status = await chartParameterNotice();
     expect(within(status).getByText("filters.wallet")).toBeInTheDocument();
     expect(within(status).getByText(/not supported by this chart version/)).toBeInTheDocument();
   });
@@ -735,7 +736,7 @@ describe("Chart detail page — validated selection URLs", () => {
     });
 
     expect(await screen.findByText(/No filters are registered for this chart version/)).toBeInTheDocument();
-    const status = screen.getByRole("status");
+    const status = await chartParameterNotice();
     expect(within(status).getByText(/registers no filters/)).toBeInTheDocument();
   });
 
@@ -1031,6 +1032,15 @@ describe("ChartDetailClient — selection survives navigation through the URL", 
   });
 });
 
+async function chartParameterNotice(): Promise<HTMLElement> {
+  const message = await screen.findByText(
+    "Some URL parameters were not used — the chart request carries only supported fields.",
+  );
+  const status = message.closest<HTMLElement>('[role="status"]');
+  expect(status).not.toBeNull();
+  return status!;
+}
+
 // -- NI-071 multi-value comparison filters ------------------------------------- //
 
 describe("NI-071 multi-value comparison filters", () => {
@@ -1229,7 +1239,9 @@ describe("ChartAuthActions — anonymous private-action continuation", () => {
     expect(new URL(next, "http://localhost").searchParams.get("start")).toBe(VIEW_WINDOW.start);
     expect(new URL(next, "http://localhost").searchParams.get("end")).toBe(VIEW_WINDOW.end);
     // The pending UI announces the continuation honestly.
-    expect(screen.getByRole("status")).toHaveTextContent(/selection are preserved in the sign-in link/);
+    const continuation = screen.getByText(/^Signing in to continue — this chart/);
+    expect(continuation).toHaveAttribute("role", "status");
+    expect(continuation).toHaveTextContent(/selection are preserved in the sign-in link/);
   });
 
   it("offers saved-chart persistence to a signed-in visitor", async () => {
@@ -1315,5 +1327,52 @@ describe("Chart detail compact presentation (NI-076 D3)", () => {
     const table = await screen.findByRole("region", { name: /exact data table/ });
     expect(table).toBeInTheDocument();
     expect(screen.queryByText("Exact values and summary")).toBeNull();
+  });
+});
+
+
+describe("NI-080 implicit latest coverage", () => {
+  const definition = definitionFixture();
+  const archivedWindow = { start: "2026-01-01", end: "2026-01-15" };
+  function archivedView(url: URL) {
+    const range = { start: url.searchParams.get("start")!, end: url.searchParams.get("end")! };
+    const view = viewFixture(definition, range);
+    view.dataset = datasetFixture(archivedWindow);
+    for (const series of view.series) {
+      series.dataset = view.dataset;
+      series.points = range.start <= "2026-01-01" && range.end > "2026-01-01"
+        ? [observation("2026-01-01", "1000")]
+        : [observation(range.start, null)];
+    }
+    return jsonResponse(view);
+  }
+  function routes() {
+    return [chartRoute("gross-fees", definition), metricRoute(metricFixture(METRIC_FEES_ID, "provider_gross_fees_usd", "USD")),
+      viewRoute("gross-fees", archivedView), ANONYMOUS_SESSION];
+  }
+
+  it("reanchors the implicit preset to old approved coverage and pins the second request", async () => {
+    const requests = installApiMock(routes());
+    render(await ChartDetailPage({ params: Promise.resolve({ chartId: "gross-fees" }), searchParams: Promise.resolve({}) }));
+    const views = requestsTo(requests, "/api/charts/gross-fees/view");
+    expect(views).toHaveLength(2);
+    expect(views[0].searchParams.has("dataset_version")).toBe(false);
+    expect(views[1].searchParams.get("dataset_version")).toBe(DATASET_ID);
+    expect(views[1].searchParams.get("end")).toBe("2026-01-15");
+    expect(views[1].searchParams.get("start")).toBe(shiftIsoDate("2026-01-15", -90));
+    expect(screen.getByText(/latest approved dataset's coverage end/)).toBeVisible();
+    expect(await screen.findByRole("region", { name: /exact data table/ })).toHaveTextContent(/1\s000/);
+  });
+
+  it("preserves an explicit out-of-coverage custom selection without any reanchor", async () => {
+    const requests = installApiMock(routes());
+    render(await ChartDetailPage({ params: Promise.resolve({ chartId: "gross-fees" }),
+      searchParams: Promise.resolve({ start: "2026-11-01", end: "2026-11-06", filters: '{"source":"SRC-LLAMA"}' }) }));
+    const views = requestsTo(requests, "/api/charts/gross-fees/view");
+    expect(views).toHaveLength(1);
+    expect(views[0].searchParams.get("start")).toBe("2026-11-01");
+    expect(views[0].searchParams.get("end")).toBe("2026-11-06");
+    expect(views[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
+    expect(views[0].searchParams.has("dataset_version")).toBe(false);
   });
 });

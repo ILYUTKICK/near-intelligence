@@ -106,7 +106,7 @@
         "description": "Bounded query ranges of a chart definition (registry ``allowed_ranges``).",
         "properties": {
           "max_days": {
-            "maximum": 366.0,
+            "maximum": 730.0,
             "minimum": 1.0,
             "title": "Max Days",
             "type": "integer"
@@ -4136,6 +4136,174 @@
         "title": "ReasonCodeResponse",
         "type": "object"
       },
+      "ResearchHistoryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "fees": {
+            "$ref": "#/components/schemas/ChartViewResponse"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "monthly": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchPeriodSummary"
+            },
+            "title": "Monthly",
+            "type": "array"
+          },
+          "purchases": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChartViewResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quarterly": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchPeriodSummary"
+            },
+            "title": "Quarterly",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ResearchPeriodSummary"
+          },
+          "volume": {
+            "$ref": "#/components/schemas/ChartViewResponse"
+          }
+        },
+        "required": [
+          "volume",
+          "fees",
+          "purchases",
+          "summary",
+          "monthly",
+          "quarterly",
+          "limitations"
+        ],
+        "title": "ResearchHistoryResponse",
+        "type": "object"
+      },
+      "ResearchPeriodSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "effective_gross_fee_bps": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "expected_days": {
+            "maximum": 730.0,
+            "minimum": 1.0,
+            "title": "Expected Days",
+            "type": "integer"
+          },
+          "fee_days": {
+            "minimum": 0.0,
+            "title": "Fee Days",
+            "type": "integer"
+          },
+          "gross_fees_usd": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matched_days": {
+            "minimum": 0.0,
+            "title": "Matched Days",
+            "type": "integer"
+          },
+          "matched_gross_fees_usd": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matched_volume_usd": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "volume_days": {
+            "minimum": 0.0,
+            "title": "Volume Days",
+            "type": "integer"
+          },
+          "volume_usd": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zero_fee_days": {
+            "minimum": 0.0,
+            "title": "Zero Fee Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "expected_days",
+          "volume_days",
+          "fee_days",
+          "matched_days",
+          "zero_fee_days",
+          "volume_usd",
+          "gross_fees_usd",
+          "matched_volume_usd",
+          "matched_gross_fees_usd",
+          "effective_gross_fee_bps",
+          "complete"
+        ],
+        "title": "ResearchPeriodSummary",
+        "type": "object"
+      },
       "ResolvedContext": {
         "additionalProperties": false,
         "description": "Frozen chart inspection record (API_SPECIFICATION ``ResolvedContext``).\n\nContains the selected range (``selection.start``/``selection.end`` with the\nhalf-open UTC window rules of :class:`near_api.schemas.common.Selection`),\nthe bounded registered filter dimensions as passed (the referenced chart\ndefinition controls the exact allowed values), the immutable pinned dataset version and the stable\nversion identifiers whose ``context_hash`` binds them together. Server\nresolution/verification of every id happens where the context is created;\nthis contract keeps a stored context from drifting afterwards.",
@@ -4193,7 +4361,7 @@
       },
       "ResolvedSelection": {
         "additionalProperties": false,
-        "description": "The resolved selection echoed back on series/chart-view responses.\n\nSame window rules as the shared bootstrap ``Selection`` (ISO dates,\nfrequency ``day``, non-empty half-open window of at most 366 days), but\n``filters`` carries the chart-version-validated values instead of the\nstrict-empty bootstrap object.",
+        "description": "The resolved selection echoed back on series/chart-view responses.\n\nSame window rules as the shared bootstrap ``Selection`` (ISO dates,\nfrequency ``day``, non-empty half-open window of at most 730 days), but\n``filters`` carries the chart-version-validated values instead of the\nstrict-empty bootstrap object.",
         "properties": {
           "end": {
             "format": "date",
@@ -13072,6 +13240,97 @@
         "summary": "Clone a published release into a new private document",
         "tags": [
           "publications"
+        ]
+      }
+    },
+    "/api/research/history": {
+      "get": {
+        "operationId": "getResearchHistory",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "SRC-LLAMA",
+              "maxLength": 40,
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dataset_version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dataset Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Unsupported source or range"
+          },
+          "503": {
+            "description": "Approved research data unavailable"
+          }
+        },
+        "summary": "Get History",
+        "tags": [
+          "research"
         ]
       }
     },

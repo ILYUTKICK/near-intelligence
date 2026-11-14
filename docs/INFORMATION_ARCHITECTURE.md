@@ -1,13 +1,33 @@
 # Information architecture
 
+## Blog / research publications — implemented locally, 14 November 2026
+
+The [publication brief](BLOG_PUBLICATIONS.md) is implemented through NI-085:
+
+- `/blog` — public catalog of curated, actually available research articles.
+- `/blog/[slug]` — shared article route for registered local editorial entries;
+  an unknown or malformed slug produces the generic article 404.
+- `/blog/near-thesis-2026-11` — permanent 308 alias to the original `/research`.
+  The first catalog card links directly to `/research`, which remains canonical.
+
+The full original article, fifteen sections, H1–H4/claim/evidence anchors, release
+identity and interactive charts remain at `/research`. Blog is the primary
+navigation label; it is active on both catalog/article routes and `/research`.
+The article has a backlink to the catalog. A future real entry uses the curated
+publication registry and shared article template, without copying the entire
+original thesis route. No synthetic/demo/private publication populates Blog.
+New articles do not silently rewrite earlier conclusions or pinned evidence.
+
 Canonical product name: NEAR Intelligence. Labels and routes below override the earlier `product-plan` route proposal. Navigation is data-driven with `{label,href,group,icon,priority,enabled}`; desktop and mobile use one registry.
 
 ## Public navigation
 
 | Label | Route | Content / authentication |
 | --- | --- | --- |
-| Overview | `/` | Landing, conditional thesis and selected real metrics; public |
-| Research | `/research` | Canonical published long-term thesis with H1–H4 and evidence anchors; public |
+| Overview | `/` | Editorial product introduction, one real featured research article, data directions, workflow and workspace entry; public (NI-086) |
+| Blog | `/blog` | Public research-article catalog; active on article pages and `/research` (NI-085) |
+| Original research | `/research` | First full article, canonical stable H1–H4/claim/evidence anchors; linked from Blog |
+| Article | `/blog/[slug]` | Curated editorial article; first original-research slug aliases `/research`; unknown slug 404 |
 | Data | `/data` | Data explorer overview: the five categories below with live availability or honest explanations; public (NI-015) |
 | Data category | `/data/[category]` | `network`, `intents`, `revenue`, `token-economics`, `ecosystem`; same analytical components as workspace; public (NI-015) |
 | Data chart | `/data/[category]/[chartId]` | Chart detail through the same shared implementation as `/charts/[chartId]`, mounted under the category; public (NI-015) |
@@ -19,7 +39,7 @@ Canonical product name: NEAR Intelligence. Labels and routes below override the 
 | Sign in | `/login` | Email/password sign-in and registration links |
 | Sign up / recovery | `/signup`, `/reset-password`, `/auth/callback` | Provider auth flows |
 
-Use `/research#h1` through `#h4`, `/methodology#sources` and `#reproduce` as stable editorial anchors. The research route (NI-014) additionally exposes fifteen thesis-section anchors (`#executive-summary`, `#question`, `#ecosystem`, `#intents-mechanism`, `#adoption`, `#revenue-generation`, `#revenue-capture`, `#token-economics`, `#econometrics`, `#alternative-explanations`, `#risks`, `#scenarios`, `#assessment`, `#limits`, `#sources-reproducibility`); the hypothesis anchors live inside `#question`. The landing (NI-012) exposes stable anchors `/#evidence` (selected approved metrics) and `/#findings` (supporting/contrary registry claims). Unpublished model runs never resolve publicly.
+Use `/research#h1` through `#h4`, `/methodology#sources` and `#reproduce` as stable editorial anchors. The research route (NI-014) additionally exposes fifteen thesis-section anchors (`#executive-summary`, `#question`, `#ecosystem`, `#intents-mechanism`, `#adoption`, `#revenue-generation`, `#revenue-capture`, `#token-economics`, `#econometrics`, `#alternative-explanations`, `#risks`, `#scenarios`, `#assessment`, `#limits`, `#sources-reproducibility`); the hypothesis anchors live inside `#question`. The approved Overview (NI-086) retains `/#evidence` and `/#findings` as compatible section destinations, with detailed source-qualified metrics and supporting/contrary claims remaining in the linked research/data pages. `/#mechanism` and `/#release-status` retain meaningful workflow/methodology entry points and links to the owning evidence/status sections. Unpublished model runs never resolve publicly.
 
 The public header highlights Data on the explorer and chart library routes, and Models on the catalog and run routes. The workspace sidebar highlights the owning section on document, revision and saved-chart detail routes. Sign-in and registration share an account layout with links to each other and to Overview.
 
@@ -30,18 +50,18 @@ The public header highlights Data on the explorer and chart library routes, and 
 | Workspace | Home | `/workspace` | P0 |
 | Workspace | My Research | `/workspace/research` | P0 |
 | Workspace | Saved Charts | `/workspace/saved-charts` | P0 |
-| Data Explorer | Network Activity | `/data/network` | P0, show availability |
-| Data Explorer | Intents & Adoption | `/data/intents` | P0 |
-| Data Explorer | Revenue & Fees | `/data/revenue` | P0 |
-| Data Explorer | Token Economics | `/data/token-economics` | P0 |
-| Data Explorer | Ecosystem | `/data/ecosystem` | P0 shell with honest gaps |
-| Analytics | Econometric Models | `/models` | P0 published runs; P1 embedding |
+| Data Explorer | Network Activity | `/workspace/data/network` | P0, show availability |
+| Data Explorer | Intents & Adoption | `/workspace/data/intents` | P0 |
+| Data Explorer | Revenue & Fees | `/workspace/data/revenue` | P0 |
+| Data Explorer | Token Economics | `/workspace/data/token-economics` | P0 |
+| Data Explorer | Ecosystem | `/workspace/data/ecosystem` | P0 shell with honest gaps |
+| Analytics | Econometric Models | `/workspace/models` | P0 published runs; P1 embedding |
 | Account | Profile | `/workspace/profile` | P0 |
 | Account | Settings | `/workspace/settings` | P0 |
 
-Reconciled in NI-064 (8 November 2026 NI-024 review input): the Data Explorer and Analytics sidebar entries previously carried the never-implemented aliases `/workspace/data/*` and `/workspace/models`, so the workspace sidebar prefetched 404s. They now target the implemented public routes (`/data/*`, `/models`); there is exactly one data explorer and one model catalog implementation.
+Historical NI-064 decision (superseded by NI-080 below): the Data Explorer and Analytics sidebar entries previously carried the never-implemented aliases `/workspace/data/*` and `/workspace/models`, so the workspace sidebar prefetched 404s. They then targeted the implemented public routes (`/data/*`, `/models`); there is exactly one data explorer and one model catalog implementation.
 
-The research editor opens at `/workspace/research/[documentId]`. Its Revision history link opens `/workspace/research/[documentId]/versions`. The optional `version` UUID selects a saved read-only revision with its pinned charts and CSV. Model detail links to the public read-only model; private arbitrary execution is excluded. No dead chart entries for unverified metrics; an empty category explains why and links to definitions.
+The research editor opens at `/workspace/research/[documentId]`. Its Revision history link opens `/workspace/research/[documentId]/versions`. The optional `version` UUID selects a saved read-only revision with its pinned charts and CSV. Model detail stays in the workspace while displaying the same published read-only model; private arbitrary execution is excluded. No dead chart entries for unverified metrics; an empty category explains why and links to definitions.
 
 ## Context and orientation
 
@@ -54,3 +74,24 @@ Implemented public data explorer (NI-015): `/data` renders the five explorer cat
 Public-to-private actions preserve a short-lived internal pending action with chart ID/version/range/filter context, never serialized private document content or arbitrary redirect URLs. After authentication show a destination picker; insertion occurs only after server validation and explicit destination choice. Breadcrumbs: Workspace → My Research → document title; Data → category → chart.
 
 At ≥1280px editor shows outline, paper and tools; 768–1279px uses a collapsible outline and drawer tools; below 768px one pane plus accessible drawers. Sidebar is a modal drawer on mobile with focus restoration. Error boundaries preserve the shell; session expiry preserves local unsaved text and returns to the same permitted internal route.
+
+
+## NI-080 cabinet navigation correction — 13 November 2026
+
+Owner feedback replaces the former public-route-only sidebar decision. The signed-in
+cabinet now mounts the same shared screens at `/workspace/data`,
+`/workspace/data/[category]`, `/workspace/data/[category]/[chartId]`,
+`/workspace/charts`, `/workspace/charts/[chartId]`, `/workspace/models` and
+`/workspace/models/[runId]`. These are implemented routes behind the workspace
+session gate, not redirect aliases. Sidebar exploration, Saved Charts' Explore
+charts, catalog search/category/pagination links and chart range/backlinks remain
+inside the workspace shell. Public `/data`, `/charts` and `/models` routes retain
+their public shells and the same canonical API/selection/rendering logic.
+Network Activity and Ecosystem continue to state their actual data gaps; this
+navigation correction does not create new metrics. Source documentation remains
+an explicit public reference link.
+
+Home no longer displays Data context or its indicator cards. Recent research,
+saved charts/notes, Create/Continue and the research checklist remain. The Home
+API's indicator contract is retained for existing consumers; it is not rendered
+on the Home screen under the owner's new scope.

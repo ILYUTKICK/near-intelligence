@@ -15,15 +15,17 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <>
       <header className="text-center">
         <p className="eyebrow">Sign in</p>
-        <h1 className="mt-2 text-title">Welcome back.</h1>
-        <p className="mt-2 text-ui text-text-secondary">Continue where your research left off.</p>
+        <h1 className="mt-2 text-title">Explore your research workspace.</h1>
+        <p className="mt-2 text-ui text-text-secondary">Start with a ready-to-edit research template.</p>
       </header>
-      <LoginForm returnTo={returnTo} />
-      <p className="mt-5 text-center text-ui text-text-secondary">
-        New to NEAR Intelligence?{" "}
-        <Link href="/signup" className="font-medium underline underline-offset-2">Create an account</Link>
-      </p>
       <DemoSignIn returnTo={returnTo} />
+      <details className="mt-6 border-t border-border pt-4">
+        <summary className="cursor-pointer text-ui font-medium text-link">Sign in to an existing account</summary>
+        <LoginForm returnTo={returnTo} />
+        <p className="mt-5 text-center text-ui text-text-secondary">
+          <Link href="/signup" className="font-medium underline underline-offset-2">Create a permanent account</Link>
+        </p>
+      </details>
     </>
   );
 }

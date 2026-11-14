@@ -1058,6 +1058,8 @@ def build_chart_view(connection: Connection, *, chart_id: str, version: int | No
         raise DeliveryReferenceInvalid("verified chart reads require immutable versions")
     chart_row, bindings, metric_rows = load_chart_view_inputs(connection, chart_id, version)
     resolved_filters = validate_filters_against_schema(filters, chart_row["filter_schema"])
+    if not 0 < (end - start).days <= chart_row["allowed_ranges"]["max_days"]:
+        raise DeliveryInvalidFilter("Selection exceeds this chart definition's maximum range")
 
     required_ids = tuple({metric_id for metric_id, role in bindings
                           if role.startswith("required")})

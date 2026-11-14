@@ -1010,6 +1010,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/research/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get History */
+        get: operations["getResearchHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/saved-charts": {
         parameters: {
             query?: never;
@@ -3059,6 +3076,49 @@ export interface components {
              */
             severity: "rejecting" | "limit" | "informational";
         };
+        /** ResearchHistoryResponse */
+        ResearchHistoryResponse: {
+            fees: components["schemas"]["ChartViewResponse"];
+            /** Limitations */
+            limitations: string[];
+            /** Monthly */
+            monthly: components["schemas"]["ResearchPeriodSummary"][];
+            purchases: components["schemas"]["ChartViewResponse"] | null;
+            /** Quarterly */
+            quarterly: components["schemas"]["ResearchPeriodSummary"][];
+            summary: components["schemas"]["ResearchPeriodSummary"];
+            volume: components["schemas"]["ChartViewResponse"];
+        };
+        /** ResearchPeriodSummary */
+        ResearchPeriodSummary: {
+            /** Complete */
+            complete: boolean;
+            effective_gross_fee_bps: components["schemas"]["DecimalString"] | null;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Expected Days */
+            expected_days: number;
+            /** Fee Days */
+            fee_days: number;
+            gross_fees_usd: components["schemas"]["DecimalString"] | null;
+            /** Matched Days */
+            matched_days: number;
+            matched_gross_fees_usd: components["schemas"]["DecimalString"] | null;
+            matched_volume_usd: components["schemas"]["DecimalString"] | null;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /** Volume Days */
+            volume_days: number;
+            volume_usd: components["schemas"]["DecimalString"] | null;
+            /** Zero Fee Days */
+            zero_fee_days: number;
+        };
         /**
          * ResolvedContext
          * @description Frozen chart inspection record (API_SPECIFICATION ``ResolvedContext``).
@@ -3100,7 +3160,7 @@ export interface components {
          * @description The resolved selection echoed back on series/chart-view responses.
          *
          *     Same window rules as the shared bootstrap ``Selection`` (ISO dates,
-         *     frequency ``day``, non-empty half-open window of at most 366 days), but
+         *     frequency ``day``, non-empty half-open window of at most 730 days), but
          *     ``filters`` carries the chart-version-validated values instead of the
          *     strict-empty bootstrap object.
          */
@@ -8000,6 +8060,45 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
+            };
+        };
+    };
+    getResearchHistory: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+                source?: string;
+                dataset_version?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchHistoryResponse"];
+                };
+            };
+            /** @description Unsupported source or range */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Approved research data unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

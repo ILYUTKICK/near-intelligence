@@ -310,6 +310,36 @@ describe("buildChart — renderer contract guards", () => {
 });
 
 describe("renderer/registry alignment", () => {
+  it("enables linked browser zoom without adding navigation to frozen exports", () => {
+    const usd = metric("USD", "Synthetic volume", "synthetic_volume");
+    const near = metric("NEAR", "Synthetic purchases", "synthetic_purchases");
+    const resolved = view(definition(), [usd, near].map((m) => series(m, [
+      observation("2026-11-01", "10"), observation("2026-11-02", "20"),
+    ])));
+    const interactive = buildChart(resolved, { interactions: true });
+    const frozen = buildChart(resolved, { interactions: false });
+    if (interactive.kind !== "ok" || frozen.kind !== "ok") throw new Error("Expected supported charts");
+    expect(interactive.option.dataZoom).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "inside", xAxisIndex: [0, 1], filterMode: "none", zoomOnMouseWheel: "shift" }),
+      expect.objectContaining({ type: "slider", xAxisIndex: [0, 1] }),
+    ]));
+    expect(frozen.option.dataZoom).toBeUndefined();
+  });
+
+  it("keeps exact tooltips aligned across interleaved unit panels", () => {
+    const a = metric("USD", "Synthetic A", "a");
+    const b = metric("NEAR", "Synthetic B", "b");
+    const c = metric("USD", "Synthetic C", "c");
+    const built = buildChart(view(definition(), [
+      series(a, [observation("2026-11-01", "111")]),
+      series(b, [observation("2026-11-01", "222")]),
+      series(c, [observation("2026-11-01", "333")]),
+    ]));
+    if (built.kind !== "ok") throw new Error("Expected supported chart");
+    const formatter = (built.option.tooltip as TooltipComponentOption).formatter as (params: unknown) => string;
+    expect(formatter([{ seriesIndex: 1, dataIndex: 0 }])).toContain("Synthetic B (NEAR): 222");
+    expect(formatter([{ seriesIndex: 2, dataIndex: 0 }])).toContain("Synthetic C (USD): 333");
+  });
   it("RENDERER_VERSION equals the apps/api chart registry constant", () => {
     const registrySource = readFileSync(
       path.join(REPO_ROOT, "apps/api/src/near_api/charts/registry.py"),

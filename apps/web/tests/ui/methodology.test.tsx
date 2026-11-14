@@ -1,9 +1,4 @@
-/**
- * NI-013 methodology page: provider/definition/cleaning/readiness sections on
- * the stable anchors, exact verified periods, explicit attribution/supply
- * bounds, no raw-download guarantees — and every command label verified
- * against the tooling the repository actually ships.
- */
+/** Public methodology keeps the reader article, not the removed operator appendices. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -12,114 +7,101 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import MethodologyPage from "@/app/(public)/methodology/page";
+import { methodology } from "@/features/public-research/content";
 
 const repoRoot = join(process.cwd(), "..", "..");
-
 function readRepo(relative: string): string {
   return readFileSync(join(repoRoot, relative), "utf8");
 }
-
 const rootPackageJson = JSON.parse(readRepo("package.json")) as { scripts: Record<string, string> };
 const webPackageJson = JSON.parse(readRepo("apps/web/package.json")) as {
-  name: string;
-  scripts: Record<string, string>;
+  name: string; scripts: Record<string, string>;
 };
+function renderedPage() { return render(<MethodologyPage />); }
 
-/** External documentation links verified live in docs/SOURCE_VERIFICATION.md. */
-const verifiedExternalHrefs = [
-  "https://docs.near.org/api/rpc/providers",
-  "https://docs.near.org/api/rpc/block-chunk",
-  "https://docs.near-intents.org/llms.txt",
-  "https://docs.llama.fi/pro-api",
-  "https://github.com/DefiLlama/dimension-adapters/blob/master/fees/near-intents/index.ts",
-  "https://docs.dune.com/api-reference/overview/authentication",
-  "https://docs.dune.com/api-reference/overview/rate-limits",
-  "https://docs.coingecko.com/reference/coins-id-market-chart-range",
-  "https://docs.cloud.google.com/bigquery/public-data",
-  "https://www.near.org/blog/evolving-near-tokenomics",
-];
-
-function renderedPage() {
-  return render(<MethodologyPage />);
-}
-
-describe("Methodology anchors and honesty", () => {
-  it("carries the stable anchors including the readiness section", async () => {
+describe("Reader-facing methodology", () => {
+  it("retains all six chapters, canonical anchors and an accessible article", async () => {
     const { container } = renderedPage();
-    for (const anchor of ["sources", "definitions", "collection", "readiness", "reproduce"]) {
-      const element = document.getElementById(anchor);
-      expect(element, `missing #${anchor}`).not.toBeNull();
-      expect(element!.tagName).toBe("SECTION");
+    const links = within(screen.getByRole("navigation", { name: "On this page" })).getAllByRole("link");
+    expect(links).toHaveLength(6);
+    for (const id of ["sources", "definitions", "collection", "verify", "readiness", "reproduce"]) {
+      expect(container.querySelector(`#${id}`)?.tagName).toBe("SECTION");
     }
+    for (const link of links) expect(container.querySelector(link.getAttribute("href")!)).not.toBeNull();
     expect(await axe(container, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });
 
-  it("states the exact verified periods", () => {
+  it("removes every disclosure and its technical content from page markup", () => {
     const { container } = renderedPage();
-    const text = container.textContent as string;
-    // 90-day conversion/payout cohort (gate window, end exclusive).
-    expect(text).toContain("2026-08-06");
-    expect(text).toContain("2026-11-04");
-    // Intents creation cohort.
-    expect(text).toContain("2026-11-01");
-    expect(text).toContain("2026-11-03");
-    // The single OQ-03 probe timestamp.
-    expect(text).toContain("2026-11-06T19:13:45Z");
+    expect(container.querySelectorAll("details, summary")).toHaveLength(0);
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    expect(screen.getByRole("table").getAttribute("aria-label")).not.toBe("Source register table");
+    for (const title of [
+      "Full source register & access notes", "Definition versions & availability labels",
+      "Validation rules & recorded calculation path", "Model readiness policy & recorded verdicts",
+      "Reproduction commands & environment",
+    ]) expect(screen.queryByText(title)).toBeNull();
+    expect(container.textContent).not.toMatch(/SRC-BQ|SRC-NEAR-RPC|PROXY_ONLY_READY|NOT_READY|near_api|--database-url|NI-\d+/);
+    expect(container.textContent).not.toContain("GATED_METRIC_NO_OBSERVATIONS");
+    expect(container.textContent).not.toContain("At least 60 complete daily observations");
+    expect(container.textContent).not.toContain("flows_90d_raw.json");
+    expect(container.textContent).not.toContain("18,496 bytes");
   });
 
-  it("keeps attribution and supply bounds explicit", () => {
+  it("keeps source names, shared lineage and historical scope visible", () => {
     const { container } = renderedPage();
-    const text = container.textContent as string;
+    expect(screen.getByText(/NEAR public BigQuery tables · NEAR RPC/)).toBeVisible();
+    expect(screen.getByText(/DefiLlama · NEAR Revenue Dashboard · Dune/)).toBeVisible();
+    expect(screen.getByText(/CoinGecko · NEAR materials/)).toBeVisible();
+    expect(screen.getByText(/These sources share Dune lineage/)).toBeVisible();
+    expect(container.textContent).toContain("6 August–3 November 2026 UTC");
+    expect(container.textContent).toContain("2026-08-06");
+    expect(container.textContent).toContain("2026-11-04");
+    expect(container.textContent).toMatch(/Coverage, access and reuse rights vary by source/);
+  });
+
+  it("keeps economic distinctions, missing data and the scientific limits explicit", () => {
+    const { container } = renderedPage();
+    const text = container.textContent;
+    expect(screen.getByText(/Cash flows, not revenue/)).toBeVisible();
     expect(text).toContain("Treasury purchases do not reduce total supply — burns do");
-    expect(text).toMatch(/conservative lower bounds/i);
+    expect(text).toMatch(/Not whole-market demand/);
+    expect(text).toMatch(/Missing observations remain gaps, never zeros/);
+    expect(text).toMatch(/conservative lower bounds/);
     expect(text).toContain("6 of 297");
-    // Short attribution cohorts stay descriptive; the 90-day window is short.
-    expect(text).toMatch(/Short attribution cohorts/i);
-    expect(text).toMatch(/cannot establish a long-term stable mechanism/i);
-    // Purchases cohort is not market demand; payouts are not revenue.
-    expect(text).toMatch(/not whole-market demand/i);
-    expect(text).toMatch(/cash flows, not revenue/i);
+    expect(text).toMatch(/cannot establish a long-term stable mechanism/);
+    expect(screen.getByRole("heading", { name: "Correlation is not causation." })).toBeVisible();
+    expect(screen.getByText(/No reviewed fitted result is published here/)).toBeVisible();
+    expect(text).not.toMatch(/β\s*=|p\s*[=<]\s*0\.|\bR2?\s*=/);
   });
 
-  it("never offers raw-data downloads or unsupported public access guarantees", () => {
+  it("keeps the actual chart verification and versioned reproduction guidance", () => {
     const { container } = renderedPage();
-    const text = container.textContent as string;
-    expect(text).toMatch(/No raw-data downloads are offered/i);
-    expect(text).toMatch(/intentionally does not contain them/i);
-    expect(text).toMatch(/fresh retrieval does not make an old observation fresh/i);
-    // No download affordances of any kind.
-    for (const anchor of Array.from(container.querySelectorAll("a"))) {
-      expect(anchor.getAttribute("download")).toBeNull();
-    }
+    const verify = container.querySelector("#verify")!;
+    expect(verify.textContent).toMatch(/Sources & definitions/);
+    expect(verify.textContent).toMatch(/dates, filters and dataset version/);
+    expect(verify.textContent).toMatch(/equivalent data table/);
+    expect(verify.textContent).toMatch(/acknowledged revision/);
+    const reproduce = container.querySelector("#reproduce")!;
+    expect(reproduce.textContent).toMatch(/content hashes/);
+    expect(reproduce.textContent).toMatch(/approved immutable dataset/);
+    expect(reproduce.textContent).toMatch(/No raw-data downloads are offered/);
+    expect(reproduce.querySelectorAll("pre, code, details")).toHaveLength(0);
   });
 
-  it("links only verified provider documentation (no repository or file links)", () => {
+  it("offers only chapter and actual product links, with no raw download affordance", () => {
     const { container } = renderedPage();
-    const hrefs = Array.from(container.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    const external = hrefs.filter((href) => !href?.startsWith("#"));
-    // External links are HTTPS and come from the verified provider register.
-    expect(new Set(hrefs.filter((href) => href?.startsWith("#")))).toEqual(new Set(["#collection", "#sources"]));
-    for (const href of external) {
-      expect(href).toMatch(/^https:\/\//);
-      expect(verifiedExternalHrefs).toContain(href);
+    for (const link of container.querySelectorAll("a")) {
+      const href = link.getAttribute("href")!;
+      expect(href.startsWith("#") || ["/charts", "/models", "/research"].includes(href)).toBe(true);
+      expect(link.getAttribute("download")).toBeNull();
     }
-    expect(external).toHaveLength(verifiedExternalHrefs.length);
-    expect(external).toHaveLength(new Set(external).size);
   });
 });
 
-describe("Methodology command labels vs available tooling", () => {
-  function listByName(name: string): HTMLElement {
-    return screen.getByRole("list", { name });
-  }
-
-  function commandsOf(list: HTMLElement): string[] {
-    return Array.from(list.querySelectorAll("code")).map((code) => code.textContent ?? "");
-  }
-
-  it("lists implemented commands that exist in the repository tooling", () => {
-    render(<MethodologyPage />);
-    const commands = commandsOf(listByName("Implemented commands"));
+describe("Canonical methodology tooling stays available internally", () => {
+  it("retains canonical command documentation that matches available tooling", () => {
+    const commands = methodology.reproduce.implemented.map(item => item.command);
     const joined = commands.join("\n");
 
     // Root package.json really ships the API test scripts.
@@ -224,108 +206,10 @@ describe("Methodology command labels vs available tooling", () => {
     }
   });
 
-  it("keeps unimplemented CLI verbs out of the implemented list", () => {
-    render(<MethodologyPage />);
-    const implementedText = listByName("Implemented commands").textContent as string;
-    // The unified near_api.cli module does not exist; the refresh and research
-    // commands run through their own modules (listed above as implemented).
-    expect(implementedText).not.toContain("near_api.cli");
-    expect(implementedText).not.toContain("research run");
-    expect(implementedText).not.toContain("download");
-    const unavailableText = listByName("Commands not implemented yet").textContent as string;
-    expect(unavailableText).toContain("python -m near_api.cli …");
-    expect(unavailableText).toContain("near_api.cli module does not exist");
-    expect(unavailableText).toContain("dataset download endpoints");
-  });
-
-  it("states the honest NI-070 estimator status with no fitted values", () => {
-    const { container } = renderedPage();
-    const text = container.textContent as string;
-    expect(text).toMatch(/no real-archive fit has been executed, so no fitted results exist anywhere/);
-    expect(text).toMatch(/real-archive fit run is pending operator execution/);
-    expect(text).toMatch(/public model catalog stays honestly empty/);
-    // The synthetic verification is recorded, never a real-data claim.
-    expect(text).toMatch(/synthetic-verified/);
-    expect(text).toMatch(/intercept 0, slope 1/);
-    expect(text).toMatch(/atol 1e-10/);
-    // No fitted statistic can exist on the page.
-    expect(text).not.toMatch(/β\s*=|p\s*[=<]\s*0\.|\bR2?\s*=/);
-  });
-
-  it("renders gate thresholds exactly as the preregistered policy config declares", () => {
-    const gatePolicy = JSON.parse(
-      readRepo("research/models/configs/readiness_gate_policy_v1.json"),
-    ) as {
-      min_complete_daily_observations: number;
-      min_observations_per_parameter: number;
-      max_substantive_slopes: number;
-      long_run_min_days: number;
-      window: { start: string; end_exclusive: string };
-    };
-    const { container } = renderedPage();
-    const text = container.textContent as string;
-    expect(text).toContain(`At least ${gatePolicy.min_complete_daily_observations} complete daily observations`);
-    expect(text).toContain(`at least ${gatePolicy.min_observations_per_parameter} per estimated parameter`);
-    expect(text).toContain(`At most ${gatePolicy.max_substantive_slopes} substantive slopes`);
-    expect(text).toContain(`A minimum of ${gatePolicy.long_run_min_days} days`);
-    expect(text).toContain(gatePolicy.window.start);
-    expect(text).toContain(gatePolicy.window.end_exclusive);
-  });
-});
-
-describe("Methodology source→transform→metric path", () => {
-  it("traces SRC-BQ through import/staging to a registered metric in order", () => {
-    const { container } = renderedPage();
-    const text = container.textContent as string;
-    const indexSource = text.indexOf("SRC-BQ saved export flows_90d_raw.json");
-    const indexImport = text.indexOf("NI-027 archive import verifies the file hashes");
-    const indexStage = text.indexOf("NI-028 stage-from-import");
-    const indexMetric = text.indexOf("observed_near_purchases v1 (availability A)");
-    expect(indexSource).toBeGreaterThan(-1);
-    expect(indexImport).toBeGreaterThan(indexSource);
-    expect(indexStage).toBeGreaterThan(indexImport);
-    expect(indexMetric).toBeGreaterThan(indexStage);
-  });
-
-  it("renders the provider register as a table with provider rows", () => {
-    renderedPage();
-    const table = screen.getByRole("table", { name: /Provider register/i });
-    const rows = within(table).getAllByRole("row");
-    // 10 provider rows + header row.
-    expect(rows).toHaveLength(11);
-    for (const id of [
-      "SRC-NEAR-RPC",
-      "SRC-BQ",
-      "SRC-INTENTS",
-      "SRC-LLAMA",
-      "SRC-DASHBOARD",
-      "SRC-DUNE",
-      "SRC-PRICE",
-      "SRC-FASTNEAR",
-      "SRC-NEARBLOCKS",
-      "SRC-GOV",
-    ]) {
-      expect(within(table).getByRole("rowheader", { name: id })).toBeInTheDocument();
-    }
-  });
-
-  it("renders readiness verdicts with the recorded reason codes", () => {
-    renderedPage();
-    expect(screen.getByText(/PROXY_ONLY_READY_WITH_LIMITS/)).toBeInTheDocument();
-    for (const spec of ["true_revenue_daily_v1", "gross_fee_activity_v1", "purchases_activity_v1", "supply_bounds_activity_v1"]) {
-      expect(screen.getByText(spec)).toBeInTheDocument();
-    }
-    for (const verdict of ["NOT_READY", "READY_WITH_LIMITS", "REJECTED"]) {
-      expect(screen.getAllByText(verdict).length).toBeGreaterThan(0);
-    }
-    for (const code of [
-      "GATED_METRIC_NO_OBSERVATIONS",
-      "PROTOCOL_REVENUE_NOT_ESTABLISHED_OQ01",
-      "LOWER_BOUND_SERIES_NOT_EXACT_OUTCOME",
-      "WINDOW_AGGREGATE_NOT_DAILY",
-      "MINT_HEADER_AUDIT_INCOMPLETE",
-    ]) {
-      expect(screen.getByText(code)).toBeInTheDocument();
-    }
+  it("preserves source and readiness records without publishing their appendices", () => {
+    expect(methodology.sources.providers).toHaveLength(10);
+    expect(methodology.readiness.specs.map(spec => spec.spec)).toContain("true_revenue_daily_v1");
+    expect(methodology.readiness.gateNumbers).toContain("At least 60 complete daily observations, and at least 10 per estimated parameter including the intercept.");
+    expect(methodology.reproduce.implemented.some(item => item.command.includes("near_api.cli"))).toBe(false);
   });
 });

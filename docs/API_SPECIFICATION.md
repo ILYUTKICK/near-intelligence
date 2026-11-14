@@ -259,6 +259,36 @@ license-`prohibited`. Approved content is served with immutable public cache
 headers and a `content_sha256` ETag; latest pointers with `max-age=60`.
 
 
+### Long-history descriptive research — NI-083
+
+`GET /api/research/history` is a public read through `near_app`; it accepts optional
+`start`/`end` ISO UTC dates together, `source=SRC-LLAMA|SRC-DASHBOARD` (default
+SRC-LLAMA), and optional `dataset_version` UUID. No route accepts a filesystem
+path, provider URL or query, and no request triggers data preparation/collection.
+Absent approved inputs give typed DATA_NOT_READY; non-approved explicit versions
+are indistinguishable from absent (404).
+
+`ResearchHistoryResponse` carries canonical `volume` and `fees` ChartViews from
+ONE approved dataset pin, an optional independently resolved `purchases` ChartView,
+`summary`, `monthly`, `quarterly`, and explicit limitations. Each period summary
+contains calendar bounds, expected/observed volume/fee/matched-day coverage,
+source-valued zero-fee count, observed USD subtotals, matched-day USD subtotals,
+weighted effective gross fee bps, and `complete`. Decimal results are strings.
+Calendar edge buckets retain whole month/quarter bounds and are marked partial;
+no prorating/annualization or monthly-to-daily allocation is performed. The bps
+ratio uses only same-source date intersections, not an average of daily rates.
+
+Chart definitions `intents-volume` and `gross-fees` append immutable v2 with
+30/90/365/730-day presets and a 730-day maximum. Structural selection/response
+contracts accept up to 730 days; every actual chart resolution additionally
+checks its pinned definition's maximum. Existing v1 definitions retain 366-day
+bounds and their original identities. No metric definition or fitted-model
+window is rewritten by extending descriptive history. Purchases retain their own
+short cohort coverage and dataset identity. The UI retains its first observed
+purchase view during provider-range edits; this endpoint's composite response
+uses `public,max-age=60` because the optional purchases view can resolve a
+separate latest pointer even when the provider dataset is explicitly pinned.
+
 ## Insights, hypotheses and evidence
 
 NI-046 defines the annotation contracts in `apps/api/src/near_api/insights/schemas.py`. NI-047, NI-048 and NI-049 implement the insight, hypothesis and evidence routes. TypeScript contracts are generated from OpenAPI. Inputs reject owner fields and author timestamps. Responses add stable IDs and server-authored UTC timestamps. The canonical editor grammar validates rich-text bodies up to 10,000 plain-text characters.

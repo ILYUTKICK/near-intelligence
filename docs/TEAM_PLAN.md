@@ -171,6 +171,13 @@ A/B — лид приёмки всей задачи; второй участни
 | NI-076 | Run PR 87 locally and review desktop design against NI-074 | P0 | A | Owner |
 | NI-077 | Record finish-local-verify-deploy handoff | P0 | A | Coordinator |
 | NI-078 | Complete desktop research and chart presentation | P0 | A | Coordinator |
+| NI-080 | Repair workspace navigation and email-label demo entry | P0 | A | B |
+| NI-081 | Redesign the public methodology reading experience | P0 | A | B |
+| NI-082 | Audit and design the long-history evidence extension | P0 | B | A |
+| NI-083 | Implement interactive long-history research and exact descriptive calculations | P0 | A with B data/calculations | Coordinator |
+| NI-084 | Record the Blog and research-publication product direction | P1 | A | Coordinator |
+| NI-085 | Implement the public Blog and research-publication catalog | P1 | A | Coordinator |
+| NI-086 | Implement the approved editorial Overview design | P1 | A | Coordinator |
 | NI-079 | Pass final integrated local release acceptance | P0 | A with B data/API/model contributions | Coordinator |
 | NI-071 | Add advanced supported analytical filters | P1 | A | B |
 | NI-072 | Add lightweight private research organization | P1 | B | A |
@@ -189,3 +196,17 @@ NI-076 owner review: role A /root coordinates isolated local deployment and desk
 **NI-064 completion handoff — 13 November 2026:** the owner explicitly assigned completion to Codex `/root` in chat `01a1d450-7c47-7371-8d61-022471615ad3`. This supersedes the older retained NI-064 claim only for its acceptance/fixes; prior implementation evidence remains. Role A owns current desktop accessibility/keyboard/performance verification and the screen-reader/IME remainder, with actual results in TASKS and the QA report. No mobile or deployment scope.
 
 **NI-064 completion — 13 November 2026:** Codex `/root` finished the bounded fixes and local desktop verification; the owner confirmed the remaining IME/VoiceOver checklist with “Все четок”. Evidence and DONE status are recorded only in [TASKS.md](TASKS.md) and the linked QA report. The execution claim is released; PR #99 is the owner-merge handoff. NI-079 and NI-067 retain their own acceptance scope.
+
+**NI-080 owner correction batch — 13 November 2026:** `/root` coordinates Home/navigation and demo-entry corrections in TASKS. A bounded subagent handles shared workspace route/UI changes; the coordinator owns demo gateway/harness integration and actual two-visitor verification. No competing claim or shared Alice identity.
+
+**NI-081 local methodology review — 13 November 2026:** role A coordinates a reader-facing design/local implementation. A dedicated NI-081 subagent handles the page and focused tests; root checks source fidelity and desktop behavior. NI-080 changes remain preserved. All Git publication is on hold by owner instruction.
+
+**NI-082 — 13 November 2026:** root coordinates a bounded role-B read-only archive audit via a dedicated agent, then checks interpretation and primary-source policy dates. No data collection, remote publication or replacement of the existing cohort is authorized by this claim.
+
+**NI-083 — 14 November 2026:** root owns research UI/shared chart interactions, integration and acceptance; dedicated task agent owns backend saved-history loading, exact descriptive calculations, contracts and focused tests. Coordinate generated client changes before consumption. Root alone updates task/plan status. Preserve NI-080/081/082 and the Git hold.
+
+**NI-084 — 14 November 2026:** documentation only. A dedicated agent writes the Blog/editorial brief; root synchronizes README, product requirements, scope, route planning and the decision log. No application route, dependency, public content or raw data is added. Status and acceptance remain in TASKS.
+
+**NI-085 — 14 November 2026:** dedicated task agent owns Blog web implementation, curated publication metadata/routing, public navigation and focused UI tests. Root owns plan/contracts documentation, local production build, real archive/API browser verification and acceptance. Coordinate before editing shared files; preserve NI-080–084 and the Git hold.
+
+**NI-086 — 14 November 2026:** dedicated task agent owns Overview web layout/copy and affected frontend tests. Root owns approved mockup/hero asset handoff, legacy landing HTTP integration acceptance updates, documentation and production/browser verification. No shared-file edits without coordination. Research article, Blog, private workspace and all prior batches remain preserved; Git hold remains.

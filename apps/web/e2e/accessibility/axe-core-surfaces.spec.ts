@@ -12,8 +12,8 @@
  * the scanned DOM is the production application, not a storybook stand-in.
  *
  * The suite also closes two of the recorded NI-024 regressions in the real
- * browser: the workspace sidebar must not point at the unimplemented
- * `/workspace/data/*` / `/workspace/models` aliases (prefetched 404s), and
+ * browser: every workspace sidebar destination must resolve while retaining
+ * the cabinet (NI-080 now implements the former data/model aliases), and
  * the primary Continue link's foreground must come from the layered
  * `text-on-accent` utility, not from the global anchor rule.
  */
@@ -101,10 +101,10 @@ test("NI-024 regression: every workspace sidebar link resolves (no alias prefetc
     (anchors) => anchors.map((anchor) => (anchor as HTMLAnchorElement).getAttribute("href")),
   );
   expect(hrefs.length).toBeGreaterThanOrEqual(11);
-  // The recorded regression: the never-implemented /workspace/data/* and
-  // /workspace/models aliases must not be back.
+  // NI-080 implements these shared-screen routes; all sidebar navigation
+  // must now stay within the workspace rather than reaching public layouts.
   for (const href of hrefs) {
-    expect(href, "sidebar href").not.toMatch(/^\/workspace\/(data|models)/);
+    expect(href, "sidebar href").toMatch(/^\/workspace(?:\/|$)/);
   }
   // Each sidebar target must actually exist on the running production server
   // (this is exactly what Next.js prefetches when the sidebar renders).

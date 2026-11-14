@@ -2484,7 +2484,7 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 - **Epic:** 13 — Quality and Security
 - **Priority:** P0, mandatory before remote deployment
-- **Dependencies:** NI-078, NI-064, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063, NI-044, NI-045, NI-055, NI-059, NI-071, NI-072, NI-060, NI-065
+- **Dependencies:** NI-078, NI-064, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063, NI-044, NI-045, NI-055, NI-059, NI-071, NI-072, NI-060, NI-065, NI-080, NI-081, NI-082, NI-083, NI-084, NI-085, NI-086
 - **Complexity:** L
 - **Status:** TODO
 - **Execution role:** A (coordinator); B owns data/model/API acceptance contributions
@@ -2500,3 +2500,213 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 **Testing requirements:** Full applicable web/API/unit/DB/contracts/security/E2E; production build, contrast and secret scans; clean local container rehearsal; manual desktop flow/keyboard and measured limits; real permitted research reproduction separated from synthetic E2E. Runtime checks actually executed, not inferred from screenshots, HTTP200, old CI or documentation. No external collection or real-auth/provider invocation beyond existing explicit authorization; otherwise record blocker. No mobile pass.
 
 **Extended local chart acceptance — owner 2026-11-12:** Verify real chart rendering and exact table/source/selection in public research/explorer, saved charts, editor, explicit snapshot freeze→latest refresh→compare, source-supported advanced comparison, model-result insertion and template/private-copy flows. Save/reopen preserves the requested context; historical pins do not refresh. Markdown and PDF include the same frozen figures/data/source references without clipped charts. Local sharing displays its frozen allowed charts and revocation removes asset access; integrity checks refer to the exact document/chart context. Trace at least one permitted real chart end to end (input→metric→API→plot→saved revision→ZIP/PDF); synthetic E2E alone cannot satisfy this requirement. Missing unsupported metrics stay explicit unavailable; never fill every category with fabricated data. Every listed P1/P2 is implemented and tested; NI-060/065 cannot pass through planning alone. The NI-079 release gate may depend on P1/P2 by the explicit 12 November scope update; priority labels are not changed.
+
+### NI-080 — Repair workspace navigation and email-label demo entry
+
+- **Epic:** 13 — Quality and Security
+- **Priority:** P0, owner-requested correction batch
+- **Dependencies:** NI-024, NI-015, NI-034, NI-035, NI-017, NI-020, NI-021, NI-064
+- **Complexity:** M
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex `/root`, chat `01a1d450-7c47-7371-8d61-022471615ad3`
+- **Execution role:** A, with bounded local auth/test-provider contribution
+- **Started at:** 2026-11-13T16:15:16+00:00
+- **Branch/worktree:** `codex/ni-080-workspace-demo`; `/Users/ilyutkinn/.codex/worktrees/pr-97-fix/Near`
+- **Dependency verification:** All eight direct dependencies are DONE in the registry at main `8eed5d3` (PR #99 merged); working tree clean before this claim.
+- **Owner scope (13 November 2026):** First live-feedback batch: remove Home Data context entirely; Saved Charts Explore charts and sidebar Network Activity / Intents & Adoption must stay in the workspace; visitors enter a usable demo profile with any valid email label, without a password or verification email. The email label proves no identity. Preserve separate demo identities/ownership rather than sharing Alice's private rows. This explicitly replaces the previous public-route sidebar decision and Home indicator display requirement for this batch.
+
+**Implementation steps:** Remove Home indicator UI; implement workspace routes using shared explorer/library/detail components and keep internal category/chart/range links inside that shell. Promote email-label demo entry, preserve real-account entry separately, and make the local preview support the actual demo/refresh/logout gateway flow without a cloud provider. Give a new demo profile useful starter research using existing schema/template paths; keep any fixture evidence clearly labeled. Fix the confirmed implicit-date bug so default chart views use the latest approved coverage, preserving explicit dates and pins. Keep public routes and their canonical metric logic shared.
+
+**Expected files/modules:** apps/web workspace navigation/Home, shared chart navigation/pages, login/demo UI and route validation, e2e harness and focused tests; IA/auth/screen specs and task evidence.
+
+**Acceptance criteria:** Home has no Data context; Explore charts → workspace catalog → category/detail → range/source/save/reopen stays in the workspace shell. Network Activity keeps its honest no-data state without leaving the cabinet. Any valid email label enters a distinct demo profile with starter research; same email in another browser does not grant prior private access. Reload, logout, a new login and refresh work locally through normal signed cookies and API ownership. Public data routes remain public. No financial values fabricated or fixture data represented as real research.
+
+**Testing requirements:** Focused UI/navigation/auth validation tests, strict TS/lint/build, real-stack browser demo entry and navigation/save/reopen, refresh/logout and two-visitor isolation; affected accessibility checks. Independent review skipped by user instruction 2026-11-09; coordinator verifies actual results. No mobile, provider call, collection or deployment.
+
+- **Local result (2026-11-13):** Home indicator UI removed; all workspace chart/data/model mounts use shared screens; email-label demo creates an isolated identity and eight-section starter. Local signup/refresh/logout runs through the normal signed-session and API/RLS boundaries. Implicit latest chart dates now follow resolved historical coverage; explicit dates and immutable pins stay unchanged. [Evidence](verification/ni-080/README.md).
+- **Verification:** 676/676 unit/interaction tests, 25/25 complete real-stack browser scenarios, focused auth 8/8 and chart/explorer 91/91; lint, TS, production build, contracts, 22 contrast pairs, docs links and whitespace pass. Native preview form/Home/Explore/Network/Intents/plot checked. Independent review skipped by user instruction 2026-11-09; coordinator verified results.
+- **Blocker / handoff:** Owner instruction during local review: do not send anything to Git yet; no commit/push/PR was made. Local acceptance complete, publication/final-head CI deferred until the owner lifts that boundary. Preserve this batch while continuing independent NI-081. This is a publication blocker, not a failed local implementation.
+- **Publication resumed at:** 2026-11-14T02:00:58+03:00 — same coordinator, role and worktree. The owner explicitly requests committing all accumulated corrections for continuation by another agent. This lifts the earlier Git hold for delivery of NI-080–086; raw research, credentials and process state remain excluded. Coordinator owns packaging/push/handoff and final-head checks; the existing NI-080 task agent performs a bounded file-scope audit. Merge and deployment remain separate.
+- **Integrated packaging verification (14 November):** Final full web run: 64 files pass, 676/684 tests pass; eight failures are ambiguous status selectors after NI-083 introduced a plot-zoom live region. The two affected suites were repaired without changing application behavior or weakening filter/range/continuation assertions, then pass 91/91 in a quiet rerun (13.97 s). An earlier concurrent focused attempt had one 5-second timeout; quiet rerun passes without increasing that test's timeout. ESLint, strict TS, generated contracts, API history 11/11 + chart registry 30/30 + contracts 7/7, 1001 relative documentation links and whitespace pass. Bounded file/text audit excludes raw research/secrets/process state. Existing production-build and browser evidence remains in NI-081/083/085/086 reports. Independent review skipped by user instruction 2026-11-09; coordinator verified results.
+- **Continuation handoff:** [Delivery instructions](LOCAL_CORRECTIONS_HANDOFF.md). All code edits in this batch are ready for the requested commit/push. This claim has no further implementation work reserved after Git delivery; the receiving agent may finish the final-head CI check and close NI-080 once green, before proceeding to NI-079. Remote checks are not claimed in the local packaging record. Merge remains with the owner.
+
+### NI-081 — Redesign the public methodology reading experience
+
+- **Epic:** 13 — Quality and Security
+- **Priority:** P0, owner-requested public-page correction
+- **Dependencies:** NI-013, NI-075
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** Codex `/root`, chat `01a1d450-7c47-7371-8d61-022471615ad3`
+- **Execution role:** A
+- **Started at:** 2026-11-13T16:43:54+00:00
+- **Branch/worktree:** existing `codex/ni-080-workspace-demo`, same worktree; preserve NI-080 local edits.
+- **Dependency verification:** NI-013 and NI-075 are DONE and their actual content/design tokens exist. No competing methodology claim. Owner explicitly requests designing a proper public methodology page while retaining all work locally; commits, pushes and PR creation are deferred.
+
+**Description:** Replace the hackathon/operator-runbook presentation with a polished public research methodology: source transparency, exact metric meanings, calculation/version flow, a concrete verification path, limitations and reproducibility. Preserve the established visual language and actual evidence boundaries.
+
+**Implementation steps:** Design the reading hierarchy, then produce a local reviewable page using existing tokens/components/content. Replace internal task/status jargon in the primary reading path with plain explanations; move provider access/rights, readiness codes and operator commands into clearly labeled technical disclosures. Keep all canonical anchor targets and cite the actual source/metric registers. No invented quantitative results, source guarantees, full-market inference or causal claims. Reuse existing sources; no new collection/provider call.
+
+**Expected files/modules:** public methodology page and scoped content/components/tests; methodology design/verification note and screen specification if behavior changes.
+
+**Acceptance criteria:** A reader can identify where data came from, what each key metric measures, what it does not establish, how a number becomes a versioned published view and how to inspect the same evidence. The page retains working #sources/#definitions/#collection/#readiness/#reproduce anchors, accessible source/definition/limitations details, honest historical/provider/model states and existing public styling. Main content contains no NI task IDs or implementation backlog. Technical evidence is retained without overwhelming the primary article. Local review does not publish or close remote release gates.
+
+**Testing requirements:** Focused content/anchors/link/disclosure and accessibility checks, TS/lint/production build and desktop browser visual review on the updated local preview. No mobile pass, remote CI claim, data refresh, commits, pushes or PRs while the owner's publication hold remains.
+
+- **Local result:** Reader-first public methodology with six chapters, human source lineage, three-metric meaning/limitation comparison, preparation/version path, concrete chart-inspection guide, visible scientific limitations and reproducibility checklist. Five technical disclosures retain source/access/rights, definitions, validation, readiness and real commands. Existing anchors preserved; #verify added. [Design and verification](verification/ni-081/README.md).
+- **Verification:** Methodology 15/15, public/landing regression 23/23, strict TS, affected lint, production build `YhRHSMaL-ww7UOsfc9pqa`, one real-stack desktop browser scenario, zero axe findings, no overflow, working keyboard disclosures/chapter links and inspected screenshots/native public preview. Original source dates, provenance boundaries and no-fabrication requirements retained. Independent review skipped by user instruction 2026-11-09; coordinator accepted the local implementation.
+- **Completed locally at:** 2026-11-13T16:55:24+00:00; execution claim released. No commit/push/PR or remote CI: publication remains deferred by explicit owner instruction. This DONE records the requested local page deliverable, not release/deployment acceptance.
+
+- **Owner follow-up / reopened at:** 2026-11-13T20:36:16+00:00 — Codex `/root`, same chat/role/worktree. Owner explicitly removes ALL five methodology technical disclosures and their contents, including full source register, version/availability details, validation appendix, model-readiness appendix and reproduction commands. This supersedes the earlier public-page requirement to retain those appendices. Canonical internal source/metric/method/model/reproduction docs remain intact; visible source lineage, key economic distinctions, coverage/bounds/causal limitations and all reading anchors remain. No Git transfer remains in force. Recheck the revised public page and absence of disclosure content; do not replace accordions with always-open technical blocks.
+
+- **Follow-up result:** Removed all five public technical disclosure blocks and their contents, unused helper and provider-name mapping. No hidden or expanded technical replacements. Six reading chapters and important visible evidence limitations remain; canonical internal source/metric/model/reproduction records remain unchanged.
+- **Follow-up verification:** Methodology 8/8, strict TS, affected lint, production build `DRbjGHPSz9qGxSktfCSuw`, one production browser scenario with zero axe findings/no overflow, all chapter targets and complete absence of disclosure labels/payloads verified. Updated desktop captures inspected by coordinator; native local review page opened. No Git transfer.
+- **Follow-up completed locally at:** 2026-11-13T20:42:12+00:00; claim released.
+
+### NI-082 — Audit and design the long-history evidence extension
+
+- **Epic:** 10 — Original Research
+- **Priority:** P0, owner-requested thesis strengthening
+- **Dependencies:** NI-026, NI-027, NI-029, NI-051
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** Codex `/root`, chat `01a1d450-7c47-7371-8d61-022471615ad3`
+- **Execution role:** B, research/data audit; root coordinates source/interpretation
+- **Started at:** 2026-11-13T20:51:27+00:00
+- **Branch/worktree:** existing `codex/ni-080-workspace-demo`; preserve all local UI batches and Git publication hold.
+- **Dependency verification:** All four direct dependencies are DONE; the real local archive is present in the owner's Desktop checkout. No new provider/data permission is inferred.
+- **Owner instruction:** Expand historical evidence beyond the existing 90-day cohort to support a long-term case. First establish actual available history and comparability; history length alone does not close revenue attribution, retention or causality gates.
+
+**Implementation steps:** Read-only inventory the saved provider/price/cohort/supply/treasury files; hash inputs, identify actual min/max dates, unique dates, gaps, duplicates and provisional latest dates. Distinguish candidate provider-reported history from approved comparable datasets. Inspect official documentation/source descriptions for dated launch/fee-policy regimes without requesting new datasets. Produce a concrete long-history research protocol and bounded missing-input/access handoff. Do not overwrite the 90-day analysis, alter existing model configs, fit a new model or claim unavailable long-run capture data.
+
+**Expected files/modules:** docs/verification/ni-082/README.md; local ignored audit summaries/scripts if required. Raw JSON/CSV and calculation scripts remain local under existing sharing rules.
+
+**Acceptance criteria:** Actual saved-history coverage and quality are recorded with input hashes; usable extensions and unsatisfied inputs are separated by metric/source. The proposed long-term protocol has explicit cohort/revision/policy/price/missing-data treatment and staged descriptive versus inferential scope. No invented longer onchain history, source independence, fees-as-revenue, model results or long-run verdict. New cloud SQL/paid/API-key/bulk collection requires a separately bounded authorized handoff; stopped collectors remain stopped. No Git transfer while owner hold applies.
+
+**Testing requirements:** Reconcile dates/counts and file hashes without rewriting inputs; coordinator reviews the report and primary-source attributions. This audit does not mark collection/extended-model/release gates DONE.
+
+- **Result:** [Saved-history audit](verification/ni-082/README.md) establishes 694 volume days, 543 fee days, the 543-day common window, provider disagreements, gaps/zeros, partial months and the still-short attributed cohort. [Extension protocol](verification/ni-082/LONG_TERM_PROTOCOL.md) separates business/network/capture histories, dated source/policy regimes, source-qualified candidate versions, descriptive versus inferential work and bounded missing inputs. Existing datasets/models/UI are unchanged by NI-082.
+- **Verification:** Dedicated audit rerun exited 0; 14/14 inputs byte-identical before/after and 10/10 recorded input digests matched. Coordinator independently reconciled core provider coverage and reviewed the report/protocol against original limitations and official launch/Q2 policy descriptions. `node scripts/check-doc-links.mjs` passed: 906 relative documentation links resolve. No data endpoint, stopped collector or Git mutation was invoked for this task.
+- **Reviewer:** Codex root coordinator; independent review skipped by user instruction 2026-11-09. DONE covers the bounded audit/design only, not longer collection, publication, model fitting or release gates.
+- **Completed at:** 2026-11-14T00:01:24+03:00
+
+
+### NI-083 — Implement interactive long-history research and exact descriptive calculations
+
+- **Epic:** 10 — Original Research / shared charts
+- **Priority:** P0, explicit owner correction batch
+- **Dependencies:** NI-082, NI-029, NI-032, NI-033, NI-014
+- **Complexity:** L
+- **Status:** DONE
+- **Claimed by:** Codex `/root`, chat `01a1d450-7c47-7371-8d61-022471615ad3`
+- **Execution role:** A with bounded B data/calculation handoff
+- **Started at:** 2026-11-14T00:10:29+03:00
+- **Branch/worktree:** existing `codex/ni-080-workspace-demo`; preserve prior local batches and index, no Git publication.
+- **Dependency verification:** Direct prerequisites are DONE; NI-082 verified the real saved owner archive and its source/coverage limits. This task is explicitly selected by the owner's latest request.
+- **Owner instruction:** Make the discussed graphs interactive and correct calculations using the available long history.
+- **Handoff:** Dedicated NI-083 agent owns backend loaders, exact descriptive calculations, contract generation and focused tests; root owns shared interactive renderer/research UI and integrated local acceptance.
+
+**Implementation steps:** Use the existing saved archive without network collection. Add explicit long-history descriptive delivery and source-qualified calculations with complete-period comparisons, weighted effective gross fee rate and honest missing/zero/partial-period handling. Reuse canonical metric/chart definitions and exact Decimal arithmetic; append immutable versions for changed definitions/range capabilities. Integrate actual interactive ECharts on the public research page: exact hover values, legend toggles, zoom/pan/reset and bounded range controls with a keyboard-accessible data alternative. Preserve the original 90-day claims/cohort and label which data extends further. Verify the local preview with real archived inputs and existing synthetic regression isolation.
+
+**Acceptance criteria:** The research page renders working interactive volume/fee/history charts from real saved inputs; period changes and chart interactions work, sources/UTC coverage/quality remain inspectable, and API outages do not create invented values. Calculations use matched periods and compatible source definitions; no missing-as-zero, daily allocation of monthly values, purchase/payout double counting, fees-as-revenue or causal/price inference. Original immutable artifacts and archived inputs stay unchanged. Existing static exports and saved pins remain deterministic. No data collection, collector restart, Git staging/commit/push or deployment.
+
+**Expected files/modules:** apps/api research/delivery modules and tests; generated API client if contracts change; apps/web shared chart renderer and public research components/tests; docs/verification/ni-083 and affected metric/chart/reproducibility docs. Raw/derived research records and offline calculation artifacts remain local and ignored.
+
+**Testing requirements:** Meaningful exact-calculation, missing/partial/zero and range/version tests; frontend interaction/options/error tests; typecheck/lint/build/contracts; desktop real browser interaction and API-to-real-archive reconciliation. Input hash integrity and focused saved/export renderer regression. No mobile checks or unsupported fitted-model claims.
+
+- **Result:** [Integrated local verification](verification/ni-083/README.md) and [backend calculations](verification/ni-083/BACKEND.md). Public research has real 694-day volume/543-day fee histories, source/period controls, exact hover values, mouse/keyboard zoom/reset, slider/pan, legend toggles and exact tables. Existing categorical comparisons also use ECharts. Decimal monthly/quarterly calculations distinguish incomplete periods and use matched sums for effective fees; purchases keep their own pinned 90 days. Original cohort totals reconciled without numerical replacements. Old definitions/pins/static export layout remain; v2 supports 730 days.
+- **Verification:** Focused API/registry/loader integration 82/82, contracts 7/7; frontend/renderer/recorded figures/static export 76/76, later affected history/chart checks 29/29 and final keyboard chart checks 26/26. Web production build and TypeScript/lint passed; generated contracts current. Desktop real-browser verification covered archive→API→plot, source/range changes, exact hover, keyboard/reset, timeline drag, legend hide/show and partial quarters. Final purchase metadata checked against actual saved cutoff with unknown retrieval left null. All 14 audited input files byte-identical; 925 documentation links resolve and whitespace check passes. Initial bootstrap validation failures were fixed without bypassing dataset validation; details in the report.
+- **Reviewer:** Codex root coordinator; independent review skipped by user instruction 2026-11-09.
+- **Completed at:** 2026-11-14T00:34:56+03:00
+- **Local handoff:** Production build `gI08nOw4Da145y4CJcX9-`, preview `http://127.0.0.1:64769/research#interactive-history`, saved real inputs in an isolated disposable database; synthetic authentication transport only. No Git stage/commit/push, provider collection or remote publication. NI-079 and fitted-model/attribution/release gates remain open under their own criteria.
+
+
+### NI-084 — Record the Blog and research-publication product direction
+
+- **Epic:** 01 — Product Definition / public research
+- **Priority:** P1, owner-requested documentation
+- **Dependencies:** NI-014, NI-070, NI-083
+- **Complexity:** S
+- **Status:** DONE
+- **Claimed by:** Codex `/root`, chat `01a1d450-7c47-7371-8d61-022471615ad3`
+- **Execution role:** A, product documentation
+- **Started at:** 2026-11-14T00:44:44+03:00
+- **Branch/worktree:** existing `codex/ni-080-workspace-demo`, preserve all prior batches and Git hold.
+- **Dependency verification:** All three direct prerequisites are DONE; current public full research and interactive history are implemented locally. The owner asks to record a publication direction, not to launch an unrequested implementation.
+- **Handoff:** Dedicated task agent drafts docs/BLOG_PUBLICATIONS.md; root synchronizes project entry points and reviews acceptance.
+
+**Owner instruction:** Evolve public NEAR Intelligence into an accumulating collection of research articles, with a separate page such as Blog. The existing full research becomes the initial publication. Main requested deliverable now: anchor the direction in project documentation.
+
+**Implementation steps:** Record audience/product positioning, Blog catalog and article-page direction, first-publication continuity, required article metadata/evidence, follow-up publication relationships and editorial-versus-data-update semantics. Synchronize README, requirements, information architecture, scope and decision log. Preserve current routes/anchors, public release IDs, claims, workspace and data integrity. Mark future routes explicitly planned.
+
+**Expected files/modules:** docs/BLOG_PUBLICATIONS.md; README.md; docs/PRODUCT_REQUIREMENTS.md; docs/INFORMATION_ARCHITECTURE.md; docs/MVP_SCOPE.md; docs/INDEX.md; docs/DECISIONS.md and execution records. No application code.
+
+**Acceptance criteria:** A future contributor can identify the accepted Blog/article direction, its first real article, what later publications may add and what remains implementation work. No placeholder second article, invented publication metadata, automatic rewrite of original findings, implicit publication of private documents or claim that Blog already exists. Research/chart/source/model versioning and no-fabrication rules retained. Existing release gates unchanged; recording the direction does not count as implementing the Blog UI.
+
+**Testing requirements:** Documentation links, whitespace and unique/acyclic/topological task references. Coordinator checks future-route wording against existing routes and source/publication boundaries. No application tests needed for documentation-only work; no Git staging/commit/push.
+
+- **Result:** [Blog/publication brief](BLOG_PUBLICATIONS.md) records the accumulating article library, full existing research as its first publication, planned catalog/article URLs, article metadata, related follow-ups and separation of editorial evidence from latest-data exploration. README, requirements, scope, information architecture, documentation index and ADR-023 now carry the accepted direction. No application route or public article was created by this task.
+- **Verification:** `node scripts/check-doc-links.mjs` — 951 relative links resolve; unique task/PLAN identifiers, all dependency references and topological ordering verified (82 execution rows); planned Blog route files are absent as documented; `git diff --check` passes. Coordinator reviewed stable `/research` anchors/publication identity, privacy and evidence boundaries. Application tests are not applicable to this documentation-only batch.
+- **Reviewer:** Codex root coordinator; independent review skipped by user instruction 2026-11-09.
+- **Completed at:** 2026-11-13T21:47:43+00:00
+- **Publication boundary:** Local documentation only. Blog UI/routing/CMS/automatic publishing remain future implementation work under a bounded NI-task. No Git staging, commit, push, PR or external publication; current release/data/model gates retained.
+
+
+### NI-085 — Implement the public Blog and research-publication catalog
+
+- **Epic:** 02 — Public Research / editorial product
+- **Priority:** P1, explicit owner implementation
+- **Dependencies:** NI-084, NI-014, NI-011, NI-083
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** Codex `/root`, chat `01a1d450-7c47-7371-8d61-022471615ad3`
+- **Execution role:** A
+- **Started at:** 2026-11-14T00:48:57+03:00
+- **Branch/worktree:** existing `codex/ni-080-workspace-demo`; all prior batches and index preserved, no Git publication.
+- **Dependency verification:** All direct dependencies DONE; NI-084 brief is accepted. Owner explicitly requests its implementation now, superseding the earlier documentation-only boundary for this scope.
+- **Handoff:** Dedicated task agent owns Blog web code/navigation/metadata and focused tests. Root owns documentation, integration, production build and actual desktop acceptance.
+
+**Implementation steps:** Implement an accessible public Blog catalog consistent with current desktop design. Use a curated typed publication registry, starting with exactly the existing full NEAR/Intents research; show only verified editorial metadata (do not turn authoring/retrieval dates into invented publication dates). Keep /research and all existing H1–H4/claim/section anchors working, and implement an explicit compatible article route policy. Future real articles must be addable through shared organization rather than copying the entire research route. Add Blog to public navigation and coherent back-to-catalog links. Preserve actual interactive graphs, evidence provenance, current private journeys and no-data/error handling. No CMS, dependency, fake second article or automatic publication/collection.
+
+**Acceptance criteria:** Anonymous reader opens Blog, sees one real article, opens complete research, inspects its real charts and evidence, and returns to Blog. Existing deep links work; unknown article URLs produce a generic 404. Publication registry/routing uses stable slug identities and supports another real entry without duplicating the whole page; synthetic test-only entries never reach runtime. Article publication dates and evidence observation periods remain distinct. Public navigation active state and keyboard flow work. Existing 90-day/long-history claims, source/definition/dataset pins and private access boundaries remain. No Git stage/commit/push, external rollout or data fetch.
+
+**Expected files/modules:** apps/web public Blog routes, publication components/registry, shared navigation/tests; affected README/IA/publication brief/scope/ADR and docs/verification/ni-085.
+
+**Testing requirements:** Focused catalog/navigation/routing/unknown-slug/shared article tests, accessibility and preserved research/figure regressions; TypeScript/lint/production build. Actual desktop browser catalog→full article→graph→evidence→catalog on real saved-archive API. Verify no unrequested fake/public/private content or broken links. Document actual results; leave NI-079/model/deployment gates separate.
+
+- **Result:** `/blog` now lists the existing complete research as its first real publication. Typed curated registry/shared card/article template support future real articles without duplicating the thesis route. Blog is the public navigation entry and stays active on `/research`, which retains its content/anchors/charts/release identity and has a catalog backlink. First slug is an explicit 308 alias; unknown slug 404. Only known metadata is shown, without a fabricated author, publication day or additional article. README/brief/requirements/IA/scope/ADR reflect the implementation. [Verification and desktop proof](verification/ni-085/README.md).
+- **Verification:** Five focused frontend suites 55/55 passed; final Blog metadata follow-up 8/8 passed; TypeScript/lint and production build passed. Actual desktop keyboard catalog→research→chart zoom/reset→source dialog→catalog verified on the real saved archive; alias preserved #h1 and unknown article recovery worked. Loopback HTTP checks returned 200/308/404 and canonical Location /research; research gateway reconciled 694/543/543 dates. Documentation links, unique/acyclic/topologically ordered task references (83 PLAN rows) and whitespace checks passed. No application/backend/data contract change outside this public editorial scope.
+- **Reviewer:** Codex root coordinator; independent review skipped by user instruction 2026-11-09.
+- **Completed at:** 2026-11-14T01:01:36+03:00
+- **Local handoff:** Build `7apX5U1Dn0wC518_nfqTU`, preview `http://127.0.0.1:54480/blog`, isolated saved-archive/API stack left running. No Git staging/commit/push, provider collection, CMS dependency, remote publication or deployment. NI-079 and the existing model/attribution/refresh gates remain separate.
+
+
+### NI-086 — Implement the approved editorial Overview design
+
+- **Epic:** 02 — Public Research / product presentation
+- **Priority:** P1, owner-approved visual implementation
+- **Dependencies:** NI-085, NI-083, NI-075, NI-012
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** Codex `/root`, chat `01a1d450-7c47-7371-8d61-022471615ad3`
+- **Execution role:** A
+- **Started at:** 2026-11-14T01:27:11+03:00
+- **Branch/worktree:** existing `codex/ni-080-workspace-demo`; preserve all prior batches/index and Git hold.
+- **Dependency verification:** Direct prerequisites DONE. The owner approved the generated full-page Overview concept and explicitly requested implementation.
+- **Handoff:** Dedicated task agent owns web Overview/components/copy/frontend tests. Root owns visual asset handoff, legacy landing HTTP integration tests, project docs and local production/browser acceptance.
+
+**Owner scope:** Implement the approved ivory/navy/green editorial mockup: hero “Understand NEAR. Build your own thesis.” with research/data actions and research-desk artwork; one actual featured research entry linked through the curated publication registry; three data-direction cards; Read→Inspect→Build workflow; short methodology band; green workspace CTA. Keep public header/footer coherent. No invented financial data or extra articles.
+
+**Implementation steps:** Replace the prior long thesis-centric landing presentation and its duplicate financial/claim/model-status tables. Preserve complete original content in research/methodology/models and actual APIs; update requirements/tests to the explicit new owner scope rather than keeping obsolete on-Overview assertions. Reuse publication card/metadata and existing tokens/icons. Preserve meaningful legacy landing anchors with compatible section placement or links to the owning research sections. Add a project-local approved-style hero asset, optimized through existing image delivery. Record asset source/prompt and distinguish decorative artwork from observed data.
+
+**Acceptance criteria:** Desktop page matches approved hierarchy and visual language, has readable headings/contrast/spacing, keyboard-accessible working Blog/research/data/methodology/workspace links and one genuine featured article. Historic data qualification stays clear, with no live/update/return promise or financial aggregation in UI. Main page works without data API availability; actual data/research services retain their evidence semantics. Existing /research claims/charts/pins and private journey remain. No mobile work, dependencies, collection, external publication or Git mutation.
+
+**Expected files/modules:** Overview route/components/copy, public illustration asset, focused web and legacy landing HTTP tests; affected README/IA/product/scope/UI specifications, docs/verification/ni-086 and task records.
+
+**Testing requirements:** Meaningful content/links/one-real-publication/a11y tests; preserve helper financial-contract tests and independent actual API assertions. TypeScript/lint/production build; updated real loopback landing integration including API-outage independence; actual desktop browser layout/keyboard/navigation and research graph continuity. No fabricated results or release/model gate bypass.
+
+- **Result:** Overview implements the approved editorial hierarchy with native text/actions, project-local research artwork, shared genuine publication card, three data directions, workflow, methodology band and green workspace CTA. The old duplicate on-home metric/claim/model-status tables are replaced by links to their intact owning research/data pages. Legacy anchors remain meaningful; homepage is independent of data API availability. README/requirements/scope/IA/UI/testing strategy and ADR-024 record the explicit owner change. [Verification, screenshot and asset prompt](verification/ni-086/README.md).
+- **Verification:** Six frontend suites 62/62 passed (CLI 15-second timeout for heavy axe cases, assertions retained), TypeScript and clean lint passed. Final production build `E0KUqyBTBvduaTs0Foq_o` passed after fixing actual CSS heading inheritance found in browser. Real isolated landing integration passed 1/1 synthetic and 1/1 real-archive modes, retaining unavailable/approval/exact-value/source-ambiguity checks and unchanged visible Overview across publication/API outage; real input hashes unchanged. Desktop 1440×900 showed the approved layout, keyboard links/focus and preserved article/694–543-day charts. Final CTA contrast 7.89:1 and overflow 0px measured from browser DOM; local page/category/methodology links and optimized WebP returned 200. Documentation links, whitespace, unique/dependency/topological task checks passed (84 PLAN rows).
+- **Reviewer:** Codex root coordinator; independent review skipped by user instruction 2026-11-09.
+- **Completed at:** 2026-11-14T01:51:23+03:00
+- **Local handoff:** `http://127.0.0.1:51528/`, final saved-archive/API preview remains running. Artwork and exact built-in generation prompt are recorded in verification/ni-086/ASSETS.md. No Git staging/commit/push, dependencies, collection or external publication. NI-079/model/attribution/refresh/deployment gates remain separate.

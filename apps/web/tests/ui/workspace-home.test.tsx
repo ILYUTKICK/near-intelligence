@@ -70,7 +70,7 @@ describe("Workspace Home", () => {
     expect(document.body.textContent).not.toMatch(/confidence|conviction|\d+%/i);
   });
 
-  it("keeps documents and owner navigation when one indicator is unavailable; retains exact decimals and pinned explorer context", async () => {
+  it("omits Data context entirely even when the API returns indicators; keeps owned research and saved items", async () => {
     const home = homeFixture(); home.recent_documents = [summary]; home.counts.documents = 1;
     const value = "123456789012345678901234.123456789012345678901234";
     const data = series(metric("NEAR", "Synthetic purchased quantity", "synthetic-metric"), [observation("2026-11-01", value)], { start: "2026-11-01", end: "2026-11-02" });
@@ -83,15 +83,13 @@ describe("Workspace Home", () => {
     home.recent_insights = [{ insight_id: CHART, document_id: DOC, document_title: summary.title, block_id: CHART,
       type: "observation", classification: "uncertain", modified_at: summary.updated_at, excerpt: "Synthetic saved note" }];
     setup(home); const { container } = render(<WorkspaceHome />);
-    await screen.findByText(value);
+    await screen.findByRole("link", { name: summary.title });
     expect(screen.getByRole("link", { name: summary.title })).toBeVisible();
-    expect(screen.getByText(/Synthetic source outage/)).toBeVisible();
-    expect(screen.getByText(/Stale data/)).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Data context" })).not.toBeInTheDocument();
+    expect(screen.queryByText(value)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Synthetic source outage/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Synthetic saved chart" })).toHaveAttribute("href", `/workspace/saved-charts/${CHART}`);
     expect(screen.getByText("Synthetic saved note")).toBeVisible();
-    const link = screen.getByRole("link", { name: "Explore Synthetic purchases" });
-    expect(link.getAttribute("href")).toContain(`dataset_version=${data.dataset.id}`);
-    expect(link.getAttribute("href")).toContain("version=2&start=2026-11-01&end=2026-11-02");
     expect(await axe(container)).toHaveNoViolations();
   });
 

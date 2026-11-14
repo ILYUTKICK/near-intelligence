@@ -1,4 +1,4 @@
-"""NI-012: real Next HTTP -> FastAPI HTTP -> disposable PostgreSQL.
+"""NI-086: editorial Overview resilience plus preserved real metric delivery.
 
 Run through run-db-tests.py --suite landing after the frozen web build.
 Default data is explicitly synthetic. NI_LANDING_ARCHIVE_ROOT opts into
@@ -27,7 +27,7 @@ from sqlalchemy.pool import NullPool
 from near_api.datasets.service import publish, stage
 from near_api.metrics.emit import DatasetSpec, ManifestInputSpec, build_manifest
 from near_api.metrics.loaders import load_metric_inputs
-from near_api.metrics.registry import definition_by_metric_id, definition_by_metric_id_version, register_definitions
+from near_api.metrics.registry import definition_by_metric_id_version, register_definitions
 from test_delivery_apis import SOURCE_IDS, manifest_document, observation
 
 START, END = "2026-08-06", "2026-11-04"
@@ -35,35 +35,37 @@ METRICS = ("observed_near_purchases", "treasury_payouts_near", "provider_gross_f
 
 
 class LandingHTML(HTMLParser):
-    """Visible article text only: React's script payloads are not UI evidence."""
+    """Visible Overview text/links, excluding React scripts and CSS payloads."""
 
     def __init__(self, html: str):
         super().__init__()
-        self.articles: dict[str, list[str]] = {}
-        self.current: str | None = None
+        self.parts: list[str] = []
+        self.links: set[str] = set()
+        self.ids: set[str] = set()
         self.hidden = 0
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
         if tag in ("script", "style"):
             self.hidden += 1
-        if tag == "article" and not self.hidden:
-            self.current = dict(attrs).get("aria-labelledby")
-            if self.current:
-                self.articles[self.current] = []
+        if not self.hidden:
+            attributes = dict(attrs)
+            if attributes.get("id"):
+                self.ids.add(attributes["id"])
+            if tag == "a" and attributes.get("href"):
+                self.links.add(attributes["href"])
 
     def handle_endtag(self, tag):
         if tag in ("script", "style"):
             self.hidden -= 1
-        if tag == "article":
-            self.current = None
 
     def handle_data(self, data):
-        if self.current and not self.hidden:
-            self.articles[self.current].append(data)
+        if not self.hidden:
+            self.parts.append(data)
 
-    def metric(self, metric_id: str) -> str:
-        return " ".join("".join(self.articles[f"{metric_id}-metric-heading"]).split())
+    @property
+    def visible(self) -> str:
+        return " ".join(" ".join(self.parts).split())
 
 
 def unused_port() -> int:
@@ -160,8 +162,25 @@ class LandingIntegrationTests(unittest.TestCase):
                                      window=(START, END))
         return document, {}
 
-    def test_live_delivery_render_and_outage(self):
-        """No approved data -> real publication -> rendered values -> API outage."""
+    def assert_editorial_overview(self, parsed: LandingHTML):
+        self.assertIn("Understand NEAR.", parsed.visible)
+        self.assertIn("Build your own thesis.", parsed.visible)
+        self.assertIn("The research, in focus.", parsed.visible)
+        self.assertEqual(parsed.visible.count("A conversion channel."), 1)
+        for label in ("Intents activity", "Revenue & fees", "Token economics",
+                      "Sources first. Assumptions visible.", "Make the research your own."):
+            self.assertIn(label, parsed.visible)
+        for path in ("/blog", "/research", "/data", "/data/intents", "/data/revenue",
+                     "/data/token-economics", "/methodology", "/workspace"):
+            self.assertIn(path, parsed.links)
+        self.assertTrue({"evidence", "findings", "mechanism", "release-status"} <= parsed.ids)
+        for old_metric in METRICS:
+            self.assertNotIn(old_metric, parsed.visible)
+        self.assertNotIn("Selected approved metrics", parsed.visible)
+        self.assertNotIn("Original research release status", parsed.visible)
+
+    def test_editorial_overview_and_delivery_outage(self):
+        """NI-086: stable editorial home; real metric API keeps its own data gates."""
         node = shutil.which("node")
         self.assertIsNotNone(node, "Activate the pinned Node 24 runtime")
         web = self.repo / "apps/web"
@@ -179,13 +198,15 @@ class LandingIntegrationTests(unittest.TestCase):
             "web", [node, str(web / "node_modules/next/dist/bin/next"), "start", "--hostname",
                     "127.0.0.1", "--port", web_url.rsplit(":", 1)[1]], environment, web,
             web_url + "/health")
-
+        query = {"definition_version": 1, "start": START, "end": END,
+                 "dataset_version": "latest", "frequency": "day"}
+        for name in METRICS:
+            response = self.http.get(api_url + f"/api/metrics/{name}/series", params=query)
+            self.assertEqual(response.status_code, 503, "Unapproved data must stay unavailable")
         empty = self.http.get(web_url)
         self.assertEqual(empty.status_code, 200)
-        parsed = LandingHTML(empty.text)
-        for name in METRICS:
-            self.assertIn("not zero", parsed.metric(name))
-            self.assertNotIn("Latest approved observation", parsed.metric(name))
+        initial = LandingHTML(empty.text)
+        self.assert_editorial_overview(initial)
 
         document, original_hashes = self.prepared_manifest()
         manifest = self.directory / "prepared.json"
@@ -193,55 +214,46 @@ class LandingIntegrationTests(unittest.TestCase):
         result = stage(self.operator, manifest, self.directory / "storage")
         self.assertEqual(result.status, "validated", result.validation)
         publish(self.operator, result.dataset_version_id)
-        expected = {}
+        observations_available = 0
         for name in METRICS:
-            response = self.http.get(api_url + f"/api/metrics/{name}/series", params={
-                "definition_version": 1, "start": START, "end": END,
-                "dataset_version": "latest", "frequency": "day"})
+            response = self.http.get(api_url + f"/api/metrics/{name}/series", params=query)
             self.assertEqual(response.status_code, 200)
-            expected[name] = response.json()
-            self.assertEqual(expected[name]["dataset"]["id"], str(result.dataset_version_id))
-
+            series = response.json()
+            self.assertEqual(series["dataset"]["id"], str(result.dataset_version_id))
+            self.assertEqual(series["metric"]["metric_id"], name)
+            self.assertEqual(series["metric"]["version"], 1)
+            self.assertEqual(len(series["points"]), 90)
+            valued = [point for point in series["points"] if point["value"] is not None]
+            if valued:
+                observations_available += 1
+                self.assertTrue(all(isinstance(point["value"], str) for point in valued))
+                if not original_hashes:
+                    self.assertEqual(valued[-1]["value"],
+                                     "123456789012345678.123456789012345678901234")
+            else:
+                self.assertTrue(all(point["quality"]["reasons"] for point in series["points"]),
+                                "Ambiguous source data must remain null with reasons")
+        self.assertGreaterEqual(observations_available, 2)
         rendered = self.http.get(web_url)
         self.assertEqual(rendered.status_code, 200)
-        parsed = LandingHTML(rendered.text)
-        observations_shown = 0
-        for name, series in expected.items():
-            card = parsed.metric(name)
-            valued = [p for p in series["points"] if p["value"] is not None]
-            if valued:
-                observations_shown += 1
-                self.assertIn(valued[-1]["value"], card)
-                self.assertIn(series["metric"]["unit"], card)
-                self.assertIn("Data as of:", card)
-                self.assertIn(series["dataset"]["dataset_key"], card)
-                self.assertIn("approved", card)
-                self.assertIn("end exclusive", card)
-            else:
-                # Multiple provider variants remain unavailable; never pick
-                # one or sum the variants to manufacture a headline number.
-                self.assertIn("not zero", card)
-                self.assertNotIn("Latest approved observation", card)
-                point_reasons = {reason for point in series["points"]
-                                 for reason in point["quality"]["reasons"]}
-                self.assertTrue(point_reasons, "Unavailable data must explain why")
-                self.assertTrue(any(reason in card for reason in point_reasons),
-                                "Point-level reasons must survive the API-to-HTML boundary")
-            self.assertNotIn("Live", card)
-        self.assertGreaterEqual(observations_shown, 2)
-        self.assertIn('href="/methodology#definitions"', rendered.text)
-        self.assertIn('href="/methodology#collection"', rendered.text)
+        after_publication = LandingHTML(rendered.text)
+        self.assert_editorial_overview(after_publication)
+        self.assertEqual(initial.visible, after_publication.visible,
+                         "Dataset publication must not rewrite the editorial Overview")
 
         self.stop_process(api)
+        with self.assertRaises(httpx.HTTPError):
+            self.http.get(api_url + "/health", timeout=1)
         outage = self.http.get(web_url)
         self.assertEqual(outage.status_code, 200)
-        parsed = LandingHTML(outage.text)
-        for name in METRICS:
-            self.assertIn("not zero", parsed.metric(name))
-            self.assertNotIn("Latest approved observation", parsed.metric(name))
+        after_outage = LandingHTML(outage.text)
+        self.assert_editorial_overview(after_outage)
+        self.assertEqual(initial.visible, after_outage.visible,
+                         "Overview and research entry links must survive an API outage")
         for path, digest in original_hashes.items():
             self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), digest,
                              "Saved research inputs must remain byte-identical")
         label = "saved archive (read-only)" if original_hashes else "synthetic regression fixture"
-        print(f"NI-012 integration: {label}; {observations_shown}/3 observed metric cards; "
-              "publication/render/outage passed; source bytes unchanged", flush=True)
+        print(f"NI-086 integration: {label}; {observations_available}/3 metric series available; "
+              "editorial Overview stable before/after publication and API outage; "
+              "source bytes unchanged", flush=True)

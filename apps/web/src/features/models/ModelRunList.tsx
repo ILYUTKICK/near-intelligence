@@ -10,7 +10,7 @@ import type { ModelRunSummary } from "@/features/models/models-schema";
  * served — the empty catalog case is handled by the page as the honest
  * "no published model yet" state, never as placeholder content here.
  */
-export function ModelRunList({ items }: { items: ModelRunSummary[] }) {
+export function ModelRunList({ items, basePath = "/models" }: { items: ModelRunSummary[]; basePath?: string }) {
   return (
     <ul className="mt-8 grid gap-5 lg:grid-cols-2">
       {items.map((item) => (
@@ -21,7 +21,7 @@ export function ModelRunList({ items }: { items: ModelRunSummary[] }) {
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className="text-heading">
               <Link
-                href={`/models/${encodeURIComponent(item.run_id)}`}
+                href={`${basePath}/${encodeURIComponent(item.run_id)}`}
                 className="hover:underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 Model run {item.model_id} v{item.model_version}
@@ -49,7 +49,7 @@ export function ModelRunList({ items }: { items: ModelRunSummary[] }) {
           </dl>
           <div>
             <Link
-              href={`/models/${encodeURIComponent(item.run_id)}`}
+              href={`${basePath}/${encodeURIComponent(item.run_id)}`}
               aria-label={`Open model run: ${item.model_id} v${item.model_version}`}
               className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >

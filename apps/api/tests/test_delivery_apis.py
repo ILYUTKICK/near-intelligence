@@ -130,7 +130,7 @@ class ResolvedSelectionContractTests(unittest.TestCase):
                         {"filters": {"source": []}},
                         {"filters": {"source": ["SRC-LLAMA", ""]}},
                         {"frequency": "week"}, {"owner_id": "synthetic"},
-                        {"start": "2025-01-01", "end": "2027-01-01"}):
+                        {"start": "2025-01-01", "end": "2027-01-02"}):
             with self.subTest(changes=changes):
                 with self.assertRaises(Exception):
                     ResolvedSelection.model_validate({"start": "2026-01-01",
@@ -692,7 +692,7 @@ class DeliveryDatabaseTests(unittest.TestCase):
                 self.assertEqual(item["data_status"], "unavailable")
                 self.assertTrue(item["unavailable_reason"])
         self.assertEqual(by_id["intents-volume"]["units"], {"required_primary": "USD"})
-        self.assertEqual(by_id["intents-volume"]["available_ranges"]["max_days"], 366)
+        self.assertEqual(by_id["intents-volume"]["available_ranges"]["max_days"], 730)
 
         searched = self.get_json("/api/charts", q="fees")
         # the search covers title, description and chart_id, so the gated
@@ -1235,6 +1235,43 @@ class DeliveryDatabaseTests(unittest.TestCase):
         self.assertEqual(partial.status_code, 200, partial.text)
         self.assertEqual([series["points"][0]["value"] for series in partial.json()["series"]],
                          ["1", "1"])
+
+    def test_ni083_long_history_is_pinned_and_old_chart_range_stays_bounded(self):
+        start = dt.date(2025, 1, 1)
+        end = start + dt.timedelta(days=400)
+        observations = []
+        for index in range(400):
+            day = start + dt.timedelta(days=index)
+            observations.extend([
+                observation(METRIC_VOLUME, day, value="1000", dimensions={"source": "SRC-LLAMA"}),
+                observation(METRIC_FEES, day, value="0" if index == 0 else "1",
+                            dimensions={"source": "SRC-LLAMA"})])
+        staged = self.stage_fixture(f"ni083-history-{uuid4().hex[:10]}", observations,
+            [METRIC_VOLUME, METRIC_FEES], window=(start.isoformat(), end.isoformat()))
+        params = {"start": start.isoformat(), "end": end.isoformat(),
+                  "dataset_version": str(staged.dataset_version_id)}
+        old = self.get_json("/api/charts/intents-volume/view", definition_version=1, **params)
+        self.assertEqual(old.status_code, 422)
+        new = self.get_json("/api/charts/intents-volume/view", definition_version=2,
+                            filters='{"source":"SRC-LLAMA"}', **params)
+        self.assertEqual(new.status_code, 200, new.text)
+        self.assertEqual(len(new.json()["series"][0]["points"]), 400)
+        history = self.get_json("/api/research/history", **params)
+        self.assertEqual(history.status_code, 200, history.text)
+        body = history.json()
+        self.assertEqual(body["volume"]["dataset"]["id"], body["fees"]["dataset"]["id"])
+        self.assertEqual(body["summary"]["volume_usd"], "400000")
+        self.assertEqual(body["summary"]["gross_fees_usd"], "399")
+        self.assertEqual(body["summary"]["effective_gross_fee_bps"], "9.975")
+        self.assertEqual(body["summary"]["zero_fee_days"], 1)
+        self.assertTrue(body["summary"]["complete"])
+        self.assertFalse(body["monthly"][-1]["complete"])
+        self.assertEqual(self.get_json("/api/research/history", source="nope").status_code, 422)
+        self.assertEqual(self.get_json("/api/research/history", start=start.isoformat()).status_code, 422)
+        unapproved = self.stage_fixture(f"ni083-unapproved-{uuid4().hex[:8]}", observations,
+            [METRIC_VOLUME, METRIC_FEES], window=(start.isoformat(), end.isoformat()), do_publish=False)
+        self.assertEqual(self.get_json("/api/research/history",
+            dataset_version=str(unapproved.dataset_version_id)).status_code, 404)
 
     def test_15_v1_chart_renders_unchanged_and_v2_is_data_gated(self):
         recipients = {account: [f"{index + 1}.5" for index in range(DAILY_PERIODS)]

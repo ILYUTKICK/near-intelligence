@@ -58,8 +58,8 @@ class Selection(ContractModel):
 
     @model_validator(mode="after")
     def half_open_window(self):
-        if not 0 < (self.end - self.start).days <= 366:
-            raise ValueError("Selection requires a non-empty half-open window of at most 366 days")
+        if not 0 < (self.end - self.start).days <= 730:
+            raise ValueError("Selection requires a non-empty half-open window of at most 730 days")
         return self
 
 

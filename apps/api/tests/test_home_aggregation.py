@@ -98,8 +98,10 @@ class HomeContractTests(unittest.TestCase):
         # detail route, NI-032 added the public
         # metrics/chart/dataset/source delivery routes, NI-054 added the
         # public model definition/readiness/run routes, NI-041 added the
-        # chart-block insertion route and NI-044 added the snapshot routes.
+        # chart-block insertion route, NI-044 added the snapshot routes and
+        # NI-083 added the public research history route.
         self.assertEqual(set(schema["paths"]), {"/health", "/api/home", "/api/me",
+                "/api/research/history",
                 "/api/saved-charts", "/api/saved-charts/{instance_id}",
                 "/api/snapshots", "/api/snapshots/{snapshot_id}",
                 "/api/snapshots/{snapshot_id}/compare-live",
@@ -582,7 +584,9 @@ class HomeContextDatabaseTests(unittest.TestCase):
         self.assertNotIn(bob_saved.id, {item.id for item in home.recent_charts})
         self.assertEqual(home.indicators[0].series.points[0].value, exact)
         self.assertEqual(home.indicators[0].series.dataset.id, dataset.dataset_version_id)
-        self.assertEqual(home.indicators[0].chart_version, 1)
+        # Home indicators follow the latest registered definition; NI-083
+        # appended the immutable long-history v2 for intents-volume.
+        self.assertEqual(home.indicators[0].chart_version, chart_by_chart_id("intents-volume").version)
         self.assertEqual(home.indicators[0].series.selection.start.isoformat(), "2026-01-01")
         self.assertEqual(home.indicators[0].series.selection.end.isoformat(), "2026-01-02")
         original = delivery.load_chart_definition

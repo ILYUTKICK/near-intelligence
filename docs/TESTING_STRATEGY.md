@@ -31,17 +31,19 @@ Model reproducibility compares canonical prepared-data bytes and manifest hashes
 
 Local production-mode performance/container/restore rehearsals must identify machine and limits; they do not establish real staging-machine performance, final-origin TLS/callbacks or remote restore. Local NI-064 acceptance uses the same budgets on a documented production-mode local environment under the owner's ordering change; NI-067 rechecks relevant budgets on the actual staging environment. Missing local prerequisites block NI-079. Real permitted refresh/model/reproduction evidence remains distinct from synthetic E2E; unknown/skipped required gates do not pass. Remote-only acceptance stays with NI-067/068/069.
 
-NI-012 HTTP integration (`apps/api/tests/test_landing_integration.py`) runs via
-`scripts/run-db-tests.py --suite landing` after the frozen web build. It starts
-real production Next.js and FastAPI processes on loopback, uses the unprivileged
-`near_app` connection for delivery and `near_operator` for staging/publication,
-and compares visible HTML article text (excluding React script payloads) with
-the API's exact decimal strings. It verifies no-approved-data and stopped-API
-states on the same running web process. CI uses only labeled synthetic data.
-An explicit `NI_LANDING_ARCHIVE_ROOT` selects the saved-input emission path and
-checks the consumed archive hashes before/after; missing inputs fail the run
-instead of substituting fixtures. This is HTTP/SSR integration evidence;
-keyboard, responsive and screen-reader release checks remain separate.
+The landing HTTP integration (`apps/api/tests/test_landing_integration.py`,
+updated for NI-086) runs via `scripts/run-db-tests.py --suite landing` after the
+frozen web build. It starts real production Next.js and FastAPI on loopback,
+uses unprivileged `near_app` delivery and `near_operator` staging/publication,
+and independently checks unavailable-before-approval and exact-string metric
+series after publication. The editorial Overview's visible text/links (excluding
+React script payloads) remain unchanged before/after publication and after the
+API stops. Obsolete on-home metric-card assertions are superseded by the owner's
+approved design, not by weakening financial delivery gates. Standalone web
+financial-loader tests retain exact decimals, zero/missing/source ambiguity,
+coverage and contract-failure behavior. `NI_LANDING_ARCHIVE_ROOT` opts into the
+saved-input emission path with before/after hashes; missing inputs fail rather
+than substitute fixtures. Desktop keyboard/layout checks remain separate.
 
 NI-024 Home integration runs with `scripts/run-db-tests.py --workspace-home-http`
 after the production web build. It uses the real Next.js private gateway,

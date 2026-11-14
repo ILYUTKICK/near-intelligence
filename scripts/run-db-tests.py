@@ -25,7 +25,7 @@ def main() -> int:
     parser.add_argument("--saved-charts-http", action="store_true",
                         help="run saved-chart DB and production gateway HTTP checks only")
     parser.add_argument("--pg-bin", type=Path, required=True)
-    parser.add_argument("--suite", choices=("all", "landing", "insights", "exports", "publications"),
+    parser.add_argument("--suite", choices=("all", "landing", "insights", "exports", "publications", "history"),
                         default="all",
                         help="run all database suites, landing HTTP integration, focused "
                              "insight, export, or publication checks")
@@ -141,6 +141,8 @@ def main() -> int:
             patterns = ["test_exports_ir.py", "test_exports_jobs.py"]
         if args.suite == "publications":
             patterns = ["test_publications.py"]
+        if args.suite == "history":
+            patterns = ["test_chart_registry.py", "test_delivery_apis.py", "test_research_history.py"]
         # NI-030 bounded authorized live smoke: only when the operator
         # explicitly sets NI_LIVE_SMOKE=1 in the invoking environment (the same
         # gate the smoke file itself requires) does one real finalized-header

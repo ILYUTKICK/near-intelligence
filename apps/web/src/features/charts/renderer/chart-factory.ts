@@ -19,6 +19,9 @@ export interface EChartsLike {
   setOption(option: ChartOption): void;
   resize(): void;
   dispose(): void;
+  /** Browser-only view navigation; never changes observations or saved pins. */
+  zoom?(start: number, end: number): void;
+  onZoom?(listener: (start: number, end: number) => void): () => void;
 }
 
 export interface ChartFactoryContext {
@@ -58,6 +61,7 @@ export const defaultChartFactory: ChartFactory = async (container, context) => {
     components.AriaComponent,
     components.LegendComponent,
     components.AxisPointerComponent,
+    components.DataZoomComponent,
     // v6 moved `grid.containLabel` behind this legacy feature; the panel
     // layout relies on it so axis labels never clip.
     features.LegacyGridContainLabel,
@@ -76,5 +80,14 @@ export const defaultChartFactory: ChartFactory = async (container, context) => {
     setOption: (option) => chart.setOption(option),
     resize: () => chart.resize(),
     dispose: () => chart.dispose(),
+    zoom: (start, end) => chart.dispatchAction({ type: "dataZoom", start, end }),
+    onZoom: (listener) => {
+      const handler = () => {
+        const zoom = (chart.getOption().dataZoom as { start?: number; end?: number }[] | undefined)?.[0];
+        listener(zoom?.start ?? 0, zoom?.end ?? 100);
+      };
+      chart.on("datazoom", handler);
+      return () => chart.off("datazoom", handler);
+    },
   };
 };

@@ -96,6 +96,8 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 
 ## 7. Текущая точка входа
 
+**Передача накопленных исправлений — 14 ноября 2026:** пользователь поручил закоммитить всю локальную пачку NI-080–086 для продолжения другим агентом. Прежний запрет Git снят для этой передачи; упаковка, push рабочей ветки и проверки выполняются как завершающая часть NI-080. [Актуальный handoff](docs/LOCAL_CORRECTIONS_HANDOFF.md) описывает состав пачки и границы продолжения. Это не разрешение на merge, deployment или публикацию исходных исследовательских данных.
+
 **Актуальное поручение — 12 ноября 2026: завершить все зарегистрированные P0/P1/P2; сохранить почти готовый desktop-дизайн, устранить конкретные проблемы и добиться работающих локально графиков; затем полностью проверить интегрированную версию и только после этого размещать.** Порядок и обязательный барьер перед размещением — в разделе 10; задание для передачи агенту — [docs/FINISH_BEFORE_DEPLOY_PROMPT.md](docs/FINISH_BEFORE_DEPLOY_PROMPT.md). Это актуальная точка входа вместо исторического старта с NI-001. Статусы остаются только в TASKS.md.
 
 На момент создания этого плана все 72 NI-задачи имеют TODO. Это датированный исходный факт, а не обновляемый реестр статусов. При будущем старте перечитать TASKS.md и проверить код.
@@ -181,10 +183,17 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 | 71 | [NI-072](docs/TASKS.md) | Add lightweight private research organization | P1 | B |
 | 72 | [NI-060](docs/TASKS.md) | Implement revocable read-only sharing | P2 | B |
 | 73 | [NI-065](docs/TASKS.md) | Implement advisory integrity checks and optional AI tools | P2 | A |
-| 74 | [NI-079](docs/TASKS.md) | Pass final integrated local release acceptance | P0 | A |
-| 75 | [NI-067](docs/TASKS.md) | Deploy staging and production with safe configuration | P0 | A |
-| 76 | [NI-068](docs/TASKS.md) | Verify backups, restore and operational monitoring | P0 | A |
-| 77 | [NI-069](docs/TASKS.md) | Run hackathon demo and reviewer reproduction | P0 | A |
+| 74 | [NI-080](docs/TASKS.md) | Repair workspace navigation and email-label demo entry | P0 | A |
+| 75 | [NI-081](docs/TASKS.md) | Redesign the public methodology reading experience | P0 | A |
+| 76 | [NI-082](docs/TASKS.md) | Audit and design the long-history evidence extension | P0 | B |
+| 77 | [NI-083](docs/TASKS.md) | Implement interactive long-history research and exact descriptive calculations | P0 | A with B |
+| 78 | [NI-084](docs/TASKS.md) | Record the Blog and research-publication product direction | P1 | A |
+| 79 | [NI-085](docs/TASKS.md) | Implement the public Blog and research-publication catalog | P1 | A |
+| 80 | [NI-086](docs/TASKS.md) | Implement the approved editorial Overview design | P1 | A |
+| 81 | [NI-079](docs/TASKS.md) | Pass final integrated local release acceptance | P0 | A |
+| 82 | [NI-067](docs/TASKS.md) | Deploy staging and production with safe configuration | P0 | A |
+| 83 | [NI-068](docs/TASKS.md) | Verify backups, restore and operational monitoring | P0 | A |
+| 84 | [NI-069](docs/TASKS.md) | Run hackathon demo and reviewer reproduction | P0 | A |
 
 ## 9. Изменение самого плана
 
@@ -221,3 +230,19 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 NI-077 оформляет передачу и её уточнение 12 ноября; он не запускает реализацию или размещение в текущей сессии. Агент-исполнитель берёт NI-задачи по актуальным claims и исходной приёмке. При внешнем blocker продолжает независимую разрешённую работу и сообщает точные недостающие входы; не снижает gates.
 
 **Уточнение scope — 12 ноября 2026:** владелец остановил передачу «только MVP» и потребовал выполнить все P1/P2 до деплоя, с приоритетом работающего локального продукта и графиков. NI-060 и NI-065 переведены из design/plan-only в implement-and-test; подробная приёмка — TASKS и FEATURE_SPECIFICATIONS. Это расширяет существующие восемь карточек, но не включает отдельные CRDT/portfolio/multichain/billing или платные сервисы. Старые указания об отсрочке P1/P2 в разделе 9 — история и заменены этим уточнением. Принимающий агент исполняет расширенную передачу; текущая NI-077 остаётся документационной.
+
+**Owner correction batch — 13 November 2026:** NI-080 implements the first cabinet-feedback batch (remove Home Data context, retain workspace explorer/chart navigation, usable email-label demo entry). It precedes NI-079 and replaces the older public-route-only sidebar choice for these journeys. Email labels do not establish identity; demo ownership remains isolated. No data collection or cloud rollout is added.
+
+**Local public-page review — 13 November 2026:** owner requests a proper reader-facing methodology design (NI-081) and explicitly defers Git commits, pushes and PR publication while collecting local corrections. NI-080 local acceptance is preserved; its publication waits for this hold to end. NI-081 may proceed after its own DONE dependencies without claiming NI-079 or remote readiness.
+
+**NI-081 follow-up — 13 November 2026:** owner removes all methodology-page technical disclosures together with their contents. Keep the public explanatory article and honest limits; preserve the detailed records internally. This replaces the prior on-page appendix design. Continue local-only, without Git publication.
+
+**Long-term thesis evidence — 13 November 2026:** owner requests more historical depth beyond the 90-day cohort. NI-082 first audits saved history and defines the comparable extension/protocol. It grants no new bulk collection, paid/cloud/API-key access, collector restart or Git publication. Existing long-run readiness and revenue/attribution gates remain intact.
+
+**Interactive history implementation — 14 November 2026:** the owner explicitly requests interactive research charts and corrected calculations after NI-082. NI-083 implements that local scope using saved real inputs, exact descriptive calculations and the shared ECharts renderer. Preserve existing pinned 90-day evidence and model gates. No new collection or Git publication is authorized; NI-079 must include this local batch.
+
+**Research publication direction — 14 November 2026:** the owner wants the public product to grow into a collection of research articles with a separate Blog page and asks to anchor this in the project. NI-084 records that decision and implementation brief only. The existing full research is the first publication; further articles/updates build on it. Blog routes, CMS, automatic publishing and daily data collection are not implemented or started by this documentation task. Existing workspace/data/reproducibility requirements and the Git hold remain in force.
+
+**Blog implementation — 14 November 2026:** the owner explicitly says to implement the recorded direction. NI-085 adds the public catalog/navigation and reusable publication routing/content organization, with the existing full research as its first real article. Preserve `/research` and all evidence anchors, source/metric/chart identities and private boundaries. No invented extra articles/metadata, CMS dependency, external publication, new data collection or Git mutation. This local batch is included in NI-079 before deployment.
+
+**Approved Overview — 14 November 2026:** owner approved the generated editorial Overview mockup and explicitly requests implementation through NI-086. Replace the old thesis-heavy landing presentation with the approved hero, one real featured research card, three data-exploration links, reader workflow, methodology band and workspace CTA. This supersedes NI-012's on-Overview metric/claim-table presentation only; preserve the real data services, full research/evidence/model status and existing documented deep links through compatible destinations. No fake KPIs, live claims, automatic data refresh or Git publication. Include NI-086 in NI-079 local acceptance.

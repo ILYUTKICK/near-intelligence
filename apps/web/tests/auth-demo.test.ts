@@ -11,6 +11,8 @@ import { resetRateLimitForTests } from "@/lib/auth/rate-limit";
 
 const ENV = {
   APP_ENV: "test",
+  APP_ORIGIN: "http://localhost:3000",
+  API_INTERNAL_URL: "http://localhost:8000",
   NEXT_PUBLIC_SUPABASE_URL: "https://dev.supabase.co",
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_synthetic_test_key_0123456789",
   SUPABASE_JWT_ISSUER: "https://dev.supabase.co/auth/v1",
@@ -30,6 +32,7 @@ beforeEach(() => {
     process.env[key] = value;
   }
   providerFetchMock.mockReset();
+  providerFetchMock.mockResolvedValue(providerReply(201, {}));
   vi.stubGlobal("fetch", providerFetchMock);
 });
 
@@ -74,7 +77,7 @@ describe("Demo sign-in", () => {
     );
     const response = await demoPost(await demoRequest({ displayEmail: "visitor@example.test" }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: "session", demo: true, returnTo: "/" });
+    expect(await response.json()).toEqual({ status: "session", demo: true, returnTo: "/workspace" });
     const session = response.headers.getSetCookie().find((c) => c.startsWith("ni_session="));
     expect(session).toContain("HttpOnly");
     const [url, init] = providerFetchMock.mock.calls[0];
@@ -85,21 +88,52 @@ describe("Demo sign-in", () => {
   });
 
   it("preserves an internal chart continuation and rejects external targets", async () => {
-    for (const [returnTo, expected] of [["/charts/intents-volume?dataset_version=synthetic", "/charts/intents-volume?dataset_version=synthetic"], ["https://foreign.example", "/"], ["//foreign.example", "/"]]) {
+    for (const [returnTo, expected] of [["/charts/intents-volume?dataset_version=synthetic", "/charts/intents-volume?dataset_version=synthetic"], ["https://foreign.example", "/workspace"], ["//foreign.example", "/workspace"]]) {
       providerFetchMock.mockResolvedValueOnce(providerReply(200, { access_token: "synthetic-access", refresh_token: "synthetic-refresh", expires_in: 600 }));
       const response = await demoPost(await demoRequest({ returnTo }));
       expect((await response.json()).returnTo).toBe(expected);
     }
   });
 
-  it("treats the email as a display label only — absent labels are fine", async () => {
-    providerFetchMock.mockResolvedValueOnce(
-      providerReply(200, { access_token: "a", refresh_token: "r", expires_in: 600 }),
-    );
-    const response = await demoPost(await demoRequest({ displayEmail: "" }));
+  it("rejects empty or invalid labels before contacting the provider", async () => {
+    for (const displayEmail of ["", "not-an-email", "x".repeat(255) + "@example.test"]) {
+      const response = await demoPost(await demoRequest({ displayEmail }));
+      expect(response.status).toBe(400);
+    }
+    expect(providerFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed request bodies without an exception or provider call", async () => {
+    for (const body of ["null", "[]", "42", "invalid JSON"]) {
+      const request = await demoRequest({});
+      const response = await demoPost(new NextRequest(request.url, {
+        method: "POST", headers: request.headers, body,
+      }));
+      expect(response.status).toBe(400);
+    }
+    expect(providerFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("creates the starter template under the bearer identity, never an email owner", async () => {
+    providerFetchMock.mockResolvedValueOnce(providerReply(200, {
+      access_token: "access", refresh_token: "refresh", expires_in: 600,
+    }));
+    const response = await demoPost(await demoRequest({ displayEmail: " visitor@example.test " }));
     expect(response.status).toBe(200);
-    const sentBody = JSON.parse(providerFetchMock.mock.calls[0][1].body as string);
-    expect(sentBody.data).toEqual({});
+    const [url, init] = providerFetchMock.mock.calls[1];
+    expect(String(url)).toBe("http://localhost:8000/api/documents");
+    expect(init.headers.authorization).toBe("Bearer access");
+    expect(JSON.parse(init.body as string)).toEqual({ title: "My demo research", template_id: "investment-v1" });
+    expect(init.headers["idempotency-key"]).toMatch(/^[a-f0-9-]{36}$/);
+  });
+
+  it("does not issue a browser session when starter creation fails", async () => {
+    providerFetchMock.mockResolvedValueOnce(providerReply(200, {
+      access_token: "access", refresh_token: "refresh", expires_in: 600,
+    })).mockResolvedValueOnce(providerReply(503, {}));
+    const response = await demoPost(await demoRequest({}));
+    expect(response.status).toBe(503);
+    expect(response.headers.getSetCookie()).toEqual([]);
   });
 
   it("fails honestly when anonymous sign-ins are disabled on the provider", async () => {

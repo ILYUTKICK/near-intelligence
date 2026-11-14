@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
  * a plain GET form (progressive enhancement); the active category is kept
  * as a hidden field so search and category compose.
  */
-export function CatalogSearch({ initialQuery, category }: { initialQuery: string; category: string | null }) {
+export function CatalogSearch({ initialQuery, category, basePath = "/charts" }: { initialQuery: string; category: string | null; basePath?: string }) {
   const router = useRouter();
   const [value, setValue] = useState(initialQuery);
 
@@ -29,11 +29,11 @@ export function CatalogSearch({ initialQuery, category }: { initialQuery: string
     if (category !== null) {
       params.set("category", category);
     }
-    router.push(params.size > 0 ? `/charts?${params.toString()}` : "/charts");
+    router.push(params.size > 0 ? `${basePath}?${params.toString()}` : basePath);
   }
 
   return (
-    <form role="search" action="/charts" method="get" onSubmit={submit} className="flex flex-col gap-1.5">
+    <form role="search" action={basePath} method="get" onSubmit={submit} className="flex flex-col gap-1.5">
       <Label htmlFor="chart-catalog-search">Search charts</Label>
       <div className="flex gap-2">
         <div className="relative min-w-0">

@@ -141,8 +141,10 @@ class ChartBlockContractTests(unittest.TestCase):
 
     def test_02_request_contract_bounds_and_unknown_fields(self):
         with self.assertRaises(ValidationError):
+            # Beyond the shared 730-day contract bound (NI-083 long history);
+            # per-chart allowed ranges are enforced by the service instead.
             ChartBlockInsertRequest.model_validate(
-                insert_payload(selection=selection("2025-01-01", "2026-03-01")))
+                insert_payload(selection=selection("2024-01-01", "2026-03-01")))
         with self.assertRaises(ValidationError):
             ChartBlockInsertRequest.model_validate(
                 insert_payload(selection={"start": "2026-01-08", "end": "2026-01-01",
@@ -893,14 +895,17 @@ class ChartBlockServiceDatabaseTests(ChartBlockDatabaseFixture, unittest.TestCas
             absent = self.client.get(path, params=no_choice,
                                      headers={"Authorization": "Bearer t.alice"})
             self.assertEqual(absent.status_code, 422)
+            # A truly incomplete selection: the end bound itself is missing.
+            incomplete = {key: value for key, value in params.items() if key != "end"}
+            self.assertEqual(self.client.get(path, params=incomplete,
+                             headers={"Authorization": "Bearer t.alice"}).status_code, 422)
             for changes in ({"dataset_version": "https://example.com/data"},
                             {"start": "2026-01-08", "end": "2026-01-01"},
-                            {"start": "2025-01-01"},
                             {"filters": '{"source":"unapproved"}'},
                             {"chart_definition_version_id": str(UNAVAILABLE_CHART_ID)}):
                 response = self.client.get(path, params={**params, **changes},
                                            headers={"Authorization": "Bearer t.alice"})
-                self.assertEqual(response.status_code, 422, response.text)
+                self.assertEqual(response.status_code, 422, f"{changes} -> {response.text}")
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
 
     def historical_chart(self, document_id, version_id, block_id, suffix="view", *,

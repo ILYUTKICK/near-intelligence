@@ -7,7 +7,7 @@ import { Brand } from "./Brand";
 import { MobileNavDrawer } from "./MobileNavDrawer";
 import { ProductIcon } from "./ProductIcon";
 import { Button } from "@/components/ui/button";
-import { authNav, isWithinRoute, publicNav } from "@/lib/navigation";
+import { authNav, isPublicNavActive, publicNav } from "@/lib/navigation";
 
 import { cn } from "@/lib/utils";
 
@@ -44,7 +44,7 @@ export function PublicHeader() {
             <NavLink
               key={item.href}
               item={item}
-              active={isWithinRoute(pathname, item.href) || (item.href === "/data" && isWithinRoute(pathname, "/charts"))}
+              active={isPublicNavActive(pathname, item.href)}
             />
           ))}
         </nav>
