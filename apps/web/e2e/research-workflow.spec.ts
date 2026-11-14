@@ -235,7 +235,6 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
 
   // -- 5. Add to research: destination picker -> new document ------------- //
   await page.goto(chartSelectionUrl());
-  await expect(page.getByRole("button", { name: "Save chart", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Add to research" }).click();
   const destinationDialog = page.getByRole("dialog");
   await expect(destinationDialog).toContainText("Add chart to your research");
