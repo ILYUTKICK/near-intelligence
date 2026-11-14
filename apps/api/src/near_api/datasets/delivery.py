@@ -883,13 +883,11 @@ def build_series_points(version: Mapping, content: Mapping, metric_id: UUID,
     for row in content["observations"].get(metric_id, ()):
         if not (start_dt <= row["period_start"] < end_dt):
             continue
-        # A filter exists to disambiguate dimension VARIANTS: an observation
-        # that does not carry the dimension has no variants to disambiguate
-        # and is never excluded by it (NI-079 acceptance: the quantity/USD
-        # chart filters price_basis on the USD series while the purchases
-        # series carries no price dimension).
-        if all(key not in row["dimensions"] or row["dimensions"].get(key) == value
-               for key, value in filters.items()):
+        # Strict variant matching (NI-071): a filtered dimension must be
+        # carried and equal. A chart whose filter must NOT blank a sibling
+        # series declares `applies_to` on the filter dimension (NI-094) —
+        # the scoping happens in build_chart_view before this point.
+        if all(row["dimensions"].get(key) == value for key, value in filters.items()):
             matched.append(row)
     by_period: dict[dt.datetime, list[dict]] = {}
     for row in matched:
