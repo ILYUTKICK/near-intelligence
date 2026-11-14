@@ -10,10 +10,10 @@
 
 | # | Gate | Status | Evidence |
 |---|------|--------|----------|
-| A1 | Offline API suite | pending | — |
-| A2 | Full disposable-cluster DB suite (26 patterns) | running | — |
-| A3 | Web unit suite (serial) | pending | — |
-| A4 | Production build | pending | — |
+| A1 | Offline API suite | running | — |
+| A2 | Full disposable-cluster DB suite (26 patterns) | **PASS** | `scripts/run-db-tests.py --pg-bin /opt/homebrew/opt/postgresql@18/bin` (thread caps 1): **exit 0, 571 tests ok, 31 module summaries OK, zero failures/skips** |
+| A3 | Web unit suite (serial) | **PASS** | `pnpm --filter web test --maxWorkers=1`: **66 files / 681 tests pass, exit 0** |
+| A4 | Production build | **PASS** | `pnpm --filter web build`: exit 0 (static prerender + dynamic server routes) |
 | A5 | lint / typecheck / contracts / doc-links / contrast / client-secrets / uv lock | **PASS** | below |
 | B1 | Real-stack workflow e2e (public→chart→login→saved→research→insight→evidence→save/reopen→ZIP) | pending | — |
 | B2 | Alice/Bob denial + source-outage editing | pending | — |
