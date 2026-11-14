@@ -549,18 +549,19 @@ class ChartRegistryDatabaseTests(unittest.TestCase):
     def test_04_registries_are_readable_but_append_only(self):
         with self.operator.begin() as connection:
             register_charts(connection)
-        # two runtime users read the public scientific definitions, including
-        # the honestly unavailable ones
+        # two runtime users read the public scientific definitions; NI-096
+        # removed the gated charts, so the model-artifact chart carries the
+        # recorded unavailable state instead
         for subject in (uuid4(), uuid4()):
             with user_transaction(self.runtime, subject) as connection:
                 count = connection.scalar(text("SELECT count(*) FROM app.chart_definitions"))
                 gated = connection.execute(text("""
                     SELECT data_status, unavailable_reason FROM app.chart_definitions
-                    WHERE chart_id = 'protocol-revenue'
+                    WHERE chart_id = 'model-diagnostics'
                 """)).one()
             self.assertEqual(count, len(CHARTS))
             self.assertEqual(gated.data_status, "unavailable")
-            self.assertIn("OQ-01", gated.unavailable_reason)
+            self.assertIn("model run", gated.unavailable_reason)
         runtime_forbidden = (
             "INSERT INTO app.chart_definitions(id, chart_id, version, title, description,"
             " category, visualization_type, data_status, update_frequency,"

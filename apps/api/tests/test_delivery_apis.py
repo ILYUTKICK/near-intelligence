@@ -678,7 +678,10 @@ class DeliveryDatabaseTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         items = response.json()["items"]
         by_id = {item["chart_id"]: item for item in items}
-        self.assertEqual(len(items), 11)
+        # NI-096: the gated charts were removed from the registry (owner
+        # release decision) — the catalog lists exactly the eight honest
+        # definitions, seven available plus the model-artifact chart.
+        self.assertEqual(len(items), 8)
         for item in items:
             ChartDefinitionResponse.model_validate(item)
         available = {"intents-volume", "gross-fees", "observed-conversions",
@@ -689,6 +692,7 @@ class DeliveryDatabaseTests(unittest.TestCase):
                 self.assertEqual(item["data_status"], "available")
                 self.assertIsNone(item["unavailable_reason"])
             else:
+                self.assertEqual(chart_id, "model-diagnostics")
                 self.assertEqual(item["data_status"], "unavailable")
                 self.assertTrue(item["unavailable_reason"])
         self.assertEqual(by_id["intents-volume"]["units"], {"required_primary": "USD"})
