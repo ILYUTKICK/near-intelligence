@@ -760,7 +760,11 @@ describe("Data chart detail — the same gates as /charts", () => {
     render(ui);
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
-    expect([...viewRequests[0].searchParams.keys()]).toEqual(["definition_version", "start", "end"]);
+    // NI-092: the implicit filter preselection is forwarded; arbitrary URL
+    // fields are still dropped and reported.
+    expect([...viewRequests[0].searchParams.keys()].sort()).toEqual(
+      ["definition_version", "end", "filters", "start"]);
+    expect(viewRequests[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
     const status = await chartParameterNotice();
     expect(within(status).getByText("foo")).toBeInTheDocument();
     expect(within(status).getByText("admin")).toBeInTheDocument();

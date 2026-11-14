@@ -169,10 +169,11 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await expect(page.getByRole("button", { name: "Sign in to save this chart" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in to add it to research" })).toBeVisible();
 
-  // NI-080: an implicit default follows the approved historical coverage.
-  // Explicit dates remain authoritative even when they have no observations.
+  // NI-080/NI-092: an implicit default is clamped to the approved coverage and
+  // preselects the first approved filter value. Explicit dates remain
+  // authoritative even when they have no observations.
   await expect(page.getByRole("group", { name: "Time range" })).toBeVisible();
-  await expect(page.getByText(/default preset is anchored to the latest approved dataset's coverage end/)).toBeVisible();
+  await expect(page.getByText(/implicit default is clamped to the latest approved dataset's coverage/)).toBeVisible();
   await expect(page.getByText(state.pin_value)).toBeVisible();
   await page.goto(`${state.web_url}/data/intents/intents-volume?version=1&start=2026-11-01&end=2026-11-04`);
   await expect(page).toHaveURL(/start=2026-11-01&end=2026-11-04/);

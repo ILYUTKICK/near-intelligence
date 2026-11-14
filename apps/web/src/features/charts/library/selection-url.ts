@@ -146,6 +146,28 @@ export function hasNoFilterDomain(definition: ChartDefinitionResponse): boolean 
   return Object.keys(filterProperties(definition)).length === 0;
 }
 
+/**
+ * Deterministic preselection for an implicit default view (NI-092): the first
+ * approved option of every registered filter dimension. The chart discloses
+ * the preselection through its filter chips — providers are never summed; an
+ * explicit `filters` URL parameter always wins over these defaults.
+ */
+export function defaultFiltersFor(definition: ChartDefinitionResponse): FiltersSelection {
+  const filters: FiltersSelection = {};
+  for (const [key, property] of Object.entries(filterProperties(definition))) {
+    const options = Array.isArray(property.enum)
+      ? property.enum.filter((value): value is string => typeof value === "string")
+      : [];
+    if (options.length > 0) filters[key] = options[0];
+  }
+  return filters;
+}
+
+/** True when the selection carries no explicit filter choice. */
+export function hasNoExplicitFilters(filters: FiltersSelection): boolean {
+  return Object.keys(filters).length === 0;
+}
+
 function parseFiltersParam(
   raw: string,
   definition: ChartDefinitionResponse,

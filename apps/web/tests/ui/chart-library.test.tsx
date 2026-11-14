@@ -652,10 +652,15 @@ describe("Chart detail page — validated selection URLs", () => {
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
     expect(viewRequests).toHaveLength(1);
-    expect([...viewRequests[0].searchParams.keys()]).toEqual(["definition_version", "start", "end"]);
+    // NI-092: an explicit range with no filters param still preselects the
+    // first approved filter value (the filters param is appended to the
+    // explicit definition_version/start/end identity).
+    expect([...viewRequests[0].searchParams.keys()].sort()).toEqual(
+      ["definition_version", "end", "filters", "start"]);
     expect(viewRequests[0].searchParams.get("definition_version")).toBe("1");
     expect(viewRequests[0].searchParams.get("start")).toBe(VIEW_WINDOW.start);
     expect(viewRequests[0].searchParams.get("end")).toBe(VIEW_WINDOW.end);
+    expect(viewRequests[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
 
     // The renderer resolved the pinned view: accessible table and frame.
     expect(await screen.findByRole("region", { name: /exact data table/ })).toBeInTheDocument();
@@ -675,7 +680,11 @@ describe("Chart detail page — validated selection URLs", () => {
     });
 
     const viewRequests = requestsTo(requests, "/api/charts/gross-fees/view");
-    expect([...viewRequests[0].searchParams.keys()]).toEqual(["definition_version", "start", "end"]);
+    // NI-092: the implicit filter preselection is forwarded; arbitrary URL
+    // fields are still dropped and reported.
+    expect([...viewRequests[0].searchParams.keys()].sort()).toEqual(
+      ["definition_version", "end", "filters", "start"]);
+    expect(viewRequests[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
     const status = await chartParameterNotice();
     expect(within(status).getByText("foo")).toBeInTheDocument();
     expect(within(status).getByText("admin")).toBeInTheDocument();
@@ -1305,7 +1314,7 @@ describe("NI-080 implicit latest coverage", () => {
       viewRoute("gross-fees", archivedView), ANONYMOUS_SESSION];
   }
 
-  it("reanchors the implicit preset to old approved coverage and pins the second request", async () => {
+  it("reanchors the implicit preset to the approved coverage window and pins the second request", async () => {
     const requests = installApiMock(routes());
     render(await ChartDetailPage({ params: Promise.resolve({ chartId: "gross-fees" }), searchParams: Promise.resolve({}) }));
     const views = requestsTo(requests, "/api/charts/gross-fees/view");
@@ -1313,8 +1322,13 @@ describe("NI-080 implicit latest coverage", () => {
     expect(views[0].searchParams.has("dataset_version")).toBe(false);
     expect(views[1].searchParams.get("dataset_version")).toBe(DATASET_ID);
     expect(views[1].searchParams.get("end")).toBe("2026-01-15");
-    expect(views[1].searchParams.get("start")).toBe(shiftIsoDate("2026-01-15", -90));
-    expect(screen.getByText(/latest approved dataset's coverage end/)).toBeVisible();
+    // NI-092: the implicit window is clamped to the approved coverage start…
+    expect(views[1].searchParams.get("start")).toBe("2026-01-01");
+    // …and preselects the first approved filter value (disclosed by the chips).
+    expect(views[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
+    expect(views[1].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
+    expect(screen.getByText(/implicit default is clamped to the latest approved dataset's coverage/)).toBeVisible();
+    expect(screen.getByText(/preselects the first approved filter value/)).toBeVisible();
     expect(await screen.findByRole("region", { name: /exact data table/ })).toHaveTextContent(/1\s000/);
   });
 
