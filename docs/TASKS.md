@@ -2823,10 +2823,13 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0 (owner release decision 2026-11-14: the gated charts must not appear before the recorded demo; the detail pages follow the supplied redesign brief)
 - **Dependencies:** NI-095, NI-071, NI-032
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
 - **Started at:** 2026-11-14T19:10:00+03:00
 - **Execution role:** A
+- **Implementation (2026-11-14):** the three gated charts removed from the registry (`1449da6`) and from the deployment DB (operator DELETE as the cluster admin — near_operator is write-once by design); the category scope note no longer mentions them. Detail redesign: the full ChartFrame chrome now matches the cards (units left, compact Live badge right with honest fallbacks, divider, one toolbar with range presets / source selector / single primary "+ Add to research", plot, axis footer, sr-only provenance+summary+tables; SourceDrawer retained only on working surfaces via `sourceDrawer`); ChartDetailClient passes the single action; the NI-071 strict variant-matching and the NI-092 anchoring note are unchanged. Commits `8f8e734`, `ac2f677`, `36d084b`, `dcabc4b`, `03f1022`.
+- **Verification (2026-11-14):** offline suites green (metrics/real-archive/registry/delivery/chart-blocks); full disposable-cluster suite **exit 0, 571 tests ok**; web suite **680/680**; lint/typecheck/build green; **e2e 25 passed + 1 honest skip** (D4 — the removed Save-chart creation path; the saved-preview surface stays covered by the unit suite); live: the gated charts appear nowhere, `/api/charts` lists 8 definitions, the detail pages render the unified chrome with real data.
+- **Completed at:** 2026-11-14T19:40:00+03:00
 
 **Description (two owner decisions):** (1) the three OQ-gated charts (protocol-revenue, capture-rate, fee-funded-buybacks) are removed from the registry and catalog entirely — the owner release decision supersedes the "listed unavailable" presentation; the OQ gates stay recorded on the metric definitions. (2) The seven chart DETAIL pages get the unified editorial redesign: page header (breadcrumbs, uppercase category label, large serif title), one main analytics card (units left, compact Live badge right, divider, toolbar with time-range presets / source selector / one primary "+ Add to research" action), the plot as the focal point, compact axis footer, and removal of Save chart / Freeze snapshot / Add Insight / Sources & definitions / Inspect / zoom buttons / visible data tables / accessible-summary accordions (a11y semantics stay nonvisually).
 
