@@ -1,0 +1,46 @@
+# NI-079 — Final integrated local release acceptance
+
+**Status:** IN_PROGRESS (evidence accumulates here; the task is DONE only when every applicable gate below is recorded as passed or explicitly blocked).
+
+**Release candidate:** `feat/ni-079-release-acceptance` — `596c36e` (owner landing copy revisions) + `4c493b0` (NI-090 VPS preparation record) on top of main `13e9d0c` (PRs #100, #101 merged). Claim: 2026-11-14T15:32:44+03:00, ZCode role-A coordinator, interactive owner chat session, worktree `/Users/ilyutkinn/Desktop/near-deploy`.
+
+**Environment:** macOS ARM64 (Darwin 25.6.0), Node v24.22.2 (node@24 keg-only), pnpm 12.16.1 (corepack), uv / CPython 3.13 (`apps/api/.venv`, frozen), PostgreSQL 18.6 (Homebrew, disposable clusters), Docker 29.9.2 + Compose v5.6.1.
+
+## Gate matrix
+
+| # | Gate | Status | Evidence |
+|---|------|--------|----------|
+| A1 | Offline API suite | pending | — |
+| A2 | Full disposable-cluster DB suite (26 patterns) | running | — |
+| A3 | Web unit suite (serial) | pending | — |
+| A4 | Production build | pending | — |
+| A5 | lint / typecheck / contracts / doc-links / contrast / client-secrets / uv lock | **PASS** | below |
+| B1 | Real-stack workflow e2e (public→chart→login→saved→research→insight→evidence→save/reopen→ZIP) | pending | — |
+| B2 | Alice/Bob denial + source-outage editing | pending | — |
+| C1 | Real research data import (stage→validate→approve→publish) | pending | — |
+| C2 | Real-data provenance/rights/quality audit | pending | — |
+| D1 | Real deterministic model fit + publish gate | pending | — |
+| D2 | Offline reproduction of the published run | pending | — |
+| E1 | Permitted-source refresh last-good evidence (1 guarded request, OQ-03) | pending | — |
+| F1 | Container/migration rehearsal on RC images | pending | — |
+| F2 | Local backup/restore + rollback rehearsal | pending | — |
+| G1 | Desktop keyboard/accessibility/performance | pending | — |
+| G2 | Extended chart acceptance incl. one real chart end-to-end (input→metric→API→plot→saved revision→ZIP/PDF) | pending | — |
+
+## Gate A5 — fast static gates (2026-11-14, this worktree, RC head)
+
+| Check | Command | Result |
+|-------|---------|--------|
+| lint | `corepack pnpm --filter web lint` | 0 problems |
+| typecheck | `corepack pnpm --filter web typecheck` | clean |
+| contracts | `corepack pnpm check:contracts` | OpenAPI and TypeScript are current |
+| doc-links | `corepack pnpm check:doc-links` | OK — 1029 relative links resolve |
+| contrast | `corepack pnpm --filter web check:contrast` | all token contrast checks passed |
+| client-secrets | `corepack pnpm --filter web check:client-secrets` | exit 0 |
+| uv lock | `uv lock --check --project apps/api` | OK |
+
+Notes: root `check:contrast` / `check:client-secrets` wrappers fail with exit 127 under corepack-shimmed PATH because the root scripts shell out to a bare `pnpm`; the underlying workspace scripts pass (recorded command above is the workspace-scoped equivalent).
+
+## Gate C/D/E — real-data prerequisites (operator scope)
+
+The deployment DB (`near-deploy`, localhost:15433) currently holds the registered registries (20 metric definitions, 14 chart definitions, 6 documented sources seeded 2026-11-14) and **no approved datasets** — delivery endpoints answer the honest 503/unavailable states. Gates C/D/E require the owner's machine-local research archive and one operator decision (permitted-source refresh authorization); recorded here as they land, never fabricated.
