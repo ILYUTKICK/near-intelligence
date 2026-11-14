@@ -2486,8 +2486,11 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0, mandatory before remote deployment
 - **Dependencies:** NI-078, NI-064, NI-066, NI-070, NI-030, NI-054, NI-061, NI-062, NI-063, NI-044, NI-045, NI-055, NI-059, NI-071, NI-072, NI-060, NI-065, NI-080, NI-081, NI-082, NI-083, NI-084, NI-085, NI-086, NI-087, NI-088
 - **Complexity:** L
-- **Status:** TODO
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
 - **Execution role:** A (coordinator); B owns data/model/API acceptance contributions
+- **Started at:** 2026-11-14T15:32:44+03:00
+- **Release candidate:** feat/ni-079-release-acceptance @ 596c36e (owner landing copy revisions) + 4c493b0 (NI-090 VPS preparation record) on top of main 13e9d0c
 
 **Description:** Verify the integrated P0/P1/P2 release candidate locally after all eight formerly deferred features work; preserve the current design and prioritize actual charts. Earlier DONE cards or a design preview do not establish readiness.
 
