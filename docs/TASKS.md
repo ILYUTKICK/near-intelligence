@@ -2817,6 +2817,25 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Testing requirements:** data-explorer category tests updated and green; full web suite serial green; lint/typecheck clean; live verification on the deploy stack.
 
+### NI-095 — Unified minimalist redesign of the seven analytics chart cards
+
+- **Epic:** 07 — Public Data Delivery
+- **Priority:** P1 (owner design decision 2026-11-14, full redesign brief supplied)
+- **Dependencies:** NI-033, NI-015, NI-092, NI-093
+- **Complexity:** M
+- **Status:** IN_PROGRESS
+- **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14), worktree /Users/ilyutkinn/Desktop/near-deploy
+- **Started at:** 2026-11-14T18:20:00+03:00
+- **Execution role:** A
+
+**Description:** One consistent, minimalist institutional design system across all seven analytics chart cards: clean card container (project tokens: surface/border/radius-surface 22px), serif title + units subtitle + one compact Live badge, exactly ONE action per card ("+ Add to research" with the anonymous sign-in continuation), the plot as the focal point, and a compact axis-explanation footer. Removed from cards: the long mode pill, "Complete" badge, period/last-observed metadata line, Sources drawer, zoom buttons, visible exact-value tables and accessible-summary accordions.
+
+**Integrity rules honored:** no API/data/model changes; unavailable/no-data states keep their honest compact rendering; the stale notice stays; the accessible summary and exact-value tables remain in the DOM as visually-hidden nonvisual semantics; tooltips and pointer/scroll zoom interactions stay; the detail pages keep their full chrome (they are the "full info" destination) — the redesign applies to the dashboard cards via the new ChartFrame `variant="card"`.
+
+**Implementation steps:** ChartFrame card variant (title link, units, Live badge, divider + right-aligned action slot, plot, axis footer, sr-only a11y block); ChartView suppresses zoom controls and renders the axis explanation in card mode; category pages pass one Add action built from the resolved default view; tests updated.
+
+**Acceptance criteria:** all seven charts render in the unified card system on the category pages with real data; detail pages unchanged; full web suite + lint/typecheck/build green; live browser verification.
+
 ### NI-094 — Resolve charts whose required metrics span multiple approved datasets
 
 - **Epic:** 07 — Public Data Delivery
