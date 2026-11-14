@@ -444,7 +444,7 @@ describe("Compact hypothesis assessment (NI-076 D1)", () => {
       expect(card!.textContent).toContain(hypothesis.status);
       expect(card!.textContent).toContain(hypothesis.title);
       const link = within(card as HTMLElement).getByRole("link", {
-        name: `Read the full ${hypothesis.code} assessment: ${hypothesis.title}`,
+        name: `${hypothesis.code} ${hypothesis.title} ${hypothesis.status}`,
       });
       expect(link).toHaveAttribute("href", `#${hypothesis.id}`);
       // The anchor target is the unchanged full section below.

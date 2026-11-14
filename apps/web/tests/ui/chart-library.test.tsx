@@ -878,7 +878,8 @@ describe("Chart detail page — validated selection URLs", () => {
     expect(screen.queryByText("Definition, dataset and quality")).not.toBeInTheDocument();
     expect(requestsTo(requests, `/api/metrics/${METRIC_FEES_ID}`)).toHaveLength(0);
     await userEvent.click(screen.getByRole("button", { name: "Sources & definitions" }));
-    expect(await screen.findByRole("dialog", { name: "Sources and definitions" })).toBeVisible();
+    const sources = await screen.findByRole("dialog", { name: "Sources and definitions" });
+    expect(within(sources).getByText(DATASET_ID)).toBeVisible();
   });
 
   it("passes axe on the resolved chart page", async () => {

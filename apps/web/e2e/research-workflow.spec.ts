@@ -94,6 +94,14 @@ async function setOutage(enabled: boolean, page: Page): Promise<void> {
   expect(await response.json()).toEqual({ enabled });
 }
 
+async function expectRecordedDataset(page: Page) {
+  await page.getByRole("button", { name: "Sources & definitions" }).click();
+  const sources = page.getByRole("dialog", { name: "Sources and definitions" });
+  await expect(sources.getByText(state.dataset_version_id, { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sources).toBeHidden();
+}
+
 async function inspectDocumentVersion(page: Page, documentId: string) {
   const response = await page.request.get(`${state.inspect_document}/${documentId}`);
   // The harness DB inspection must see the version row.
@@ -175,7 +183,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await page.goto(chartSelectionUrl());
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
   // The dataset identity is the exact persisted approved dataset (browser -> DB).
-  await expect(page.getByText(state.dataset_version_id).first()).toBeVisible();
+  await expectRecordedDataset(page);
 
   // Keyboard range control: focus the 7-day preset and activate it with Enter;
   // the preset anchors to the pinned selection end, not the wall clock.
@@ -496,7 +504,7 @@ test("the public explorer shows approved data again once the outage ends", async
   await setOutage(false, page);
   await page.goto(chartSelectionUrl());
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
-  await expect(page.getByText(state.dataset_version_id).first()).toBeVisible();
+  await expectRecordedDataset(page);
   await context.close();
 });
 

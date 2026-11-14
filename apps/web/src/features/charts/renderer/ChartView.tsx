@@ -412,6 +412,7 @@ export function ChartView({
       }
       sources={activeView ? sourcesOf(activeView) : []}
       definition={definition.description}
+      datasetId={activeView?.dataset.id}
       manifestUrl={activeView?.dataset.manifest_url ?? undefined}
       rangeSlot={
         onSelectionChange ? (

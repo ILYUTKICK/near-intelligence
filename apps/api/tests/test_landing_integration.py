@@ -166,14 +166,14 @@ class LandingIntegrationTests(unittest.TestCase):
         self.assertIn("Understand NEAR.", parsed.visible)
         self.assertIn("Build your own thesis.", parsed.visible)
         self.assertIn("The research, in focus.", parsed.visible)
-        self.assertEqual(parsed.visible.count("A conversion channel."), 1)
+        self.assertEqual(parsed.visible.count("Can Intents create lasting value for NEAR?"), 1)
         for label in ("Intents activity", "Revenue & fees", "Token economics",
                       "Sources first. Assumptions visible.", "Make the research your own."):
             self.assertIn(label, parsed.visible)
         for path in ("/blog", "/research", "/data", "/data/intents", "/data/revenue",
                      "/data/token-economics", "/methodology", "/workspace"):
             self.assertIn(path, parsed.links)
-        self.assertTrue({"evidence", "findings", "mechanism", "release-status"} <= parsed.ids)
+        self.assertTrue({"evidence", "findings", "mechanism", "release-status", "how-it-works"} <= parsed.ids)
         for old_metric in METRICS:
             self.assertNotIn(old_metric, parsed.visible)
         self.assertNotIn("Selected approved metrics", parsed.visible)

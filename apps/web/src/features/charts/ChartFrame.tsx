@@ -32,6 +32,7 @@ export function ChartFrame({
   sources = [],
   definition,
   formulaUrl,
+  datasetId,
   manifestUrl,
   tableRows,
   valueHeader,
@@ -54,6 +55,7 @@ export function ChartFrame({
   sources?: DataSource[];
   definition?: string;
   formulaUrl?: string;
+  datasetId?: string;
   manifestUrl?: string;
   tableRows?: FrameTableRow[];
   valueHeader?: string;
@@ -110,6 +112,7 @@ export function ChartFrame({
           label="Sources & definitions"
           sources={sources}
           formulaUrl={formulaUrl}
+          datasetId={datasetId}
           manifestUrl={manifestUrl}
           definition={definition}
           triggerClassName="ml-auto"
