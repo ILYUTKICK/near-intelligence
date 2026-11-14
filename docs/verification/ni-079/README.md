@@ -60,3 +60,15 @@ Notes: root `check:contrast` / `check:client-secrets` wrappers fail with exit 12
 The deployment DB (`near-deploy`, localhost:15433) currently holds the registered registries (20 metric definitions, 14 chart definitions, 6 documented sources seeded 2026-11-14) and **no approved datasets** — delivery endpoints answer the honest 503/unavailable states. Gates C/D/E require the owner's machine-local research archive and one operator decision (permitted-source refresh authorization); recorded here as they land, never fabricated.
 
 **Archive import preparation (2026-11-14):** a strict `shasum -a 256` manifest was generated over the machine-local archive `/Users/ilyutkinn/Desktop/Near/research` (395 files incl. macOS Finder junk). Dry-run findings against the shipped NI-027 cohort registry (`archive_cohorts.json`): byte verification passes; the batch is rejected only because root-level `.DS_Store` files (11) belong to no cohort directory. The importer scopes its extra/missing-file tree comparison to the manifest's common leading directory, so the sanctioned import shape is **per-cohort manifests** (each manifest covering one cohort directory). Plan: import chart-relevant cohorts (`near-treasury`, `near-supply`, `near-weekly`, `near-dollar`, `near-longitudinal`, `near-pilot`, `near-provenance`) via `python -m near_api.ingestion.archive` as `near_operator` into the deployment DB, then `python -m near_api.metrics build` (NI-029) and `python -m near_api.datasets stage-from-import → validate → publish` (NI-028) per the recorded DATA_PIPELINE.md contract. No archive byte is modified; the archive tree hash is recorded before/after.
+
+## NI-067 bounded deployment corrections
+
+The accepted runtime was deployed from main1d5e550 with two environment-boundary
+fixes: API configuration no longer requires gateway signing/CSRF secrets, and
+auth callbacks use configured APP_ORIGIN instead of the standalone internal
+request origin. Runtime e1671af passed scoped API/JWT/security and callback
+regressions, strict TypeScript and all four CI jobs in run43635577293. The actual
+HTTPS two-user save/reopen/pinned ZIP/PDF and callback smoke passed on the VPS;
+[deployment report](../ni-067.md) records source hashes, data handoff, commands,
+operational boundaries and remaining NI-068/069 checks. These changes do not
+modify financial definitions, observations, model results or existing pins.

@@ -2208,7 +2208,7 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P0
 - **Dependencies:** NI-066, NI-062, NI-063, NI-079
 - **Complexity:** L
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** Codex /root, chat 01a1db7f-9b8c-70e3-a57e-004e7f89f5e6
 - **Execution role:** A (deployment coordinator)
 - **Started at:** 2026-11-14T22:32:42+03:00
@@ -2229,6 +2229,12 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 **Testing requirements:** Staging full workflow/security smoke then production bounded smoke; callback/expiry tests; provider failure leaves editing usable.
 
 - **Production preparation evidence:** main 1d5e550 fast-forwarded; source manifest 8212e33318331eed verified (818 files), 26 VPS tests pass locally and on Ubuntu x86_64. Docker installed; initial research-only restore rehearsed locally and imported to VPS with all 14 table counts and 11 artifact hashes matching; private tables empty. All public pages and real TLS/HTTP308 pass. Owner separately approved exact source/env/data payload transfer, existing Supabase, Site URL/callback and single-A DNS replacement. Bounded first demo test exposed backend requiring gateway-only secrets; fixing inside NI-067 before final acceptance.
+
+- **Result:** Published https://near-intelligence.me on the owner-supplied DigitalOcean VPS. Fresh main1d5e550 plus bounded production fixes fc29502/e1671af; deployed immutable source release20261114T200424Z-f924da0c2859129e. Valid HTTPS and HTTP308; private API/DB remain unexposed. Imported separately approved research-only data/model package with all table counts/artifact hashes matching, preserving source limitations and excluding private users/documents. Fixed API requiring web-only secrets and callback returning an internal standalone origin.
+- **Verification:** Source hashes and VPS26 tests; API config5 + JWT18 + security/session4; web auth gateway15 and strict TypeScript. GitHub CI43635577293 on deployed runtime e1671af: web/API/database/E2E all success. Real HTTPS two-user Supabase anonymous login/session/refresh/CSRF; pinned real chart inspect→insert→save/reopen; Bob denied read/delete/download; ZIP/PDF actual worker success with exact CSV, revision/dataset and all ZIP hashes verified. Final canonical callback verified; QA documents removed and real logout/post-logout401 passed. Post-deploy coherent DB/artifact backup hash-verified. Export/sweep/local-nightly-backup systemd timers enabled and readiness rechecked.
+- **Reviewer:** Coordinator accepted actual results; independent review skipped by user instruction2026-11-09. Role-B/A auth handoffs and tests supplied by /root/ni067_review; root independently reran scoped suites and executed final production smoke.
+- **Remaining operational scope:** NI-068 still TODO for encrypted offsite backups, retention, measured remote restore and alerting; NI-069 deployed demo/reproduction remains separate. Email SMTP/delivered signup/recovery-link completion was not exercised by anonymous demo checks. No source refresh/collector enabled and no new provider data request.
+- **Completed at:** 2026-11-14T23:14:13+03:00
 
 ### NI-068 — Verify backups, restore and operational monitoring
 
