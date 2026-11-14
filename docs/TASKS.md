@@ -2823,11 +2823,14 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Priority:** P2 (honest fallback renders today; discovered by NI-093 live verification)
 - **Dependencies:** NI-028, NI-029, NI-032
 - **Complexity:** M
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Claimed by:** ZCode role-A coordinator, interactive owner chat session (2026-11-14)
 - **Started at:** 2026-11-14T17:20:00+03:00
 - **Execution role:** A (data-model decision may route parts to B)
 - **Decision:** option (b) — the owner instructed the chart must render now; a dedicated combined dataset avoids touching the delivery resolution contract.
+- **Implementation (2026-11-14):** the NI-029 emitter gained the `metrics.supply-context.windows` dataset (members: observed_near_purchases window totals via a shape-specific formula override + net_supply_change_near), the price_basis observation vocabulary was aligned with the chart filter contract ("start_of_day"/"end_of_day"), and the chart registry gained the NI-094 `applies_to` series-role scoping with quantity-usd-sensitivity **v2** (v1 byte-for-byte immutable; the strict variant-matching semantics of NI-071 stay unchanged). Commits `78e56a6`, `cb219a0`, `5517508`, `a2808f3`, `ac2f677`.
+- **Verification (2026-11-14):** metrics 40 OK; real-archive reconciliation OK; chart registry OK; delivery OK; **full disposable-cluster suite exit 0 (571 tests ok, 31 modules)**; live: `/api/charts/quantity-usd-sensitivity` v2 latest with `applies_to` served, default-filter view returns 34/34 + 34/34 points, v1 recipient-filter strict behavior unchanged (all missing), supply-context **Complete** (2 series × 3 window points), all three explorer categories verified in the browser (intents 3× Complete, revenue figures + honest gated cards in one grid, token-economics Complete).
+- **Completed at:** 2026-11-14T18:05:00+03:00
 
 **Description:** `supply-context` binds `observed_near_purchases` (in the published `metrics.flows.daily`) and `net_supply_change_near` (in `metrics.windows.snapshot`). The NI-032 latest resolution requires ONE approved dataset containing every required metric, so the chart answers the honest "no approved dataset exists for this selection" fallback although both datasets are published. The NI-029 emitter intentionally emits two manifest families by structure (daily flows vs window snapshots).
 
