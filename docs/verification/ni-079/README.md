@@ -18,7 +18,7 @@
 | B1 | Real-stack workflow e2e (public→chart→login→saved→research→insight→evidence→save/reopen→ZIP) | **PASS (synthetic leg)** | `pnpm --filter web exec playwright test --config e2e/playwright.config.ts`: **26 passed, exit 0, 2.6 min** — the NI-063 journey covers the full workflow incl. outage and export on the real loopback stack. The real-data leg of the end-to-end trace is Gate G2. |
 | B2 | Alice/Bob denial + source-outage editing | **PASS (synthetic leg)** | covered by the same e2e run (journey outage step, two-user denial specs) and the DB-suite ownership matrix (A2). |
 | C1 | Real research data import (stage→validate→approve→publish) | pending | — |
-| C2 | Real-data provenance/rights/quality audit | pending | — |
+| C2 | Real-data provenance/rights/quality audit | **partial PASS (compute leg)** | `NI_REAL_ARCHIVE_ROOT=…/research python -m unittest discover -s apps/api/tests -p test_metrics_real_archive.py`: **7 real-archive reconciliation tests OK** (buy total, fee bps at storage scale, payout matching, supply values, treasury balance, USD estimates, emitted manifests vs summaries — all reconcile exactly with the saved archive; 6 DB-gated cases skip outside a cluster). Source provenance/rights statuses come from the shipped NI-027 cohort registry transcription (documented/unverified, never invented). |
 | D1 | Real deterministic model fit + publish gate | pending | — |
 | D2 | Offline reproduction of the published run | pending | — |
 | E1 | Permitted-source refresh last-good evidence (1 guarded request, OQ-03) | pending | — |
