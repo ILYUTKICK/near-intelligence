@@ -245,6 +245,8 @@ export async function ChartDetailScreen({
               : { start: "", end: "" }}
             mode="live"
             presentation="compact"
+            sourceDrawer={false}
+            exactValues="sr-only"
           />
           {dropped.length > 0 ? <DroppedNotice dropped={dropped} /> : null}
         </div>

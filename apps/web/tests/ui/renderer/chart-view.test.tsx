@@ -132,17 +132,11 @@ afterEach(() => {
 });
 
 describe("ChartView — plot and accessible table integration", () => {
-  it("offers keyboard zoom controls that navigate the plot without changing exact rows", async () => {
-    const zoom = vi.fn();
-    const factory: ChartFactory = () => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn(), zoom });
-    renderChart({ factory });
-    const navigation = screen.getByRole("group", { name: /plot navigation/ });
-    within(navigation).getByRole("button", { name: "Zoom in" }).focus();
-    await userEvent.keyboard("{Enter}");
-    expect(zoom).toHaveBeenLastCalledWith(25, 75);
-    within(navigation).getByRole("button", { name: "Reset zoom" }).focus();
-    await userEvent.keyboard("{Enter}");
-    expect(zoom).toHaveBeenLastCalledWith(0, 100);
+  it("renders no zoom buttons in the redesigned chrome; exact rows stay announced", async () => {
+    // NI-096: the zoom button group is gone — the plot keeps its direct
+    // drag/scroll dataZoom interaction and the exact rows stay in the DOM.
+    renderChart();
+    expect(screen.queryByRole("group", { name: /plot navigation/ })).toBeNull();
     expect(screen.getByRole("region", { name: /exact data table/ })).toHaveTextContent("2026-11-01");
   });
   it("distinguishes repeated exact table landmarks with human instance context", () => {
@@ -200,12 +194,12 @@ describe("ChartView — plot and accessible table integration", () => {
     expect(within(table).getByText(/lower bound/)).toBeInTheDocument();
   });
 
-  it("renders frame metadata: units, period, quality and last observed", () => {
+  it("renders units and the compact Live badge; freshness stays nonvisual (NI-096)", () => {
     renderChart();
-    expect(screen.getByText(/^Units:/)).toHaveTextContent("USD");
-    expect(screen.getByText(/Period: 2026-11-01 … 2026-11-06 UTC\./)).toBeInTheDocument();
-    expect(screen.getByText(/Last observed: 2026-11-06T00:00:00Z\./)).toBeInTheDocument();
-    expect(screen.getByText("Live — latest approved data")).toBeInTheDocument();
+    expect(screen.getByText("USD")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
+    expect(screen.getByText(/Period: 2026-11-01 … 2026-11-06 UTC\./).closest(".sr-only")).not.toBeNull();
+    expect(screen.getByText(/Last observed: 2026-11-06T00:00:00Z\./).closest(".sr-only")).not.toBeNull();
   });
 
   it("exposes the manual accessible summary", () => {
@@ -346,7 +340,7 @@ describe("ChartView — honest states", () => {
     });
     renderChart({ view: stale, mode: "historical" });
     expect(screen.getByText(/Showing the last verified values/)).toBeInTheDocument();
-    expect(screen.getByText("Historical — pinned version")).toBeInTheDocument();
+    expect(screen.getByText("Last good values")).toBeInTheDocument();
   });
 });
 
@@ -439,8 +433,8 @@ describe("ChartView — data flow and stale requests", () => {
     };
     const { rerender } = render(<ChartView {...props} factory={recordingFactory().factory} />);
     await screen.findByRole("region", { name: /exact data table/ });
-    expect(screen.getByText(/Period: 2026-11-01 … 2026-11-06 UTC\./)).toBeInTheDocument();
-    expect(screen.getByText(/^Units:/)).toHaveTextContent("USD");
+    expect(screen.getByText(/Period: 2026-11-01 … 2026-11-06 UTC\./).closest(".sr-only")).not.toBeNull();
+    expect(screen.getByText("USD")).toBeInTheDocument();
 
     const nextWindow = view(
       baseDefinition,
@@ -465,7 +459,7 @@ describe("ChartView — data flow and stale requests", () => {
     await waitFor(() =>
       expect(screen.getByText(/Period: 2026-10-08 … 2026-11-06 UTC\./)).toBeInTheDocument(),
     );
-    expect(screen.getByText(/^Units:/)).toHaveTextContent("USD");
+    expect(screen.getByText("USD")).toBeInTheDocument();
     const table = screen.getByRole("region", { name: /exact data table/ });
     expect(within(table).getByText("77")).toBeInTheDocument();
     await waitFor(() => expect(instances.length).toBeGreaterThanOrEqual(1));
@@ -628,11 +622,11 @@ describe("ChartView — compact presentation (NI-078, NI-076 D3/D4)", () => {
     const figure = screen.getByRole("img").closest("figure");
     expect(figure).not.toBeNull();
     expect(within(figure as HTMLElement).queryByText(definition().title, { exact: true })).toBeNull();
-    // Units, mode badge and freshness metadata stay visible.
-    expect(within(figure as HTMLElement).getByText(/Units:/)).toBeInTheDocument();
-    expect(within(figure as HTMLElement).getByText("Historical — pinned version")).toBeInTheDocument();
-    expect(within(figure as HTMLElement).getByText(/Period:/)).toBeInTheDocument();
-    // The public-detail contract holds: exact values stay open (no hover).
+    // Units, the compact pinned badge and the nonvisual freshness metadata stay.
+    expect(within(figure as HTMLElement).getByText("USD")).toBeInTheDocument();
+    expect(within(figure as HTMLElement).getByText("Pinned version")).toBeInTheDocument();
+    expect(within(figure as HTMLElement).getByText(/Period:/).closest(".sr-only")).not.toBeNull();
+    // The public-detail contract holds: exact values stay in the DOM (sr-only).
     expect(screen.getByRole("region", { name: /exact data table/ })).toBeInTheDocument();
     expect(screen.queryByText("Exact values and summary")).toBeNull();
   });
@@ -648,7 +642,7 @@ describe("ChartView — compact presentation (NI-078, NI-076 D3/D4)", () => {
     expect(screen.queryByText("Historical — pinned version")).toBeNull();
     expect(screen.queryByText(/Period:/)).toBeNull();
     expect(screen.getByText(/Last observed:/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sources & definitions" })).toBeInTheDocument();
+    expect(screen.getByText("Pinned version")).toBeInTheDocument();
   });
 
   it("keeps the table always open outside compact contexts", () => {

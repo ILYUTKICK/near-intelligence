@@ -165,9 +165,10 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await expect(page).toHaveURL(/\/data\/intents\/intents-volume/);
   await expect(page.getByRole("heading", { level: 1, name: "Provider-reported Intents gross volume" }))
     .toBeVisible();
-  // The anonymous surface exposes the private actions only as auth continuations.
-  await expect(page.getByRole("button", { name: "Sign in to save this chart" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in to add it to research" })).toBeVisible();
+  // NI-096: the anonymous surface exposes exactly ONE private-action
+  // continuation — the context-preserving Add to research.
+  await expect(page.getByRole("button", { name: "+ Add to research" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in to save this chart" })).toHaveCount(0);
 
   // NI-080/NI-092: an implicit default is clamped to the approved coverage and
   // preselects the first approved filter value. Explicit dates remain

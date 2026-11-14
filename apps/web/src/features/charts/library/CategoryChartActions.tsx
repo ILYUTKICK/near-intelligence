@@ -21,16 +21,19 @@ export function CategoryChartActions({
   nextPath,
   basePath,
   saveInput,
+  variant = "secondary",
 }: {
   nextPath: string;
   basePath: string;
-  saveInput: SaveInput;
+  saveInput?: SaveInput;
+  /** NI-096: the detail page renders the action as the primary filled button. */
+  variant?: "secondary" | "primary";
 }) {
   const router = useRouter();
   const { session } = usePublicSession();
   const [pending, setPending] = useState(false);
 
-  if (session.subject) {
+  if (session.subject && saveInput) {
     return <div key={session.subject} className="flex flex-wrap gap-2">
       <AddChartToResearch input={saveInput} suspended={session.status !== "authenticated"} />
     </div>;
@@ -42,7 +45,7 @@ export function CategoryChartActions({
     return (
       <>
         <Button
-          variant="secondary"
+          variant={variant}
           pending={pending}
           onClick={() => {
             if (!isInternalPath(nextPath, basePath)) {

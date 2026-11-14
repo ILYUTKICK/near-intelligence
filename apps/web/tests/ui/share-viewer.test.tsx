@@ -80,7 +80,7 @@ describe("ShareViewer (read-only rendering)", () => {
     // and its exact-value table carries the exact decimal strings.
     const chart = screen.getByTestId("share-chart");
     expect(chart).toHaveTextContent(/Frozen chart/);
-    expect(chart).toHaveTextContent("Historical — pinned version");
+    expect(chart).toHaveTextContent("Pinned version");
     expect(chart).toHaveTextContent("12.5");
     expect(chart).toHaveTextContent(/never refreshes/);
     // No chart data loading indicator: the view is controlled.

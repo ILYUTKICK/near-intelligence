@@ -1038,7 +1038,7 @@ describe("Data chart detail island — selection URLs and continuation stay /dat
       />,
     );
 
-    const saveButton = await screen.findByRole("button", { name: "Sign in to save this chart" });
+    const saveButton = await screen.findByRole("button", { name: "+ Add to research" });
     await user.click(saveButton);
     expect(routerPush).toHaveBeenCalledTimes(1);
     const [href] = routerPush.mock.calls[0];
