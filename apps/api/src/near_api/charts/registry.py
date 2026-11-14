@@ -245,10 +245,6 @@ def _series(*bindings: "tuple[str, str] | tuple[str, str, int]") -> tuple[ChartS
                  for binding in bindings)
 
 
-GatedRevenueReason = ("protocol_revenue_usd is gated (OQ-01): no verified economically "
-                      "attributable revenue/allocation ledger exists; gross fees and "
-                      "treasury payouts are not substitutes.")
-
 CHARTS: tuple[ChartDefinition, ...] = (
     _chart(
         "intents-volume", version=1,
@@ -394,55 +390,6 @@ CHARTS: tuple[ChartDefinition, ...] = (
                         "note": "Resolves a published model artifact by run ID; this "
                                 "chart binds no metric series, so it stays unavailable "
                                 "until a reviewed artifact is published."},
-    ),
-    _chart(
-        "protocol-revenue", version=1,
-        title="Economically attributable protocol revenue (gated)",
-        description="Explicitly unavailable chart: attributable protocol revenue stays "
-                    "gated until a reconciled fee/allocation ledger exists. Gross fees, "
-                    "volume and treasury payouts are not substitutes.",
-        category="fees", visualization_type="bar", update_frequency="daily",
-        series=_series(("protocol_revenue_usd", "required_primary")),
-        data_status="unavailable", unavailable_reason=GatedRevenueReason,
-        unit_schema={"required_primary": "USD"},
-        source_lineage={"sources": [],
-                        "note": "Bound to the gated protocol_revenue_usd definition "
-                                "(OQ-01); every observation is null with that reason "
-                                "until the gate passes."},
-    ),
-    _chart(
-        "capture-rate", version=1,
-        title="Protocol capture rate (gated)",
-        description="Explicitly unavailable chart: the capture rate needs an "
-                    "attributable revenue numerator and a compatible gross-fee "
-                    "denominator; both reconciliations are open questions.",
-        category="fees", visualization_type="line", update_frequency="daily",
-        series=_series(("protocol_capture_rate", "required_primary")),
-        data_status="unavailable",
-        unavailable_reason="protocol_capture_rate is gated (OQ-01/OQ-11): the revenue "
-                           "numerator and the compatible fee denominator are "
-                           "unresolved, so every observation is null with a reason.",
-        unit_schema={"required_primary": "percent"},
-        source_lineage={"sources": [],
-                        "note": "Bound to the gated protocol_capture_rate definition; no "
-                                "hard daily 0-100 clip hides the mismatch."},
-    ),
-    _chart(
-        "fee-funded-buybacks", version=1,
-        title="Fee-funded buybacks (gated)",
-        description="Explicitly unavailable chart: executed conversions attributable to "
-                    "earned fees cannot be identified because pooled funds are not "
-                    "physically tagged.",
-        category="treasury", visualization_type="bar", update_frequency="snapshot",
-        series=_series(("fee_funded_buybacks_near", "required_primary")),
-        data_status="unavailable",
-        unavailable_reason="fee_funded_buybacks_near is gated (OQ-08): no documented "
-                           "mixed-pool accounting attribution exists for the full "
-                           "window, so every observation is null with a reason.",
-        unit_schema={"required_primary": "NEAR"},
-        source_lineage={"sources": [],
-                        "note": "The narrow 27 Oct-2 Nov strict inventory equivalent is "
-                                "a NI-051 research artifact, not this metric."},
     ),
 )
 
