@@ -3008,3 +3008,35 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Follow-up verification:** 1068 relative links resolve;17 shell blocks parse and fences balance; git diff --check passes. README env and own-domain snippets re-executed in disposable source copy;26 VPS tests, env and hardened Compose checks pass. MIT metadata JSON/TOML consistency and offline uv lock check pass with uv.lock/pnpm-lock/requirements unchanged. Published-ref review covers66 branches,737 commits/2782 blobs;40 pattern hits are placeholders/examples/synthetic tests, no actual credential identified. Scope/limits and binary/remote-GitHub exclusions recorded in PUBLIC_RELEASE. Prior documentation head de9ce66 passed all4 CI jobs in run43638842063; final follow-up head checks are verified on the PR before handoff.
 - **Follow-up boundaries:** Repository remains private; no visibility mutation, application submission, history rewrite, raw-data publication, runtime change or remote deployment. GitHub-only logs/artifacts/discussions and full asset rights are not cleared by the bounded Git review.
 - **Follow-up completed at:** 2026-11-15T00:52:22+03:00.
+
+
+### NI-099 — Implement the approved Comic Lab desktop identity
+
+- **Epic:** 01 — Design system and product presentation
+- **Priority:** P1, explicit owner redesign request, 22 November 2026
+- **Dependencies:** NI-075, NI-086, NI-064
+- **Complexity:** L
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat 01a1fb40-3d6a-7912-87bf-615fdbf1bfff
+- **Execution role:** A
+- **Started at:** 2026-11-22T00:56:59+03:00
+- **Branch/worktree:** feat/ni-099-comic-lab; /Users/ilyutkinn/.codex/worktrees/near-comic-lab/Near
+- **Authorization:** Owner approved Comic Lab direction A, the three-node graph wordmark, TRACE and English mockups, then explicitly requested implementing locally and delivering a GitHub feature PR. This replaces the prior editorial appearance only; no merge or deployment.
+- **Dependency verification:** NI-075/086/064 are DONE, with shared components, public pages and desktop checks present at main 3ff78b0. Other active NI-080/088/092/093/095 claims and behavior are preserved, not reassigned.
+- **Handoff:** Per PLAN's explicit separate-task-agent instruction, a dedicated NI-099 agent implements the web code. /root owns the asset handoff, execution registry, local runtime, verification and delivery. Coordinate shared files before edits.
+
+**Description:** Apply the owner-approved mint/ivory/ink Comic Lab design to the implemented Next.js frontend. Begin with shared tokens/controls and the personal workspace, then cover public, chart/model, editor and account views. Use the 58 visual frames as references while retaining existing services, real datasets, exact values, source context, definitions, ownership, revision pins, exports and all route functionality. English text throughout.
+
+**Implementation steps:** Import canonical logo/TRACE and self-hosted licensed Rubik/Golos Text/IBM Plex Mono; extend existing semantic tokens and shared primitives/shells; restyle workspace Home/navigation and shared feature views; update public/auth/account views; run appropriate automated and real desktop browser checks; deliver a focused branch and reviewable PR with screenshots and actual results.
+
+**Acceptance criteria:** Recognizable canonical graph logo and TRACE, consistent Comic Lab typography/palette/borders/radii/shadows across current desktop routes, accessible loading/error/empty states and keyboard operation. Existing chart/editor/save/reopen/export behavior and financial/reproducibility contracts retained. No fake production data, duplicate metric logic, schema/auth changes, raw archive or secrets in Git, new provider calls, collector restart, mobile work, merge or deployment. Record actual verification and honest limitations.
+
+**Expected files/modules:** apps/web styles, layout/UI components, frontend feature views, existing chart theme only where required, public brand assets/fonts, relevant tests, docs/DESIGN_SYSTEM.md and docs/verification/ni-099.
+
+**Testing requirements:** Lint, strict TS, relevant/full web unit tests, production build, contrast and client-secret checks, affected chart/editor/navigation checks, and desktop public/private browser journeys. Verify actual saved-chart/document save/reopen/export where local inputs permit; run two-user checks if private behavior changes. Record fixture versus real-data scope. Independent review skipped under the existing 9 November instruction; coordinator acceptance remains mandatory.
+
+- **Result:** Implemented canonical graph wordmark/favicon and approved TRACE, same-origin licensed Rubik/Golos Text/IBM Plex Mono, mint/ivory/ink shared tokens and outlined controls/panels across the current desktop application. Restyled Home/checklist, public/auth and chart/model/editor/share views; added the existing Chart library destination to cabinet navigation. Preserved API/auth/ownership, metric logic, editor schema, revision pins, scientific renderer and frozen export palette. Updated design/IA/screen documentation and asset/license provenance.
+- **Verification:** Final production build, strict TypeScript and lint pass (four existing unused-variable warnings); full web unit suite 66 files / 682 tests pass. Final contrast gate passes 28 role pairs. OpenAPI/generated client unchanged. Final desktop production-stack journeys: 16/16 pass, 4.8 minutes, 1440×900, one worker/no retries. Real API/PG/RLS/worker verify pinned exact values, save/reopen, source-outage behavior, ZIP manifest/member hashes and two-user denial; provider transport/data in automated tests are synthetic and labeled. Axe reports zero serious/critical and no lower-impact findings on scanned surfaces; keyboard/focus/sidebar checks pass. 1083 relative doc links and whitespace pass. Client-secret command exits0 with no root .env / nothing to scan. Evidence and five screenshots: [NI-099 report](verification/ni-099/README.md).
+- **Coordinator review:** Actual native Chrome desktop inspection covers login/demo Home, editor, historical Intents charts and the final rebuilt Home. Found/fixed secondary-copy contrast on lavender (4.03→4.98:1), expanded the contrast gate, and fixed the existing research E2E's autosave revision-count race while retaining exact DB/export revision/hash checks and requiring full outage prose. Dedicated task agent implemented; root reviewed and verified. Independent second acceptance remains waived under the existing owner instruction.
+- **Local preview / limits:** Production-build local preview left running at http://127.0.0.1:55168 with saved historical archive/cohort imported into a disposable DB. This is not restored production state or a real-provider login/model completeness acceptance. No raw archive, credentials, local state, mobile work, backend/schema/collection changes, merge or deployment. Deliver the branch as a reviewable PR; owner controls merge.
+- **Completed at:** 2026-11-22T01:21:27+03:00

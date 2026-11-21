@@ -15,7 +15,7 @@
  * browser: every workspace sidebar destination must resolve while retaining
  * the cabinet (NI-080 now implements the former data/model aliases), and
  * the primary Continue link's foreground must come from the layered
- * `text-on-accent` utility, not from the global anchor rule.
+ * `text-on-action` utility, not from the global anchor rule.
  */
 import { expect, test } from "@playwright/test";
 
@@ -36,6 +36,7 @@ test("public surfaces: landing, research, methodology, data explorer, chart deta
   await page.goto(`${state.web_url}/`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expectNoSeriousViolations(page, "public / (landing)");
+  await page.screenshot({ path: test.info().outputPath("comic-lab-overview.png"), fullPage: true });
 
   await page.goto(`${state.web_url}/research`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -54,6 +55,7 @@ test("public surfaces: landing, research, methodology, data explorer, chart deta
   // DOM (table + accessible alternatives), not a fabricated stand-in.
   await expect(page.getByText(state.pin_value).first()).toBeVisible();
   await expectNoSeriousViolations(page, "public chart detail (resolved data)");
+  await page.screenshot({ path: test.info().outputPath("comic-lab-chart.png"), fullPage: true });
 
   await page.goto(`${state.web_url}/models`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -62,12 +64,14 @@ test("public surfaces: landing, research, methodology, data explorer, chart deta
   await page.goto(`${state.web_url}/login`);
   await expect(page.getByRole("textbox", { name: "Email", exact: true })).toBeVisible();
   await expectNoSeriousViolations(page, "auth /login");
+  await page.screenshot({ path: test.info().outputPath("comic-lab-login.png"), fullPage: true });
 });
 
 test("workspace surfaces: home, my research, saved charts (alice session)", async ({ page }) => {
   await signIn(page, state, "/workspace");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expectNoSeriousViolations(page, "workspace home");
+  await page.screenshot({ path: test.info().outputPath("comic-lab-workspace.png"), fullPage: true });
 
   await page.goto(`${state.web_url}/workspace/research`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -121,17 +125,17 @@ test("NI-024 regression: the primary Continue link foreground comes from the lay
   await signIn(page, state, "/workspace");
   const continueLink = page.getByRole("link", { name: /Continue research/ });
   await expect(continueLink).toBeVisible();
-  const onAccent = await page.evaluate(
-    () => getComputedStyle(document.documentElement).getPropertyValue("--color-on-accent"),
+  const onAction = await page.evaluate(
+    () => getComputedStyle(document.documentElement).getPropertyValue("--color-on-action"),
   );
   // The global anchor rule now sits in the base cascade layer, so the
-  // primary variant's text-on-accent utility wins (unlayered CSS used to
+  // primary variant's text-on-action utility wins (unlayered CSS used to
   // override every layer, which forced an inline-style workaround).
-  await expect(continueLink).toHaveCSS("color", hexToRgbString(onAccent));
+  await expect(continueLink).toHaveCSS("color", hexToRgbString(onAction));
   // The anchor keeps its default link affordance nowhere: the button styling
-  // also carries the accent background from the same layered utility set.
-  const accent = await page.evaluate(
-    () => getComputedStyle(document.documentElement).getPropertyValue("--color-accent"),
+  // also carries the mint action background from the same layered utility set.
+  const action = await page.evaluate(
+    () => getComputedStyle(document.documentElement).getPropertyValue("--color-action"),
   );
-  await expect(continueLink).toHaveCSS("background-color", hexToRgbString(accent));
+  await expect(continueLink).toHaveCSS("background-color", hexToRgbString(action));
 });

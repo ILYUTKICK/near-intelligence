@@ -233,3 +233,8 @@ NI-098; /root/ni067_review audits commands. Status/acceptance remain in TASKS.
 No application/SEO feature, new data collection or remote rollout is included.
 
 NI-098 follow-up15 November2026: root handles published-history audit and release record; /root/ni067_review implements the approved original-code MIT/third-party notices and public-clone README adjustments. No visibility mutation or research-data publication.
+
+
+## NI-099 — Comic Lab implementation
+
+Role A /root coordinates the owner-approved desktop redesign. The dedicated task agent owns apps/web code and bounded design documentation; root supplies canonical brand/font assets, claims/status, runtime/verification and GitHub delivery. Preserve current backend/metrics, editor schema, auth/ownership and immutable exports. Existing NI-080/088/092/093/095 claims remain assigned as recorded. The earlier independent-review waiver applies; actual coordinator checks remain mandatory. No mobile work, merge or deployment. Status lives only in TASKS.md.

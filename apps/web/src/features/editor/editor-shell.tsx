@@ -885,7 +885,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
         <section
           data-pane="outline-tablet"
           aria-label="Document outline"
-          className="rounded-surface border border-border bg-surface p-3 hidden md:block xl:hidden"
+          className="rounded-surface border-2 border-panel-border bg-surface p-3 hidden md:block xl:hidden"
         >
           <OutlinePane
             entries={outline}

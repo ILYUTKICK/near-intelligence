@@ -87,7 +87,7 @@ function ListContent({ ordered, items }: { ordered: boolean; items: ListItems })
 function ChartBlock({ block }: { block: Extract<ShareBlockPayload, { block_type: "liveChart" }> }) {
   const view = block.view;
   return (
-    <figure className="mt-6 rounded-surface border border-border p-5" data-testid="share-chart">
+    <figure className="mt-6 rounded-surface border-2 border-panel-border p-5" data-testid="share-chart">
       <ChartView definition={view.definition} selection={view.selection} view={view}
         mode="historical" height={320} />
       <figcaption className="mt-2 text-metadata leading-metadata text-text-secondary">
@@ -102,7 +102,7 @@ function ChartBlock({ block }: { block: Extract<ShareBlockPayload, { block_type:
 function DataTableBlock({ block }: { block: Extract<ShareBlockPayload, { block_type: "dataTable" }> }) {
   const rows = block.rows ?? [];
   return (
-    <figure className="mt-6 rounded-surface border border-border p-5" data-testid="share-table">
+    <figure className="mt-6 rounded-surface border-2 border-panel-border p-5" data-testid="share-table">
       <div role="region" aria-label="Shared data table" tabIndex={0}
         className="max-h-64 overflow-auto rounded-control border border-border">
         <table className="w-full border-collapse text-left tabular-nums">
@@ -146,7 +146,7 @@ function InsightBlock({ block }: { block: Extract<ShareBlockPayload, { block_typ
     ? `Chart evidence: definition ${block.context.chart_definition_version_id}, dataset ${block.context.dataset_version_id}, inspected ${formatUpdated(block.context.resolved_at)} UTC.`
     : `Model evidence: published run ${block.context.model_run_id} (specification ${block.context.specification_version}).`;
   return (
-    <section className="mt-6 rounded-surface border border-border p-5" data-testid="share-insight">
+    <section className="mt-6 rounded-surface border-2 border-panel-border p-5" data-testid="share-insight">
       <p className="eyebrow">{block.insight_type} · {block.classification}</p>
       <div className="mt-2"><BodyContent body={block.body} /></div>
       <p className="mt-2 text-metadata leading-metadata text-text-secondary">{contextLine}</p>
@@ -174,7 +174,7 @@ function EvidenceBlock({ block }: { block: Extract<ShareBlockPayload, { block_ty
 
 function RiskBlock({ block }: { block: Extract<ShareBlockPayload, { block_type: "risk" }> }) {
   return (
-    <section className="mt-6 rounded-surface border border-border border-s p-5" data-testid="share-risk">
+    <section className="mt-6 rounded-surface border-2 border-panel-border border-s p-5" data-testid="share-risk">
       <p className="eyebrow">Counterargument</p>
       <h3 className="font-serif text-heading leading-heading mt-1">{block.title}</h3>
       <div className="mt-2"><BodyContent body={block.body} /></div>
@@ -190,7 +190,7 @@ const coefficientColumns = [
 function ModelResultBlock({ block }: { block: Extract<ShareBlockPayload, { block_type: "modelResult" }> }) {
   const { limitations, sample, tolerances } = block;
   return (
-    <section className="mt-6 rounded-surface border border-border p-5">
+    <section className="mt-6 rounded-surface border-2 border-panel-border p-5">
       <h3 className="font-serif text-heading">Published model {block.spec_id} v{block.spec_version}</h3>
       <p className="mt-2 break-all text-metadata text-text-secondary">
         Run {block.model_run_id} · Pinned dataset {block.dataset_version_id}
@@ -254,7 +254,7 @@ function Block({ block }: { block: ShareBlockPayload }) {
       return <InsightBlock block={block} />;
     case "hypothesis":
       return (
-        <section className="mt-6 rounded-surface border border-border p-5" data-testid="share-hypothesis">
+        <section className="mt-6 rounded-surface border-2 border-panel-border p-5" data-testid="share-hypothesis">
           <p className="eyebrow">Hypothesis · {block.assessment}</p>
           <p className={`${textUi} mt-2 font-medium`}>{block.statement}</p>
         </section>

@@ -17,8 +17,8 @@ function NavLink({ item, active }: { item: (typeof publicNav)[number]; active: b
       href={item.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "inline-flex h-11 items-center border-b-2 border-transparent text-ui leading-ui",
-        active ? "border-accent font-medium text-accent" : "text-text-secondary hover:text-accent",
+        "inline-flex h-10 items-center rounded-control border-2 px-3 text-ui leading-ui",
+        active ? "border-panel-border bg-action font-semibold text-on-action" : "border-transparent text-text hover:bg-surface-muted",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
       )}
     >
@@ -36,10 +36,10 @@ export function PublicHeader() {
   const pathname = usePathname();
   const signIn = authNav[0];
   return (
-    <header className="border-b border-border bg-canvas">
-      <div className="mx-auto flex w-full max-w-(--width-content-max) items-center justify-between gap-4 px-(--page-gutter) py-4 md:py-6">
+    <header className="border-b-2 border-panel-border bg-surface">
+      <div className="mx-auto flex w-full max-w-(--width-content-max) items-center justify-between gap-4 px-(--page-gutter) py-3 md:py-3">
         <Brand />
-        <nav aria-label="Primary" className="hidden items-center gap-4 md:flex lg:gap-7">
+        <nav aria-label="Primary" className="hidden items-center gap-1 md:flex lg:gap-2">
           {publicNav.map((item) => (
             <NavLink
               key={item.href}

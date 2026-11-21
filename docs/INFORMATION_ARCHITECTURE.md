@@ -50,6 +50,7 @@ The public header highlights Data on the explorer and chart library routes, and 
 | Workspace | Home | `/workspace` | P0 |
 | Workspace | My Research | `/workspace/research` | P0 |
 | Workspace | Saved Charts | `/workspace/saved-charts` | P0 |
+| Workspace | Chart library | `/workspace/charts` | P0, direct catalog entry (NI-099) |
 | Data Explorer | Network Activity | `/workspace/data/network` | P0, show availability |
 | Data Explorer | Intents & Adoption | `/workspace/data/intents` | P0 |
 | Data Explorer | Revenue & Fees | `/workspace/data/revenue` | P0 |

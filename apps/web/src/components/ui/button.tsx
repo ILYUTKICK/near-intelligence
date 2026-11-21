@@ -18,8 +18,8 @@ import { cn } from "@/lib/utils";
  */
 const buttonVariants = cva(
   cn(
-    "press-feedback inline-flex items-center justify-center gap-2 rounded-full border",
-    "font-ui text-ui leading-ui font-medium select-none",
+    "press-feedback inline-flex items-center justify-center gap-2 rounded-control border-2",
+    "font-ui text-ui leading-ui font-semibold select-none",
     "h-11 min-w-11 px-4",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
     "disabled:pointer-events-none",
@@ -33,11 +33,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "border-transparent bg-accent text-on-accent hover:bg-accent-hover",
+        primary: "border-panel-border bg-action text-on-action shadow-[3px_3px_0_var(--color-panel-border)] hover:bg-action-hover",
         secondary:
           "border-control-border bg-surface text-text hover:bg-surface-muted",
         quiet: "border-transparent bg-transparent text-text hover:bg-surface-muted",
-        destructive: "border-transparent bg-danger text-on-accent hover:bg-danger/90",
+        destructive: "border-danger bg-danger text-on-accent hover:bg-danger/90",
       },
       block: {
         true: "w-full",

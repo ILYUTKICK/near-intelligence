@@ -11,14 +11,14 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <header className="self-center">
         <Brand />
         <div className="mt-9 hidden md:block">
-          <p className="eyebrow">A calmer place to think</p>
+          <p className="eyebrow">Your research workspace</p>
           <p className="mt-3 font-serif text-page font-medium tracking-tight">
-            Your evidence.<br />Your research.<br /><em className="text-accent">Your conviction.</em>
+            Your evidence.<br />Your research.<br /><span className="text-accent">Your thesis.</span>
           </p>
           <p className="mt-4 max-w-[33ch] text-ui text-text-secondary">
             Bring charts, sources and observations together in a private research workspace.
           </p>
-          <ResearchIllustration eager className="editorial-art mt-6 aspect-[1.45] w-full max-w-[22rem] rounded-surface object-cover object-bottom" />
+          <ResearchIllustration eager className="paper-panel mt-6 h-auto w-full max-w-[20rem] bg-surface p-4 object-contain" />
         </div>
       </header>
       <main id="main-content" className="paper-panel w-full self-center p-6 sm:p-9">

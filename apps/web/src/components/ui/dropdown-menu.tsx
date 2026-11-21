@@ -26,7 +26,7 @@ export function DropdownMenuContent({
         sideOffset={sideOffset}
         className={cn(
           "z-50 min-w-48 p-1",
-          "rounded-control border border-border bg-surface",
+          "rounded-control border-2 border-panel-border bg-surface",
           "shadow-[var(--shadow-overlay)]",
           className,
         )}

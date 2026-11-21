@@ -1,28 +1,36 @@
 /*
- * Design tokens for the NI-074 desktop direction. Semantic names remain
+ * NI-099 Comic Lab tokens for the owner-approved desktop direction. Semantic names remain
  * shared by Tailwind, interaction primitives and chart rendering.
  */
 
 :root {
   /* --- color.canvas --- */
-  --color-canvas: #f8f6ee; /* main warm ivory background */
-  --color-surface: #fffdfa; /* reading paper, cards, dialogs */
-  --color-surface-muted: #f0ede5; /* quiet neutral fill */
-  --color-text: #132c41; /* primary navy typography */
-  --color-text-secondary: #596b75; /* secondary descriptions, metadata */
-  --color-accent: #1c5b41; /* primary action, links, chart series 1 */
-  --color-accent-hover: #154632; /* hover/pressed action */
-  --color-sage: #e7efdd; /* highlight fill only; dark text above */
-  --color-border: #e7e1d6; /* decorative border; never sole control boundary */
-  --color-control-border: #79877c; /* input boundaries on light surfaces */
-  --color-focus: #285f9a; /* focus ring, >=2px plus offset */
+  --color-canvas: #fffdf6; /* main warm ivory background */
+  --color-surface: #ffffff; /* reading paper, cards, dialogs */
+  --color-surface-muted: #eef5ef; /* quiet neutral fill */
+  --color-text: #10231c; /* primary ink typography */
+  --color-text-secondary: #46594f; /* secondary descriptions, metadata */
+  --color-accent: #006e4e; /* accessible dark links and text accents */
+  --color-accent-hover: #00553d; /* hover/pressed action */
+  --color-sage: #c9fae7; /* highlight fill only; dark text above */
+  --color-border: #cad8cf; /* decorative border; never sole control boundary */
+  --color-control-border: #10231c; /* input boundaries on light surfaces */
+  --color-focus: #007b58; /* focus ring, >=2px plus offset */
   --color-warning: #8a5c2b; /* stale/partial text with pale background */
   --color-danger: #973e36; /* errors and opposing evidence, always with label/icon */
   --color-chart-2: #3a6684; /* distinguishable secondary series */
   --color-chart-3: #99662d;
   --color-chart-4: #86657e;
-  --color-on-accent: #fffdfa; /* text on primary action fills */
+  --color-on-accent: #ffffff; /* text on existing dark accent/danger fills */
   --color-info-surface: #e8eef2;
+
+  /* Mint is an action fill, never small text on paper. */
+  --color-action: #00e5a0;
+  --color-action-hover: #00d393;
+  --color-on-action: #10231c;
+  --color-yellow: #ffe27a;
+  --color-lavender: #dacbff;
+  --color-panel-border: #10231c;
 
   /* --- spacing scale (px) --- */
   --space-1: 4px;
@@ -36,12 +44,12 @@
   --space-24: 96px;
 
   /* --- radius and elevation --- */
-  --radius-surface: 22px;
-  --radius-control: 10px;
-  --radius-dialog: 24px;
-  --border-width: 1px;
-  --shadow-panel: 0 14px 38px -28px #5e4b2f66;
-  --shadow-overlay: 0 20px 64px -24px #132c414d;
+  --radius-surface: 16px;
+  --radius-control: 12px;
+  --radius-dialog: 20px;
+  --border-width: 2px;
+  --shadow-panel: 4px 4px 0 #10231c;
+  --shadow-overlay: 6px 6px 0 #10231c;
 
   /* --- focus --- */
   --focus-ring-width: 2px;
@@ -53,8 +61,10 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
   /* --- typography families (fonts self-hosted via next/font in layout.tsx) --- */
-  --font-serif: var(--font-newsreader, "Newsreader"), Georgia, "Times New Roman", serif;
-  --font-sans: var(--font-inter, "Inter"), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-rubik, "Rubik"), system-ui, sans-serif;
+  --font-serif: var(--font-display); /* legacy heading utility, now Rubik */
+  --font-sans: var(--font-golos, "Golos Text"), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-plex-mono, "IBM Plex Mono"), ui-monospace, monospace;
 
   /* --- type scale: size/leading per DESIGN_SYSTEM.md; phone values in the
      media query below. Hero 64/68 desktop, 40/44 phone. --- */
@@ -78,7 +88,7 @@
   /* --- layout widths --- */
   --width-content-max: 1280px; /* desktop max */
   --width-prose: 72ch; /* public prose reading width 68-74ch */
-  --width-sidebar: 216px;
+  --width-sidebar: 234px;
   --width-editor-outline: 154px;
   --width-editor-tools: 236px;
   --page-gutter: clamp(1rem, 3.125vw, 2.5rem);
@@ -123,19 +133,19 @@ body {
   h1 {
     font-size: var(--text-hero-size);
     line-height: var(--text-hero-leading);
-    font-weight: 500;
+    font-weight: 700;
   }
 
   h2 {
     font-size: var(--text-title-size);
     line-height: var(--text-title-leading);
-    font-weight: 500;
+    font-weight: 700;
   }
 
   h3 {
     font-size: var(--text-heading-size);
     line-height: var(--text-heading-leading);
-    font-weight: 500;
+    font-weight: 700;
   }
 
   /* Let button and navigation utilities override the default link color. */
@@ -153,6 +163,7 @@ body {
 
 /* Tabular lining numerals for metrics/tables. */
 .tabular-nums {
+  font-family: var(--font-mono);
   font-variant-numeric: lining-nums tabular-nums;
 }
 

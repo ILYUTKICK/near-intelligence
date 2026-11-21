@@ -42,9 +42,9 @@ export default function HomePage() {
   return <div className="page-container">
     <section aria-labelledby="overview-heading" className="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-12">
       <div>
-        <p className="eyebrow">Independent research · NEAR ecosystem</p>
-        <h1 id="overview-heading" className="mt-6 font-serif text-[clamp(3rem,4.5vw,4.25rem)] leading-[1.02] tracking-[-0.045em]">
-          Understand NEAR.<br /><em className="text-accent">Build your own thesis.</em>
+        <p className="comic-tag bg-yellow">Independent research · NEAR ecosystem</p>
+        <h1 id="overview-heading" className="mt-6 font-serif text-[clamp(3rem,4.5vw,4.25rem)] leading-[1.08] font-bold tracking-[-0.035em]">
+          Understand NEAR.<br /><span>Build your own thesis.</span>
         </h1>
         <p className="mt-6 max-w-[39ch] text-body leading-body text-text-secondary lg:text-[1.25rem] lg:leading-[1.5]">Original research, interactive data and the evidence behind every conclusion.</p>
         <div className="mt-8 flex flex-wrap gap-3">
@@ -68,7 +68,7 @@ export default function HomePage() {
       <h2 id="evidence-heading" className={sectionHeading}>Explore the evidence.</h2>
       <p className="mt-3 text-body leading-body text-text-secondary">Follow the activity, fees and token flows behind the research.</p>
       <ul aria-label="Data exploration directions" className="mt-7 grid gap-4 lg:grid-cols-3">
-        {dataDirections.map((direction) => <li key={direction.href} className="rounded-surface border border-border p-6 lg:p-7">
+        {dataDirections.map((direction) => <li key={direction.href} className="paper-panel p-6 lg:p-7">
           <ProductIcon name={direction.icon} className="size-8 text-accent" />
           <h3 className="mt-5 font-serif text-heading leading-heading">{direction.title}</h3>
           <p className="mt-3 max-w-[36ch] text-ui leading-ui text-text-secondary">{direction.description}</p>
@@ -102,10 +102,10 @@ export default function HomePage() {
       </div>
     </section>
 
-    <section aria-labelledby="workspace-heading" className="mt-6 rounded-surface bg-accent px-7 py-10 text-center text-on-accent lg:py-12">
-      <h2 id="workspace-heading" className="font-serif text-title leading-title text-on-accent lg:text-[2.75rem] lg:leading-[1.08]">Make the research your own.</h2>
+    <section aria-labelledby="workspace-heading" className="paper-panel mt-6 bg-action px-7 py-10 text-center text-on-action lg:py-12">
+      <h2 id="workspace-heading" className="font-serif text-title leading-title text-on-action lg:text-[2.75rem] lg:leading-[1.08]">Make the research your own.</h2>
       <p className="mt-3 text-ui leading-ui">Save charts, add notes and build a thesis you can trace.</p>
-      <Button asChild className="mt-6 border-transparent bg-surface text-accent hover:bg-sage focus-visible:outline-on-accent"><Link href="/workspace">Open workspace <ProductIcon name="arrow" /></Link></Button>
+      <Button asChild className="mt-6 bg-surface text-text hover:bg-surface-muted"><Link href="/workspace">Open workspace <ProductIcon name="arrow" /></Link></Button>
     </section>
   </div>;
 }

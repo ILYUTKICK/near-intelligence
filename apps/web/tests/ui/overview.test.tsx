@@ -55,7 +55,7 @@ describe("Approved editorial Overview", () => {
     expect(container.textContent).not.toMatch(/Selected approved metrics|Latest approved observation|\bDATA_NOT_READY\b|observed_near_purchases|treasury_payouts_near|provider_gross_fees_usd|document_id|owner_id|Bearer|\d+%/);
     expect(screen.queryByText(/^Live$/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open workspace" })).toHaveAttribute("href", "/workspace");
-    expect(screen.getByRole("link", { name: "Open workspace" })).toHaveClass("focus-visible:outline-on-accent");
+    expect(screen.getByRole("link", { name: "Open workspace" })).toHaveClass("focus-visible:outline-focus");
   });
 
   it("uses decorative prioritized artwork rather than a baked-in screenshot or financial chart", () => {
@@ -64,9 +64,9 @@ describe("Approved editorial Overview", () => {
     expect(image).toHaveAttribute("alt", "");
     expect(image).toHaveAttribute("loading", "eager");
     expect(image).toHaveAttribute("fetchpriority", "high");
-    expect(image?.getAttribute("src")).toContain("overview-research-desk.png");
-    expect(image).toHaveAttribute("width", "1254");
-    expect(image).toHaveAttribute("height", "1254");
+    expect(image?.getAttribute("src")).toContain("trace-approved.png");
+    expect(image).toHaveAttribute("width", "1312");
+    expect(image).toHaveAttribute("height", "1199");
   });
 
   it("supports keyboard action order and passes the accessibility tree check", async () => {

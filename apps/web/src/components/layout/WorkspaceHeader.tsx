@@ -24,10 +24,10 @@ export function WorkspaceHeader() {
   }
 
   return (
-    <header className="mx-(--page-gutter) flex min-h-19 flex-wrap items-center justify-between gap-2 border-b border-border py-3">
+    <header className="px-(--page-gutter) flex min-h-20 flex-wrap items-center justify-between gap-2 border-b-2 border-panel-border bg-surface py-3">
       <Breadcrumbs label="Workspace breadcrumb" items={[{ label: "Workspace", href: "/workspace" }, { label }]} />
       <div className="flex flex-wrap items-center gap-2">
-        <span className="hidden text-metadata text-text-secondary lg:inline">Private workspace</span>
+        <span className="comic-tag hidden bg-surface-muted lg:inline-flex">Private workspace</span>
         <Button asChild variant="secondary" className="px-0">
           <Link href="/methodology#sources" aria-label="Source documentation">
             <ProductIcon name="book" className="size-[18px]" />

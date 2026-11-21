@@ -3,26 +3,22 @@ import type { ReactNode } from "react";
 import localFont from "next/font/local";
 import "@/styles/globals.css";
 
-// Self-hosted variable fonts (SIL OFL 1.1) — see src/styles/fonts/LICENSE-NOTES.md.
-// next/font/local serves them same-origin with automatic fallback-metric
-// adjustment; no external font service is contacted at runtime.
-const newsreader = localFont({
+// NI-099: approved Comic Lab families, served same-origin. See font licenses.
+const rubik = localFont({
   src: [
-    { path: "../styles/fonts/Newsreader-Variable.woff2", style: "normal" },
-    { path: "../styles/fonts/Newsreader-Italic-Variable.woff2", style: "italic" },
-  ],
-  weight: "200 800",
-  display: "swap",
-  variable: "--font-newsreader",
-  fallback: ["Georgia", "Times New Roman", "serif"],
+    { path: "../styles/fonts/Rubik-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../styles/fonts/Rubik-Bold.woff2", weight: "700", style: "normal" },
+  ], display: "swap", variable: "--font-rubik", fallback: ["system-ui", "sans-serif"],
 });
-
-const inter = localFont({
-  src: [{ path: "../styles/fonts/Inter-Variable.woff2", style: "normal" }],
-  weight: "100 900",
-  display: "swap",
-  variable: "--font-inter",
-  fallback: ["system-ui", "Segoe UI", "sans-serif"],
+const golos = localFont({
+  src: [
+    { path: "../styles/fonts/GolosText-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../styles/fonts/GolosText-Bold.woff2", weight: "700", style: "normal" },
+  ], display: "swap", variable: "--font-golos", fallback: ["system-ui", "sans-serif"],
+});
+const plexMono = localFont({
+  src: [{ path: "../styles/fonts/IBMPlexMono-Medium.woff2", weight: "500", style: "normal" }],
+  display: "swap", variable: "--font-plex-mono", fallback: ["monospace"],
 });
 
 export const metadata: Metadata = {
@@ -31,9 +27,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en" className={`${newsreader.variable} ${inter.variable}`}>
-      <body>{children}</body>
-    </html>
-  );
+  return <html lang="en" className={`${rubik.variable} ${golos.variable} ${plexMono.variable}`}>
+    <body>{children}</body>
+  </html>;
 }

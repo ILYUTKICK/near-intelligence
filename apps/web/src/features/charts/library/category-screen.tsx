@@ -88,7 +88,7 @@ export async function DataCategoryScreen({
       <PageIntro className="mt-5" eyebrow="Data explorer" title={explorer.label} description={explorer.question} />
 
       {dropped.length > 0 ? (
-        <div role="status" className="mt-4 rounded-surface border border-border bg-surface-muted p-4 max-w-prose">
+        <div role="status" className="mt-4 rounded-surface border-2 border-panel-border bg-surface-muted p-4 max-w-prose">
           <p className="font-ui text-ui leading-ui font-medium">
             Some URL parameters were not used — the catalog request carries only supported fields.
           </p>

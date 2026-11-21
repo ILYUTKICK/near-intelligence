@@ -35,7 +35,7 @@ export const metadata: Metadata = { title: "Research — NEAR Intelligence" };
 
 const sectionClasses = "mt-12 min-w-0 scroll-mt-8 border-t border-border pt-7";
 const h2Classes = "max-w-[28ch] font-serif text-title leading-title";
-const bodyClasses = "mt-3 max-w-[62ch] font-serif text-[1.25rem] leading-[1.5]";
+const bodyClasses = "mt-3 max-w-[62ch] font-sans text-[1.25rem] leading-[1.5]";
 const listClasses = `${bodyClasses} list-disc space-y-2 pl-5`;
 const linkClasses =
   "text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
@@ -357,7 +357,7 @@ function ThesisBody() {
         <p className={bodyClasses}>{scenarios.intro}</p>
         <ol className="mt-4 flex flex-col gap-3 max-w-(--width-prose)">
           {scenarios.cases.map((scenario) => (
-            <li key={scenario.id} className="rounded-surface border border-border bg-surface p-4">
+            <li key={scenario.id} className="rounded-surface border-2 border-panel-border bg-surface p-4">
               <p className="font-ui text-ui leading-ui text-text font-medium">{scenario.title}</p>
               <p className="text-body leading-body text-text-secondary mt-1">{scenario.body}</p>
             </li>
@@ -425,7 +425,7 @@ export default function ResearchPage() {
           {thesis.title}<br /><em className="text-accent">{thesis.emphasis}</em>
         </h1>
         <div className="mt-4 flex flex-wrap items-end justify-between gap-5">
-          <p className="max-w-[47ch] font-serif text-[clamp(1.35rem,2.6vw,1.625rem)] leading-[1.25]">{thesis.standfirst}</p>
+          <p className="max-w-[47ch] font-sans text-[clamp(1.35rem,2.6vw,1.625rem)] leading-[1.25]">{thesis.standfirst}</p>
           <p className="border-l border-border pl-4 text-ui text-text-secondary">
             Observation window<br />
             <strong className="text-text">6 Aug–3 Nov 2026 UTC</strong><br />

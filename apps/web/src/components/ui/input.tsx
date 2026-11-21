@@ -25,7 +25,7 @@ export function Input({ className, error, id, ...props }: InputProps) {
       <input
         id={inputId}
         className={cn(
-          "h-11 w-full rounded-control border bg-surface px-3",
+          "h-11 w-full rounded-control border-2 bg-surface px-3",
           "text-base text-text placeholder:text-text-secondary",
           "border-control-border",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",

@@ -21,7 +21,7 @@ that every dependency has the same license.
 
 ## Bundled fonts
 
-The application includes Inter and Newsreader font files under the SIL Open
+The application includes Rubik, Golos Text, IBM Plex Mono and retained Inter/Newsreader files under the SIL Open
 Font License, Version 1.1. The full license texts and copyright notices are
 retained beside the font files:
 
@@ -29,6 +29,9 @@ retained beside the font files:
 | --- | --- | --- |
 | Inter | Copyright 2020 The Inter Project Authors | [OFL-Inter.txt](apps/web/src/styles/fonts/OFL-Inter.txt) |
 | Newsreader | Copyright 2020 The Newsreader Project Authors | [OFL-Newsreader.txt](apps/web/src/styles/fonts/OFL-Newsreader.txt) |
+| Rubik | Copyright 2015 The Rubik Project Authors (https://github.com/googlefonts/rubik) | [rubik-OFL.txt](apps/web/src/styles/fonts/rubik-OFL.txt) |
+| Golos Text | Copyright 2019 The Golos Text Project Authors (https://github.com/googlefonts/golos-text) | [golostext-OFL.txt](apps/web/src/styles/fonts/golostext-OFL.txt) |
+| IBM Plex Mono | Copyright © 2017 IBM Corp. with Reserved Font Name "Plex" | [ibmplexmono-OFL.txt](apps/web/src/styles/fonts/ibmplexmono-OFL.txt) |
 
 See [font provenance and conversion notes](apps/web/src/styles/fonts/LICENSE-NOTES.md).
 These fonts remain under OFL 1.1; the project's MIT License does not supersede it.
@@ -56,6 +59,7 @@ capture provenance describes how an asset was made; it is not a replacement for
 any rights review needed for a particular reuse.
 
 Available provenance includes the
+[owner-approved Comic Lab brand assets](apps/web/public/brand/README.md), the
 [Overview artwork record](docs/verification/ni-086/ASSETS.md),
 [generated concept notes](product-plan/near-intelligence-v1/README.md) and
 [synthetic application screenshot record](docs/verification/ni-075/README.md).

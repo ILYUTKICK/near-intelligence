@@ -199,6 +199,7 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 | 87 | [NI-068](docs/TASKS.md) | Verify backups, restore and operational monitoring | P0 | A |
 | 88 | [NI-069](docs/TASKS.md) | Run hackathon demo and reviewer reproduction | P0 | A |
 | 89 | [NI-098](docs/TASKS.md) | Explain the product and document reproducible self-hosting | P0 | A |
+| 90 | [NI-099](docs/TASKS.md) | Implement the approved Comic Lab desktop identity | P1 | A |
 
 ## 9. Изменение самого плана
 
@@ -264,3 +265,8 @@ NI-089 (role A), requested by the owner: restore the current Blog/Overview exper
 **Owner request — 14 November2026, README and self-hosting:** NI-098 rewrites the reader-facing product overview and documents a complete reproducible local/own-domain deployment using existing packaging. Accurately describe authoring, curated public publication and search/AI discoverability intent; do not invent an AI thesis generator, guaranteed indexing, public data bundle or a new deployment capability. Documentation may proceed directly after its DONE dependencies; no remote rollout or new collection is authorized.
 
 **Owner follow-up — 15 November2026, public-release preparation:** NI-098 includes public-clone onboarding, original-code MIT licensing (explicitly approved), preserved third-party/data rights and bounded review of tracked content and published Git history. Official https://nearhackathon.com/HACKATHON.md Q-014 requires LICENSE and permits MIT. Prepare a reviewable release; do not change repository visibility, publish excluded data, rewrite history or submit an application without the applicable explicit instruction.
+
+
+## 11. Owner Comic Lab redesign — 22 November 2026
+
+The owner explicitly commissions NI-099: implement the approved Comic Lab identity, canonical graph logo and TRACE across the existing desktop application locally, verify it, and deliver a GitHub feature PR. This supersedes previous appearance-preservation instructions only for the requested redesign. The existing data, auth/ownership, editor schema, revision pins and export contracts remain in force. NI-075/086/064 are prerequisites, with the sole status/claim in TASKS.md. Other claims remain untouched. No merge, deployment, mobile work or new collection is requested.

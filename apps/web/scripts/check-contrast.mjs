@@ -40,6 +40,12 @@ const LARGE_OR_BOUNDARY = 3.0;
 
 /** [foreground, background, target, role description] */
 const pairs = [
+  ["on-action", "action", TEXT, "dark label on mint action"],
+  ["on-action", "action-hover", TEXT, "dark label on mint hover"],
+  ["text-secondary", "yellow", TEXT, "secondary copy on yellow note"],
+  ["text-secondary", "lavender", TEXT, "secondary copy on lavender note"],
+  ["text", "yellow", TEXT, "ink on yellow note"],
+  ["text", "lavender", TEXT, "ink on lavender note"],
   ["text", "canvas", TEXT, "primary text on ivory canvas"],
   ["text", "surface", TEXT, "primary text on reading paper"],
   ["text", "surface-muted", TEXT, "primary text on quiet surface"],

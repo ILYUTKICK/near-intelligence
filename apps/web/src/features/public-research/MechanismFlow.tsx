@@ -20,7 +20,7 @@ export function MechanismFlow() {
           <li
             key={stage.id}
             id={stage.id}
-            className="rounded-surface border border-border bg-surface p-4"
+            className="rounded-surface border-2 border-panel-border bg-surface p-4"
           >
             <p className="font-ui text-ui leading-ui text-text-secondary flex items-baseline gap-2">
               <span aria-hidden="true" className="font-medium">

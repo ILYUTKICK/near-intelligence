@@ -20,3 +20,10 @@ bundled license files, retained here unchanged). Reserved font names
 CSS variables: `--font-serif` (Newsreader — editorial hero/research titles),
 `--font-sans` (Inter — app UI), with Georgia/system-ui fallbacks declared in
 [tokens.css](../tokens.css).
+
+
+## Comic Lab fonts — NI-099
+
+Rubik (regular/bold), Golos Text (regular/bold), and IBM Plex Mono (medium) are self-hosted WOFF2 conversions of the Google Fonts files used in the owner-approved Comic Lab guide. Conversion uses FontTools without changing glyph designs. Original SIL Open Font License texts and copyright notices are retained in rubik-OFL.txt, golostext-OFL.txt, and ibmplexmono-OFL.txt.
+
+Official sources: https://github.com/google/fonts/tree/main/ofl/rubik · https://github.com/google/fonts/tree/main/ofl/golostext · https://github.com/google/fonts/tree/main/ofl/ibmplexmono.

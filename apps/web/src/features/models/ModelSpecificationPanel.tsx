@@ -25,7 +25,7 @@ export function ModelSpecificationPanel({
     <section aria-labelledby="model-specification-heading" className="mt-10 max-w-prose">
       <h2 id="model-specification-heading">Specification and readiness</h2>
       {definition !== null ? (
-        <div className="mt-4 rounded-surface border border-border bg-surface-muted p-6">
+        <div className="mt-4 rounded-surface border-2 border-panel-border bg-surface-muted p-6">
           <h3 className="text-base">Public model definition (v{definition.version})</h3>
           <p className="mt-2 font-ui text-ui leading-ui font-medium">
             Mechanically composed question — a fixed template over the specification&rsquo;s
@@ -60,7 +60,7 @@ export function ModelSpecificationPanel({
           />
         </div>
       ) : (
-        <div role="status" className="mt-4 rounded-surface border border-border bg-surface-muted p-4">
+        <div role="status" className="mt-4 rounded-surface border-2 border-panel-border bg-surface-muted p-4">
           <p className="text-ui leading-ui text-text-secondary">
             The public model definition could not be resolved for this run&rsquo;s specification
             right now. Nothing is paraphrased in its place.
@@ -69,7 +69,7 @@ export function ModelSpecificationPanel({
       )}
 
       {readiness !== null ? (
-        <div className="mt-6 rounded-surface border border-border bg-surface-muted p-6">
+        <div className="mt-6 rounded-surface border-2 border-panel-border bg-surface-muted p-6">
           <h3 className="text-base">Recorded readiness (NI-051 gate verdict)</h3>
           {readiness.ready ? (
             <p className="mt-2 font-ui text-ui leading-ui font-medium text-text">
@@ -107,7 +107,7 @@ export function ModelSpecificationPanel({
           ) : null}
         </div>
       ) : (
-        <div role="status" className="mt-6 rounded-surface border border-border bg-surface-muted p-4">
+        <div role="status" className="mt-6 rounded-surface border-2 border-panel-border bg-surface-muted p-4">
           <p className="text-ui leading-ui text-text-secondary">
             The recorded readiness verdict could not be resolved for this specification right
             now. A verdict is never guessed here.
@@ -148,7 +148,7 @@ export function VerbatimBlock({ label, value }: { label: string; value: unknown 
       <figcaption className="font-ui text-ui leading-ui font-medium text-text-secondary">
         {label}
       </figcaption>
-      <pre className="mt-2 overflow-x-auto rounded-surface border border-border bg-surface p-4 text-ui leading-ui font-mono">
+      <pre className="mt-2 overflow-x-auto rounded-surface border-2 border-panel-border bg-surface p-4 text-ui leading-ui font-mono">
         <code>{recordedJson(value)}</code>
       </pre>
     </figure>

@@ -8,7 +8,7 @@ import Link from "next/link";
 export default function ChartNotFound() {
   return (
     <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-      <div className="rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
+      <div className="rounded-surface border-2 border-panel-border bg-surface-muted p-6 max-w-prose">
         <h1>Chart not found</h1>
         <p className="text-body leading-body text-text-secondary mt-2">
           This chart, or the definition version pinned in the URL, is not registered. The link

@@ -79,7 +79,7 @@ export async function DataExplorerScreen({
       />
 
       {dropped.length > 0 ? (
-        <div role="status" className="mt-4 rounded-surface border border-border bg-surface-muted p-4 max-w-prose">
+        <div role="status" className="mt-4 rounded-surface border-2 border-panel-border bg-surface-muted p-4 max-w-prose">
           <p className="font-ui text-ui leading-ui font-medium">
             Some URL parameters were not used — this page carries no parameters.
           </p>

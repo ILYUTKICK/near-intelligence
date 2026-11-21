@@ -43,6 +43,7 @@ describe("Route registry", () => {
       "Home",
       "My Research",
       "Saved Charts",
+      "Chart library",
       "Network Activity",
       "Intents & Adoption",
       "Revenue & Fees",
@@ -77,6 +78,7 @@ describe("Route registry", () => {
       "/workspace/data/network", "/workspace/data/intents", "/workspace/data/revenue",
       "/workspace/data/token-economics", "/workspace/data/ecosystem",
     ]);
+    expect(workspaceNav.find((item) => item.label === "Chart library")?.href).toBe("/workspace/charts");
     expect(workspaceNav.find((item) => item.label === "Econometric Models")?.href).toBe("/workspace/models");
   });
 });
