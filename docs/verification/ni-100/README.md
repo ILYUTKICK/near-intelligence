@@ -82,6 +82,13 @@ uv run --project apps/api --frozen --offline python scripts/run-db-tests.py \
 
 Runtime data/services, metrics, editor schema, ownership, pins and frozen render/export palette are untouched; only the landing HTTP test's owned copy expectations change in the API tree. No new dependency, generated media, mobile adaptation, deployment or merge. Existing model/production-data/remote-provider acceptance belongs to its original tasks. Independent review skipped by user instruction 2026-11-09; root performed acceptance after the dedicated task agent's implementation.
 
-Code/test digest relative to 6fd643c (sorted changed apps/web and apps/api/tests paths and bytes): `379e6fe4485d898767fe8f4e950059d18cec5d8fddba8087d4bd5afecb09e555`.
+Code/test digest relative to 6fd643c (sorted changed apps/web and apps/api/tests paths and bytes): `83715d0b580e86ab85d4819db77653bef347d1cf04c24e6963125583923c04a3`.
 
 Final documentation check: 1,108 relative links resolve; whitespace check passes.
+
+
+## CI test-harness follow-up
+
+On 0d60e3a, API, database and the complete browser CI passed. Web CI found one race in the existing Home loading/error/retry test: the loading DOM can appear before its effect assigns the controlled request resolver. The test now waits for the request resolver to exist before returning 503. Its loading, error, retry and nonfabrication assertions remain; no runtime behavior changed and no timeout was increased.
+
+The Home file passes 10 tests; a targeted Home/model-result/thesis run passes 45 tests across 3 files in 13.31s. Strict TS and targeted ESLint pass. A repeated full local run had four failures plus jsdom selection-geometry errors in two unchanged model/thesis files, including 5s time limits; those same tests passed in the isolated run. The initial full 682 pass, production build and full 25-case desktop acceptance above still apply to the unchanged runtime. Final-head CI remains the delivery gate and is reported on the PR rather than replacing failures with claimed passes.
