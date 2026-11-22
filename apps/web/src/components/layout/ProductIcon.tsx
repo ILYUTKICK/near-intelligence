@@ -13,6 +13,8 @@ const paths = {
   arrow: "M2.75 8h10.5m-4-4 4 4-4 4",
   shield: "M8 1.75 14 4v4.1c0 3.4-3.8 5.5-6 6.15-2.2-.65-6-2.75-6-6.15V4Zm-2.5 6.5 1.75 1.7 3.25-3.5",
   document: "M3.25 1.75h6.5l3 3v9.5h-9.5zm6.5 0V5h3M5.5 8h5m-5 2.75h5",
+  check: "m3 8 3 3 7-7",
+  circle: "M14 8a6 6 0 1 0-12 0 6 6 0 0 0 12 0Z",
 } as const;
 
 export type ProductIconName = keyof typeof paths;

@@ -238,3 +238,8 @@ NI-098 follow-up15 November2026: root handles published-history audit and releas
 ## NI-099 — Comic Lab implementation
 
 Role A /root coordinates the owner-approved desktop redesign. The dedicated task agent owns apps/web code and bounded design documentation; root supplies canonical brand/font assets, claims/status, runtime/verification and GitHub delivery. Preserve current backend/metrics, editor schema, auth/ownership and immutable exports. Existing NI-080/088/092/093/095 claims remain assigned as recorded. The earlier independent-review waiver applies; actual coordinator checks remain mandatory. No mobile work, merge or deployment. Status lives only in TASKS.md.
+
+
+## NI-100 — Unslop polish
+
+Role A /root coordinates the explicitly requested Unslop pass using the already-approved Comic Lab direction. Dedicated task agent /root/ni100_unslop owns bounded web/styles/tests/design-doc edits; root owns audit, registry, runtime, acceptance and the existing PR105. Preserve all product/data/auth/export contracts, canonical brand and section order. No generated media, mobile work, merge or deployment. Sole status/claim in TASKS.md; independent review waiver remains.

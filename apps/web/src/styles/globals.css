@@ -103,6 +103,16 @@
   background: var(--color-surface);
 }
 
+/* Workspace titles name a working context, rather than acting as a landing
+   headline. Preserve the public display scale and the editor paper scale. */
+@media (min-width: 768px) {
+  .workspace-main .page-intro-title {
+    font-size: 36px;
+    line-height: 42px;
+    letter-spacing: -0.02em;
+  }
+}
+
 button.press-feedback:disabled:not([aria-busy="true"]) {
   background: var(--color-surface-muted);
   border-color: var(--color-control-border);

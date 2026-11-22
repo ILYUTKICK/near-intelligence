@@ -18,7 +18,7 @@ function NavLink({ item, active }: { item: (typeof publicNav)[number]; active: b
       aria-current={active ? "page" : undefined}
       className={cn(
         "inline-flex h-10 items-center rounded-control border-2 px-3 text-ui leading-ui",
-        active ? "border-panel-border bg-action font-semibold text-on-action" : "border-transparent text-text hover:bg-surface-muted",
+        active ? "border-transparent bg-surface-muted font-semibold text-text" : "border-transparent text-text hover:bg-surface-muted",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
       )}
     >

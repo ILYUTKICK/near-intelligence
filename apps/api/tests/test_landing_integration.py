@@ -165,10 +165,10 @@ class LandingIntegrationTests(unittest.TestCase):
     def assert_editorial_overview(self, parsed: LandingHTML):
         self.assertIn("Understand NEAR.", parsed.visible)
         self.assertIn("Build your own thesis.", parsed.visible)
-        self.assertIn("The research, in focus.", parsed.visible)
+        self.assertIn("The research, in focus", parsed.visible)
         self.assertEqual(parsed.visible.count("Can Intents create lasting value for NEAR?"), 1)
         for label in ("Intents activity", "Revenue & fees", "Token economics",
-                      "Sources first. Assumptions visible.", "Make the research your own."):
+                      "Sources first. Assumptions visible", "Make the research your own"):
             self.assertIn(label, parsed.visible)
         for path in ("/blog", "/research", "/data", "/data/intents", "/data/revenue",
                      "/data/token-economics", "/methodology", "/workspace"):

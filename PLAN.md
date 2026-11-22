@@ -200,6 +200,7 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 | 88 | [NI-069](docs/TASKS.md) | Run hackathon demo and reviewer reproduction | P0 | A |
 | 89 | [NI-098](docs/TASKS.md) | Explain the product and document reproducible self-hosting | P0 | A |
 | 90 | [NI-099](docs/TASKS.md) | Implement the approved Comic Lab desktop identity | P1 | A |
+| 91 | [NI-100](docs/TASKS.md) | Apply Unslop polish to the approved Comic Lab UI | P1 | A |
 
 ## 9. Изменение самого плана
 
@@ -270,3 +271,8 @@ NI-089 (role A), requested by the owner: restore the current Blog/Overview exper
 ## 11. Owner Comic Lab redesign — 22 November 2026
 
 The owner explicitly commissions NI-099: implement the approved Comic Lab identity, canonical graph logo and TRACE across the existing desktop application locally, verify it, and deliver a GitHub feature PR. This supersedes previous appearance-preservation instructions only for the requested redesign. The existing data, auth/ownership, editor schema, revision pins and export contracts remain in force. NI-075/086/064 are prerequisites, with the sole status/claim in TASKS.md. Other claims remain untouched. No merge, deployment, mobile work or new collection is requested.
+
+
+## 12. Owner Unslop polish — 22 November 2026
+
+The owner explicitly requests applying the installed Unslop skill to the current Comic Lab implementation. NI-100 is a bounded polish pass on the approved brand, not a replacement identity. Preserve TRACE, canonical graph logo, mint/ivory/ink palette, chosen font families, current features/section order and data/security/reproducibility contracts. Audit concrete issues, improve desktop hierarchy/copy/accent use and details, verify the result and update the existing feature PR. No new generated artwork/video, mobile work, merge, deployment or collection. Claims/status live only in TASKS.md.

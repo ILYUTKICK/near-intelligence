@@ -50,7 +50,6 @@ export default function HomePage() {
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild><Link href="/blog">Read the research <ProductIcon name="arrow" /></Link></Button>
           <Button asChild variant="secondary"><Link href="/data">Explore data</Link></Button>
-          <Link href="#how-it-works" className={textLink}>How it works</Link>
         </div>
       </div>
       <OverviewArtwork />
@@ -58,14 +57,14 @@ export default function HomePage() {
 
     <section id="findings" aria-labelledby="featured-research-heading" className="mt-14 border-t border-border pt-9 lg:mt-16">
       <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
-        <h2 id="featured-research-heading" className={sectionHeading}>The research, in focus.</h2>
+        <h2 id="featured-research-heading" className={sectionHeading}>The research, in focus</h2>
         <Link href="/blog" className={textLink}>Visit the Blog <ProductIcon name="arrow" /></Link>
       </div>
       <PublicationCard publication={featured} />
     </section>
 
     <section id="evidence" aria-labelledby="evidence-heading" className="mt-14 border-t border-border pt-9 lg:mt-16">
-      <h2 id="evidence-heading" className={sectionHeading}>Explore the evidence.</h2>
+      <h2 id="evidence-heading" className={sectionHeading}>Explore the evidence</h2>
       <p className="mt-3 text-body leading-body text-text-secondary">Follow the activity, fees and token flows behind the research.</p>
       <ul aria-label="Data exploration directions" className="mt-7 grid gap-4 lg:grid-cols-3">
         {dataDirections.map((direction) => <li key={direction.href} className="paper-panel p-6 lg:p-7">
@@ -93,7 +92,7 @@ export default function HomePage() {
 
     <section id="release-status" aria-labelledby="methodology-heading" className="mt-12 flex flex-wrap items-center justify-between gap-5 border-y border-border py-8 lg:mt-14">
       <div>
-        <h2 id="methodology-heading" className="font-serif text-heading leading-heading lg:text-[2rem]">Sources first. Assumptions visible.</h2>
+        <h2 id="methodology-heading" className="font-serif text-heading leading-heading lg:text-[2rem]">Sources first. Assumptions visible</h2>
         <p className="mt-2 text-ui leading-ui text-text-secondary">Every conclusion has a scope. Every number has a source.</p>
       </div>
       <div className="flex flex-wrap items-center gap-x-6">
@@ -103,7 +102,7 @@ export default function HomePage() {
     </section>
 
     <section aria-labelledby="workspace-heading" className="paper-panel mt-6 bg-action px-7 py-10 text-center text-on-action lg:py-12">
-      <h2 id="workspace-heading" className="font-serif text-title leading-title text-on-action lg:text-[2.75rem] lg:leading-[1.08]">Make the research your own.</h2>
+      <h2 id="workspace-heading" className="font-serif text-title leading-title text-on-action lg:text-[2.75rem] lg:leading-[1.08]">Make the research your own</h2>
       <p className="mt-3 text-ui leading-ui">Save charts, add notes and build a thesis you can trace.</p>
       <Button asChild className="mt-6 bg-surface text-text hover:bg-surface-muted"><Link href="/workspace">Open workspace <ProductIcon name="arrow" /></Link></Button>
     </section>

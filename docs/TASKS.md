@@ -3045,3 +3045,32 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 - **CI correction result:** Preserved the D5 <386px gate and compacted workbench spacing; actual paper top 381px / visible 519px at1440×900. Fresh production build and focused editor ESLint pass; full local desktop suite passes25/skips1 existing D4, 3.2m, one worker/no retries. Includes sharing/custom-range/viewport/table scenarios beyond the earlier16-case pass. Six screenshots in the report; final preview http://127.0.0.1:51574. No API or data logic changed.
 - **Follow-up completed at:** 2026-11-22T14:00:50+03:00
+
+
+### NI-100 — Apply Unslop polish to the approved Comic Lab UI
+
+- **Epic:** 01 — Design system and product presentation
+- **Priority:** P1, explicit owner polish request
+- **Dependencies:** NI-099
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat 01a1fb40-3d6a-7912-87bf-615fdbf1bfff
+- **Execution role:** A
+- **Started at:** 2026-11-22T14:36:59+03:00
+- **Branch/worktree:** feat/ni-099-comic-lab; current attached Near worktree at 6fd643c, PR105
+- **Authorization:** Owner explicitly requests applying Unslop after approving and implementing Comic Lab. Existing brand direction remains approved; this authorizes bounded polish and verification in the ongoing feature PR, not a new identity, merge or deployment.
+- **Dependency verification:** NI-099 is DONE; four latest-head CI jobs passed on6fd643c. Working tree was clean before this task. No unrelated claim is reassigned.
+- **Handoff:** Per PLAN's separate-task-agent rule, /root/ni100_unslop owns bounded frontend/style/test/design-doc changes; root owns audit/direction, registry, runtime, verification and delivery. No simultaneous edits to shared files.
+
+**Description:** Apply the local Unslop skill in light-polish mode. Audit current rendered screens/code; preserve the owner-approved Comic Lab identity while reducing competing accents, vague app copy and oversized/redundant chrome. Follow the nine passes in order and record actual deltas, retained brand decisions and skill credit.
+
+**Acceptance criteria:** The private workspace has a clear action hierarchy, readable contextual page titles, quieter supporting panels and consistent icon/spacing details. Public hero has at most two adjacent actions with all destinations preserved; short UI copy is concrete and sentence case. Canonical brand/art/font families, feature/section order, exact financial values, accessible state/focus behavior, auth/ownership, editor schema, pins and exports remain intact. No fake data, new images/video/dependencies, mobile adaptation, raw data/credentials publication, merge or deployment.
+
+**Expected files:** Shared workspace/intro/header styles; WorkspaceHome; bounded public/auth labels and navigation; existing UI tests, landing HTTP copy expectations and design docs; docs/verification/ni-100.
+
+**Testing requirements:** Focused affected UI tests, strict TypeScript/lint/contrast, production build, full applicable desktop journeys including D3/D5 viewport gates, keyboard/axe, save/reopen/export/two visitors. At most three visual render review rounds per Unslop run. Final current-head CI and actual before/after evidence. Independent review skipped by user instruction 2026-11-09; root acceptance mandatory.
+
+- **Result:** Applied Unslop in the approved Comic Lab direction: contextual Home/login copy, one leading action based on actual document availability, quieter secondary panels/metadata, shared SVG checklist icons, workspace-only 36/42 px PageIntro and 64 px desktop bar. Public active nav is neutral; Overview retains two hero actions with How it works preserved in footer. TRACE/logo/palette/font families and focal drawn frame remain. Full audit, nine-pass decisions, skill credit and six after captures: [NI-100 report](verification/ni-100/README.md).
+- **Verification:** Focused 3 files / 25 tests, full 66 files / 682 tests (57.61s), strict TS/lint/build and 28 contrast pairs pass. Four existing unused-variable warnings remain. Real landing HTTP integration passes (2.175s), including data publication/outage/source-byte checks; only owned-heading expectations changed. Full desktop production-stack suite passes 25 / skips 1 existing D4 in 4.0m; D5 paper 365 px (<386), visible 535 px, chart viewport/keyboard/axe, save/reopen/frozen ZIP hashes, two-user isolation and sharing pass. Client-secret check reports no configured root .env/nothing to scan. Native Chrome login→demo Home inspection confirms action/panel hierarchy. Whitespace passes; 1,108 relative documentation links resolve.
+- **Reviewer:** Root inspected changed source and actual browser output after the dedicated agent's implementation; independent review skipped by user instruction 2026-11-09. Preserved source-qualified values, research prose, APIs/auth/editor/pins/export contracts and current 44 px controls. Existing before captures reused; one after-code version rendered/reviewed, no iterative redesign or new media.
+- **Local handoff / limits:** Review at http://127.0.0.1:58346/ with existing saved archive in isolated DB; automated tests use labeled fixtures and synthetic provider transport. No raw archive/secrets/local-state publication, new provider request, mobile work, merge or deployment. Update existing PR105; owner retains merge.
+- **Completed at:** 2026-11-22T14:48:41+03:00

@@ -15,8 +15,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <>
       <header className="text-center">
         <p className="eyebrow">Sign in</p>
-        <h1 className="mt-2 text-title">Explore your research workspace.</h1>
-        <p className="mt-2 text-ui text-text-secondary">Start with a ready-to-edit research template.</p>
+        <h1 className="mt-2 text-title">Open your research workspace</h1>
+        <p className="mt-2 text-ui text-text-secondary">Start with a research template for charts and notes</p>
       </header>
       <DemoSignIn returnTo={returnTo} />
       <details className="mt-6 border-t border-border pt-4">

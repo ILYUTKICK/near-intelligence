@@ -43,7 +43,8 @@ and IBM Plex Mono is used for tabular figures. All are self-hosted through
 remains a compatibility alias to Rubik for existing heading components, while
 the editor's paragraph body uses Golos Text. The logo uses its canonical vector
 wordmark. Headings remain bold and readable; labels and prose carry a quieter
-weight. Desktop page titles use the existing fluid scale; body is 16/26 px,
+weight. Public page titles use the existing fluid scale; workspace PageIntro
+titles use 36/42 px on desktop so document and chart content lead. Body is 16/26 px,
 UI 14/20 px, metadata 12/18 px, and writing 17/28 px. Research prose is around
 72 characters per line, with tabular lining numerals in tables/metrics.
 
@@ -53,6 +54,20 @@ and dialogs 20 px. Card/control outlines are 2 px. Paper cards use a compact
 3 px shadow, a 44 px target and ink labels on mint. Quiet dividers remain 1 px.
 The desktop workspace sidebar is 234 px, with the existing editor outline and
 properties pane widths. Public content retains the existing 1280 px cap.
+
+NI-100 applies [Unslop by Damir Sokolovsky](https://heydamir.design/unslop)
+(CC BY 4.0) as a light polish of this approved identity. TRACE, the graph logo,
+font families and the comic outline/shadow signature stay. The main continue
+card keeps the strongest frame; secondary Home cards use the existing neutral
+border with no offset shadow. Checklist states use the shared line icons and
+explicit Complete/To do text. Existing documents make Continue research the
+primary action and Create document secondary; first use keeps creation primary.
+The desktop workspace topbar is 64 px high, with 44 px controls. Its private
+label is quiet text. Public active navigation is neutral, while private selected
+navigation retains mint. Overview has two hero actions; How it works remains
+available in the footer. Section order, destinations and scientific/chart data
+presentation are unchanged. Existing responsive layout rules are retained;
+new mobile adaptation and device checks are outside this pass.
 
 ## Component contracts
 
