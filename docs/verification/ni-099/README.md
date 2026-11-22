@@ -32,10 +32,10 @@ Commands use Node 24.22.2 and the repository-pinned pnpm 12.16.1 through Corepac
 | `pnpm check:contrast` | 28 role pairs passed, including secondary text on both colored notes |
 | `pnpm check:contracts` | OpenAPI and generated TypeScript are current |
 | `pnpm check:client-secrets` | Exit 0, explicitly reports no root `.env` configured / nothing to scan; this is not a scan of production credentials |
-| Desktop browser journeys | 16 / 16 passed in 4.8 minutes; Chromium, 1440×900, one worker, no retries |
+| Desktop browser journeys | Full suite: 25 passed / one existing intentional skip in 3.2m; Chromium desktop, one worker, no retries |
 | Documentation links / whitespace | Passed; final link count recorded in the task card; `git diff --check` clean |
 
-The full unit suite passed before the final CSS-only secondary-color correction. That correction is covered by the final contrast check, production rebuild and browser scans. The final test-helper edits are covered by strict TypeScript, lint and the final desktop journeys.
+The full unit suite passed before the final CSS-only secondary-color correction. That correction is covered by the final contrast check, production rebuild and browser scans. The final test-helper edits are covered by strict TypeScript, lint and the final desktop journeys. The subsequent editor-only spacing correction is covered by a fresh production build, focused ESLint and the complete desktop suite.
 
 ### Browser → API → database → export
 
@@ -59,11 +59,12 @@ Manual Chrome inspection additionally confirmed the real rendered logo/TRACE, lo
 
 1. Real axe found secondary text on lavender at 4.03:1. Darkened the shared secondary token to `#46594F`, producing 4.98:1 on lavender and 5.86:1 on yellow; added both pairs to the contrast gate. No axe rule was disabled.
 2. The long research journey assumed one autosave per user step and failed when normal typing produced revision 4 before it observed revision 3. The test now captures each acknowledged saved revision, requires subsequent mutations to advance it, and compares the exact final revision and hash with both the database and exported manifest. Full typed prose, including outage-time prose, remains required in the downloaded bundle. Production autosave behavior was not changed.
-3. The layered button regression now expects the approved `action`/`on-action` roles instead of the superseded dark-accent fill. It still checks actual computed foreground/background colors.
+3. Full GitHub CI found that the long-title performance fixture placed the paper at 397 px, violating its existing <386 px threshold. Reduced workbench gaps from 16 to 8 px; the unchanged D5 test now measures 381 px, with 519 px of paper visible. A new local full-suite run 25 passed, one skipped. The existing D4 skip predates this task and records NI-096 removal of the Save-chart action; no new skip or weakened threshold was added.
+4. The layered button regression now expects the approved `action`/`on-action` roles instead of the superseded dark-accent fill. It still checks actual computed foreground/background colors.
 
 ## Review locally
 
-The live review stack was left running at `http://127.0.0.1:55168/`; cabinet entry is `/login`. Use an arbitrary example email label and “Enter demo workspace”; the existing demo flow creates a separate private visitor. This local stack uses the existing saved archive import for historical charts and the original 90-day cohort; it also retains the clearly identified harness/performance fixtures. It is not a restored production database and does not claim a published real model where none is staged.
+The live review stack was left running at `http://127.0.0.1:51574/`; cabinet entry is `/login`. Use an arbitrary example email label and “Enter demo workspace”; the existing demo flow creates a separate private visitor. This local stack uses the existing saved archive import for historical charts and the original 90-day cohort; it also retains the clearly identified harness/performance fixtures. It is not a restored production database and does not claim a published real model where none is staged.
 
 To recreate this native preview after stopping it, build first, then run from the checkout with the existing local archive root:
 
@@ -80,9 +81,7 @@ NI_RESEARCH_ARCHIVE_ROOT=/path/to/approved/local/research \
 The handoff prints newly selected loopback ports. This command uses an existing authorized local archive; it does not fetch provider data. Automated fixture-only reproduction omits `NI_RESEARCH_ARCHIVE_ROOT` and runs:
 
 ```sh
-corepack pnpm --filter web exec playwright test --config e2e/playwright.config.ts \
-  research-workflow.spec.ts workspace-demo.spec.ts \
-  accessibility/axe-core-surfaces.spec.ts accessibility/keyboard-navigation.spec.ts
+corepack pnpm --filter web exec playwright test --config e2e/playwright.config.ts
 ```
 
 ## Screenshots
@@ -91,6 +90,7 @@ corepack pnpm --filter web exec playwright test --config e2e/playwright.config.t
 - [Workspace Home](comic-lab-workspace.png)
 - [Chart detail](comic-lab-chart.png)
 - [Editor, saved pinned context and integrity](comic-lab-editor.png)
+- [Editor layout with a long title](comic-lab-editor-layout.jpg)
 - [Sign in](comic-lab-login.png)
 
 Screenshots come from the passing production-build desktop tests; financial values and author documents in them are synthetic fixtures. Raw archive inputs, database files, sessions, traces and local process state are excluded from Git.
@@ -99,4 +99,4 @@ Screenshots come from the passing production-build desktop tests; financial valu
 
 No backend/schema/provider change, new collection, mobile adaptation, merge or deployment. Existing unrelated active tasks remain assigned as before. Real Supabase credential entry, a remote environment, all production data/model completeness and a new PDF-layout acceptance run are outside this desktop identity task. The existing frozen export/render contracts were retained and the ZIP research workflow was actually exercised as recorded above.
 
-Code/asset/test content digest (sorted changed `apps/web` paths and bytes, excluding generated files): f39226232953b704e64ecaac8747347603735ec30b883e94b618e9524d906879.
+Code/asset/test content digest (sorted changed `apps/web` paths and bytes, excluding generated files): 40bffa695d78458b309bc9473a70c6c9055c4725cebc1dfa9eae8f59bbec92b8.

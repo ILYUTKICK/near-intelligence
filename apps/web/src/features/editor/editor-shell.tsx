@@ -743,7 +743,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
       saved={controller.status.kind === "clean"} revision={controller.revision} onObserve={recordObservation}
       onInsightAction={controller.draft ? undefined : openInsight} onHypothesisAction={controller.draft ? undefined : openHypothesis}
       onEvidenceAction={controller.draft ? undefined : openEvidence}>
-    <div className="flex flex-col gap-4" data-testid="editor-workbench">
+    <div className="flex flex-col gap-2" data-testid="editor-workbench">
       <p aria-live="polite" role="status" data-testid="editor-announcement" className="sr-only">
         {announcement}
       </p>
