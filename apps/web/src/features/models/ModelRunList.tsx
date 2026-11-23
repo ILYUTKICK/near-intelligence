@@ -75,7 +75,6 @@ export function ModelRunList({ items, basePath = "/models" }: { items: ModelRunS
                 className="inline-flex h-11 items-center gap-2 rounded-control border border-control-border bg-surface px-5 font-ui text-ui font-medium text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 View results
-                <span aria-hidden="true">↗</span>
               </Link>
             </div>
           </li>

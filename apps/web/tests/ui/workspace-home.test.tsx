@@ -100,6 +100,7 @@ describe("Workspace Home", () => {
       ? new Promise<Response>((resolve) => { resolveHome = resolve; }) : Response.json(homeFixture())) : undefined);
     render(<WorkspaceHome />);
     await screen.findByRole("status", { name: "Loading your recent research" });
+    await waitFor(() => expect(resolveHome).toBeTypeOf("function"));
     await act(async () => resolveHome(Response.json({}, { status: 503 })));
     expect(await screen.findByRole("alert")).toHaveTextContent("Your research could not be loaded");
     expect(screen.queryByRole("heading", { name: "Recent documents" })).not.toBeInTheDocument();

@@ -9,7 +9,7 @@ import Link from "next/link";
 export default function DataNotFound() {
   return (
     <div className="mx-auto w-full max-w-(--width-content-max) px-4 py-12">
-      <div className="rounded-surface border border-border bg-surface-muted p-6 max-w-prose">
+      <div className="rounded-surface border-2 border-panel-border bg-surface-muted p-6 max-w-prose">
         <h1>Data page not found</h1>
         <p className="text-body leading-body text-text-secondary mt-2">
           This data-explorer address does not exist: either the category is not one of the five

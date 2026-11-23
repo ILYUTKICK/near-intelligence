@@ -11,6 +11,7 @@ import { usePathname } from "next/navigation";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 import { PublicHeader } from "@/components/layout/PublicHeader";
+import { PublicFooter } from "@/components/layout/PublicFooter";
 import { SkipLink } from "@/components/layout/SkipLink";
 import { WorkspaceSidebar } from "@/components/layout/WorkspaceSidebar";
 import { authNav, publicNav, workspaceNav, workspaceNavByGroup } from "@/lib/navigation";
@@ -43,6 +44,7 @@ describe("Route registry", () => {
       "Home",
       "My Research",
       "Saved Charts",
+      "Chart library",
       "Network Activity",
       "Intents & Adoption",
       "Revenue & Fees",
@@ -77,6 +79,7 @@ describe("Route registry", () => {
       "/workspace/data/network", "/workspace/data/intents", "/workspace/data/revenue",
       "/workspace/data/token-economics", "/workspace/data/ecosystem",
     ]);
+    expect(workspaceNav.find((item) => item.label === "Chart library")?.href).toBe("/workspace/charts");
     expect(workspaceNav.find((item) => item.label === "Econometric Models")?.href).toBe("/workspace/models");
   });
 });
@@ -101,11 +104,13 @@ describe("Skip link", () => {
 describe("Public header", () => {
   it("renders registry navigation and exposes the active route", async () => {
     vi.mocked(usePathname).mockReturnValue("/");
-    render(<PublicHeader />);
+    render(<><PublicHeader /><PublicFooter /></>);
     const nav = screen.getByRole("navigation", { name: "Primary" });
     expect(within(nav).getByRole("link", { name: "Blog" })).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
+    const footer = screen.getByRole("navigation", { name: "Footer" });
+    expect(within(footer).getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/#how-it-works");
     expect(screen.getByRole("button", { name: "Open site menu" })).toBeInTheDocument();
     expect(await axe(document.body, { rules: { region: { enabled: false } } })).toHaveNoViolations();
   });

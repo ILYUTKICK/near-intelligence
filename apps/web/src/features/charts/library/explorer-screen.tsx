@@ -69,17 +69,17 @@ export async function DataExplorerScreen({
     <div className="page-container">
       <PageIntro
         eyebrow="Data explorer"
-        title="Explore the evidence."
+        title="Explore the evidence"
         description="Start with an economic question. Each chart keeps its source, period and limitations close."
         action={
           <Link href={`${routePrefix}/charts`} className="inline-flex min-h-11 items-center gap-2 text-ui font-medium hover:underline">
-            Browse the chart library <ProductIcon name="arrow" />
+            Browse the chart library
           </Link>
         }
       />
 
       {dropped.length > 0 ? (
-        <div role="status" className="mt-4 rounded-surface border border-border bg-surface-muted p-4 max-w-prose">
+        <div role="status" className="mt-4 rounded-surface border-2 border-panel-border bg-surface-muted p-4 max-w-prose">
           <p className="font-ui text-ui leading-ui font-medium">
             Some URL parameters were not used — this page carries no parameters.
           </p>
@@ -137,7 +137,7 @@ export async function DataExplorerScreen({
                       aria-label={`Open category: ${category.label}`}
                       className="inline-flex min-h-11 items-center gap-2 text-ui font-semibold hover:underline"
                     >
-                      Open category <ProductIcon name="arrow" />
+                      Open category
                     </Link>
                   </div>
                 </li>
@@ -150,7 +150,7 @@ export async function DataExplorerScreen({
                 Unavailable metrics carry a reason. Use the definitions to see what each source supports.
               </p>
               <Link href="/methodology#definitions" className="mt-3 inline-flex min-h-11 items-center gap-2 text-ui font-semibold hover:underline">
-                Read the definitions <ProductIcon name="arrow" />
+                Read the definitions
               </Link>
             </li>
           </ul>

@@ -3,7 +3,6 @@ import Link from "next/link";
 
 import { AccountMenu } from "@/components/layout/AccountMenu";
 import { PageIntro } from "@/components/layout/PageIntro";
-import { ProductIcon } from "@/components/layout/ProductIcon";
 
 export const metadata: Metadata = { title: "Settings — NEAR Intelligence" };
 
@@ -37,7 +36,7 @@ export default function SettingsPage() {
               If a tab reloads with unsaved changes, reopen the document in that tab. The editor offers to restore or discard its recovery copy.
             </p>
             <Link href="/workspace/research" className="mt-3 inline-flex min-h-11 items-center gap-2 text-ui font-medium hover:underline">
-              Open My Research <ProductIcon name="arrow" />
+              Open My Research
             </Link>
           </section>
           <section className="paper-panel p-6" aria-labelledby="account-heading">
@@ -53,7 +52,7 @@ export default function SettingsPage() {
             A chart records the period and dataset it uses. Saved revisions keep that evidence with the document.
           </p>
           <Link href="/methodology#sources" className="mt-3 inline-flex min-h-11 items-center gap-2 text-ui font-medium hover:underline">
-            Read the source policy <ProductIcon name="arrow" />
+            Read the source policy
           </Link>
         </aside>
       </div>

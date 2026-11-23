@@ -36,7 +36,7 @@ export function BlockToolbar({
   const canOperate = currentBlock !== null;
 
   const buttonClass = cn(
-    "inline-flex min-h-11 items-center gap-1.5 rounded-control border border-control-border bg-surface px-3",
+    "inline-flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-transparent px-2",
     "text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
     "disabled:pointer-events-none disabled:opacity-60",
   );
@@ -50,7 +50,7 @@ export function BlockToolbar({
       className="flex flex-wrap items-center gap-2"
     >
       <p className="text-ui leading-ui text-text-secondary" data-testid="current-block-label">
-        Current block: <span className="font-medium text-text">{label}</span>
+        <span className="font-medium text-text">{label}</span>
       </p>
       <button
         type="button"

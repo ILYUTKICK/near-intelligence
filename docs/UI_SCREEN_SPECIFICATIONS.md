@@ -6,7 +6,7 @@ All routes in [information architecture](INFORMATION_ARCHITECTURE.md) use [desig
 
 | Screen | Layout and content | Actions / state acceptance |
 | --- | --- | --- |
-| Overview `/` (NI-086) | Approved editorial hero and decorative research artwork; one curated featured publication; three data-direction cards; Read→Inspect→Build workflow; compact methodology band; green workspace CTA | Blog/research/data/methodology/workspace links work with keyboard; historical coverage qualification; no duplicate financial/claim tables; page remains available during API outage |
+| Overview `/` (NI-086) | Approved Comic Lab hero and TRACE artwork; one curated featured publication; three data-direction cards; Read→Inspect→Build workflow; compact methodology band; green workspace CTA | Blog/research/data/methodology/workspace links work with keyboard; historical coverage qualification; no duplicate financial/claim tables; page remains available during API outage |
 | Research `/research` | Reading column plus sticky section outline; executive summary, question, ecosystem, Intents, adoption, revenue generation/capture, token economics, econometrics, alternatives, risks, scenarios, assessment, limits, references | Citation opens evidence/source panel; chart opens pinned detail; model opens run; duplication CTA (NI-045) rendered only when a release is actually published for the slug — anonymous visitors get the sign-in continuation, signed-in users the pinned-version duplicate dialog; no release, no affordance. Research date/release version fixed; unresolved H1/H4 clearly labeled |
 | Public Data `/data`, `/data/[category]` | Five category tabs/sidebar; question headline; concise availability statement; range/filter controls; selected chart rows with definitions and source panel | Browse/search/view/save/add/insight; private actions invoke login + destination choice. Empty category explains data gap; failure uses last good with stale badge |
 | Chart detail `/charts/[chartId]` | Title/definition, unit and quality; plot plus accessible data table; pinned/latest mode and source/updated times; methodology link and related charts | Dates/allowed filters, inspect values, refresh, Save/Add to Research/Add Insight. Unsupported URL selection gives recoverable validation error; source gap is not zero |
@@ -22,7 +22,7 @@ Shared shell: persistent group sidebar on desktop; top breadcrumb/title/account;
 
 | Screen | Structure | Actions / required states |
 | --- | --- | --- |
-| Home `/workspace` | Greeting; Create New/Continue; up to5 recent docs; small recent charts/notes; workflow progress checklist; no Data context section (owner NI-080 correction) | First-use explanation and create action instead of fake docs; deleted recent target resolves safely; Home does not render economic indicator cards |
+| Home `/workspace` | Research-context introduction; Create New/Continue; up to5 recent docs; small recent charts/notes; workflow progress checklist; no Data context section (owner NI-080 correction) | First-use explanation and create action instead of fake docs; deleted recent target resolves safely; Home does not render economic indicator cards |
 | My Research `/workspace/research` | Title search, updated sort, document list with title/date/progress; create action | Empty document default; investment-v1 template choice (NI-045, keyboard-accessible, empty preselected). Rename and delete dialogs; pending save; pagination; 404 if inaccessible. No confidence scoring |
 | Saved Charts `/workspace/saved-charts` | Search/category, saved instances showing range/mode/last resolved date, preview | Open, rename, remove, Add to Research; live changed-since-save badge; explicit snapshot badge P1; empty list directs to explorer |
 | Network `/workspace/data/network` | Network question; only verified counts/fees; definitions distinguish signer/receiver/address semantics | Initial unavailable metrics remain listed in availability explanation, not fake KPIs. Show supply/header context only if relevant and labeled |
@@ -45,6 +45,14 @@ checked again, and a different account discards pending continuation state.
 NI-080 removes the Data context section and its economic indicator cards from Home; the canonical indicator API remains available without being rendered here.
 
 ## Research editor `/workspace/research/[documentId]`
+
+NI-101 desktop polish (23 November 2026): preserve the selected block's tools
+and all editor actions; group Share with history/export, show one persistent
+save-state line, and disclose readable UTC update/schema metadata under Document
+details. Block reference and annotation Evidence details use native keyboard
+disclosures. Secondary toolbar/pane borders and badges are quiet; the paper
+retains the approved Comic Lab frame. Source/pin access and save/dirty/error,
+conflict, ownership and export behavior remain unchanged.
 
 Header: editable title, saved/dirty/saving/error state, last saved time, manual Save, Export. Left outline from headings; central paper contains typed blocks; right contextual panel switches Add Block/Chart Library/Properties/Sources/Insight/Model. Tool panels collapse. Desktop three-pane appears only when minimum paper width fits; tablet tools as drawer; phone full paper with one drawer at a time.
 
@@ -115,3 +123,28 @@ is sign-aware: it is selected from the recorded slope's confidence interval, so 
 finding is never presented for a negative or unresolved result. Unknown specifications get
 an identity-preserving fallback built from their recorded fields. The manifest download,
 Add to research and the anonymous sign-in continuation behave exactly as before.
+
+
+## Comic Lab desktop implementation — NI-099, 22 November 2026
+
+The owner-approved A / Comic Lab appearance replaces the earlier editorial
+appearance across the existing routes. The canonical graph wordmark, Rubik /
+Golos Text / IBM Plex Mono, ivory reading surfaces, mint actions, ink outlines
+and neutral offset shadows come from the shared tokens/components. Public
+and workspace navigation use a visible mint selected route. TRACE appears on
+Overview, auth, the personal workspace's Continue panel and empty Saved Charts;
+no chart/data/error view is replaced with an illustration.
+
+Workspace Home retains its real owned document, progress and recent evidence
+queries; the Continue panel becomes white paper, the research checklist is a
+yellow supporting card, and recent insight notes are lavender. Public Overview
+keeps its approved discovery sections and existing anchors. The Blog card uses
+registered topic/question/release metadata in an outlined mint-cover layout.
+The original publication/article content, scientific qualifications, existing
+chart renderer and frozen export palette remain unchanged. Native forms,
+menus, dialogs, saved cards, model panels and the editor share the same border,
+control, paper and heading treatments. Existing loading/empty/error states,
+keyboard semantics and ownership guards remain in use.
+
+This is a frontend desktop redesign. No new mobile layouts, provider calls,
+metric definitions, document schema or private-resource behavior are added.

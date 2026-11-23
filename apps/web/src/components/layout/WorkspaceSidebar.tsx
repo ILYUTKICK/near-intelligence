@@ -16,7 +16,7 @@ function WorkspaceNavList({ pathname }: { pathname: string | null }) {
       {workspaceNavByGroup().map(({ group, items }) => (
         <div key={group} className={group === "Account" ? "mt-auto" : undefined}>
           {group === "Data Explorer" || group === "Analytics" ? (
-            <p className="px-3 pb-1 text-metadata font-medium tracking-widest text-text-secondary uppercase">{group}</p>
+            <p className="px-3 pb-1 text-metadata font-medium text-text-secondary">{group}</p>
           ) : null}
           <ul className="space-y-0.5">
             {items.map((item) => {
@@ -27,11 +27,11 @@ function WorkspaceNavList({ pathname }: { pathname: string | null }) {
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex min-h-11 items-center gap-2.5 rounded-[14px] px-2.5 py-1.5",
+                      "flex min-h-11 items-center gap-2.5 rounded-control border-2 px-2.5 py-1.5",
                       "text-[0.8125rem] leading-5",
                       active
-                        ? "bg-sage font-semibold text-accent"
-                        : "text-text-secondary hover:bg-surface-muted hover:text-text",
+                        ? "border-panel-border bg-action font-semibold text-on-action"
+                        : "border-transparent text-text-secondary hover:bg-surface-muted hover:text-text",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
                     )}
                   >
@@ -65,7 +65,7 @@ export function WorkspaceSidebar() {
   const pathname = usePathname();
   return (
     <>
-      <aside aria-label="Workspace navigation panel" className="sticky top-0 hidden max-h-dvh w-(--width-sidebar) shrink-0 flex-col gap-8 self-start overflow-y-auto border-r border-border bg-surface/55 px-4 py-7 md:flex md:min-h-dvh">
+      <aside aria-label="Workspace navigation panel" className="sticky top-0 hidden max-h-dvh w-(--width-sidebar) shrink-0 flex-col gap-8 self-start overflow-y-auto border-r-2 border-panel-border bg-surface px-4 py-5 md:flex md:min-h-dvh">
         <div className="px-2"><Brand /></div>
         <WorkspaceNavList pathname={pathname} />
       </aside>

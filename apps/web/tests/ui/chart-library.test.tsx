@@ -743,7 +743,7 @@ describe("Chart detail page — validated selection URLs", () => {
       filters: '{"source":"SRC-LLAMA"}',
     });
 
-    expect(await screen.findByText(/No filters are registered for this chart version/)).toBeInTheDocument();
+    expect(screen.queryByText(/No filters are registered for this chart version/)).not.toBeInTheDocument();
     const status = await chartParameterNotice();
     expect(within(status).getByText(/registers no filters/)).toBeInTheDocument();
   });
@@ -795,7 +795,7 @@ describe("Chart detail page — validated selection URLs", () => {
     expect(viewRequests[0].searchParams.get("start")).toBe("2026-08-07");
     expect(viewRequests[0].searchParams.get("end")).toBe("2026-11-05");
     expect(viewRequests[0].searchParams.get("dataset_version")).toBe(PINNED_DATASET_ID);
-    expect(await screen.findByText(/coverage end \(2026-11-05 UTC\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/Default period: .* to 2026-11-05 UTC \(end excluded\), from the pinned dataset/)).toBeInTheDocument();
     expect(screen.getByText("Pinned version")).toBeInTheDocument();
   });
 
@@ -832,8 +832,11 @@ describe("Chart detail page — validated selection URLs", () => {
     await renderDetail({ version: "1", start: VIEW_WINDOW.start, end: VIEW_WINDOW.end });
 
     const alert = await screen.findByRole("alert");
-    expect(within(alert).getByText(/No approved dataset is ready/)).toBeInTheDocument();
-    expect(within(alert).getByText(/this is not zero/)).toBeInTheDocument();
+    expect(within(alert).getByRole("heading", { name: "Data unavailable" })).toBeInTheDocument();
+    expect(within(alert).getByText("No approved dataset is available for this chart yet.")).toBeVisible();
+    const diagnostic = within(alert).getByText("no approved dataset exists for latest");
+    expect(diagnostic.closest("details")).not.toHaveAttribute("open");
+    expect(diagnostic).not.toBeVisible();
     expect(within(alert).getByRole("link", { name: "Try again" })).toHaveAttribute(
       "href",
       "/charts/gross-fees?version=1",
@@ -857,7 +860,7 @@ describe("Chart detail page — validated selection URLs", () => {
     await renderDetail({ version: "1", start: VIEW_WINDOW.start, end: VIEW_WINDOW.end });
 
     const alert = await screen.findByRole("alert");
-    expect(within(alert).getByText(/rejected this selection as unsupported/)).toBeInTheDocument();
+    expect(within(alert).getByText("This chart does not support the selected range or filters. Choose another selection.")).toBeInTheDocument();
     expect(within(alert).getByRole("link", { name: "Reset to the default selection" })).toHaveAttribute(
       "href",
       "/charts/gross-fees?version=1",
@@ -1329,8 +1332,7 @@ describe("NI-080 implicit latest coverage", () => {
     // …and preselects the first approved filter value (disclosed by the chips).
     expect(views[0].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
     expect(views[1].searchParams.get("filters")).toBe('{"source":"SRC-LLAMA"}');
-    expect(screen.getByText(/implicit default is clamped to the latest approved dataset's coverage/)).toBeVisible();
-    expect(screen.getByText(/preselects the first approved filter value/)).toBeVisible();
+    expect(screen.getByText("Default period: 2026-01-01 to 2026-01-15 UTC (end excluded), within the latest approved dataset.")).toBeVisible();
     expect(await screen.findByRole("region", { name: /exact data table/ })).toHaveTextContent(/1\s000/);
   });
 

@@ -26,7 +26,7 @@ export function HomeIndicators({ indicators }: { indicators: Home["indicators"] 
           // through unchanged — the detail URL re-pins the exact selection.
           filters: series.selection.filters,
         }) : "/charts";
-        return <article key={indicator.chart_id} aria-label={indicator.title} className="min-w-0 rounded-surface border border-border p-4 [overflow-wrap:anywhere]">
+        return <article key={indicator.chart_id} aria-label={indicator.title} className="min-w-0 rounded-surface border-2 border-panel-border p-4 [overflow-wrap:anywhere]">
           <h3 className="font-medium">{indicator.title}</h3>
           {series ? <>
             <p className="mt-2 text-metadata text-text-secondary">{series.metric.title}</p>

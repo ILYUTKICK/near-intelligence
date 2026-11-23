@@ -39,7 +39,7 @@ export default function EditorPrototypePage() {
           Insert insight card
         </button>
       </div>
-      <div className="mt-6 rounded-surface border border-border bg-surface p-4 prose-editor" data-testid="editor-root">
+      <div className="mt-6 rounded-surface border-2 border-panel-border bg-surface p-4 prose-editor" data-testid="editor-root">
         <EditorContent editor={editor} />
       </div>
     </div>

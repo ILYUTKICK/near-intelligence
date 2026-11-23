@@ -87,7 +87,7 @@ export function InteractiveHistory() {
       pin.current = null; purchasePin.current = undefined; allRange.current = null; setLoading(true); setError(null); setData(null); setRange(null); setSource(item.id);
     }}>{item.label}</Button>)}</div>
     {loading ? <p role="status" className="mt-4 text-ui text-text-secondary">Loading the selected history…</p> : null}
-    {error ? <div role="alert" className="mt-4 rounded-surface border border-border p-4"><p>{error}</p><Button className="mt-3" variant="secondary" onClick={() => { setLoading(true); setError(null); setRetry((value) => value + 1); }}>Retry history</Button></div> : null}
+    {error ? <div role="alert" className="mt-4 rounded-surface border-2 border-panel-border p-4"><p>{error}</p><Button className="mt-3" variant="secondary" onClick={() => { setLoading(true); setError(null); setRetry((value) => value + 1); }}>Retry history</Button></div> : null}
     {data ? <div aria-busy={loading} className="mt-5">
       <div role="group" aria-label="Research period" className="flex flex-wrap gap-2">
         <Button variant={range === null ? "primary" : "secondary"} onClick={() => { if (range !== null) chooseRange(null); }}>All history</Button>

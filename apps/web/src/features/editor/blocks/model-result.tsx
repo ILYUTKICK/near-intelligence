@@ -63,7 +63,7 @@ export const ModelResult = Node.create({
 export type ModelResultAttrs = CanonicalModelResultBlock["attrs"];
 
 const cardWrapperClass =
-  "my-4 rounded-surface border border-control-border bg-surface p-4";
+  "my-4 rounded-surface border border-border bg-surface p-4";
 
 const CONTROL_CLASS = "min-h-11 max-w-full rounded-control border border-control-border bg-surface px-3 py-2 font-ui text-base sm:text-ui touch-manipulation leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 aria-disabled:opacity-60";
 
@@ -247,17 +247,16 @@ function ModelResultBlockView({ node, editor, getPos, updateAttributes }: NodeVi
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-ui text-ui leading-ui font-medium text-text">Model result</p>
           {run ? (
-            <span className="rounded-control border border-control-border px-1.5 py-0.5 text-metadata leading-metadata text-text-secondary">
+            <span className="text-metadata leading-metadata text-text-secondary">
               {run.model_id} · v{run.model_version}
             </span>
           ) : null}
-          <span className="rounded-control border border-control-border px-1.5 py-0.5 text-metadata leading-metadata text-text-secondary">
+          <span className="text-metadata leading-metadata text-text-secondary">
             Published run · immutable result
           </span>
         </div>
         <p className="mt-1 text-metadata leading-metadata text-text-secondary">
-          The recorded result below is re-projected from the pinned published run — never stored in
-          this document. Editing your interpretation never changes it.
+          This result uses the saved published run. Your interpretation does not change its data.
         </p>
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-metadata leading-metadata text-text-secondary">
           {fieldPair("Pinned run", shortId(attrs.model_run_id), "mmr")}
@@ -307,8 +306,7 @@ function ModelResultBlockView({ node, editor, getPos, updateAttributes }: NodeVi
                 className="mt-1 w-full rounded-control border border-control-border bg-surface px-2 py-1 font-ui text-ui leading-ui text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               />
               <p className="mt-1 text-metadata leading-metadata text-text-secondary">
-                Each line becomes one paragraph. Your prose is stored in the document; the recorded
-                result stays on the pinned run.
+                Each line starts a paragraph. The recorded result stays unchanged.
               </p>
             </>
           ) : attrs.interpretation ? (

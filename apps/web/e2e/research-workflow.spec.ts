@@ -108,12 +108,16 @@ async function inspectDocumentVersion(page: Page, documentId: string) {
   return (await response.json()) as NonNullable<typeof journey.documentVersionRow>;
 }
 
-/** Wait until the editor reports a fully saved revision. */
-async function waitForSavedRevision(page: Page, revision: number): Promise<void> {
-  await expect(page.getByTestId("save-status")).toContainText(`Revision ${revision}`, {
-    timeout: 30_000,
-  });
-  await expect(page.getByTestId("save-status")).toContainText(/All changes saved|No unsaved changes/);
+/** Autosave may persist an intermediate typing revision; capture the acknowledged one. */
+async function waitForSavedRevision(page: Page, minimumRevision: number): Promise<number> {
+  let acknowledged = 0;
+  await expect.poll(async () => {
+    const status = await page.getByTestId("save-status").textContent();
+    const match = /^(?:All changes saved|No unsaved changes).*Revision (\d+)/.exec(status ?? "");
+    acknowledged = match ? Number(match[1]) : 0;
+    return acknowledged;
+  }, { timeout: 30_000 }).toBeGreaterThanOrEqual(minimumRevision);
+  return acknowledged;
 }
 
 /** Insert one paragraph after the current block and type into it. */
@@ -173,7 +177,15 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   // preselects the first approved filter value. Explicit dates remain
   // authoritative even when they have no observations.
   await expect(page.getByRole("group", { name: "Time range" })).toBeVisible();
-  await expect(page.getByText(/implicit default is clamped to the latest approved dataset's coverage/)).toBeVisible();
+  // The inspected selection may end before dataset coverage. Read the
+  // independent delivery metadata instead of treating state.window as the
+  // complete dataset's half-open period.
+  const coverageResponse = await page.request.get(`${state.api_url}/api/datasets/${state.dataset_version_id}`);
+  expect(coverageResponse.ok()).toBe(true);
+  const coverage = await coverageResponse.json() as { start: string; end: string };
+  expect(coverage.start).toBe("2026-01-01");
+  expect(coverage.end).toBe("2026-01-15");
+  await expect(page.getByText(`Default period: ${coverage.start} to ${coverage.end} UTC (end excluded), within the latest approved dataset.`, { exact: true })).toBeVisible();
   await expect(page.getByText(state.pin_value)).toBeVisible();
   await page.goto(`${state.web_url}/data/intents/intents-volume?version=1&start=2026-11-01&end=2026-11-04`);
   await expect(page).toHaveURL(/start=2026-11-01&end=2026-11-04/);
@@ -272,9 +284,9 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await expect(contextLine).toBeVisible();
   journey.contextHash = ((await contextLine.textContent()) ?? "").replace("Context hash: ", "");
 
-  // -- 7. Prose via the insert menu; autosave acknowledges revision 3 ---- //
+  // -- 7. Prose via the insert menu; capture its saved revision --------- //
   await addParagraph(page, PARAGRAPH_ONE);
-  await waitForSavedRevision(page, 3);
+  const proseRevision = await waitForSavedRevision(page, 3);
 
   // -- 8. Hypothesis ------------------------------------------------------ //
   await page.getByRole("button", { name: "Add hypothesis" }).click();
@@ -283,7 +295,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await hypothesisDialog.getByLabel("Hypothesis statement").fill(HYPOTHESIS_STATEMENT);
   await hypothesisDialog.getByRole("button", { name: "Save hypothesis" }).click();
   await expect(page.getByText(HYPOTHESIS_STATEMENT).first()).toBeVisible();
-  await waitForSavedRevision(page, 4);
+  const hypothesisRevision = await waitForSavedRevision(page, proseRevision + 1);
 
   // -- 9. Insight pinned to the chart's inspected context ----------------- //
   await page.getByRole("button", { name: "Add Insight" }).click();
@@ -292,8 +304,8 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await insightDialog.getByLabel("Insight text").fill(INSIGHT_TEXT);
   await insightDialog.getByRole("button", { name: "Save insight" }).click();
   await expect(page.getByText(INSIGHT_TEXT).first()).toBeVisible();
-  await waitForSavedRevision(page, 5);
-  await expect(integrity.getByTestId("integrity-revision")).toHaveText("Checked saved revision 5.");
+  const insightRevision = await waitForSavedRevision(page, hypothesisRevision + 1);
+  await expect(integrity.getByTestId("integrity-revision")).toHaveText(`Checked saved revision ${insightRevision}.`);
   await expect(integrity.getByTestId("integrity-empty")).toHaveText("No integrity findings on this revision.");
   await expect(integrity.getByTestId("integrity-findings")).toHaveCount(0);
 
@@ -311,12 +323,12 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   expect(chosenTarget?.startsWith(INSIGHT_TEXT.slice(0, 40))).toBe(true);
   await evidenceDialog.getByLabel("Explanation").fill(INSIGHT_TEXT);
   await evidenceDialog.getByRole("button", { name: "Save evidence link" }).click();
-  await waitForSavedRevision(page, 6);
+  const linkedRevision = await waitForSavedRevision(page, insightRevision + 1);
 
   // -- 11. Reopen: the saved context matches ------------------------------ //
   await page.reload();
   await expect(page.getByLabel("Research paper editor")).toBeVisible();
-  await waitForSavedRevision(page, 6);
+  await waitForSavedRevision(page, linkedRevision);
   await expect(page.getByText(HYPOTHESIS_STATEMENT).first()).toBeVisible();
   await expect(page.getByText(INSIGHT_TEXT).first()).toBeVisible();
   // The pinned-context details is collapsed after a fresh load; open it again.
@@ -325,6 +337,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   await expect(page.getByText(`Context hash: ${journey.contextHash}`).first()).toBeVisible();
   const counts = page.getByTestId("evidence-counts");
   await expect(counts).toContainText("Supporting 0 · Contradicting 1 · Uncertain 0");
+  await page.screenshot({ path: test.info().outputPath("comic-lab-editor.png") });
 
   // Keyboard navigation through the evidence panel: Enter opens the linked
   // insight, the back control (Enter) returns focus to the originating entry.
@@ -338,7 +351,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
 
   // The DB revision row: exact version, content hash and the pinned context.
   journey.documentVersionRow = await inspectDocumentVersion(page, journey.documentId!);
-  expect(journey.documentVersionRow.revision).toBe(6);
+  expect(journey.documentVersionRow.revision).toBe(linkedRevision);
   expect(journey.documentVersionRow.content_sha256).toMatch(/^[0-9a-f]{64}$/);
   const persistedContext = Object.values(journey.documentVersionRow.resolved_contexts)[0];
   expect(persistedContext.context_hash).toBe(journey.contextHash);
@@ -348,8 +361,8 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
 
   // The public explorer fails honestly and never fabricates values.
   await page.goto(chartSelectionUrl());
-  await expect(page.getByText("The chart data could not be resolved")).toBeVisible();
-  await expect(page.getByText("No approved dataset is ready for this chart yet")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Data unavailable", exact: true })).toBeVisible();
+  await expect(page.getByText("No approved dataset is available for this chart yet.", { exact: true })).toBeVisible();
   await expect(page.getByText(state.pin_value)).toHaveCount(0);
 
   // The editor's pinned chart still resolves its observed dataset (explicit
@@ -366,14 +379,14 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
 
   // Prose persistence survives the outage.
   await addParagraph(page, OUTAGE_PARAGRAPH);
-  await waitForSavedRevision(page, 7);
+  const exportRevision = await waitForSavedRevision(page, linkedRevision + 1);
 
   // The export target is the revision acknowledged by autosave.
   await expect(page.getByLabel("Research paper editor")).toBeVisible();
-  await waitForSavedRevision(page, 7);
-  // Refresh the DB row: the exported revision is now revision 7.
+  await waitForSavedRevision(page, exportRevision);
+  // Refresh the DB row: export must pin the exact acknowledged revision.
   journey.documentVersionRow = await inspectDocumentVersion(page, journey.documentId!);
-  expect(journey.documentVersionRow.revision).toBe(7);
+  expect(journey.documentVersionRow.revision).toBe(exportRevision);
 
   // -- 13. Export the pinned revision (outage still on) ------------------- //
   page.on("response", (response) => {
@@ -410,7 +423,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   // Manifest pins the exact revision the DB holds.
   expect(manifest.bundle_format_version).toBe(1);
   expect(manifest.document.document_id).toBe(journey.documentId);
-  expect(manifest.document.revision).toBe(7);
+  expect(manifest.document.revision).toBe(exportRevision);
   expect(manifest.document.version_id).toBe(journey.documentVersionRow!.id);
   expect(manifest.document.content_sha256).toBe(journey.documentVersionRow!.content_sha256);
   expect(manifest.document.title).toBe(DOCUMENT_TITLE);
@@ -443,6 +456,7 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   const research = files.get("research.md")!.data.toString("utf-8");
   expect(research).toContain(DOCUMENT_TITLE);
   expect(research).toContain(PARAGRAPH_ONE);
+  expect(research).toContain(OUTAGE_PARAGRAPH);
   expect(research).toContain(HYPOTHESIS_STATEMENT);
   expect(research).toContain(INSIGHT_TEXT);
   // The pinned chart values live in the CSV asset; research.md embeds it.

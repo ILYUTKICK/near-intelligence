@@ -115,7 +115,7 @@ export function ChartDetailClient({
   return (
     <div className="flex flex-col gap-4">
       {dropped.length > 0 ? (
-        <div role="status" className="rounded-surface border border-border bg-surface-muted p-4">
+        <div role="status" className="rounded-surface border-2 border-panel-border bg-surface-muted p-4">
           <p className="font-ui text-ui leading-ui font-medium">
             Some URL parameters were not used — the chart request carries only supported fields.
           </p>
@@ -151,7 +151,7 @@ export function ChartDetailClient({
                 onChange={setFilters}
                 idPrefix="chart-filter"
               />
-            ) : <span className="text-metadata text-text-secondary">No filters are registered for this chart version.</span>}
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
               <Dialog open={rangeOpen} onOpenChange={(open) => {
                 setRangeOpen(open);
@@ -200,8 +200,9 @@ export function ChartDetailClient({
                 </Button>
               ) : null}
             </div>
-            {/* NI-096: exactly one primary action on the detail page. */}
+            {/* Save the inspected selection or attach it to a document. */}
             <CategoryChartActions
+              allowSave={basePath.startsWith("/workspace/")}
               variant="primary"
               nextPath={detailHref({ ...selection, ...view?.selection, datasetVersion: view?.dataset.id ?? selection.datasetVersion })}
               basePath={`${basePath}/`}

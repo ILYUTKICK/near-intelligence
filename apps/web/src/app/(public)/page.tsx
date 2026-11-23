@@ -42,15 +42,14 @@ export default function HomePage() {
   return <div className="page-container">
     <section aria-labelledby="overview-heading" className="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-12">
       <div>
-        <p className="eyebrow">Independent research · NEAR ecosystem</p>
-        <h1 id="overview-heading" className="mt-6 font-serif text-[clamp(3rem,4.5vw,4.25rem)] leading-[1.02] tracking-[-0.045em]">
-          Understand NEAR.<br /><em className="text-accent">Build your own thesis.</em>
+        <p className="comic-tag bg-yellow">Independent research · NEAR ecosystem</p>
+        <h1 id="overview-heading" className="mt-6 font-serif text-[clamp(3rem,4.5vw,4.25rem)] leading-[1.08] font-bold tracking-[-0.035em]">
+          Understand NEAR.<br /><span>Build your own thesis.</span>
         </h1>
         <p className="mt-6 max-w-[39ch] text-body leading-body text-text-secondary lg:text-[1.25rem] lg:leading-[1.5]">Original research, interactive data and the evidence behind every conclusion.</p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Button asChild><Link href="/blog">Read the research <ProductIcon name="arrow" /></Link></Button>
+          <Button asChild><Link href="/blog">Read the research</Link></Button>
           <Button asChild variant="secondary"><Link href="/data">Explore data</Link></Button>
-          <Link href="#how-it-works" className={textLink}>How it works</Link>
         </div>
       </div>
       <OverviewArtwork />
@@ -58,21 +57,21 @@ export default function HomePage() {
 
     <section id="findings" aria-labelledby="featured-research-heading" className="mt-14 border-t border-border pt-9 lg:mt-16">
       <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
-        <h2 id="featured-research-heading" className={sectionHeading}>The research, in focus.</h2>
-        <Link href="/blog" className={textLink}>Visit the Blog <ProductIcon name="arrow" /></Link>
+        <h2 id="featured-research-heading" className={sectionHeading}>The research, in focus</h2>
+        <Link href="/blog" className={textLink}>Visit the Blog</Link>
       </div>
       <PublicationCard publication={featured} />
     </section>
 
     <section id="evidence" aria-labelledby="evidence-heading" className="mt-14 border-t border-border pt-9 lg:mt-16">
-      <h2 id="evidence-heading" className={sectionHeading}>Explore the evidence.</h2>
+      <h2 id="evidence-heading" className={sectionHeading}>Explore the evidence</h2>
       <p className="mt-3 text-body leading-body text-text-secondary">Follow the activity, fees and token flows behind the research.</p>
       <ul aria-label="Data exploration directions" className="mt-7 grid gap-4 lg:grid-cols-3">
-        {dataDirections.map((direction) => <li key={direction.href} className="rounded-surface border border-border p-6 lg:p-7">
+        {dataDirections.map((direction) => <li key={direction.href} className="paper-panel p-6 lg:p-7">
           <ProductIcon name={direction.icon} className="size-8 text-accent" />
           <h3 className="mt-5 font-serif text-heading leading-heading">{direction.title}</h3>
           <p className="mt-3 max-w-[36ch] text-ui leading-ui text-text-secondary">{direction.description}</p>
-          <Link href={direction.href} className={`${textLink} mt-3`} aria-label={`Explore data: ${direction.title}`}>Explore data <ProductIcon name="arrow" /></Link>
+          <Link href={direction.href} className={`${textLink} mt-3`} aria-label={`Explore data: ${direction.title}`}>Explore data</Link>
         </li>)}
       </ul>
       <p className="mt-4 text-metadata leading-metadata text-text-secondary">Historical datasets · coverage varies by source</p>
@@ -85,7 +84,7 @@ export default function HomePage() {
           <span className="inline-flex size-8 items-center justify-center rounded-control bg-sage font-serif text-ui font-semibold text-accent">0{index + 1}</span>
           <h3 className="mt-4 font-serif text-heading leading-heading">{step.title}</h3>
           <p className="mt-3 max-w-[34ch] text-ui leading-ui text-text-secondary">{step.body}</p>
-          <Link href={step.href} className={`${textLink} mt-2`}>{step.action} <ProductIcon name="arrow" /></Link>
+          <Link href={step.href} className={`${textLink} mt-2`}>{step.action}</Link>
         </li>)}
       </ol>
       <p id="mechanism" className="mt-5 text-metadata text-text-secondary">Trace the mechanism in the <Link href="/research#mechanism" className="text-accent underline underline-offset-4">full research</Link>.</p>
@@ -93,19 +92,19 @@ export default function HomePage() {
 
     <section id="release-status" aria-labelledby="methodology-heading" className="mt-12 flex flex-wrap items-center justify-between gap-5 border-y border-border py-8 lg:mt-14">
       <div>
-        <h2 id="methodology-heading" className="font-serif text-heading leading-heading lg:text-[2rem]">Sources first. Assumptions visible.</h2>
+        <h2 id="methodology-heading" className="font-serif text-heading leading-heading lg:text-[2rem]">Sources first. Assumptions visible</h2>
         <p className="mt-2 text-ui leading-ui text-text-secondary">Every conclusion has a scope. Every number has a source.</p>
       </div>
       <div className="flex flex-wrap items-center gap-x-6">
-        <Link href="/methodology" className={textLink}>Our methodology <ProductIcon name="arrow" /></Link>
+        <Link href="/methodology" className={textLink}>Our methodology</Link>
         <Link href="/research#econometrics" className="inline-flex min-h-11 items-center text-metadata text-accent underline underline-offset-4">Research status</Link>
       </div>
     </section>
 
-    <section aria-labelledby="workspace-heading" className="mt-6 rounded-surface bg-accent px-7 py-10 text-center text-on-accent lg:py-12">
-      <h2 id="workspace-heading" className="font-serif text-title leading-title text-on-accent lg:text-[2.75rem] lg:leading-[1.08]">Make the research your own.</h2>
+    <section aria-labelledby="workspace-heading" className="paper-panel mt-6 bg-action px-7 py-10 text-center text-on-action lg:py-12">
+      <h2 id="workspace-heading" className="font-serif text-title leading-title text-on-action lg:text-[2.75rem] lg:leading-[1.08]">Make the research your own</h2>
       <p className="mt-3 text-ui leading-ui">Save charts, add notes and build a thesis you can trace.</p>
-      <Button asChild className="mt-6 border-transparent bg-surface text-accent hover:bg-sage focus-visible:outline-on-accent"><Link href="/workspace">Open workspace <ProductIcon name="arrow" /></Link></Button>
+      <Button asChild className="mt-6 bg-surface text-text hover:bg-surface-muted"><Link href="/workspace">Open workspace</Link></Button>
     </section>
   </div>;
 }

@@ -133,13 +133,13 @@ function ResultPanel({
         ) : null}
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-surface border border-border bg-surface-muted p-5">
+          <div className="rounded-surface border-2 border-panel-border bg-surface-muted p-5">
             <h3 className="text-ui leading-ui font-medium text-text">What this supports</h3>
             <p className="mt-1.5 text-ui leading-ui text-text-secondary">
               {presentation.supports}
             </p>
           </div>
-          <div className="rounded-surface border border-border bg-surface-muted p-5">
+          <div className="rounded-surface border-2 border-panel-border bg-surface-muted p-5">
             <h3 className="text-ui leading-ui font-medium text-text">What remains unanswered</h3>
             <p className="mt-1.5 text-ui leading-ui text-text-secondary">
               {presentation.unanswered}
@@ -147,7 +147,7 @@ function ResultPanel({
           </div>
         </div>
 
-        <details aria-label="Recorded interpretation" className="mt-6 rounded-surface border border-border bg-surface p-5">
+        <details aria-label="Recorded interpretation" className="mt-6 rounded-surface border-2 border-panel-border bg-surface p-5">
           <summary className="cursor-pointer text-ui leading-ui font-medium text-text">
             The recorded interpretation (verbatim)
           </summary>
@@ -155,7 +155,7 @@ function ResultPanel({
         </details>
       </section>
 
-      <details className="rounded-surface border border-border bg-surface p-5"
+      <details className="rounded-surface border-2 border-panel-border bg-surface p-5"
         aria-label="Exact data table: coefficients and inference">
         <summary className="cursor-pointer text-ui leading-ui font-medium text-text">
           Exact coefficients and inference
@@ -309,7 +309,7 @@ function LimitationsDisclosure({
 }) {
   const codes = run.limitations.gate_limit_codes;
   return (
-    <details className="rounded-surface border border-border bg-surface p-5">
+    <details className="rounded-surface border-2 border-panel-border bg-surface p-5">
       <summary className="cursor-pointer text-ui leading-ui font-medium text-text">
         All recorded limitations · {codes.length}
       </summary>
@@ -422,7 +422,7 @@ function DiagnosticsPanel({ run }: { run: ModelRunDetailData }) {
       </section>
 
       {exact.length > 0 ? (
-        <details className="rounded-surface border border-border bg-surface p-5">
+        <details className="rounded-surface border-2 border-panel-border bg-surface p-5">
           <summary className="cursor-pointer text-ui leading-ui font-medium text-text">
             Exact diagnostic p-values
           </summary>
@@ -437,7 +437,7 @@ function DiagnosticsPanel({ run }: { run: ModelRunDetailData }) {
         </details>
       ) : null}
 
-      <details className="rounded-surface border border-border bg-surface p-5">
+      <details className="rounded-surface border-2 border-panel-border bg-surface p-5">
         <summary className="cursor-pointer text-ui leading-ui font-medium text-text">
           Full recorded diagnostics (verbatim)
         </summary>
@@ -638,7 +638,7 @@ function SpecificationPanel({
           ))}
         </dl>
       </section>
-      <details className="rounded-surface border border-border bg-surface p-5">
+      <details className="rounded-surface border-2 border-panel-border bg-surface p-5">
         <summary className="cursor-pointer text-ui leading-ui font-medium text-text">
           Raw specification (recorded verbatim)
         </summary>
@@ -730,10 +730,10 @@ function ReproductionPanel({
           A reviewer re-verifies the downloaded bundle offline — no operator tooling, no
           network, no re-fit — with:
         </p>
-        <pre className="mt-2 overflow-x-auto rounded-surface border border-border bg-surface-muted p-4 text-ui leading-ui font-mono">
+        <pre className="mt-2 overflow-x-auto rounded-surface border-2 border-panel-border bg-surface-muted p-4 text-ui leading-ui font-mono">
           <code>{verifyCommand}</code>
         </pre>
-        <details className="mt-4 rounded-surface border border-border bg-surface p-5">
+        <details className="mt-4 rounded-surface border-2 border-panel-border bg-surface p-5">
           <summary className="cursor-pointer text-ui leading-ui font-medium text-text">
             Recorded environment and reproduction contract (verbatim)
           </summary>

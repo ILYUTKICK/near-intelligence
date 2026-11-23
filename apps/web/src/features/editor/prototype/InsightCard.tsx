@@ -32,7 +32,7 @@ function InsightCardView({
 
   return (
     <NodeViewWrapper
-      className="my-4 rounded-surface border border-border bg-surface-muted p-4"
+      className="my-4 rounded-surface border-2 border-panel-border bg-surface-muted p-4"
       data-insight-card
     >
       <div contentEditable={false} className="not-prose">

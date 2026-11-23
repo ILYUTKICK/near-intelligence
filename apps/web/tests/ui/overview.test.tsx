@@ -13,11 +13,13 @@ describe("Approved editorial Overview", () => {
     const { container } = render(<HomePage />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Understand NEAR.Build your own thesis.");
     expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
-      "The research, in focus.", "Explore the evidence.", "How it works",
-      "Sources first. Assumptions visible.", "Make the research your own.",
+      "The research, in focus", "Explore the evidence", "How it works",
+      "Sources first. Assumptions visible", "Make the research your own",
     ]);
     for (const id of ["findings", "evidence", "mechanism", "release-status"]) expect(container.querySelector(`#${id}`)).not.toBeNull();
-    expect(screen.getByRole("link", { name: "How it works" })).toHaveAttribute("href", "#how-it-works");
+    const hero = screen.getByRole("region", { name: /Understand NEAR/ });
+    expect(within(hero).getAllByRole("link")).toHaveLength(2);
+    expect(within(hero).queryByRole("link", { name: "How it works" })).not.toBeInTheDocument();
     const workflow = screen.getByRole("region", { name: "How it works" });
     expect(within(workflow).getByRole("link", { name: "Read the hypotheses" })).toHaveAttribute("href", "/research#question");
     expect(within(workflow).getByRole("link", { name: "Browse charts" })).toHaveAttribute("href", "/charts");
@@ -55,7 +57,7 @@ describe("Approved editorial Overview", () => {
     expect(container.textContent).not.toMatch(/Selected approved metrics|Latest approved observation|\bDATA_NOT_READY\b|observed_near_purchases|treasury_payouts_near|provider_gross_fees_usd|document_id|owner_id|Bearer|\d+%/);
     expect(screen.queryByText(/^Live$/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open workspace" })).toHaveAttribute("href", "/workspace");
-    expect(screen.getByRole("link", { name: "Open workspace" })).toHaveClass("focus-visible:outline-on-accent");
+    expect(screen.getByRole("link", { name: "Open workspace" })).toHaveClass("focus-visible:outline-focus");
   });
 
   it("uses decorative prioritized artwork rather than a baked-in screenshot or financial chart", () => {
@@ -64,9 +66,9 @@ describe("Approved editorial Overview", () => {
     expect(image).toHaveAttribute("alt", "");
     expect(image).toHaveAttribute("loading", "eager");
     expect(image).toHaveAttribute("fetchpriority", "high");
-    expect(image?.getAttribute("src")).toContain("overview-research-desk.png");
-    expect(image).toHaveAttribute("width", "1254");
-    expect(image).toHaveAttribute("height", "1254");
+    expect(image?.getAttribute("src")).toContain("trace-approved.png");
+    expect(image).toHaveAttribute("width", "1312");
+    expect(image).toHaveAttribute("height", "1199");
   });
 
   it("supports keyboard action order and passes the accessibility tree check", async () => {

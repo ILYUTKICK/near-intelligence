@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LoadingPanel } from "@/components/data-state/DataState";
 import { PageIntro } from "@/components/layout/PageIntro";
 import { ProductIcon } from "@/components/layout/ProductIcon";
+import { ResearchIllustration } from "@/features/public-research/ResearchIllustration";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -136,7 +137,7 @@ export function SavedCharts() {
   return <div className="min-w-0 space-y-6">
     <PageIntro compact eyebrow="Saved Charts" title="Evidence worth keeping."
       description="Return to a saved range and filters. Live selections resolve the latest approved dataset."
-      action={<Button asChild><Link href="/workspace/charts">Explore charts <ProductIcon name="arrow" /></Link></Button>} />
+      action={<Button asChild><Link href="/workspace/charts">Explore charts</Link></Button>} />
     <form role="search" className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); setCursor(null); setQuery(search.trim()); }}>
       <div><Label htmlFor="saved-search">Search saved charts</Label><Input id="saved-search" type="search" value={search} maxLength={200}
         className="rounded-full text-ui" placeholder="Search by label" onChange={(event) => setSearch(event.target.value)} /></div>
@@ -146,12 +147,15 @@ export function SavedCharts() {
     {loading ? <LoadingPanel label="Loading saved charts" /> : null}
     {error ? <div role="alert" className="paper-panel space-y-3 p-6"><p>{error}</p><Button variant="secondary" onClick={reload}>Try again</Button></div> : null}
     {data?.items.length === 0 ? (
-      <div className="paper-panel p-9 text-center">
-        <ProductIcon name={query ? "search" : "chart"} className="mx-auto mb-3 size-7 text-accent" />
+      <div className={query ? "paper-panel p-8" : "paper-panel grid items-center gap-7 p-8 text-left lg:grid-cols-[14rem_1fr]"}>
+        {!query ? <ResearchIllustration className="mx-auto h-auto w-full max-w-[14rem]" /> : null}
+        <div>
+        <ProductIcon name={query ? "search" : "chart"} className="mb-3 size-7 text-accent" />
         <p role="status" className="font-serif text-heading">No saved charts match this selection.</p>
         <p className="mt-2 text-ui text-text-secondary">
           {query ? "Clear the search to see the other saved selections." : <><Link href="/workspace/charts" className="underline">Explore the chart library</Link> to save a chart.</>}
         </p>
+        </div>
       </div>
     ) : null}
     {data?.items.length ? <ul className="grid items-start gap-5 lg:grid-cols-2">

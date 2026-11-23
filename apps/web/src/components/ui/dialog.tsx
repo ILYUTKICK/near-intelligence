@@ -26,7 +26,7 @@ export function DialogContent({
       <DialogPrimitive.Content
         className={cn(
           "fixed top-1/2 left-1/2 z-50 w-[min(32rem,calc(100vw-2*var(--space-4)))] -translate-x-1/2 -translate-y-1/2",
-          "max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-dialog border border-border bg-surface p-6",
+          "max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-dialog border-2 border-panel-border bg-surface p-6",
           "shadow-[var(--shadow-overlay)]",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
           className,

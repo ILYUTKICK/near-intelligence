@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { ProductIcon } from "@/components/layout/ProductIcon";
 import { claimRegistry, type ClaimQuantity, type ThesisClaim } from "./content";
 import { RecordedQuantityPlot } from "./RecordedQuantityPlot";
 
@@ -114,7 +113,7 @@ function FigureShell({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-metadata text-text-secondary">
         {claimIds.map((id) => (
           <Link key={id} href={`#${id}-heading`} className={claimLinkClasses}>
-            Recorded claim {id} <ProductIcon name="arrow" className="size-3.5" />
+            Recorded claim {id}
           </Link>
         ))}
       </div>

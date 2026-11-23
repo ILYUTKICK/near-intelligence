@@ -345,7 +345,7 @@ export function ShareDialog({
               <div className="min-w-40">
                 <Label htmlFor="share-expiry">Link expires</Label>
                 <select id="share-expiry" data-testid="share-expiry"
-                  className="mt-1 block w-full rounded-surface border border-border bg-surface p-2 text-ui text-text"
+                  className="mt-1 block w-full rounded-surface border-2 border-panel-border bg-surface p-2 text-ui text-text"
                   value={expiry}
                   onChange={(event) => {
                     setExpiry(event.target.value as ExpiryValue);
@@ -419,7 +419,7 @@ export function ShareDialog({
             ) : (
               <ul className="mt-2 flex flex-col gap-2">
                 {shares.map((share) => (
-                  <li key={share.id} className="rounded-surface border border-border bg-surface p-3">
+                  <li key={share.id} className="rounded-surface border-2 border-panel-border bg-surface p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-ui leading-ui text-text">
                         <span className={

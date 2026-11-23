@@ -33,7 +33,7 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
         <WorkspaceSidebar />
         <div className="min-w-0 flex-1">
           <WorkspaceHeader />
-          <main id="main-content" className="px-(--page-gutter) py-8">
+          <main id="main-content" className="workspace-main px-(--page-gutter) py-8">
             {children}
           </main>
         </div>

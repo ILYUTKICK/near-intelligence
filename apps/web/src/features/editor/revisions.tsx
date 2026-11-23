@@ -54,7 +54,7 @@ export function ResearchRevisions({ documentId, versionId, cursor }: {
               <time dateTime={revision.created_at} className="mt-1 block text-ui text-text-secondary">{formatUpdated(revision.created_at)} UTC</time>
             </div>
             <Button asChild variant="secondary">
-              <Link href={`${historyHref}?version=${revision.id}`} prefetch={false}>Revision {revision.revision} <ProductIcon name="arrow" /></Link>
+              <Link href={`${historyHref}?version=${revision.id}`} prefetch={false}>Revision {revision.revision}</Link>
             </Button>
           </li>
         ))}

@@ -42,7 +42,7 @@ export default async function ProfilePage() {
             <p className="eyebrow">Preferences</p>
             <h2 className="mt-2 text-heading">A workspace that stays focused.</h2>
             <Link href="/workspace/settings" className="mt-3 inline-flex min-h-11 items-center gap-2 text-ui font-medium hover:underline">
-              Open Settings <ProductIcon name="arrow" />
+              Open Settings
             </Link>
           </div>
         </aside>

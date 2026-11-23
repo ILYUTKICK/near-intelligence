@@ -3008,3 +3008,102 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Follow-up verification:** 1068 relative links resolve;17 shell blocks parse and fences balance; git diff --check passes. README env and own-domain snippets re-executed in disposable source copy;26 VPS tests, env and hardened Compose checks pass. MIT metadata JSON/TOML consistency and offline uv lock check pass with uv.lock/pnpm-lock/requirements unchanged. Published-ref review covers66 branches,737 commits/2782 blobs;40 pattern hits are placeholders/examples/synthetic tests, no actual credential identified. Scope/limits and binary/remote-GitHub exclusions recorded in PUBLIC_RELEASE. Prior documentation head de9ce66 passed all4 CI jobs in run43638842063; final follow-up head checks are verified on the PR before handoff.
 - **Follow-up boundaries:** Repository remains private; no visibility mutation, application submission, history rewrite, raw-data publication, runtime change or remote deployment. GitHub-only logs/artifacts/discussions and full asset rights are not cleared by the bounded Git review.
 - **Follow-up completed at:** 2026-11-15T00:52:22+03:00.
+
+
+### NI-099 — Implement the approved Comic Lab desktop identity
+
+- **Epic:** 01 — Design system and product presentation
+- **Priority:** P1, explicit owner redesign request, 22 November 2026
+- **Dependencies:** NI-075, NI-086, NI-064
+- **Complexity:** L
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat 01a1fb40-3d6a-7912-87bf-615fdbf1bfff
+- **Execution role:** A
+- **Started at:** 2026-11-22T00:56:59+03:00
+- **Branch/worktree:** feat/ni-099-comic-lab; /Users/ilyutkinn/.codex/worktrees/near-comic-lab/Near
+- **Authorization:** Owner approved Comic Lab direction A, the three-node graph wordmark, TRACE and English mockups, then explicitly requested implementing locally and delivering a GitHub feature PR. This replaces the prior editorial appearance only; no merge or deployment.
+- **Dependency verification:** NI-075/086/064 are DONE, with shared components, public pages and desktop checks present at main 3ff78b0. Other active NI-080/088/092/093/095 claims and behavior are preserved, not reassigned.
+- **Handoff:** Per PLAN's explicit separate-task-agent instruction, a dedicated NI-099 agent implements the web code. /root owns the asset handoff, execution registry, local runtime, verification and delivery. Coordinate shared files before edits.
+
+**Description:** Apply the owner-approved mint/ivory/ink Comic Lab design to the implemented Next.js frontend. Begin with shared tokens/controls and the personal workspace, then cover public, chart/model, editor and account views. Use the 58 visual frames as references while retaining existing services, real datasets, exact values, source context, definitions, ownership, revision pins, exports and all route functionality. English text throughout.
+
+**Implementation steps:** Import canonical logo/TRACE and self-hosted licensed Rubik/Golos Text/IBM Plex Mono; extend existing semantic tokens and shared primitives/shells; restyle workspace Home/navigation and shared feature views; update public/auth/account views; run appropriate automated and real desktop browser checks; deliver a focused branch and reviewable PR with screenshots and actual results.
+
+**Acceptance criteria:** Recognizable canonical graph logo and TRACE, consistent Comic Lab typography/palette/borders/radii/shadows across current desktop routes, accessible loading/error/empty states and keyboard operation. Existing chart/editor/save/reopen/export behavior and financial/reproducibility contracts retained. No fake production data, duplicate metric logic, schema/auth changes, raw archive or secrets in Git, new provider calls, collector restart, mobile work, merge or deployment. Record actual verification and honest limitations.
+
+**Expected files/modules:** apps/web styles, layout/UI components, frontend feature views, existing chart theme only where required, public brand assets/fonts, relevant tests, docs/DESIGN_SYSTEM.md and docs/verification/ni-099.
+
+**Testing requirements:** Lint, strict TS, relevant/full web unit tests, production build, contrast and client-secret checks, affected chart/editor/navigation checks, and desktop public/private browser journeys. Verify actual saved-chart/document save/reopen/export where local inputs permit; run two-user checks if private behavior changes. Record fixture versus real-data scope. Independent review skipped under the existing 9 November instruction; coordinator acceptance remains mandatory.
+
+- **Result:** Implemented canonical graph wordmark/favicon and approved TRACE, same-origin licensed Rubik/Golos Text/IBM Plex Mono, mint/ivory/ink shared tokens and outlined controls/panels across the current desktop application. Restyled Home/checklist, public/auth and chart/model/editor/share views; added the existing Chart library destination to cabinet navigation. Preserved API/auth/ownership, metric logic, editor schema, revision pins, scientific renderer and frozen export palette. Updated design/IA/screen documentation and asset/license provenance.
+- **Verification:** Final production build, strict TypeScript and lint pass (four existing unused-variable warnings); full web unit suite 66 files / 682 tests pass. Final contrast gate passes 28 role pairs. OpenAPI/generated client unchanged. Final desktop production-stack journeys: 16/16 pass, 4.8 minutes, 1440×900, one worker/no retries. Real API/PG/RLS/worker verify pinned exact values, save/reopen, source-outage behavior, ZIP manifest/member hashes and two-user denial; provider transport/data in automated tests are synthetic and labeled. Axe reports zero serious/critical and no lower-impact findings on scanned surfaces; keyboard/focus/sidebar checks pass. 1085 relative doc links and whitespace pass. Client-secret command exits0 with no root .env / nothing to scan. Evidence and five screenshots: [NI-099 report](verification/ni-099/README.md).
+- **Coordinator review:** Actual native Chrome desktop inspection covers login/demo Home, editor, historical Intents charts and the final rebuilt Home. Found/fixed secondary-copy contrast on lavender (4.03→4.98:1), expanded the contrast gate, and fixed the existing research E2E's autosave revision-count race while retaining exact DB/export revision/hash checks and requiring full outage prose. Dedicated task agent implemented; root reviewed and verified. Independent second acceptance remains waived under the existing owner instruction.
+- **Local preview / limits:** Production-build local preview left running at http://127.0.0.1:51574 with saved historical archive/cohort imported into a disposable DB. This is not restored production state or a real-provider login/model completeness acceptance. No raw archive, credentials, local state, mobile work, backend/schema/collection changes, merge or deployment. Deliver the branch as a reviewable PR; owner controls merge.
+- **Completed at:** 2026-11-22T01:21:27+03:00
+
+- **Reopened for CI acceptance:** 2026-11-22T13:55:10+03:00; full GitHub desktop suite passed24/skipped1 but D5 found paper top397px above the preserved <386px limit. Coordinator tightens workbench spacing and re-runs the unchanged acceptance threshold; no data/auth behavior change.
+
+- **CI correction result:** Preserved the D5 <386px gate and compacted workbench spacing; actual paper top 381px / visible 519px at1440×900. Fresh production build and focused editor ESLint pass; full local desktop suite passes25/skips1 existing D4, 3.2m, one worker/no retries. Includes sharing/custom-range/viewport/table scenarios beyond the earlier16-case pass. Six screenshots in the report; final preview http://127.0.0.1:51574. No API or data logic changed.
+- **Follow-up completed at:** 2026-11-22T14:00:50+03:00
+
+
+### NI-100 — Apply Unslop polish to the approved Comic Lab UI
+
+- **Epic:** 01 — Design system and product presentation
+- **Priority:** P1, explicit owner polish request
+- **Dependencies:** NI-099
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat 01a1fb40-3d6a-7912-87bf-615fdbf1bfff
+- **Execution role:** A
+- **Started at:** 2026-11-22T14:36:59+03:00
+- **Branch/worktree:** feat/ni-099-comic-lab; current attached Near worktree at 6fd643c, PR105
+- **Authorization:** Owner explicitly requests applying Unslop after approving and implementing Comic Lab. Existing brand direction remains approved; this authorizes bounded polish and verification in the ongoing feature PR, not a new identity, merge or deployment.
+- **Dependency verification:** NI-099 is DONE; four latest-head CI jobs passed on6fd643c. Working tree was clean before this task. No unrelated claim is reassigned.
+- **Handoff:** Per PLAN's separate-task-agent rule, /root/ni100_unslop owns bounded frontend/style/test/design-doc changes; root owns audit/direction, registry, runtime, verification and delivery. No simultaneous edits to shared files.
+
+**Description:** Apply the local Unslop skill in light-polish mode. Audit current rendered screens/code; preserve the owner-approved Comic Lab identity while reducing competing accents, vague app copy and oversized/redundant chrome. Follow the nine passes in order and record actual deltas, retained brand decisions and skill credit.
+
+**Acceptance criteria:** The private workspace has a clear action hierarchy, readable contextual page titles, quieter supporting panels and consistent icon/spacing details. Public hero has at most two adjacent actions with all destinations preserved; short UI copy is concrete and sentence case. Canonical brand/art/font families, feature/section order, exact financial values, accessible state/focus behavior, auth/ownership, editor schema, pins and exports remain intact. No fake data, new images/video/dependencies, mobile adaptation, raw data/credentials publication, merge or deployment.
+
+**Expected files:** Shared workspace/intro/header styles; WorkspaceHome; bounded public/auth labels and navigation; existing UI tests, landing HTTP copy expectations and design docs; docs/verification/ni-100.
+
+**Testing requirements:** Focused affected UI tests, strict TypeScript/lint/contrast, production build, full applicable desktop journeys including D3/D5 viewport gates, keyboard/axe, save/reopen/export/two visitors. At most three visual render review rounds per Unslop run. Final current-head CI and actual before/after evidence. Independent review skipped by user instruction 2026-11-09; root acceptance mandatory.
+
+- **Result:** Applied Unslop in the approved Comic Lab direction: contextual Home/login copy, one leading action based on actual document availability, quieter secondary panels/metadata, shared SVG checklist icons, workspace-only 36/42 px PageIntro and 64 px desktop bar. Public active nav is neutral; Overview retains two hero actions with How it works preserved in footer. TRACE/logo/palette/font families and focal drawn frame remain. Full audit, nine-pass decisions, skill credit and six after captures: [NI-100 report](verification/ni-100/README.md).
+- **Verification:** Focused 3 files / 25 tests, full 66 files / 682 tests (57.61s), strict TS/lint/build and 28 contrast pairs pass. Four existing unused-variable warnings remain. Real landing HTTP integration passes (2.175s), including data publication/outage/source-byte checks; only owned-heading expectations changed. Full desktop production-stack suite passes 25 / skips 1 existing D4 in 4.0m; D5 paper 365 px (<386), visible 535 px, chart viewport/keyboard/axe, save/reopen/frozen ZIP hashes, two-user isolation and sharing pass. Client-secret check reports no configured root .env/nothing to scan. Native Chrome login→demo Home inspection confirms action/panel hierarchy. Whitespace passes; 1,108 relative documentation links resolve.
+- **Reviewer:** Root inspected changed source and actual browser output after the dedicated agent's implementation; independent review skipped by user instruction 2026-11-09. Preserved source-qualified values, research prose, APIs/auth/editor/pins/export contracts and current 44 px controls. Existing before captures reused; one after-code version rendered/reviewed, no iterative redesign or new media.
+- **Local handoff / limits:** Review at http://127.0.0.1:58346/ with existing saved archive in isolated DB; automated tests use labeled fixtures and synthetic provider transport. No raw archive/secrets/local-state publication, new provider request, mobile work, merge or deployment. Update existing PR105; owner retains merge.
+- **Completed at:** 2026-11-22T14:48:41+03:00
+
+- **Reopened for CI:** 2026-11-22T14:52:58+03:00; web CI on 0d60e3a found an existing controlled-request test race: loading UI can render before the Home effect assigns resolveHome. Wait for actual request setup before resolving 503; preserve all failure/retry assertions. Runtime code and passing desktop acceptance remain unchanged.
+
+- **CI follow-up:** API/database/full browser CI pass on 0d60e3a. Corrected the existing Home unit test to wait for actual controlled-request setup before resolving 503; assertions and production behavior unchanged. Home 10/10 and Home/model/thesis 45/45 (3 files, 13.31s) pass, plus strict TS/targeted ESLint. A repeated full local run hit 4 failures / 4 jsdom errors in two unchanged model/thesis files (5s limits/selection geometry); the isolated same tests pass. Original 682-test / full 25-case runtime evidence remains valid; final current-head CI is still required for delivery. No increased timeout or skipped new test.
+- **Follow-up completed at:** 2026-11-22T14:57:50+03:00
+
+### NI-101 — Complete Unslop follow-up and restore Save chart
+
+- **Epic:** 01 — Design system and product presentation
+- **Priority:** P1, explicit owner follow-up
+- **Dependencies:** NI-100, NI-096
+- **Status:** DONE
+- **Claimed by:** Codex /root, chat 01a1fb40-3d6a-7912-87bf-615fdbf1bfff
+- **Execution role:** A
+- **Started at:** 2026-11-23T01:57:46+03:00
+- **Branch/worktree:** feat/ni-099-comic-lab; /Users/ilyutkinn/.codex/worktrees/near-comic-lab/Near; PR105 at34711a6
+- **Authorization:** Explicit owner request to continue Unslop across all public tabs, workspace entry/tabs, opened research and individual charts, and restore Save chart next to Add to research in Data Explorer. The Save chart request supersedes NI-096's action removal for these surfaces. No merge or deployment.
+- **Dependency verification:** NI-100 and NI-096 DONE; clean checkout at34711a6; PR105 remains open/unmerged. Existing unrelated claims preserved.
+- **Handoff:** Dedicated /root/ni101_unslop implements web and affected tests per PLAN's separate-task-agent instruction. Root owns registry, audit/runtime, actual acceptance and delivery; no concurrent shared-file edits.
+
+**Description:** Apply installed Unslop in the approved Comic Lab direction across every requested desktop surface. Remove redundant action arrows, simplify technical/editor chrome without losing controls or evidence, and restore existing owned saved-chart persistence from workspace explorer cards/details.
+
+**Acceptance criteria:** Review matrix covers all five public tabs, entry, every cabinet destination, opened editor and every available registered chart detail. Keep canonical brand, research content, meaningful directional controls, exact source-qualified values and accessible errors/loading/empty states. Save chart beside Add to research persists the inspected selection, can be reopened in Saved Charts and maintains two-user isolation and pins. Editor save/reopen/export and viewport gates remain working. No new datasets, schemas, providers, paid services, generated media, mobile work, merge or deployment.
+
+**Expected files:** Frontend public/workspace/chart/editor components, affected unit/browser tests, design/spec follow-up and docs/verification/ni-101.
+
+**Testing requirements:** Relevant/full web tests, strict TS/lint/contrast, production build, full desktop E2E including restored save-chart D4 where applicable, exact value/pin/source/ownership and editor save/reopen/export checks, local browser review. At most three visual review rounds. Record fixtures versus saved archive truthfully. Current-head CI required. Independent review skipped by user instruction 2026-11-09; root acceptance mandatory.
+
+- **Result:** Removed decorative action arrows across public/workspace screens and catalogs, clarified Blog/My Research/default periods/error/empty copy, quieted editor controls and contextual metadata with accessible disclosures. Restored real Save chart beside Add to research on private category/detail surfaces, keyed by account and inspected selection. Corrected duplicate saved-preview tables, cramped multi-unit panels and long comparison legends without mutating the scientific builder or frozen exports. Canonical identity and data/auth/pin/schema contracts retained.
+- **Verification:** Source deb1546: production build, strict TS, lint (three existing ModelRunDetail warnings), 28 contrast pairs and unchanged OpenAPI/generated client pass. Sequential full web suite 66 files/685 tests passes (233.09s). Full desktop production-stack E2E 27/27 passes without retries/skips (3.3m), including restored D4, all registered public/private charts/categories, exact values, save/reopen, pinned outage/export hashes, two-user denial and sharing. D3 plot320px visible, D4 preview208px visible, D5 paper top343px (<386), visible557px; axe has no findings on scanned surfaces. Saved-chart/snapshot real DB/HTTP suites9+7+1 pass. 1,135 documentation links/whitespace pass; client-secret command reports no root .env/nothing to scan. Four GitHub CI jobs pass on deb1546, run45158674892. [Full report/screenshots](verification/ni-101/README.md).
+- **Coordinator review:** Root inspected actual native Chrome output for the five public tabs, entry, all workspace destinations, opened research and individual chart states; saved six real-archive selections including changed dates/price basis/two-recipient comparison/provider. Dedicated NI-101 agent implemented; root accepted and verified. Independent review skipped by user instruction 2026-11-09.
+- **Local handoff / limits:** Final production preview http://127.0.0.1:56647/ uses permitted saved archive in an isolated DB. Supply-context combined dataset and a reviewed model are absent in that preview and remain honestly unavailable. Automated data/provider transport is explicitly synthetic, with real gateway/API/PG/RLS/worker. No raw archive, credentials or local state published; no new provider request, mobile work, merge or deployment. PR105 remains owner-merge only. Final documentation/evidence delivery receives fresh current-head CI before handoff.
+- **Completed at:** 2026-11-23T13:52:25+03:00

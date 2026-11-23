@@ -14,10 +14,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Button } from "@/components/ui/button";
-import { ChartView } from "@/features/charts/renderer/ChartView";
+import { ChartView, withBrowserLegend } from "@/features/charts/renderer/ChartView";
 import type { FiltersSelection } from "@/features/charts/filters/filter-values";
 import type { ChartFactory, ChartViewLoader } from "@/features/charts/renderer/ChartView";
-import type { ChartOption } from "@/features/charts/renderer/option-builder";
+import { buildChart, type ChartOption } from "@/features/charts/renderer/option-builder";
 import type { ChartViewResponse } from "@/features/charts/renderer/view-types";
 import {
   definition,
@@ -616,6 +616,44 @@ describe("ChartView — localized rendering failures", () => {
 });
 
 describe("ChartView — compact presentation (NI-078, NI-076 D3/D4)", () => {
+  it("bounds long comparison legends without changing series identities or the shared export option", () => {
+    const payoutMetric = metric("NEAR", "Synthetic treasury payouts with a long shared metric title", "synthetic_treasury");
+    const comparison = view(definition(), [
+      { ...series(payoutMetric, [observation("2026-11-01", "1.25")]), selection: { start: "2026-11-01", end: "2026-11-06", frequency: "day", filters: { recipient: "buybacks.synthetic.near" } } },
+      { ...series(payoutMetric, [observation("2026-11-01", "2.5")]), selection: { start: "2026-11-01", end: "2026-11-06", frequency: "day", filters: { recipient: "fefunds.synthetic.near" } } },
+    ]);
+    const built = buildChart(comparison, { interactions: false, animation: false });
+    expect(built.kind).toBe("ok");
+    if (built.kind !== "ok") throw new Error("Synthetic comparison must build");
+    const original = JSON.stringify(built.option);
+    const fitted = withBrowserLegend(built.option);
+    expect(JSON.stringify(built.option)).toBe(original);
+    expect(fitted.series).toBe(built.option.series);
+    expect(fitted.grid).toBe(built.option.grid);
+    const legend = Array.isArray(fitted.legend) ? fitted.legend[0] : fitted.legend;
+    const sourceLegend = Array.isArray(built.option.legend) ? built.option.legend[0] : built.option.legend;
+    expect(legend).toMatchObject({ type: "scroll", orient: "horizontal", left: 8, right: 8, padding: 0,
+      textStyle: { width: 160, overflow: "truncate" }, tooltip: { show: true, confine: true } });
+    expect(legend?.data).toBe(sourceLegend?.data);
+    const format = legend?.formatter;
+    if (typeof format !== "function") throw new Error("Browser legend must distinguish comparisons");
+    expect(format(String(sourceLegend?.data?.[0]))).toBe("buybacks.synthetic.near");
+    expect(format(String(sourceLegend?.data?.[1]))).toBe("fefunds.synthetic.near");
+  });
+
+  it("gives separate-unit panels room for readable axes even on compact cards", async () => {
+    const multiDefinition = definition();
+    const multiView = view(multiDefinition, [
+      series(volumeMetric, [observation("2026-11-01", "1200")]),
+      series(metric("events", "Synthetic conversions", "synthetic_events"), [observation("2026-11-01", "24")]),
+    ]);
+    const { factory, instances } = recordingFactory();
+    render(<ChartView definition={multiDefinition} view={multiView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" height={240} variant="card" factory={factory} />);
+    await waitFor(() => expect(instances).toHaveLength(1));
+    expect(screen.getByRole("img")).toHaveStyle({ height: "464px" });
+    expect(instances[0].context.height).toBe(464);
+  });
+
   it("hides the repeated frame title in compact contexts while the exact table stays visible", () => {
     render(<ChartView definition={definition()} view={resolvedView} selection={{ start: "2026-11-01", end: "2026-11-06" }} mode="historical" presentation="compact" />);
     // The frame does not repeat the title in compact contexts.
@@ -638,6 +676,11 @@ describe("ChartView — compact presentation (NI-078, NI-076 D3/D4)", () => {
     const region = within(disclosure as HTMLElement).getByRole("region", { name: /exact data table/ });
     expect(region).toBeInTheDocument();
     expect(region.closest("details")).toBe(disclosure);
+    // There must be no second, always-visible table beside the plot. Real
+    // keyboard opening and exact-value visibility are exercised by D4.
+    expect(screen.getAllByRole("region", { name: /exact data table/, hidden: true })).toHaveLength(1);
+    expect(disclosure).not.toHaveAttribute("open");
+    expect(region).not.toBeVisible();
     expect(screen.queryByText("Accessible summary")).toBeNull();
     expect(screen.queryByText("Historical — pinned version")).toBeNull();
     expect(screen.queryByText(/Period:/)).toBeNull();

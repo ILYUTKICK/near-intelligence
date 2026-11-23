@@ -72,7 +72,7 @@ export function DataTableBlockView({ node, editor, getPos }: NodeViewProps) {
   return (
     <NodeViewWrapper
       data-data-table-block
-      className="my-4 overflow-x-auto rounded-surface border border-control-border bg-surface p-4"
+      className="my-4 overflow-x-auto rounded-surface border border-border bg-surface p-4"
       aria-label="Data table block"
     >
       <div contentEditable={false} className="not-prose">

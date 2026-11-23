@@ -1,31 +1,87 @@
 # Design system
 
-NI-075 applies the NI-074 desktop design to the application. Public pages use generous editorial compositions. Data and the private workspace use denser controls and the same paper, type and evidence styles. The original notebook illustration from NI-074 appears on the Overview, auth pages and workspace Home.
+NI-099 implements the owner's approved **A / Comic Lab** desktop identity. The
+warm paper, emerald mint, ink outlines and compact offset shadows are shared
+across public research, the private workspace and native interaction controls.
+The canonical three-node graph wordmark is the product logo. TRACE is the
+approved mascot and appears on Overview, auth, workspace Home and the actual
+empty Saved Charts state. It never stands in for missing observations.
+
+This supersedes the NI-075 editorial appearance only. All route, ownership,
+source/metric, financial-definition, revision-pin and export contracts remain.
 
 ## Application tokens
 
 | Token | Value | Use |
 | --- | --- | --- |
-| color.canvas | #F8F6EE | Main warm ivory background |
-| color.surface | #FFFDFA | Reading paper, cards, dialogs |
-| color.surface-muted | #F0EDE5 | Quiet neutral fill |
-| color.text | #132C41 | Primary navy typography |
-| color.text-secondary | #596B75 | Secondary descriptions, readable metadata |
-| color.accent | #1C5B41 | Primary actions and links |
-| color.accent-hover | #154632 | Hover/pressed action |
-| color.sage | #E7EFDD | Selected rows and positive status surfaces |
-| color.border | #E7E1D6 | Decorative divider |
-| color.control-border | #79877C | Input boundaries on light surfaces |
-| color.focus | #285F9A | Focus ring, ≥2px plus offset |
-| color.warning | #8A5C2B | Stale/partial text with pale background |
-| color.danger | #973E36 | Errors and opposing evidence, with label/icon |
-| color.info-surface / color.chart-2 | #E8EEF2 / #3A6684 | Informational status surfaces and text |
+| color.canvas | #FFFDF6 | Warm ivory page |
+| color.surface | #FFFFFF | Reading paper and native dialogs |
+| color.surface-muted | #EEF5EF | Quiet secondary surface |
+| color.text | #10231C | Ink text and outlines |
+| color.text-secondary | #46594F | Readable secondary copy |
+| color.action / color.action-hover | #00E5A0 / #00D393 | Mint primary actions and selected navigation |
+| color.on-action | #10231C | Ink labels on mint; never white |
+| color.accent / color.accent-hover | #006E4E / #00553D | Dark readable links and text accents |
+| color.on-accent | #FFFFFF | Text on existing dark accent/danger fills |
+| color.sage | #C9FAE7 | Pale mint contextual highlights |
+| color.yellow / color.lavender | #FFE27A / #DACBFF | Supporting editorial/research notes |
+| color.panel-border / color.control-border | #10231C | Outlined cards and controls |
+| color.border | #CAD8CF | Quiet dividers within content |
+| color.focus | #007B58 | Visible keyboard focus |
+| color.warning / color.danger | #8A5C2B / #973E36 | Labeled warning and error text |
 
-Small text needs 4.5:1 contrast and control boundaries and focus rings need at least 3:1 where applicable. Statuses carry text and icons. Run `pnpm --filter web check:contrast` against the current tokens. The versioned ECharts palette stays fixed for reproducible exports. [Contrast check](../apps/web/scripts/check-contrast.mjs)
+The frozen ECharts palette and render version stay unchanged. No scientific
+series or old export is recolored by a page-level theme. `pnpm --filter web
+check:contrast` parses the actual tokens and checks text, primary/hover action,
+note surfaces, boundaries and focus. Small text needs 4.5:1 contrast; essential
+control boundaries/focus need 3:1. Semantic states always retain text/icons.
 
-Newsreader with a true italic face serves editorial headings and the writing paper. Inter serves controls, chart metadata and data tables. Both are self-hosted. Desktop page titles use a fluid 42–64 px scale and the workspace uses a smaller title scale. Body text is 16/26 px, UI is 14/20 px, supplementary metadata is 12/18 px and document text is 17/28 px. Metrics and tables use tabular lining numerals. Long-form prose is set to about 72 characters per line. [Font provenance](../apps/web/src/styles/fonts/LICENSE-NOTES.md)
+Rubik is the display family, Golos Text is the interface and writing family,
+and IBM Plex Mono is used for tabular figures. All are self-hosted through
+`next/font/local`, with original OFL licenses and provenance in
+[font notes](../apps/web/src/styles/fonts/LICENSE-NOTES.md). `--font-serif`
+remains a compatibility alias to Rubik for existing heading components, while
+the editor's paragraph body uses Golos Text. The logo uses its canonical vector
+wordmark. Headings remain bold and readable; labels and prose carry a quieter
+weight. Public page titles use the existing fluid scale; workspace PageIntro
+titles use 36/42 px on desktop so document and chart content lead. Body is 16/26 px,
+UI 14/20 px, metadata 12/18 px, and writing 17/28 px. Research prose is around
+72 characters per line, with tabular lining numerals in tables/metrics.
 
-Use the 4 px spacing scale, 22 px paper corners, 10 px field corners and 24 px dialog corners. Buttons and status chips use rounded ends. Main actions retain 44 px controls and visible focus. Public content is capped at 1280 px. The private workspace sidebar is 216 px, with 154 px and 236 px for the editor outline and properties when both panes are open.
+Use the 4 px spacing scale. Paper cards have 16 px corners, controls 12 px,
+and dialogs 20 px. Card/control outlines are 2 px. Paper cards use a compact
+4 px neutral hard shadow and overlays 6 px. Primary controls have an offset
+3 px shadow, a 44 px target and ink labels on mint. Quiet dividers remain 1 px.
+The desktop workspace sidebar is 234 px, with the existing editor outline and
+properties pane widths. Public content retains the existing 1280 px cap.
+
+NI-100 applies [Unslop by Damir Sokolovsky](https://heydamir.design/unslop)
+(CC BY 4.0) as a light polish of this approved identity. TRACE, the graph logo,
+font families and the comic outline/shadow signature stay. The main continue
+card keeps the strongest frame; secondary Home cards use the existing neutral
+border with no offset shadow. Checklist states use the shared line icons and
+explicit Complete/To do text. Existing documents make Continue research the
+primary action and Create document secondary; first use keeps creation primary.
+The desktop workspace topbar is 64 px high, with 44 px controls. Its private
+label is quiet text. Public active navigation is neutral, while private selected
+navigation retains mint. Overview has two hero actions; How it works remains
+available in the footer. Section order, destinations and scientific/chart data
+presentation are unchanged. Existing responsive layout rules are retained;
+new mobile adaptation and device checks are outside this pass.
+
+NI-101 continues the same Unslop direction across public pages, cabinet tabs,
+research editing and chart details. Action labels carry their meaning without
+repeated decorative arrows; block reorder arrows and mechanism-flow arrows
+retain their directional purpose. The Blog and My Research titles name their
+actual destinations. In the editor, the paper keeps its focal frame while block
+cards, metadata and properties use quieter borders and text. Document details,
+block references and pinned evidence identifiers remain available through native
+keyboard-operable disclosures; the truthful save state remains visible. Chart
+defaults show the actual UTC period and exclusive end without URL/registry jargon.
+Private Data Explorer cards and details restore Save chart alongside Add to
+research, using the existing inspected selection, account guard and idempotent
+saved-chart API. Each selection gets its own save attempt; public continuation,
+ownership, source values, revision pins and export contracts are preserved.
 
 ## Component contracts
 
@@ -39,8 +95,8 @@ Breakpoints: <768 phone single column, 768–1279 tablet/collapsed tools, ≥128
 
 Phone inputs use ≥16px font to prevent zoom, touch-action chosen per control, hover styles behind `(hover:hover)`, safe-area bottom padding, `100dvh` with fallback for full-height layout. Do not disable page zoom. Charts retain vertical page scrolling; horizontal brush/pan is explicit, not a scroll trap. Essential values available through table/tap and keyboard, not hover.
 
-Buttons give 120 ms transform feedback on pointer press. Keyboard navigation, editing and save status are immediate. Reduced motion disables press scaling.
+Buttons give 120 ms transform feedback on pointer press, gated to a fine pointer and non-reduced motion. Keyboard navigation, editing and save status are immediate. Reduced motion disables press scaling.
 
 ## Accessibility verification
 
-Landmarks, skip link and heading hierarchy; persistent labels; aria-live polite for save errors/status without announcing every keystroke; dialog focus entry/escape/return; keyboard block insertion and up/down reorder alternatives; source details usable without hover. Chart descriptions/table include missing values and units. Never use apparent precision or an unlabeled confidence gauge as visual authority. Test actual screen reader and mobile interaction in NI-064.
+Landmarks, skip link and heading hierarchy; persistent labels; aria-live polite for save errors/status without announcing every keystroke; dialog focus entry/escape/return; keyboard block insertion and up/down reorder alternatives; source details usable without hover. Chart descriptions/table include missing values and units. Never use apparent precision or an unlabeled confidence gauge as visual authority. Desktop keyboard/screen-reader acceptance remains applicable. Historical responsive behavior is retained; new mobile development and device passes are outside NI-099.

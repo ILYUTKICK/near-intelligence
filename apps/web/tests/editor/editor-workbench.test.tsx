@@ -169,6 +169,9 @@ async function renderReady(content: CanonicalDocument = PLAIN_DOC, handlers: Arr
   ]);
   render(<ResearchDocumentEditor documentId={DOC_ID} />);
   await screen.findByRole("textbox", { name: "Research paper editor" });
+  // Tiptap mounts the paper before the shell's queued initial selection
+  // derivation. Wait for usable block operations rather than the DOM alone.
+  await waitFor(() => expect(screen.getByRole("button", { name: /^Duplicate$/ })).toBeEnabled());
   return requests;
 }
 

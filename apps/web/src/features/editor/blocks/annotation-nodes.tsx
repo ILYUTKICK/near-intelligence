@@ -34,7 +34,7 @@ import { classificationLabels, targetKindLabels } from "../evidence/options";
  */
 
 const cardWrapperClass =
-  "my-4 rounded-surface border border-control-border bg-surface p-4";
+  "my-4 rounded-surface border border-border bg-surface p-4";
 
 function EditPropertiesButton({ editor, getPos, blockId }: {
   editor: NodeViewProps["editor"];
@@ -71,7 +71,9 @@ function ContextSummary({ context }: { context: CanonicalContext | null }) {
     return null;
   }
   return (
-    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-metadata leading-metadata text-text-secondary">
+    <details className="mt-2 text-metadata leading-metadata text-text-secondary">
+      <summary className="min-h-6 cursor-pointer rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Evidence details</summary>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
       {"chart_definition_version_id" in context ? (
         <>
           {fieldPair("Chart definition version", shortId(context.chart_definition_version_id), "ccd")}
@@ -88,7 +90,8 @@ function ContextSummary({ context }: { context: CanonicalContext | null }) {
         </>
       )}
       {fieldPair("Context hash", shortId(context.context_hash), "chash")}
-    </dl>
+      </dl>
+    </details>
   );
 }
 
@@ -152,7 +155,7 @@ function InsightBlockView({ node, editor, getPos }: NodeViewProps) {
       <div contentEditable={false} className="not-prose">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-ui text-ui leading-ui font-medium text-text">Insight</p>
-          <span className="rounded-control border border-control-border px-1.5 py-0.5 text-metadata leading-metadata text-text-secondary">
+          <span className="text-metadata leading-metadata text-text-secondary">
             {attrs.type ?? "—"} · {attrs.classification ?? "—"}
           </span>
         </div>
@@ -249,7 +252,7 @@ function HypothesisBlockView({ node, editor, getPos }: NodeViewProps) {
       <div contentEditable={false} className="not-prose">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-ui text-ui leading-ui font-medium text-text">Hypothesis</p>
-          <span className="rounded-control border border-control-border px-1.5 py-0.5 text-metadata leading-metadata text-text-secondary">
+          <span className="text-metadata leading-metadata text-text-secondary">
             Author assessment · {assessmentLabel(attrs.assessment)}
           </span>
         </div>
@@ -337,7 +340,7 @@ function EvidenceBlockView({ node, editor, getPos }: NodeViewProps) {
       <div contentEditable={false} className="not-prose">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-ui text-ui leading-ui font-medium text-text">Evidence</p>
-          <span className="rounded-control border border-control-border px-1.5 py-0.5 text-metadata leading-metadata text-text-secondary">
+          <span className="text-metadata leading-metadata text-text-secondary">
             {attrs.classification ? classificationLabels[attrs.classification] : "—"} · {targetLabel}
           </span>
         </div>

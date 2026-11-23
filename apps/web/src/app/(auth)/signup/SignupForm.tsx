@@ -59,7 +59,7 @@ export function SignupForm() {
 
   if (sentTo) {
     return (
-      <div role="status" className="mt-6 max-w-sm rounded-surface border border-border bg-surface-muted p-4">
+      <div role="status" className="mt-6 max-w-sm rounded-surface border-2 border-panel-border bg-surface-muted p-4">
         <p className="text-body leading-body text-text font-medium">
           Confirmation email sent to {sentTo}
         </p>

@@ -32,6 +32,7 @@ export const workspaceNav: NavItem[] = [
   { label: "Home", href: "/workspace", group: "Workspace", priority: "P0", enabled: true, icon: "home" },
   { label: "My Research", href: "/workspace/research", group: "Workspace", priority: "P0", enabled: true, icon: "book" },
   { label: "Saved Charts", href: "/workspace/saved-charts", group: "Workspace", priority: "P0", enabled: true, icon: "chart" },
+  { label: "Chart library", href: "/workspace/charts", group: "Workspace", priority: "P0", enabled: true, icon: "grid" },
   {
     label: "Network Activity",
     href: "/workspace/data/network",

@@ -28,7 +28,7 @@ const PANEL_DDL_CLASS = "text-metadata leading-metadata text-text-secondary";
 
 function InfoList({ children }: { children: React.ReactNode }) {
   return (
-    <dl className="grid gap-y-0.5 text-metadata text-text-secondary [&_dt]:mt-2 [&_dt]:font-medium [&_dd]:min-w-0 [&_dd]:break-normal [&_dd]:[overflow-wrap:anywhere]">
+    <dl className="grid gap-y-1 text-metadata text-text-secondary [&_dt]:mt-2 [&_dt]:font-medium [&_dd]:min-w-0 [&_dd]:break-normal [&_dd]:[overflow-wrap:anywhere]">
       {children}
     </dl>
   );
@@ -79,8 +79,7 @@ export function TableProperties({
           {fieldPair("Dataset version", shortId(datasetVersionId), "tds")}
         </InfoList>
         <FieldNote>
-          Dataset projections render from the pinned dataset version with the
-          data tasks; the projection itself is never edited here.
+          This table uses its saved dataset version. Its source values cannot be edited here.
         </FieldNote>
       </div>
     );
@@ -245,9 +244,7 @@ export function TableProperties({
         </button>
       </div>
       <FieldNote>
-        Cells are stored exactly as typed (strings keep decimal precision; the
-        500-character and 1k-cell limits match the canonical schema). Column
-        types describe the intended reading of the column.
+        Cells preserve exactly what you type, including decimal precision. Up to 1,000 cells and 500 characters per cell.
       </FieldNote>
     </div>
   );
@@ -257,7 +254,7 @@ export function TableProperties({
 // Pane
 // --------------------------------------------------------------------------- */
 
-const LATER_TASKS_NOTE: Record<string, string> = {
+const BLOCK_HELP: Record<string, string> = {
   liveChart:
     "Use the chart controls in the paper to inspect sources, apply a range or filter, and explicitly refresh its observed dataset. These changes are document edits.",
   insight:
@@ -266,10 +263,10 @@ const LATER_TASKS_NOTE: Record<string, string> = {
     "Use Edit hypothesis on the saved block to update the statement or author assessment. Linked evidence keeps the same hypothesis ID.",
   evidence:
     "Use Edit evidence link on the saved block to revise its target, classification or explanation.",
-  risk: "Risk body rich-text editing arrives with the annotation tasks; the title is edited on the card itself.",
-  dataTable: "Cells are edited below; the block serializes through the canonical schema.",
+  risk: "Edit the risk title on the card. Its saved explanation appears below.",
+  dataTable: "Edit the table cells below.",
   modelResult:
-    "The recorded result is re-projected from the pinned published run and never stored here; edit the interpretation on the card itself. Changing the run or dataset pin is an explicit document edit that freezes a new context.",
+    "Edit your interpretation on the card. The published result and its dataset stay pinned until you explicitly change them.",
 };
 
 function plainPreview(node: JSONContent, limit = 160): string {
@@ -308,7 +305,7 @@ export function ContextPane({
   const nodeJson = editor.state.doc.child(currentBlock.index).toJSON();
   const attrs = (nodeJson.attrs ?? {}) as Record<string, unknown>;
   const blockId = (attrs.block_id as string | null) ?? null;
-  const note = LATER_TASKS_NOTE[currentBlock.canonicalType];
+  const note = BLOCK_HELP[currentBlock.canonicalType];
 
   return (
     <div className="px-1" data-testid="context-pane">
@@ -316,9 +313,10 @@ export function ContextPane({
         {blockLabel(currentBlock.canonicalType)}
       </p>
       {blockId ? (
-        <p className="mt-1 text-metadata leading-metadata text-text-secondary">
-          Block id: <span className="break-all font-mono" title={blockId}>{shortId(blockId)}</span>
-        </p>
+        <details className="mt-2 text-metadata leading-metadata text-text-secondary">
+          <summary className="min-h-6 cursor-pointer rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Block reference</summary>
+          <p className="mt-1">Block id: <span className="break-all font-mono" title={blockId}>{blockId}</span></p>
+        </details>
       ) : null}
 
       <div className="mt-3">
@@ -402,7 +400,7 @@ export function ContextPane({
             ) : null}
             {attrs.context ? (
               <div className="mt-2">
-                <p className={PANEL_DDL_CLASS}>Pinned context (ResolvedContext)</p>
+                <p className={PANEL_DDL_CLASS}>Pinned evidence</p>
                 <InfoList>
                   {(() => {
                     const context = attrs.context as Record<string, unknown>;
@@ -464,9 +462,7 @@ export function ContextPane({
               </div>
             ) : null}
             <FieldNote>
-              The block stores the run and dataset identities plus your interpretation only —
-              coefficients/diagnostics live on the immutable published run row and are re-projected
-              for display. A newer published run never re-points this block.
+              A newer published run does not change this block. The saved run supplies its coefficients and diagnostics.
             </FieldNote>
           </div>
         ) : null}

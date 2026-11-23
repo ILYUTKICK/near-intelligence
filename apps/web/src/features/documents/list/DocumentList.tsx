@@ -191,10 +191,9 @@ export function DocumentList() {
     <div>
       <PageIntro
         compact
-        eyebrow="My Research"
-        title="Your research, connected."
-        description="A place for questions, evidence and the conclusions you are still testing."
-        action={<Button ref={newButton} onClick={openCreate}>New document <ProductIcon name="arrow" /></Button>}
+        title="My Research"
+        description="Write, organize and reopen your research documents."
+        action={<Button ref={newButton} onClick={openCreate}>New document</Button>}
       />
 
       <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
@@ -206,8 +205,8 @@ export function DocumentList() {
               type="search"
               value={searchInput}
               maxLength={200}
-              placeholder="Title contains…"
-              className="rounded-full text-ui"
+              placeholder="Search titles"
+              className="text-ui"
               autoComplete="off"
               onChange={(event) => setSearchInput(event.target.value)}
             />

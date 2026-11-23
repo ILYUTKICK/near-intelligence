@@ -65,11 +65,8 @@ export const EXPLORER_CATEGORIES: readonly ExplorerCategory[] = [
     emptyExplanation: {
       heading: "No network-level chart is registered yet",
       body:
-        "Verified network activity (signer and receiver counts, network-wide fees) has "
-        + "no approved chart definition in the registry, so this category states the gap "
-        + "instead of showing placeholder activity. This is not zero. Availability varies "
-        + "by source: a chart appears here only after its metric definitions and sources "
-        + "are validated and the chart is registered.",
+        "Signer and receiver counts and network-wide fees need validated definitions "
+        + "and sources before we can publish them here.",
     },
   },
   {
@@ -87,8 +84,7 @@ export const EXPLORER_CATEGORIES: readonly ExplorerCategory[] = [
     emptyExplanation: {
       heading: "No chart is registered for this category yet",
       body:
-        "Nothing is shown rather than placeholders; a chart appears once it is "
-        + "registered with validated inputs.",
+        "Charts require validated inputs and an approved definition before publication.",
     },
   },
   {
@@ -105,8 +101,7 @@ export const EXPLORER_CATEGORIES: readonly ExplorerCategory[] = [
     emptyExplanation: {
       heading: "No chart is registered for this category yet",
       body:
-        "Nothing is shown rather than placeholders; a chart appears once it is "
-        + "registered with validated inputs.",
+        "Charts require validated inputs and an approved definition before publication.",
     },
   },
   {
@@ -122,8 +117,7 @@ export const EXPLORER_CATEGORIES: readonly ExplorerCategory[] = [
     emptyExplanation: {
       heading: "No chart is registered for this category yet",
       body:
-        "Nothing is shown rather than placeholders; a chart appears once it is "
-        + "registered with validated inputs.",
+        "Charts require validated inputs and an approved definition before publication.",
     },
   },
   {
@@ -138,10 +132,9 @@ export const EXPLORER_CATEGORIES: readonly ExplorerCategory[] = [
     emptyExplanation: {
       heading: "Empty until source validation",
       body:
-        "Available application, integration and concentration measures require source "
-        + "validation that has not happened yet, so this category is honestly empty "
-        + "rather than filled with placeholder entries. This is not zero. The data "
-        + "requirements are recorded in the methodology.",
+        "Application, integration and concentration measures await source validation. "
+        + "Collector records do not establish customer activity. The methodology "
+        + "describes the required evidence.",
     },
   },
 ] as const;
