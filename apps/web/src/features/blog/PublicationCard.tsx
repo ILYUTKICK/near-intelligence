@@ -20,7 +20,7 @@ export function PublicationCard({ publication }: { publication: Publication }) {
       <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-ui text-text-secondary" aria-label="Inside the research">
         {publication.highlights.map((highlight) => <li key={highlight} className="flex items-center gap-2"><ProductIcon name="document" />{highlight}</li>)}
       </ul>
-      <Button asChild className="mt-7"><Link href={publicationHref(publication)}>Read the research <ProductIcon name="arrow" /></Link></Button>
+      <Button asChild className="mt-7"><Link href={publicationHref(publication)}>Read the research</Link></Button>
     </div>
   </article>;
 }

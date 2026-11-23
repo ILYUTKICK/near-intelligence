@@ -92,6 +92,11 @@ import { EditorModelBlockDialog } from "./models/model-block-dialog";
  * download / new copy — never a silent overwrite).
  */
 
+function formatDocumentDate(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(date) + " UTC";
+}
+
 export interface EditorShellProps {
   documentId: string;
   title: string;
@@ -753,17 +758,12 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           live in the same row. The paper below starts higher on desktop. */}
       <header className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3">
         <div className="min-w-0 flex-1 basis-64">
-          <Button ref={shareReturnFocusRef} data-testid="share-open" variant="secondary" className="float-right ml-3"
-              disabled={controller.status.kind !== "clean" || !controller.versionId || Boolean(controller.draft)}
-              onClick={() => setShareOpen(true)}>
-              Share
-          </Button>
           <h1 className="font-serif text-title leading-title [overflow-wrap:anywhere]">{title}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
-            <p className="text-metadata text-text-secondary">
-              Updated <time dateTime={displayedUpdatedAt}>{displayedUpdatedAt}</time> · Revision{" "}
-              {controller.revision} · Schema version 1
-            </p>
+            <details className="text-metadata text-text-secondary">
+              <summary className="min-h-6 cursor-pointer rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Document details</summary>
+              <p className="mt-1">Updated <time dateTime={displayedUpdatedAt}>{formatDocumentDate(displayedUpdatedAt)}</time> · Revision {controller.revision} · Schema version 1</p>
+            </details>
             <SaveStatusBar
               status={controller.status}
               onSave={handleSaveNow}
@@ -774,6 +774,11 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button ref={shareReturnFocusRef} data-testid="share-open" variant="secondary"
+              disabled={controller.status.kind !== "clean" || !controller.versionId || Boolean(controller.draft)}
+              onClick={() => setShareOpen(true)}>
+              Share
+          </Button>
           {controller.status.kind === "clean" ? (
             <>
               <Link href={`/workspace/research/${documentId}/versions`} prefetch={false}
@@ -789,7 +794,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           ) : <p className="text-metadata text-text-secondary">Save your edits to open revision history and export.</p>}
           <button
             type="button"
-            className="inline-flex min-h-11 items-center rounded-control border border-control-border bg-surface px-3 text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus md:hidden"
+            className="inline-flex min-h-11 items-center rounded-control border border-transparent bg-transparent px-3 text-ui leading-ui text-text-secondary hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus md:hidden"
             aria-label="Open outline drawer"
             onClick={() => setDrawerPane("outline")}
           >
@@ -797,7 +802,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           </button>
           <button
             type="button"
-            className="inline-flex min-h-11 items-center rounded-control border border-control-border bg-surface px-3 text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus hidden md:inline-flex xl:hidden"
+            className="inline-flex min-h-11 items-center rounded-control border border-transparent bg-transparent px-3 text-ui leading-ui text-text-secondary hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus hidden md:inline-flex xl:hidden"
             aria-expanded={tabletOutlineOpen}
             onClick={() => setTabletOutlineOpen((open) => !open)}
           >
@@ -805,7 +810,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           </button>
           <button
             type="button"
-            className="inline-flex min-h-11 items-center rounded-control border border-control-border bg-surface px-3 text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus xl:hidden"
+            className="inline-flex min-h-11 items-center rounded-control border border-transparent bg-transparent px-3 text-ui leading-ui text-text-secondary hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus xl:hidden"
             aria-label="Open tools drawer"
             onClick={() => setDrawerPane("tools")}
           >
@@ -813,7 +818,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           </button>
           <button
             type="button"
-            className="hidden xl:inline-flex min-h-11 items-center rounded-control border border-control-border bg-surface px-3 text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="hidden xl:inline-flex min-h-11 items-center rounded-control border border-transparent bg-transparent px-3 text-ui leading-ui text-text-secondary hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             aria-pressed={!outlineCollapsed}
             onClick={() => setOutlineCollapsed((collapsed) => !collapsed)}
           >
@@ -821,7 +826,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           </button>
           <button
             type="button"
-            className="hidden xl:inline-flex min-h-11 items-center rounded-control border border-control-border bg-surface px-3 text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="hidden xl:inline-flex min-h-11 items-center rounded-control border border-transparent bg-transparent px-3 text-ui leading-ui text-text-secondary hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             aria-pressed={!toolsCollapsed}
             onClick={() => setToolsCollapsed((collapsed) => !collapsed)}
           >
@@ -910,7 +915,7 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           className={cn("hidden min-w-0 xl:sticky xl:top-4", !outlineCollapsed && "xl:block")}
         >
           <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto px-1 py-2">
-            <p className="eyebrow mb-2 px-2">Outline</p>
+            <p className="mb-2 px-2 text-ui font-medium text-text-secondary">Outline</p>
             <OutlinePane
               entries={outline}
               activeBlockId={currentBlock?.blockId ?? null}
@@ -950,9 +955,8 @@ export function EditorShell({ documentId, title, revision, updatedAt,
           aria-label="Block properties"
           className={cn("hidden min-w-0", !toolsCollapsed && "xl:block")}
         >
-          <div className="paper-panel p-4">
-            <p className="eyebrow mb-2">Research context</p>
-            <p className="mb-3 font-serif text-heading">Properties</p>
+          <div className="rounded-surface border border-border bg-surface p-4">
+            <p className="mb-3 text-ui font-medium text-text-secondary">Block properties</p>
             {editor ? (
               <ContextPane editor={editor} currentBlock={currentBlock} onTableChange={handleTableChange} />
             ) : null}

@@ -88,7 +88,7 @@ export default function MethodologyPage() {
       <h1 className="mt-4 max-w-[19ch] text-page text-pretty">How we turn data<br className="hidden sm:block" /> <em className="text-accent">into evidence.</em></h1>
       <p className="mt-5 max-w-[60ch] text-lg leading-relaxed text-text-secondary">A number is useful when you can trace it. Here is where our data comes from, how we define it, and what the evidence can actually support.</p>
       <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 text-ui">
-        <Link className={linkClass} href="/charts">Inspect the chart library <span aria-hidden="true">↗</span></Link>
+        <Link className={linkClass} href="/charts">Inspect the chart library</Link>
         <p className="text-text-secondary">Sources, definitions and limitations stay with every chart.</p>
       </div>
     </header>
@@ -150,7 +150,7 @@ export default function MethodologyPage() {
         <section id="verify" className={sectionClass} aria-label="Inspect a number">
           <SectionHeading number="04 / Verification" title="Inspect the evidence behind a number.">Follow a number from its definition to its saved context before using it in your thesis.</SectionHeading>
           <ol className="mt-7 grid gap-x-8 gap-y-7 sm:grid-cols-2">{verification.map((step, index) => <li key={step.title}><p className="text-metadata font-medium text-accent">0{index + 1}</p><h3 className="mt-2 text-ui font-semibold text-text">{step.title}</h3><p className="mt-2 text-body leading-body text-text-secondary">{step.body}</p></li>)}</ol>
-          <Link className={`${linkClass} mt-6 inline-flex min-h-11 items-center gap-2 text-ui font-medium`} href="/charts">Open a chart and inspect its source <ProductIcon name="arrow" /></Link>
+          <Link className={`${linkClass} mt-6 inline-flex min-h-11 items-center gap-2 text-ui font-medium`} href="/charts">Open a chart and inspect its source</Link>
         </section>
 
         <section id="readiness" className={sectionClass} aria-label="Limits and interpretation">
@@ -163,7 +163,7 @@ export default function MethodologyPage() {
           <div className="mt-3 bg-sage px-5 py-5">
             <p className="text-ui font-semibold text-text">Current model evidence</p>
             <p className="mt-2 text-body leading-body text-text">No reviewed fitted result is published here. The current data-readiness decision admits a fee-versus-volume proxy only with limits; it does not establish attributable protocol revenue or token value capture.</p>
-            <Link href="/models" className={`${linkClass} mt-3 inline-flex min-h-11 items-center text-ui font-medium`}>View published model evidence <span aria-hidden="true" className="ml-2">↗</span></Link>
+            <Link href="/models" className={`${linkClass} mt-3 inline-flex min-h-11 items-center text-ui font-medium`}>View published model evidence</Link>
           </div>
         </section>
 
@@ -176,7 +176,7 @@ export default function MethodologyPage() {
             ["A fixed research revision", "The saved context behind an exported figure, rather than a chart that silently refreshes later."],
           ].map(([title, body]) => <li key={title}><h3 className="text-ui font-semibold text-text">{title}</h3><p className="mt-1 text-body leading-body text-text-secondary">{body}</p></li>)}</ul>
           <p className={bodyClass}>Raw archive access remains restricted by the source and sharing permissions. No raw-data downloads are offered here. Published metric, chart and model views expose their permitted evidence and limitations.</p>
-          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-6 text-ui font-medium"><Link href="/research" className={linkClass}>Read the research</Link><Link href="/charts" className={linkClass}>Explore the evidence <span aria-hidden="true">↗</span></Link></div>
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-6 text-ui font-medium"><Link href="/research" className={linkClass}>Read the research</Link><Link href="/charts" className={linkClass}>Explore the evidence</Link></div>
         </section>
       </div>
     </div>

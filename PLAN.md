@@ -201,6 +201,7 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 | 89 | [NI-098](docs/TASKS.md) | Explain the product and document reproducible self-hosting | P0 | A |
 | 90 | [NI-099](docs/TASKS.md) | Implement the approved Comic Lab desktop identity | P1 | A |
 | 91 | [NI-100](docs/TASKS.md) | Apply Unslop polish to the approved Comic Lab UI | P1 | A |
+| 92 | [NI-101](docs/TASKS.md) | Complete public/workspace/editor/chart Unslop pass and restore Save chart | P1 | A |
 
 ## 9. Изменение самого плана
 
@@ -276,3 +277,7 @@ The owner explicitly commissions NI-099: implement the approved Comic Lab identi
 ## 12. Owner Unslop polish — 22 November 2026
 
 The owner explicitly requests applying the installed Unslop skill to the current Comic Lab implementation. NI-100 is a bounded polish pass on the approved brand, not a replacement identity. Preserve TRACE, canonical graph logo, mint/ivory/ink palette, chosen font families, current features/section order and data/security/reproducibility contracts. Audit concrete issues, improve desktop hierarchy/copy/accent use and details, verify the result and update the existing feature PR. No new generated artwork/video, mobile work, merge, deployment or collection. Claims/status live only in TASKS.md.
+
+## 13. Owner complete Unslop follow-up — 23 November 2026
+
+NI-101 covers the explicit request to inspect Overview, Blog, Data, Methodology, Models, workspace entry, every cabinet tab, opened research and every registered chart detail. Remove redundant action arrows and unnecessary interface noise within the approved Comic Lab direction. Restore real Save chart beside Add to research on Data Explorer category cards and corresponding private details; this explicitly supersedes NI-096's removal of that action for this scope. Reuse saved-chart persistence, ownership and version contracts. Verify desktop navigation, editor save/reopen and chart save/reopen with actual local services. Preserve honest limitations, source access, exact values, private boundaries and frozen evidence. No merge, deployment, mobile work, new collection or paid services.

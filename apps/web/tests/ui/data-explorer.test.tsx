@@ -605,7 +605,7 @@ describe("Data category page — real charts through the catalog category filter
     expect(
       await screen.findByText("No network-level chart is registered yet"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/This is not zero/)).toBeInTheDocument();
+    expect(screen.getByText("Signer and receiver counts and network-wide fees need validated definitions and sources before we can publish them here.")).toBeInTheDocument();
     // NI-096 addendum: the registry-mapping paragraph below the empty-state
     // card was removed by owner decision.
     expect(screen.queryByText(/No registry category is mapped/)).not.toBeInTheDocument();
@@ -625,7 +625,9 @@ describe("Data category page — real charts through the catalog category filter
 
     expect(requestsTo(requests, "/api/charts")).toHaveLength(0);
     expect(await screen.findByText("Empty until source validation")).toBeInTheDocument();
-    expect(screen.getByText(/honestly empty rather than filled with placeholder entries/))
+    expect(screen.getByText(/Application, integration and concentration measures await source validation/))
+      .toBeInTheDocument();
+    expect(screen.getByText(/Collector records do not establish customer activity/))
       .toBeInTheDocument();
   });
 
@@ -898,7 +900,7 @@ describe("Data chart detail — the same gates as /charts", () => {
     render(ui);
 
     const alert = await screen.findByRole("alert");
-    expect(within(alert).getByText(/rejected this selection as unsupported/)).toBeInTheDocument();
+    expect(within(alert).getByText("This chart does not support the selected range or filters. Choose another selection.")).toBeInTheDocument();
     expect(within(alert).getByRole("link", { name: "Reset to the default selection" }))
       .toHaveAttribute("href", "/data/revenue/gross-fees?version=1");
   });

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "jest-axe";
 import { ChartAuthActions } from "@/features/charts/library/ChartAuthActions";
+import { CategoryChartActions } from "@/features/charts/library/CategoryChartActions";
 import { SaveChartButton } from "@/features/charts/saved/SaveChartButton";
 import { SavedCharts } from "@/features/charts/saved/SavedCharts";
 import { SavedChartDetail } from "@/features/charts/saved/SavedChartDetail";
@@ -24,6 +25,30 @@ function json(body: unknown, status = 200) { return new Response(status === 204 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Saved chart workflow", () => {
+  it("restores saving beside Add to research and resets the save attempt when the inspected selection changes", async () => {
+    const bodies: unknown[] = [], keys: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {
+      if (url === "/api/auth/session") return json({ subject: "synthetic-alice" });
+      if (url === "/api/auth/csrf") return json({ token: "synthetic-csrf" });
+      bodies.push(JSON.parse(String(options.body)));
+      keys.push(new Headers(options.headers).get("idempotency-key")!);
+      return json(saved, 201);
+    }));
+    const user = userEvent.setup();
+    const props = { nextPath: "/workspace/data/intents/intents-volume", basePath: "/workspace/data/intents/", allowSave: true };
+    const { rerender } = render(<CategoryChartActions {...props} saveInput={input} />);
+    await expect(screen.findByRole("button", { name: "Add to research" })).resolves.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Save chart$/ }));
+    await screen.findByRole("link", { name: "Open saved chart" });
+    const changed = { ...input, selection: { ...selection, start: "2026-11-03" } };
+    rerender(<CategoryChartActions {...props} saveInput={changed} />);
+    expect(screen.queryByRole("link", { name: "Open saved chart" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /^Save chart$/ }));
+    await screen.findByRole("link", { name: "Open saved chart" });
+    expect(bodies).toEqual([input, changed]);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
   it("retains a lost-response retry through same-account focus revalidation", async () => {
     const keys: string[] = [];
     let sessionChecks = 0;

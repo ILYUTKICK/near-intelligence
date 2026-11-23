@@ -22,7 +22,7 @@ import {
 import type { DroppedParam, SerializedSelection } from "@/features/charts/library/selection-url";
 import { firstValue, toPairs } from "@/features/charts/library/search-values";
 import type { SearchValues } from "@/features/charts/library/search-values";
-import { categoryWordings } from "./wording";
+import { categoryWordings, chartFailureWording } from "./wording";
 import { fetchLatestDefaultView } from "./default-view";
 
 /**
@@ -139,8 +139,7 @@ export async function ChartDetailScreen({
       if (datasetResult.ok) {
         range = defaultRangeFor(definition, datasetResult.data.end);
         rangeNote =
-          `No range was given in the URL; the chart version's default preset is anchored `
-          + `to the pinned dataset's coverage end (${datasetResult.data.end} UTC).`;
+          `Default period: ${range.start} to ${range.end} UTC (end excluded), from the pinned dataset.`;
       } else {
         datasetFailure = {
           param: "dataset_version",
@@ -153,9 +152,7 @@ export async function ChartDetailScreen({
       range = latest.range;
       defaultViewResult = latest.result;
       if (latest.result.ok) {
-        rangeNote = `No range was given in the URL; the implicit default is clamped to the `
-          + `latest approved dataset's coverage (${latest.range.start} … ${latest.result.data.dataset.end} UTC) `
-          + `and preselects the first approved filter value. Switch the filter chips to compare providers.`;
+        rangeNote = `Default period: ${latest.range.start} to ${latest.range.end} UTC (end excluded), within the latest approved dataset.`;
       }
     } else {
       range = defaultRangeFor(definition, todayUtc());
@@ -310,17 +307,17 @@ function ViewFailurePanel({
   failure: ApiFailure;
   resetHref: string;
 }) {
+  const wording = chartFailureWording(failure);
   return (
     <div role="alert" className="paper-panel mt-6 p-8">
-      <h2>The chart data could not be resolved</h2>
+      <h2>{wording.title}</h2>
       <p className="text-body leading-body text-text-secondary mt-2">
-        {failure.status === 503
-          ? "No approved dataset is ready for this chart yet — this is not zero, and no values are invented."
-          : failure.status === 422
-            ? "The server rejected this selection as unsupported. The URL selection is validated before any request, so this indicates a range or filter this chart version does not serve."
-            : "The resolution request failed. Nothing is shown rather than partial or fabricated values."}
-        {failure.message !== null ? ` The API reported: ${failure.message}` : ""}
+        {wording.description}
       </p>
+      {failure.message ? <details className="mt-3 text-metadata text-text-secondary">
+        <summary className="min-h-6 cursor-pointer rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Error details</summary>
+        <p className="mt-2">{failure.message}</p>
+      </details> : null}
       <div className="mt-4 flex flex-wrap gap-3">
         <Link
           href={resetHref}

@@ -30,3 +30,23 @@ export const updateFrequencyWordings: Record<string, string> = {
   monthly: "Updated monthly",
   snapshot: "Snapshot periods",
 };
+
+/** Reader-facing delivery errors; the raw diagnostic remains in a disclosure. */
+export function chartFailureWording(failure: { status: number; code: string | null }): { title: string; description: string } {
+  if (failure.code === "DATA_NOT_READY") {
+    return { title: "Data unavailable", description: "No approved dataset is available for this chart yet." };
+  }
+  if (failure.status === 422) {
+    return { title: "Selection unavailable", description: "This chart does not support the selected range or filters. Choose another selection." };
+  }
+  if (failure.status === 401) {
+    return { title: "Sign-in required", description: "Sign in again to access this chart data." };
+  }
+  if (failure.status === 403) {
+    return { title: "Access restricted", description: "You do not have permission to access this chart data." };
+  }
+  if (failure.status === 404) {
+    return { title: "Data not found", description: "The requested chart data could not be found." };
+  }
+  return { title: "Data unavailable", description: "The chart data could not be loaded. Try again in a moment." };
+}

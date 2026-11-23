@@ -94,7 +94,7 @@ function HomeContent({ suspended }: { suspended: boolean }) {
       compact
       title={home && !home.counts.documents ? "Your research starts here" : "Research workspace"}
       description={latest ? "Continue a document or start a new thesis with charts and source notes" : "Start a document, then add charts and source notes"}
-      action={<Button variant={latest ? "secondary" : "primary"} pending={creating} onClick={create}>Create document <ProductIcon name="arrow" /></Button>}
+      action={<Button variant={latest ? "secondary" : "primary"} pending={creating} onClick={create}>Create document</Button>}
     />
     {createError ? <p role="alert" className="text-ui text-danger">{createError}</p> : null}
     {error ? <ErrorPanel message={home ? `${error} Showing the last loaded research for this account; it may have changed.` : error} onRetry={() => setGeneration((value) => value + 1)} /> : null}
@@ -111,10 +111,10 @@ function HomeContent({ suspended }: { suspended: boolean }) {
               </p>
               {latest ? (
                 <Link className={buttonVariants({ className: "mt-5" })} href={`/workspace/research/${latest.id}`}>
-                  Continue research<span className="sr-only">: {latest.title}</span><ProductIcon name="arrow" />
+                  Continue research<span className="sr-only">: {latest.title}</span>
                 </Link>
               ) : (
-                <Button asChild variant="secondary" className="mt-5"><Link href="/research">Read the research <ProductIcon name="arrow" /></Link></Button>
+                <Button asChild variant="secondary" className="mt-5"><Link href="/research">Read the research</Link></Button>
               )}
             </div>
             <ResearchIllustration className="pointer-events-none absolute right-4 bottom-6 hidden h-auto w-[32%] object-contain xl:block" />
@@ -122,7 +122,7 @@ function HomeContent({ suspended }: { suspended: boolean }) {
           <section aria-labelledby="recent-documents-heading">
             <div className="flex items-center justify-between gap-4">
               <h2 id="recent-documents-heading" className="text-heading">Recent documents</h2>
-              <Link className="text-ui font-medium hover:underline" href="/workspace/research">My Research <span aria-hidden="true">→</span></Link>
+              <Link className="text-ui font-medium hover:underline" href="/workspace/research">My Research</Link>
             </div>
             {home.recent_documents.length ? (
               <ul className="mt-3 grid gap-3 sm:grid-cols-2">

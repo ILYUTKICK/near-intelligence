@@ -243,3 +243,7 @@ Role A /root coordinates the owner-approved desktop redesign. The dedicated task
 ## NI-100 — Unslop polish
 
 Role A /root coordinates the explicitly requested Unslop pass using the already-approved Comic Lab direction. Dedicated task agent /root/ni100_unslop owns bounded web/styles/tests/design-doc edits; root owns audit, registry, runtime, acceptance and the existing PR105. Preserve all product/data/auth/export contracts, canonical brand and section order. No generated media, mobile work, merge or deployment. Sole status/claim in TASKS.md; independent review waiver remains.
+
+## NI-101 — Complete Unslop follow-up and Save chart
+
+Role A /root coordinates the owner-requested full desktop surface audit. Dedicated /root/ni101_unslop owns frontend and affected test implementation; root owns registry, runtime/browser acceptance, verification report and PR delivery. Save chart restoration reuses existing API ownership/persistence without new backend contracts. Preserve other claims and all data/pin/export/auth boundaries. Status only in TASKS.md; independent review waiver remains.

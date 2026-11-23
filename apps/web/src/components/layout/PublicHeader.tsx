@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 
 import { Brand } from "./Brand";
 import { MobileNavDrawer } from "./MobileNavDrawer";
-import { ProductIcon } from "./ProductIcon";
 import { Button } from "@/components/ui/button";
 import { authNav, isPublicNavActive, publicNav } from "@/lib/navigation";
 
@@ -58,7 +57,7 @@ export function PublicHeader() {
             </Link>
           ) : null}
           <Button asChild className="hidden lg:inline-flex">
-            <Link href="/workspace">Open workspace <ProductIcon name="arrow" /></Link>
+            <Link href="/workspace">Open workspace</Link>
           </Button>
           <div className="md:hidden">
             <MobileNavDrawer items={publicNav} triggerLabel="Open site menu" />

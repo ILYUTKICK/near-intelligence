@@ -72,7 +72,7 @@ export function SaveStatusBar({
           data-testid="save-status"
           className="text-ui leading-ui text-warning font-medium"
         >
-          Unsaved changes — autosave runs after 1s idle (at most 5s)
+          Unsaved changes · Saving automatically
         </p>
       ) : null}
       {status.kind === "saving" ? (

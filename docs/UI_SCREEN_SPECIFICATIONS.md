@@ -46,6 +46,14 @@ NI-080 removes the Data context section and its economic indicator cards from Ho
 
 ## Research editor `/workspace/research/[documentId]`
 
+NI-101 desktop polish (23 November 2026): preserve the selected block's tools
+and all editor actions; group Share with history/export, show one persistent
+save-state line, and disclose readable UTC update/schema metadata under Document
+details. Block reference and annotation Evidence details use native keyboard
+disclosures. Secondary toolbar/pane borders and badges are quiet; the paper
+retains the approved Comic Lab frame. Source/pin access and save/dirty/error,
+conflict, ownership and export behavior remain unchanged.
+
 Header: editable title, saved/dirty/saving/error state, last saved time, manual Save, Export. Left outline from headings; central paper contains typed blocks; right contextual panel switches Add Block/Chart Library/Properties/Sources/Insight/Model. Tool panels collapse. Desktop three-pane appears only when minimum paper width fits; tablet tools as drawer; phone full paper with one drawer at a time.
 
 Block toolbar appears on keyboard focus as well as pointer hover. Slash menu has labeled types and shortcut hints. Reorder supports drag and Move Up/Down; duplicate assigns new IDs; delete handles dependent evidence explicitly. Heading outline remains accurate after undo and reorder. Chart controls do not hijack editor typing/selection. Nested charts/atomic cards are non-editable node views with accessible Edit Properties controls.

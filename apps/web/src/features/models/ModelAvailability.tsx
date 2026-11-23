@@ -45,7 +45,7 @@ export function ModelAvailability({ title, description, action }: {
           ))}
         </ul>
         <Link href="/methodology#readiness" className="mt-3 flex items-center gap-2 text-ui font-medium hover:underline">
-          Read the readiness criteria <ProductIcon name="arrow" />
+          Read the readiness criteria
         </Link>
       </section>
     </div>

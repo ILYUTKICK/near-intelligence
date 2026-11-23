@@ -81,6 +81,18 @@ Archive chart-ready CSV/normalized series with each exported chart. Exact-data/h
 
 ## Saved instances — implemented NI-035
 
+**NI-101 owner follow-up (23 November 2026):** workspace Data Explorer cards
+and private chart details again offer Save chart beside Add to research,
+superseding NI-096's removal of Save chart on those surfaces. The existing
+creation API receives the inspected definition, dataset, dates and filters;
+the mounted attempt is keyed by verified subject and selection, with the
+same-subject revalidation/retry behavior retained. Saved Charts previews expose
+one exact-values table inside the native disclosure, without a duplicate outside
+it. Browser charts with multiple unit panels reserve at least200px per panel
+plus64px for chart controls/legend; single-unit and scatter heights are unchanged.
+The scientific option builder, financial strings and frozen export dimensions
+are unchanged. Public anonymous continuation remains Add to research.
+
 `/workspace/saved-charts` supports search, labels, confirmation before removal and reopening through the shared renderer. A resolved public chart offers Save Chart after sign-in; the mutation carries its inspected definition/dataset/range/filters with an idempotency key retained across retries. Saved views are explicitly live and label newly resolved datasets; document revision pins remain separate. NI-044 snapshot management lives at `/workspace/saved-charts/snapshots`: the chart detail (public explorer and saved-chart detail) offers Freeze of the inspected evidence triple, the snapshot list/detail show owner-scoped storage metadata (frozen instant, dataset pin, content hash) and render the frozen view in historical mode, Compare-to-live is an explicit read that never rewrites the snapshot, and a snapshot a saved chart references refuses deletion. The mobile workspace content column uses `min-w-0` so the chart/table cannot widen the whole page; the exact-value table keeps its own horizontal scroll. [Synthetic browser evidence](qa/ni035-saved-chart-mobile.jpg) was captured at 387px, with document width also 387px; physical-phone touch/keyboard testing remains NI-064 release validation.
 
 NI-035 review correction: authenticated action attempts are keyed by the verified subject and inspected input. A same-subject focus check temporarily hides the action UI without destroying its retry key/result; an explicit auth-change/logout or a verified different subject discards the old attempt. Private list data is still cleared/revalidated on focus and account signals.

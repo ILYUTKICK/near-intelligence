@@ -137,7 +137,7 @@ export function SavedCharts() {
   return <div className="min-w-0 space-y-6">
     <PageIntro compact eyebrow="Saved Charts" title="Evidence worth keeping."
       description="Return to a saved range and filters. Live selections resolve the latest approved dataset."
-      action={<Button asChild><Link href="/workspace/charts">Explore charts <ProductIcon name="arrow" /></Link></Button>} />
+      action={<Button asChild><Link href="/workspace/charts">Explore charts</Link></Button>} />
     <form role="search" className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); setCursor(null); setQuery(search.trim()); }}>
       <div><Label htmlFor="saved-search">Search saved charts</Label><Input id="saved-search" type="search" value={search} maxLength={200}
         className="rounded-full text-ui" placeholder="Search by label" onChange={(event) => setSearch(event.target.value)} /></div>

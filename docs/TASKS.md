@@ -3079,3 +3079,25 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 - **CI follow-up:** API/database/full browser CI pass on 0d60e3a. Corrected the existing Home unit test to wait for actual controlled-request setup before resolving 503; assertions and production behavior unchanged. Home 10/10 and Home/model/thesis 45/45 (3 files, 13.31s) pass, plus strict TS/targeted ESLint. A repeated full local run hit 4 failures / 4 jsdom errors in two unchanged model/thesis files (5s limits/selection geometry); the isolated same tests pass. Original 682-test / full 25-case runtime evidence remains valid; final current-head CI is still required for delivery. No increased timeout or skipped new test.
 - **Follow-up completed at:** 2026-11-22T14:57:50+03:00
+
+### NI-101 — Complete Unslop follow-up and restore Save chart
+
+- **Epic:** 01 — Design system and product presentation
+- **Priority:** P1, explicit owner follow-up
+- **Dependencies:** NI-100, NI-096
+- **Status:** IN_PROGRESS
+- **Claimed by:** Codex /root, chat 01a1fb40-3d6a-7912-87bf-615fdbf1bfff
+- **Execution role:** A
+- **Started at:** 2026-11-23T01:57:46+03:00
+- **Branch/worktree:** feat/ni-099-comic-lab; /Users/ilyutkinn/.codex/worktrees/near-comic-lab/Near; PR105 at34711a6
+- **Authorization:** Explicit owner request to continue Unslop across all public tabs, workspace entry/tabs, opened research and individual charts, and restore Save chart next to Add to research in Data Explorer. The Save chart request supersedes NI-096's action removal for these surfaces. No merge or deployment.
+- **Dependency verification:** NI-100 and NI-096 DONE; clean checkout at34711a6; PR105 remains open/unmerged. Existing unrelated claims preserved.
+- **Handoff:** Dedicated /root/ni101_unslop implements web and affected tests per PLAN's separate-task-agent instruction. Root owns registry, audit/runtime, actual acceptance and delivery; no concurrent shared-file edits.
+
+**Description:** Apply installed Unslop in the approved Comic Lab direction across every requested desktop surface. Remove redundant action arrows, simplify technical/editor chrome without losing controls or evidence, and restore existing owned saved-chart persistence from workspace explorer cards/details.
+
+**Acceptance criteria:** Review matrix covers all five public tabs, entry, every cabinet destination, opened editor and every available registered chart detail. Keep canonical brand, research content, meaningful directional controls, exact source-qualified values and accessible errors/loading/empty states. Save chart beside Add to research persists the inspected selection, can be reopened in Chart library and maintains two-user isolation and pins. Editor save/reopen/export and viewport gates remain working. No new datasets, schemas, providers, paid services, generated media, mobile work, merge or deployment.
+
+**Expected files:** Frontend public/workspace/chart/editor components, affected unit/browser tests, design/spec follow-up and docs/verification/ni-101.
+
+**Testing requirements:** Relevant/full web tests, strict TS/lint/contrast, production build, full desktop E2E including restored save-chart D4 where applicable, exact value/pin/source/ownership and editor save/reopen/export checks, local browser review. At most three visual review rounds. Record fixtures versus saved archive truthfully. Current-head CI required. Independent review skipped by user instruction 2026-11-09; root acceptance mandatory.

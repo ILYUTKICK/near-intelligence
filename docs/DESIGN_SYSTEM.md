@@ -69,6 +69,20 @@ available in the footer. Section order, destinations and scientific/chart data
 presentation are unchanged. Existing responsive layout rules are retained;
 new mobile adaptation and device checks are outside this pass.
 
+NI-101 continues the same Unslop direction across public pages, cabinet tabs,
+research editing and chart details. Action labels carry their meaning without
+repeated decorative arrows; block reorder arrows and mechanism-flow arrows
+retain their directional purpose. The Blog and My Research titles name their
+actual destinations. In the editor, the paper keeps its focal frame while block
+cards, metadata and properties use quieter borders and text. Document details,
+block references and pinned evidence identifiers remain available through native
+keyboard-operable disclosures; the truthful save state remains visible. Chart
+defaults show the actual UTC period and exclusive end without URL/registry jargon.
+Private Data Explorer cards and details restore Save chart alongside Add to
+research, using the existing inspected selection, account guard and idempotent
+saved-chart API. Each selection gets its own save attempt; public continuation,
+ownership, source values, revision pins and export contracts are preserved.
+
 ## Component contracts
 
 Buttons primary/secondary/quiet/destructive; inputs/select/date range; dialog/drawer; nav item; disclosure; toast/status; tabs; source badge; quality badge; metric summary; chart frame; accessible data table; block handle/menu; evidence card; version banner; autosave indicator. Every component specifies default/hover/focus/disabled/pending/error. Disabled controls explain prerequisites with nearby text; tooltip alone is insufficient. Inline status for save/freshness is persistent; toasts only confirm brief actions.

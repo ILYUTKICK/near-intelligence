@@ -102,10 +102,9 @@ function HypothesisAssessment() {
       <ul className="mt-4 divide-y divide-border border-y border-border" aria-label="H1–H4 current assessment">
         {question.hypotheses.map((hypothesis) => (
           <li key={hypothesis.id}>
-            <a href={`#${hypothesis.id}`} className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 py-3 hover:bg-surface-muted/60">
+            <a href={`#${hypothesis.id}`} className="grid grid-cols-[2.25rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 py-3 hover:bg-surface-muted/60">
               <span className="text-ui font-semibold text-accent">{hypothesis.code}</span>{" "}
               <span className="font-serif text-xl font-medium">{hypothesis.title}</span>{" "}
-              <span aria-hidden="true" className="col-start-3 row-start-1 text-accent">→</span>
               <span className="col-start-2 text-ui text-text-secondary">{hypothesis.status}</span>
             </a>
           </li>

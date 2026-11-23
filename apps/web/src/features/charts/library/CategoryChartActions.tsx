@@ -1,18 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { AddChartToResearch } from "../add-to-research/AddChartToResearch";
+import { SaveChartButton } from "../saved/SaveChartButton";
 import type { SaveInput } from "../saved/api";
 import { usePublicSession } from "@/lib/auth/use-public-session";
 
 import { isInternalPath } from "./ChartAuthActions";
 
 /**
- * NI-095 dashboard-card action: exactly ONE visible action per chart card —
- * "+ Add to research". Signed-in visitors get the real owned persistence;
+ * Explorer chart actions. Workspace visitors can save their inspected chart
+ * or add it to research. Signed-in visitors get real owned persistence;
  * anonymous visitors get the safe sign-in continuation that preserves the
  * chart context in the internal `next` payload (same contract as
  * ChartAuthActions, reduced to the single card action).
@@ -22,11 +23,14 @@ export function CategoryChartActions({
   basePath,
   saveInput,
   variant = "secondary",
+  allowSave = false,
 }: {
   nextPath: string;
   basePath: string;
   saveInput?: SaveInput;
-  /** NI-096: the detail page renders the action as the primary filled button. */
+  /** NI-101 restores saving on the private explorer and chart details. */
+  allowSave?: boolean;
+  /** The detail page renders anonymous continuation as the primary button. */
   variant?: "secondary" | "primary";
 }) {
   const router = useRouter();
@@ -35,7 +39,10 @@ export function CategoryChartActions({
 
   if (session.subject && saveInput) {
     return <div key={session.subject} className="flex flex-wrap gap-2">
-      <AddChartToResearch input={saveInput} suspended={session.status !== "authenticated"} />
+      <Fragment key={JSON.stringify(saveInput)}>
+        {allowSave ? <SaveChartButton input={saveInput} suspended={session.status !== "authenticated"} /> : null}
+        <AddChartToResearch input={saveInput} suspended={session.status !== "authenticated"} />
+      </Fragment>
     </div>;
   }
   if (session.status === "checking") {

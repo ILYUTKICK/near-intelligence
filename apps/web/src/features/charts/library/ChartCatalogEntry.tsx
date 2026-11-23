@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { ProductIcon } from "@/components/layout/ProductIcon";
 import { cn } from "@/lib/utils";
 import type { ChartDefinitionResponse } from "@/features/charts/renderer/view-types";
 import { categoryWordings, updateFrequencyWordings, visualizationWordings } from "./wording";
@@ -18,10 +17,9 @@ export function ChartCatalogEntry({ chart, href, row = false }: {
           href={href}
           aria-label={`Open chart: ${chart.title}`}
           aria-describedby={available ? undefined : `chart-status-${chart.chart_id}`}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-1 px-2 py-3 hover:bg-surface-muted/55 sm:px-4"
+          className="grid items-center gap-x-5 gap-y-1 px-2 py-3 hover:bg-surface-muted/55 sm:px-4"
         >
           <h2 className="text-left font-sans text-base font-medium leading-snug">{chart.title}</h2>
-          <ProductIcon name="arrow" className="col-start-2 row-start-1 size-4 text-accent" />
           <p className="text-metadata text-text-secondary">
             {categoryWordings[chart.category]}
             {!available ? <> · <span id={`chart-status-${chart.chart_id}`}>Unavailable</span></> : null}
@@ -56,7 +54,6 @@ export function ChartCatalogEntry({ chart, href, row = false }: {
         <span className={cn("rounded-full px-2.5 py-1 text-metadata font-medium", available ? "bg-sage text-accent" : "bg-surface-muted text-text-secondary")}>
           {available ? "Available" : "Unavailable — this is not zero"}
         </span>
-        <ProductIcon name="arrow" className="ml-auto size-4 shrink-0 text-accent" />
       </div>
     </li>
   );

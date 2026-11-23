@@ -12,7 +12,7 @@ import { fetchChartCatalog } from "@/features/charts/library/catalog-api";
 import { explorerCategoryBySlug } from "@/features/charts/library/explorer-categories";
 import { dropUnknownParams } from "@/features/charts/library/search-values";
 import { detailHrefFor } from "@/features/charts/library/selection-url";
-import { categoryWordings } from "@/features/charts/library/wording";
+import { chartFailureWording } from "@/features/charts/library/wording";
 import { ChartView } from "@/features/charts/renderer/ChartView";
 import { fetchLatestDefaultView } from "./default-view";
 
@@ -148,9 +148,10 @@ export async function DataCategoryScreen({
                 // into the address. The Add continuation keeps the full
                 // pinned context instead.
                 const titleHref = `${routePrefix}/data/${slug}/${encodeURIComponent(definition.chart_id)}?version=${definition.version}`;
-                // NI-095: exactly ONE visible action per dashboard card.
+                // NI-101: private cards restore the existing owned save action.
                 const actions = result.ok ? (
                   <CategoryChartActions
+                    allowSave={routePrefix === "/workspace"}
                     nextPath={href}
                     basePath={`${routePrefix}/data/${slug}/`}
                     saveInput={{
@@ -171,7 +172,11 @@ export async function DataCategoryScreen({
                   <section key={definition.id} className="paper-panel h-full p-6">
                     <p className="eyebrow">Data unavailable</p>
                     <h2 className="mt-2 text-heading">{definition.title}</h2>
-                    <p className="my-3 text-ui text-text-secondary">{result.message ?? "The selected chart could not be resolved."}</p>
+                    <p className="my-3 text-ui text-text-secondary">{chartFailureWording(result).description}</p>
+                    {result.message ? <details className="my-3 text-metadata text-text-secondary">
+                      <summary className="min-h-6 cursor-pointer rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Error details</summary>
+                      <p className="mt-2">{result.message}</p>
+                    </details> : null}
                     <Link
                       href={href}
                       className="inline-flex h-11 items-center rounded-control border border-control-border bg-surface px-4 font-ui text-ui leading-ui text-text hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"

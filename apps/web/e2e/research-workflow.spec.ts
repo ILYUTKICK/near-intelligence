@@ -177,7 +177,15 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
   // preselects the first approved filter value. Explicit dates remain
   // authoritative even when they have no observations.
   await expect(page.getByRole("group", { name: "Time range" })).toBeVisible();
-  await expect(page.getByText(/implicit default is clamped to the latest approved dataset's coverage/)).toBeVisible();
+  // The inspected selection may end before dataset coverage. Read the
+  // independent delivery metadata instead of treating state.window as the
+  // complete dataset's half-open period.
+  const coverageResponse = await page.request.get(`${state.api_url}/api/datasets/${state.dataset_version_id}`);
+  expect(coverageResponse.ok()).toBe(true);
+  const coverage = await coverageResponse.json() as { start: string; end: string };
+  expect(coverage.start).toBe("2026-01-01");
+  expect(coverage.end).toBe("2026-01-15");
+  await expect(page.getByText(`Default period: ${coverage.start} to ${coverage.end} UTC (end excluded), within the latest approved dataset.`, { exact: true })).toBeVisible();
   await expect(page.getByText(state.pin_value)).toBeVisible();
   await page.goto(`${state.web_url}/data/intents/intents-volume?version=1&start=2026-11-01&end=2026-11-04`);
   await expect(page).toHaveURL(/start=2026-11-01&end=2026-11-04/);
@@ -353,8 +361,8 @@ test("complete research journey: anonymous trace, sign-in, save chart, document,
 
   // The public explorer fails honestly and never fabricates values.
   await page.goto(chartSelectionUrl());
-  await expect(page.getByText("The chart data could not be resolved")).toBeVisible();
-  await expect(page.getByText("No approved dataset is ready for this chart yet")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Data unavailable", exact: true })).toBeVisible();
+  await expect(page.getByText("No approved dataset is available for this chart yet.", { exact: true })).toBeVisible();
   await expect(page.getByText(state.pin_value)).toHaveCount(0);
 
   // The editor's pinned chart still resolves its observed dataset (explicit

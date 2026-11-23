@@ -26,6 +26,6 @@ export function PublicationArticle({ publication }: { publication: Extract<Publi
       </section>)}
     </div>
     {related.length ? <aside className="mt-12 border-t border-border pt-6" aria-label="Related research"><h2 className="font-serif text-heading">Related research</h2><ul className="mt-3 space-y-2">{related.map((entry) => <li key={entry.slug}><Link className="text-accent underline underline-offset-4" href={publicationHref(entry)}>{entry.title}</Link></li>)}</ul></aside> : null}
-    <Link href="/blog" className="mt-10 inline-flex min-h-11 items-center text-ui text-accent underline underline-offset-4">All research articles →</Link>
+    <Link href="/blog" className="mt-10 inline-flex min-h-11 items-center text-ui text-accent underline underline-offset-4">All research articles</Link>
   </article>;
 }

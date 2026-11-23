@@ -15,7 +15,7 @@ import type { ChartMode, ChartPresentation } from "@/features/charts/chart-frame
 
 import { RangeSelect } from "./RangeSelect";
 import { SeriesTable } from "./SeriesTable";
-import { buildChart, displayUnits } from "./option-builder";
+import { buildChart, displayUnits, type ChartOption } from "./option-builder";
 import type { ChartFactory, EChartsLike } from "./chart-factory";
 import { defaultChartFactory } from "./chart-factory";
 import type { FiltersSelection } from "../filters/filter-values";
@@ -91,6 +91,39 @@ export interface ChartViewProps {
 }
 
 const FETCH_DEBOUNCE_MS = 200;
+
+/** Fit long comparison names into one browser legend row. The exact series
+ * names remain the legend data and tooltip text, and the shared scientific
+ * option is never mutated or used differently by static exports. */
+export function withBrowserLegend(option: ChartOption): ChartOption {
+  if (!option.legend) return option;
+  type LegendSettings = Exclude<NonNullable<ChartOption["legend"]>, unknown[]>;
+  const fitLegend = (legend: LegendSettings) => ({
+    ...legend,
+    type: "scroll" as const,
+    orient: "horizontal" as const,
+    top: 0,
+    left: 8,
+    right: 8,
+    padding: 0,
+    itemWidth: 12,
+    itemHeight: 8,
+    pageIconSize: 10,
+    // The shared builder appends exact comparison filters after " — ".
+    // Lead with that distinguishing context instead of truncating two
+    // identical metric-title prefixes; legend data/tooltip keep full names.
+    formatter: (name: string) => {
+      const separator = name.lastIndexOf(" — ");
+      if (separator < 0) return name;
+      const filters = name.slice(separator + 3);
+      return filters.startsWith("recipient: ") ? filters.slice("recipient: ".length) : filters;
+    },
+    textStyle: { ...legend.textStyle, width: 160, overflow: "truncate" as const, ellipsis: "…" },
+    tooltip: { show: true, confine: true, renderMode: "richText" as const },
+  });
+  return { ...option, legend: Array.isArray(option.legend)
+    ? option.legend.map(fitLegend) : fitLegend(option.legend) };
+}
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException
@@ -261,6 +294,14 @@ export function ChartView({
 
   const plottable =
     built?.kind === "ok" && built.hasPlottableData && definition.data_status === "available";
+  // Different units occupy separate aligned panels. A compact card's 240px
+  // request cannot fit two plots, their tick labels and the legend/zoom row.
+  // Reserve room in the browser container, leaving the scientific builder
+  // and frozen export dimensions untouched. Scatter still has a single plot.
+  const panelCount = definition.visualization_type === "scatter"
+    ? 1 : new Set(activeView?.series.map((series) => series.metric.unit)).size;
+  const plotHeight = panelCount > 1
+    ? Math.max(height ?? 320, panelCount * 200 + 64) : height ?? 320;
 
   // Chart mount/update with full resource cleanup: an outdated instance is
   // disposed whether the teardown happens before or after the async factory.
@@ -270,11 +311,11 @@ export function ChartView({
     }
     let disposed = false;
     let instance: EChartsLike | null = null;
-    const option = built.option;
+    const option = withBrowserLegend(built.option);
     const host = plotHostRef.current;
     Promise.resolve().then(() => factory(host, {
         ...(width !== undefined ? { width } : {}),
-        ...(height !== undefined ? { height } : {}),
+        height: plotHeight,
       })).then((created) => {
       if (disposed) {
         created.dispose();
@@ -297,7 +338,7 @@ export function ChartView({
       }
       chartRef.current = null;
     };
-  }, [visible, plottable, built, factory, width, height, retryToken]);
+  }, [visible, plottable, built, factory, width, plotHeight, retryToken]);
 
   // Container-driven resize (real browsers; the test stub is a no-op).
   useEffect(() => {
@@ -371,12 +412,13 @@ export function ChartView({
           role="img"
           aria-label={built.summary}
           className="w-full"
-          style={{ height: height ?? 320, ...(width !== undefined ? { maxWidth: width } : {}) }}
+          style={{ height: plotHeight, ...(width !== undefined ? { maxWidth: width } : {}) }}
         />
-        {savedPreview || (variant !== "card" && exactValues === "visible") ? (
-          // Editor blocks and saved previews keep the visible exact table;
-          // dashboard cards and detail pages keep the values in the DOM for
-          // assistive technology only (NI-095/NI-096).
+        {savedPreview ? null : variant !== "card" && exactValues === "visible" ? (
+          // Saved previews supply their single table through previewValues,
+          // inside the frame's native disclosure. Editor blocks keep the
+          // always-visible table; dashboard cards and detail pages retain
+          // their nonvisual equivalent (NI-095/NI-096).
           <SeriesTable model={built.table} title={definition.title} instanceLabel={instanceLabel} />
         ) : (
           <div className="sr-only">
