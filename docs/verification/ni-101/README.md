@@ -96,7 +96,7 @@ Final production build and strict TypeScript pass. Full sequential web unit suit
 66 files /685 tests pass,233.09s, one worker. ESLint has no errors; the three
 pre-existing unused-variable warnings in ModelRunDetail remain. Contrast passes
 28 token pairs; OpenAPI/generated TypeScript remain current. Client-secret check
-reports no configured root.env/nothing to scan. The saved-chart/snapshot real
+reports no configured root .env/nothing to scan. The saved-chart/snapshot real
 database and HTTP suites pass9+7+1 tests, including cookie/CSRF/ES256/RLS,
 idempotent retry/reopen, frozen snapshot/compare, referenced deletion refusal
 and second-user denial. Relative documentation links and whitespace pass.
@@ -107,7 +107,44 @@ replaced with independent dataset metadata and exact half-open boundary checks;
 the editor test now awaits actual initial selection readiness. An overlapping
 unit/browser run also hit5s unit timeouts and a pending browser mutation; the
 final sequential unit pass above has no increased timeouts or skipped tests.
-Full final desktop browser and current-head CI results are pending acceptance.
+Final desktop production-stack browser suite passes27/27, without skips or
+retries, in3.3minutes on source `deb1546`. It includes the restored D4 saved-chart
+keyboard/pin/source/two-user gate and a registry-driven matrix of every public
+and private category/detail route. The complete research journey verifies
+acknowledged revisions, exact decimal strings, source-outage prose saves,
+reopened pins, frozen ZIP/member/manifest hashes and second-user denial.
+Revocable sharing and separate same-label demo users pass. Automated transport
+and research fixtures are synthetic and labeled; the API, Postgres/RLS and
+export worker are real. Axe scans report zero serious/critical and no lower
+impact findings on the tested public/private/editor surfaces.
+
+Desktop measurements: D3 plot visible320px at1440×900 and1280×800; D4 saved
+preview visible208px; D5 paper starts343px (<386px gate), with557px visible.
+Exact machine-readable records: [D3](d3-measurements.json),
+[D4](d4-measurements.json), [D5](d5-measurements.json).
+
+All four GitHub CI jobs pass on code revision `deb1546`:
+[run45158674892](https://github.com/ILYUTKICK/near-intelligence/actions/runs/45158674892).
+The following delivery commit adds only this final report, task acceptance and
+synthetic screenshots/viewport measurements; current-head checks are required
+again before handoff. The source PR is
+[105](https://github.com/ILYUTKICK/near-intelligence/pull/105).
+
+## Before / after and local handoff
+
+Baseline: [NI-100 workspace](../ni-100/workspace.png) and
+[editor](../ni-100/editor-layout.jpg). This pass's after captures use only the
+established synthetic test fixtures:
+[Overview](overview.png), [workspace](workspace.png), [login](login.png),
+[chart detail](chart.png), [Saved Charts](saved-charts.jpg),
+[editor opening](editor-layout.jpg), [opened pinned context](editor.png).
+
+Native final inspection confirms the distinguishing recipient labels and
+bounded legend row, three restored save actions in Revenue cards, and concise
+Token Economics unavailability. Review locally at http://127.0.0.1:56647/
+or `/login` → Enter demo workspace. The existing saved archive is imported
+into the isolated preview; supply-context's combined dataset and a published
+model remain absent there. No production credentials/database are copied.
 
 No deployment, merge, provider call, new collection, generated media, mobile work
 or financial/model calculation is part of this task.
