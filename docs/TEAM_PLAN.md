@@ -251,3 +251,7 @@ Role A /root coordinates the owner-requested full desktop surface audit. Dedicat
 ## NI-102 — Existing owner VPS update
 
 Owner production-update handoff (23 November 2026): role A /root coordinates registry, source packaging, existing-VPS SSH/backup/rollout and external acceptance; dedicated /root/ni102_rollout reviews merged-source deployment/schema/auth compatibility read-only. Existing claims and NI-068 operational remainder are preserved. No source collection or new infrastructure. Status and actual results live only in TASKS.md.
+
+## NI-103 — Real-product thesis demo
+
+Role A /root coordinates the owner-requested recording, separate demo identity, actual product workflow, source/date fidelity and final media acceptance. Dedicated /root/ni103_edit prepares real production-stack recording acceptance and local video editing/English chapter captions within the approved Comic Lab direction. Native capture was replaced by the existing isolated regression harness after CUA became unavailable; synthetic authentication transport is disclosed. No fabricated UI, runtime source changes, collection or social publication. Sole claim/status in TASKS.md; independent review waiver remains.
