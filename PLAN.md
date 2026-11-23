@@ -202,6 +202,7 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 | 90 | [NI-099](docs/TASKS.md) | Implement the approved Comic Lab desktop identity | P1 | A |
 | 91 | [NI-100](docs/TASKS.md) | Apply Unslop polish to the approved Comic Lab UI | P1 | A |
 | 92 | [NI-101](docs/TASKS.md) | Complete public/workspace/editor/chart Unslop pass and restore Save chart | P1 | A |
+| 93 | [NI-102](docs/TASKS.md) | Roll out merged Comic Lab release to the existing owner VPS | P0 | A |
 
 ## 9. Изменение самого плана
 
@@ -281,3 +282,7 @@ The owner explicitly requests applying the installed Unslop skill to the current
 ## 13. Owner complete Unslop follow-up — 23 November 2026
 
 NI-101 covers the explicit request to inspect Overview, Blog, Data, Methodology, Models, workspace entry, every cabinet tab, opened research and every registered chart detail. Remove redundant action arrows and unnecessary interface noise within the approved Comic Lab direction. Restore real Save chart beside Add to research on Data Explorer category cards and corresponding private details; this explicitly supersedes NI-096's removal of that action for this scope. Reuse saved-chart persistence, ownership and version contracts. Verify desktop navigation, editor save/reopen and chart save/reopen with actual local services. Preserve honest limitations, source access, exact values, private boundaries and frozen evidence. No merge, deployment, mobile work, new collection or paid services.
+
+## 14. Owner production update — 23 November 2026
+
+The owner explicitly requests updating the existing server after merging PR105. NI-102 deploys the accepted NI-099/100/101 source from merged main to the existing near-intelligence.me VPS using its established configuration, database and artifact volumes. This supersedes the previous tasks' no-deployment boundary for this update only. Verify the merged revision and CI, compatibility, coherent pre-update backup, retained rollback images, final HTTPS/public/auth/private/chart smoke and restored existing export/backup timers. Do not merge for the owner, enable collection, replace research data, provision new services or expand NI-068 offsite-backup scope. Claims/status remain in TASKS.md; dedicated task agent performs bounded compatibility review and root executes operations/acceptance.
