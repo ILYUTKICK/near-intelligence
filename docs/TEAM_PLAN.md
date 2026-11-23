@@ -247,3 +247,7 @@ Role A /root coordinates the explicitly requested Unslop pass using the already-
 ## NI-101 — Complete Unslop follow-up and Save chart
 
 Role A /root coordinates the owner-requested full desktop surface audit. Dedicated /root/ni101_unslop owns frontend and affected test implementation; root owns registry, runtime/browser acceptance, verification report and PR delivery. Save chart restoration reuses existing API ownership/persistence without new backend contracts. Preserve other claims and all data/pin/export/auth boundaries. Status only in TASKS.md; independent review waiver remains.
+
+## NI-102 — Existing owner VPS update
+
+Owner production-update handoff (23 November 2026): role A /root coordinates registry, source packaging, existing-VPS SSH/backup/rollout and external acceptance; dedicated /root/ni102_rollout reviews merged-source deployment/schema/auth compatibility read-only. Existing claims and NI-068 operational remainder are preserved. No source collection or new infrastructure. Status and actual results live only in TASKS.md.

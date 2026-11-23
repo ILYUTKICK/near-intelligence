@@ -3107,3 +3107,34 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Coordinator review:** Root inspected actual native Chrome output for the five public tabs, entry, all workspace destinations, opened research and individual chart states; saved six real-archive selections including changed dates/price basis/two-recipient comparison/provider. Dedicated NI-101 agent implemented; root accepted and verified. Independent review skipped by user instruction 2026-11-09.
 - **Local handoff / limits:** Final production preview http://127.0.0.1:56647/ uses permitted saved archive in an isolated DB. Supply-context combined dataset and a reviewed model are absent in that preview and remain honestly unavailable. Automated data/provider transport is explicitly synthetic, with real gateway/API/PG/RLS/worker. No raw archive, credentials or local state published; no new provider request, mobile work, merge or deployment. PR105 remains owner-merge only. Final documentation/evidence delivery receives fresh current-head CI before handoff.
 - **Completed at:** 2026-11-23T13:52:25+03:00
+
+### NI-102 — Roll out merged Comic Lab release to the existing owner VPS
+
+- **Epic:** 14 — Deployment and Hackathon Demo
+- **Priority:** P0
+- **Dependencies:** NI-067, NI-079, NI-099, NI-100, NI-101
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** Codex /root, current owner Comic Lab chat; dedicated executor /root/ni102_rollout
+- **Execution role:** A (deployment coordinator)
+- **Started at:** 2026-11-23T14:06:07+03:00
+- **Branch/worktree:** codex/ni-102-comic-lab-rollout; /Users/ilyutkinn/.codex/worktrees/near-comic-lab/Near
+- **Authorization:** Owner explicitly requests updating the existing server after merging all changes. PR105 is actually merged at c111d6ed7f7181da1cffd559114a3ba3d8b33b14. No agent merge, new collection, data replacement or paid service.
+- **Dependency verification:** NI-067/079/099/100/101 are DONE in merged main. NI-101 has 685 unit/27 desktop E2E and four current-head CI jobs passing; merged-main CI is checked before switching production.
+- **Handoff:** /root/ni102_rollout reviews source/schema/auth/packaging compatibility without shared-file or remote mutation. Root owns safe operations and actual acceptance; independent review skipped by user instruction 2026-11-09.
+
+**Description:** Update the existing owner instance to the accepted Comic Lab source while preserving production identity, research, private content and durable storage.
+
+**Implementation steps:** Verify merged revision/CI and current remote state; package exact reviewed source with manifest; validate configuration/compatibility; preserve previous source/images; stop existing operational timers and take a coherent hash-verified DB/artifact backup; build and roll out candidate; verify HTTPS/public/auth/private/chart behavior; resume only previously enabled operational timers; record recovery and results.
+
+**Expected files/modules:** PLAN/TEAM_PLAN/TASKS; docs/verification/ni-102.md; existing VPS tooling used without unrelated runtime changes.
+
+**Acceptance criteria:** Exact accepted merged runtime and assets are served at final HTTPS origin; canonical callback/private boundaries and real chart/model data survive; database/artifact volumes and secrets retained; backup and prior-image rollback path recorded; no source collection enabled; no secrets/private data published.
+
+**Testing requirements:** Source manifest and VPS configuration tests; merged-revision CI; remote health/readiness/TLS/redirect and desktop public/workspace/chart smoke; bounded synthetic QA documents only if needed, removed after checks; actual results and limitations recorded before DONE.
+
+- **Result:** Updated https://near-intelligence.me to merged main c111d6ed7f7181da1cffd559114a3ba3d8b33b14, immutable release20261123T110835Z-439128d3568dcb6a. Only API/web images switched; existing DB/proxy/volumes, private settings and prior source/images retained. No migration/import/refresh/collector. Current-source symlink moved atomically after external acceptance; three prior export/sweep/backup timers resumed.
+- **Verification:** Exact863-file source/archive manifests verified locally/remotely; VPS26/26 both hosts; four merged-revision CI45161554922 jobs success. Coherent pre-update DB419155-byte/artifact5468160-byte backup hash-validated. All6 datasets/1 published model/11 artifact files match pre-update fingerprints. Readiness/config/schema/internal web routes pass; external HTTPS/HTTP308 and12 public routes pass; logo/symbol/TRACE hashes equal merged source. Two genuine Supabase demo identities, secure cookies, six private destinations each, research save/reopen, real chart save/reopen exact selection/dataset/context/series, cross-owner404, anonymous401, CSRF403, canonical callback, real refresh/logout pass. QA documents/saved charts removed. Native Chrome displays accepted identity, real90→30-period chart and actual89-observation published model/login. Only public22/80/443; existing operational services last exit0. [Full report](verification/ni-102.md).
+- **Reviewer:** Coordinator accepted actual production results and dedicated compatibility review by /root/ni102_rollout; independent review skipped by user instruction2026-11-09.
+- **Limits:** No live rollback/restore drill, fresh production export or delivered SMTP email exercised in this bounded UI update. Existing NI-068 offsite-backup/retention/alerts and NI-069 demo scope remain unchanged. No mobile QA or source collection.
+- **Completed at:** 2026-11-23T14:23:24+03:00
