@@ -203,6 +203,7 @@ A отвечает за web/UI, JS-рендер графиков, browser-тес
 | 91 | [NI-100](docs/TASKS.md) | Apply Unslop polish to the approved Comic Lab UI | P1 | A |
 | 92 | [NI-101](docs/TASKS.md) | Complete public/workspace/editor/chart Unslop pass and restore Save chart | P1 | A |
 | 93 | [NI-102](docs/TASKS.md) | Roll out merged Comic Lab release to the existing owner VPS | P0 | A |
+| 94 | [NI-103](docs/TASKS.md) | Record a short real-product thesis-authoring demo | P1 | A |
 
 ## 9. Изменение самого плана
 
@@ -286,3 +287,7 @@ NI-101 covers the explicit request to inspect Overview, Blog, Data, Methodology,
 ## 14. Owner production update — 23 November 2026
 
 The owner explicitly requests updating the existing server after merging PR105. NI-102 deploys the accepted NI-099/100/101 source from merged main to the existing near-intelligence.me VPS using its established configuration, database and artifact volumes. This supersedes the previous tasks' no-deployment boundary for this update only. Verify the merged revision and CI, compatibility, coherent pre-update backup, retained rollback images, final HTTPS/public/auth/private/chart smoke and restored existing export/backup timers. Do not merge for the owner, enable collection, replace research data, provision new services or expand NI-068 offsite-backup scope. Claims/status remain in TASKS.md; dedicated task agent performs bounded compatibility review and root executes operations/acceptance.
+
+## 15. Owner thesis-authoring demo — 23 November 2026
+
+NI-103 records the owner's requested short demonstration of writing a thesis with charts, hypotheses and related evidence in the accepted Comic Lab product. Use a separate demo identity and explicitly authored example content; preserve actual chart provenance and dates. Record real UI actions, then edit locally into a concise English desktop video, applying the installed motion-design and Unslop skills within the established brand. No fabricated product functionality, quantitative findings, real-user content, new collection, paid generation, site change or social publication. Deliver playable local media and a verification/credits record. Root coordinates recording and product acceptance; a dedicated task agent handles bounded editing/source preparation. After native capture failed and the CUA tool became unavailable, capture the genuine existing production-stack regression workflow in the isolated local harness with saved research archives. Explicitly disclose synthetic authentication transport; do not present fixture financial values as real findings or substitute a recreated interface.

@@ -3138,3 +3138,35 @@ Specification: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Reviewer:** Coordinator accepted actual production results and dedicated compatibility review by /root/ni102_rollout; independent review skipped by user instruction2026-11-09.
 - **Limits:** No live rollback/restore drill, fresh production export or delivered SMTP email exercised in this bounded UI update. Existing NI-068 offsite-backup/retention/alerts and NI-069 demo scope remain unchanged. No mobile QA or source collection.
 - **Completed at:** 2026-11-23T14:23:24+03:00
+
+### NI-103 — Record a short real-product thesis-authoring demo
+
+- **Epic:** 14 — Deployment and Hackathon Demo
+- **Priority:** P1
+- **Dependencies:** NI-101, NI-102
+- **Complexity:** M
+- **Status:** DONE
+- **Claimed by:** Codex /root, current owner chat; dedicated executor /root/ni103_edit
+- **Execution role:** A (demo/media coordinator)
+- **Started at:** 2026-11-23T14:43:39+03:00
+- **Branch/worktree:** codex/ni-103-thesis-demo; /Users/ilyutkinn/.codex/worktrees/near-comic-lab/Near
+- **Authorization:** Owner explicitly requests recording a small demo showing personal thesis authoring with charts, hypotheses and related content. English/Comic Lab direction retained from this chat. No posting or paid services requested.
+- **Dependency verification:** NI-101/102 DONE; accepted runtime c111d6e is actually deployed at near-intelligence.me. NI-102 report is in owner-merge PR106; its existing work is preserved.
+- **Handoff:** Root operates and records the real product in an isolated demo identity; /root/ni103_edit prepares bounded local media editing/captions. Application and research definitions are unchanged.
+- **Recording method update:** Native macOS capture was unsuccessful and the CUA namespace subsequently became unavailable. Use the existing genuine production-stack regression harness to record and verify actual UI authoring with an isolated synthetic identity and saved-archive financial data. Primary UI/API/PG/persistence are real; only authentication-provider transport is synthetic. No production mutation during the accepted recording or recreated UI; the earlier separate native demo identity/starter/empty document remain documented in the report.
+
+**Description:** Produce a concise, playable English product demo of the actual thesis-authoring workflow, in the established Comic Lab identity.
+
+**Implementation steps:** Inspect current editor/actions; prepare factual example thesis/question/hypothesis/risk; create a separate demo workspace; record native UI creation, chart selection/insertion, structured annotation and save/reopen; trim waits and add restrained English chapter guidance; encode and inspect final playback.
+
+**Expected files/modules:** Local media/source under Desktop/Near Redesign/output/thesis-demo; docs/verification/ni-103.md; PLAN/TEAM_PLAN/TASKS. No runtime changes.
+
+**Acceptance criteria:** Video shows real authoring with chart and structured hypothesis/evidence or risk, readable actual UI, truthful data scope and saved result. Approved brand/English retained; personal tabs, credentials and unrelated user content absent. Playable MP4 delivered locally; duration/format and actual verification recorded. No social publication or data collection.
+
+**Testing requirements:** Verify authoring persisted/reopened in the demo identity; inspect several frames and full playback/decode, duration/resolution/audio policy; documentation links/whitespace. Existing application CI is not replaced or claimed as newly run for this media-only task.
+
+- **Result:** Delivered local English Comic Lab tutorial `Desktop/Near Redesign/output/thesis-demo/near-intelligence-thesis-demo.mp4`:45.1s,1920×1080,30fps,H.264/yuv420p, silent,2486151bytes. Seven actual UI beats show archived chart→new research→question→Untested hypothesis→chart-pinned insight→Uncertain linked evidence→saved revision reopen; CTA uses actual domain. Installed motion-design/Unslop applied to pacing,180ms/8px caption arrival, restrained copy and separate caption strip. Credits/README/timeline/receipt included. No fabricated UI or numerical result, no posting.
+- **Verification:** Genuine isolated production-stack recording acceptance1passed/34.1s, saved archive v2/90points, realUI/API/PG; only provider auth transport synthetic. Saved revision6, exact archive/selection/context pins and all authored nodes reopen; Alice read404; private API no-store. Context01422a48... matches independent pre-recording resolution. Root/agent final frame review plus independent full1353-frame decode, source/final hashes, dimensions,45.1s duration and moov-before-mdat faststart pass. MP4SHA25635bd99140b3ea6be91b94b5daa223a4a9fd888268d811ef83e91510b07bc8345.1143 documentation links/whitespace pass. [Full evidence and boundaries](verification/ni-103.md).
+- **Reviewer:** Coordinator accepted actual media/integration evidence; dedicated /root/ni103_edit supplied recording/editing implementation. Independent review skipped by user instruction2026-11-09.
+- **Limits:** Accepted recording is the real local application with saved historical data, not a production sign-in recording; native player playback unavailable after CUA removal. Earlier dedicated production demo identity/starter/empty document were not claimed as removed. Failed takes excluded; no existing user research changed, runtime source change, new collection, deployment, mobile work or social publication.
+- **Completed at:** 2026-11-23T17:49:18+03:00
